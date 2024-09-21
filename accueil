@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aquariums d'Eau Douce</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Aquariums d'Eau Douce</h1>
+        <nav>
+            <ul>
+                <li><a href="index.html">Accueil</a></li>
+                <li><a href="produits.html">Nos Produits</a></li>
+                <li><a href="services.html">Services</a></li>
+                <li><a href="apropos.html">À propos</a></li>
+                <li><a href="contact.html">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section id="home">
+        <h2>Bienvenue dans l'univers des aquariums d'eau douce</h2>
+        <p>Découvrez nos aquariums, nos plantes et nos accessoires pour créer l'écosystème parfait pour vos poissons.</p>
+        <button><a href="produits.html">Voir nos produits</a></button>
+    </section>
+
+    <footer>
+        <p>© 2024 Aquariums d'Eau Douce. Tous droits réservés.</p>
+    </footer>
+</body>
+</html>
