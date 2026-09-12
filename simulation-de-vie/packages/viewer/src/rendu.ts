@@ -127,6 +127,25 @@ export class Rendu {
         });
       }
 
+      // La faune : troupeaux et meutes sur les tuiles connues.
+      for (const tr of etat.troupeaux) {
+        const pos = magasin.positionAffichee(`troupeau:${tr.id}`, maintenant) ?? {
+          x: tr.x,
+          y: tr.y,
+          enMouvement: false,
+        };
+        if (!visible(pos.x, pos.y) || magasin.biomeEn(Math.round(pos.x), Math.round(pos.y)) < 0)
+          continue;
+        sprites.troupeau(ctx, pos.x, pos.y, {
+          espece: tr.espece,
+          taille: tr.taille,
+          predateur: tr.predateur,
+          marche: pos.enMouvement || tr.etat === "fuite",
+          phase: (maintenant / 300) % 1,
+          echelle: 1,
+        });
+      }
+
       // Brouillard d'exploration : dessiné après le monde, avant les textes.
       if (magasin.brouillard) {
         this.brouillard.dessiner(

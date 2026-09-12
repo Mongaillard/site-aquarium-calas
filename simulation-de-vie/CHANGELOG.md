@@ -2,6 +2,46 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M9 – La faune vit (jalon 2 de la feuille de route) (2026-09-12)
+
+- Le gibier immobile disparaît des gisements : le monde est peuplé de troupeaux mobiles
+  (cerfs, sangliers, mouflons, lièvres, aurochs) et de meutes de loups. Chaque morceau du monde
+  est peuplé à sa génération d'après ses biomes, avec un flux aléatoire propre au morceau
+  (même graine, même faune). Un troupeau a un gîte, une pâture (rayon 10 à 24 tuiles selon
+  l'espèce, élargie à l'automne, le rut), rentre au gîte la nuit, fuit l'humain qui approche
+  (de près quand il n'a jamais été chassé, de loin quand il est méfiant) et se fige quand aucun
+  humain n'est à moins de 48 tuiles.
+- Chasse : les bêtes aperçues deviennent des lieux de gibier dans la mémoire des lieux ; une
+  lance (recette désormais sans niveau requis), un arc ou un piège permettent de chasser.
+  Nouvelle action `chasser` : on s'approche à portée (trois tuiles, six à l'arc), puis on tente
+  sa chance. Seul, on réussit deux à quatre fois sur dix selon l'espèce ; chaque rabatteur à
+  moins de six tuiles ajoute deux dixièmes ; l'arc ajoute un dixième et demi et rapporte
+  parfois deux bêtes ; la méfiance du troupeau retire jusqu'à trois dixièmes. Réussie ou non,
+  la chasse fait fuir le troupeau et le rend méfiant ; un sanglier ou un aurochs acculé mord le
+  chasseur qui le rate. Une bête donne sa viande et son cuir (un cerf : quatre gibiers, deux
+  cuirs ; un aurochs : huit et trois ; un lièvre : un et rien). Le cerveau à règles chasse
+  quand il voit des bêtes, d'autant plus qu'il a faim, qu'il manque de cuir ou que d'autres
+  rabattent déjà, et ne compte plus sur le gibier pour manger tout de suite.
+- Forêt durable : un arbre abattu laisse une souche qui ne repousse qu'après 180 jours.
+- Pêche durable : les bancs de poissons croissent par bassin (carré de 8 × 8 tuiles) suivant
+  une loi logistique (croissance 0,2 par jour à mi-charge), un bassin presque vide se repeuple
+  d'un poisson par jour depuis les bassins voisins.
+- Calendrier : mises bas au dixième jour du printemps (25 à 80 % selon l'espèce, freinées par
+  la densité), mortalité d'hiver par bête, migration des herbivores vers la forêt au premier
+  jour de l'hiver et retour au printemps, rut à l'automne.
+- Démographie : scission des grands troupeaux, disparition des troupeaux vidés ; une meute
+  affamée prélève une bête sur une proie à moins de six tuiles puis se repose trois jours, et
+  perd un loup après vingt jours sans proie. Les proies sentent la meute à six tuiles et fuient.
+  Sur cinq graines et 450 jours, les loups s'éteignent souvent (les proies leur échappent) :
+  les prédateurs seront revus avec le jalon « la nuit menace ».
+- Viewer : les bêtes sont dessinées sur les tuiles connues (une à trois silhouettes, le nombre
+  au-delà), interpolées entre deux états ; tableau « Faune » et bilan des chasses dans
+  Statistiques ; événements `chasse` et `faune` (naissances, scission, migration, retour,
+  hiver, disparition, meute) dans le Journal ; les souvenirs racontent les chasses.
+- Sur cinq graines et 450 jours : 22 à 28 vivants, huit décès nommés (quatre en couches, deux
+  au berceau, une faim, une soif) ; 15 à 89 chasses réussies par monde, 2 à 16 battues à
+  plusieurs ; les troupeaux prospèrent ou s'épuisent selon la pression de chasse.
+
 ## M8 – Le corps (jalon 1 de la feuille de route) (2026-09-12)
 
 - Un personnage peut être diminué sans être mort. Le corps porte un état (`EtatCorps`) :

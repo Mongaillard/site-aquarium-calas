@@ -37,7 +37,7 @@ Le socle de tout le reste : un personnage peut être diminué sans être mort.
 
 Ce qu'on verra : des bonhommes bandés, voûtés, à bâton ; une fiche « Corps » et une fiche « Humeur » ; des anciens qui déclinent au lieu de mourir d'un tirage.
 
-### Jalon 9 — La faune vit
+### Jalon 9 — La faune vit — livré (M9)
 
 Le gibier immobile est remplacé par un monde animal.
 

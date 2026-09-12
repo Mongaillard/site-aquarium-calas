@@ -127,6 +127,9 @@ export interface Statistiques {
   readonly morceaux: number;
   /** Leçons et inventions connues dans la colonie, avec le nombre de vivants qui les portent. */
   readonly savoirs: readonly SavoirStat[];
+  /** La faune : troupeaux et bêtes par espèce, et le bilan des chasses. */
+  readonly faune: readonly FauneStat[];
+  readonly chasses: { readonly reussies: number; readonly ratees: number };
 }
 
 export interface SavoirStat {
@@ -147,6 +150,25 @@ export interface SavoirFiche {
   readonly origine: string | null;
 }
 
+/** Un troupeau ou une meute vus sur des tuiles découvertes (jalon « la faune vit »). */
+export interface TroupeauEtat {
+  readonly id: string;
+  readonly espece: string;
+  readonly nom: string;
+  readonly x: number;
+  readonly y: number;
+  readonly taille: number;
+  readonly etat: "pature" | "fuite" | "gite";
+  readonly predateur: boolean;
+}
+
+export interface FauneStat {
+  readonly espece: string;
+  readonly nom: string;
+  readonly troupeaux: number;
+  readonly betes: number;
+}
+
 export interface MessageEtat {
   readonly type: "etat";
   readonly tick: number;
@@ -156,6 +178,7 @@ export interface MessageEtat {
   readonly pause: boolean;
   readonly personnages: readonly PersonnageEtat[];
   readonly batiments: readonly BatimentEtat[];
+  readonly troupeaux: readonly TroupeauEtat[];
   /** Différentiel depuis le dernier état envoyé à ce client (complet au premier envoi). */
   readonly gisements: readonly GisementEtat[];
   readonly evenements: readonly EvenementEtat[];

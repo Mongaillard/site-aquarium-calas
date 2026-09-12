@@ -32,6 +32,7 @@ function etat(decouvertes: number[]): MessageEtat {
     pause: false,
     personnages: [],
     batiments: [],
+    troupeaux: [],
     gisements: [],
     evenements: [],
     stats: {

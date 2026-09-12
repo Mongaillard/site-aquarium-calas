@@ -66,6 +66,8 @@ export type Action =
   | { readonly type: "suivre"; readonly cible: string; ticksRestants: number }
   | { readonly type: "se_rechauffer"; ticksRestants: number }
   | { readonly type: "soigner"; readonly cible: string; ticksRestants: number }
+  /** Chasse d'un troupeau à portée (lance, arc ou piège). */
+  | { readonly type: "chasser"; readonly troupeau: string; ticksRestants: number }
   | { readonly type: "se_reposer"; ticksRestants: number };
 
 export type TypeAction = Action["type"];
@@ -164,6 +166,8 @@ export function decrireAction(a: Action): string {
       return `soigner:${a.cible}`;
     case "se_reposer":
       return `se_reposer:${a.ticksRestants}`;
+    case "chasser":
+      return `chasser:${a.troupeau}`;
   }
 }
 

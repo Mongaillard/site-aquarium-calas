@@ -46,6 +46,8 @@ import type { Lien } from "../social/relations.js";
 import { meilleureNourritureConnue, stockVolable } from "../actions/planificateur.js";
 import { eligibles, partenaireDe, veutCourtiser } from "../social/couple.js";
 import { avancementGrossesse, peutConcevoir } from "../agents/vie.js";
+import { PROFILS, troupeauxVisiblesDepuis } from "../monde/faune.js";
+import type { Espece, EtatTroupeau } from "../monde/faune.js";
 
 export interface PersonneVisible {
   readonly id: string;
@@ -75,6 +77,8 @@ export interface PersonneVisible {
   readonly saigne: boolean;
   readonly estMonParent: boolean;
   readonly estMonPartenaire: boolean;
+  /** Est en train de chasser (pour se joindre à la battue). */
+  readonly chasse: boolean;
 }
 
 export interface ProjetPercu {
@@ -117,6 +121,18 @@ export function percevoirLeger(monde: Monde, p: Personnage): PerceptionLegere {
     abriDisponible: abriDisponible(monde, p) !== null,
     feuConnu: feuConnu(monde),
   };
+}
+
+export interface TroupeauVisible {
+  readonly id: string;
+  readonly espece: Espece;
+  readonly nom: string;
+  readonly predateur: boolean;
+  readonly taille: number;
+  readonly distance: number;
+  readonly position: Position;
+  readonly mefiance: number;
+  readonly etat: EtatTroupeau;
 }
 
 export interface Perception {
@@ -183,6 +199,8 @@ export interface Perception {
   readonly rayon: number;
   readonly lieuxConnus: readonly LieuConnu[];
   readonly personnesVisibles: readonly PersonneVisible[];
+  /** Troupeaux et meutes en vue, du plus proche au plus lointain. */
+  readonly troupeauxVisibles: readonly TroupeauVisible[];
   readonly abriDisponible: boolean;
   readonly feuProche: boolean;
   readonly feuConnu: boolean;
@@ -218,13 +236,29 @@ export function rayonVision(monde: Monde, moment: Moment): number {
 export function observer(monde: Monde, p: Personnage, rayon: number): void {
   const { x, y } = p.corps.position;
   const tick = monde.horloge.tick;
+  // Les troupeaux en vue sont notés comme lieux de gibier, là où on les a vus.
+  const troupeauxIci = new Map<string, number>();
+  for (const tr of troupeauxVisiblesDepuis(monde, p.corps.position, rayon)) {
+    if (!PROFILS[tr.espece].predateur)
+      troupeauxIci.set(cleLieu(tr.position.x, tr.position.y), tr.taille);
+  }
   for (let dy = -rayon; dy <= rayon; dy++) {
     for (let dx = -rayon; dx <= rayon; dx++) {
       const t = monde.grille.tuileOuNull(x + dx, y + dy);
       if (t === null) continue;
       monde.grille.decouvrir(t.x, t.y);
       const cle = cleLieu(t.x, t.y);
-      if (t.gisement) {
+      const betes = troupeauxIci.get(cle);
+      if (betes !== undefined) {
+        p.connaissance.set(cle, {
+          x: t.x,
+          y: t.y,
+          type: "gibier",
+          outilRequis: "lance",
+          quantiteVue: betes,
+          tickVu: tick,
+        });
+      } else if (t.gisement) {
         const connu = p.connaissance.get(cle);
         if (connu?.type === t.gisement.type && connu.outilRequis === t.gisement.outilRequis) {
           connu.quantiteVue = t.gisement.quantite;
@@ -292,6 +326,9 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
         saigne: saigne(autre),
         estMonParent: rel.lien === "parent",
         estMonPartenaire: rel.lien === "partenaire",
+        chasse:
+          autre.actionEnCours?.type === "chasser" ||
+          (autre.intention?.type === "recolter" && autre.intention.ressource === "gibier"),
       });
     }
   }
@@ -386,6 +423,17 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
     meteo: monde.meteo,
     rayon,
     lieuxConnus: [...p.connaissance.values()],
+    troupeauxVisibles: troupeauxVisiblesDepuis(monde, p.corps.position, rayon).map((t) => ({
+      id: t.id,
+      espece: t.espece,
+      nom: PROFILS[t.espece].pluriel,
+      predateur: PROFILS[t.espece].predateur,
+      taille: t.taille,
+      distance: Grille.distance(t.position, p.corps.position),
+      position: t.position,
+      mefiance: t.mefiance,
+      etat: t.etat,
+    })),
     personnesVisibles,
     abriDisponible: abriDisponible(monde, p) !== null,
     feuProche: feuProche(monde, p.corps.position) !== null,

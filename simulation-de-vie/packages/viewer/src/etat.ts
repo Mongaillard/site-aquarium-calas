@@ -197,6 +197,31 @@ export class Magasin {
             });
           }
         }
+        for (const tr of message.troupeaux) {
+          const cle = `troupeau:${tr.id}`;
+          const t = this.trajets.get(cle);
+          if (t === undefined) {
+            this.trajets.set(cle, {
+              ax: tr.x,
+              ay: tr.y,
+              bx: tr.x,
+              by: tr.y,
+              t0: maintenant,
+              t1: maintenant,
+            });
+          } else if (t.bx !== tr.x || t.by !== tr.y) {
+            const courant = this.positionAffichee(cle, maintenant) ?? { x: t.bx, y: t.by };
+            const saut = Math.max(Math.abs(tr.x - t.bx), Math.abs(tr.y - t.by)) > 12;
+            this.trajets.set(cle, {
+              ax: saut ? tr.x : courant.x,
+              ay: saut ? tr.y : courant.y,
+              bx: tr.x,
+              by: tr.y,
+              t0: maintenant,
+              t1: maintenant + (saut ? 0 : duree),
+            });
+          }
+        }
         if (precedent === null) this.dernierEtatA = maintenant;
         if (message.decouvertes.length > 0) {
           const d = message.decouvertes;

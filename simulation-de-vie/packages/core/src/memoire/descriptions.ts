@@ -71,6 +71,16 @@ export function decrireEvenement(
       return temoin
         ? `J'ai vu ${qui} récolter ${ressource(d)}${lieu(e)}.`
         : `J'ai récolté ${ressource(d)}${lieu(e)}.`;
+    case "chasse":
+      if (d.reussie === true)
+        return temoin
+          ? `J'ai vu ${qui} rapporter ${String(d.betes)} ${String(d.nom)}${Number(d.betes) > 1 ? "s" : ""}${lieu(e)}.`
+          : `J'ai ${Number(d.rabatteurs) > 0 ? "chassé avec les autres" : "chassé seul" + e_} et rapporté ${String(d.betes)} ${String(d.nom)}${Number(d.betes) > 1 ? "s" : ""}${lieu(e)}.`;
+      return temoin
+        ? `${qui} a raté un ${String(d.nom)}${lieu(e)}.`
+        : `Le ${String(d.nom)} m'a échappé${lieu(e)}.`;
+    case "faune":
+      return null;
     case "gisement_epuise":
       return temoin
         ? `${qui} a épuisé un gisement${lieu(e)}, il n'y a plus ${ressource(d)} là-bas.`

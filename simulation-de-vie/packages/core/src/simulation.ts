@@ -19,7 +19,7 @@ import {
   estEpuise,
   ajouterHumeur,
 } from "./agents/corps.js";
-import type { Ressource } from "./monde/ressources.js";
+import type { Gisement, Ressource } from "./monde/ressources.js";
 import type { Personnage } from "./agents/personnage.js";
 import { genererPopulation } from "./agents/population.js";
 import { creerPersonnage } from "./agents/personnage.js";
@@ -58,7 +58,18 @@ import { apprenants, apprendre, tirerLecons } from "./savoirs/lecons.js";
 import { inventer } from "./savoirs/inventions.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
 import { genererGrille } from "./monde/generation.js";
-import { Grille } from "./monde/grille.js";
+import { Grille, cleMorceau } from "./monde/grille.js";
+import {
+  COTE_BASSIN,
+  CROISSANCE_POISSON,
+  IMMIGRATION_POISSON,
+  JOURS_REPOUSSE_SOUCHE,
+  PROFILS,
+  heureTroupeau,
+  jourTroupeau,
+  peuplerMorceau,
+} from "./monde/faune.js";
+import type { Troupeau } from "./monde/faune.js";
 import type { Position } from "./monde/grille.js";
 import { Horloge } from "./monde/horloge.js";
 import { EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
@@ -94,6 +105,10 @@ export class Simulation implements Monde {
   readonly journal = new Journal();
   readonly personnages: Personnage[];
   readonly batiments = new Map<string, Batiment>();
+  /** La faune : troupeaux et meutes, peuplés morceau par morceau. */
+  readonly troupeaux = new Map<string, Troupeau>();
+  private readonly morceauxPeuples = new Set<number>();
+  private compteurTroupeaux = 0;
   meteo: Meteo = "clair";
   private compteurPersonnages = 0;
   private readonly cerveaux = new Map<string, Cerveau>();
@@ -107,6 +122,7 @@ export class Simulation implements Monde {
   ) {
     this.personnages = genererPopulation(rng, config, grille);
     this.compteurPersonnages = this.personnages.length;
+    this.peuplerFaune();
     // La colonie s'installe en terrain reconnu : chacun connaît déjà les environs
     // du berceau (points d'eau, gisements), et ces tuiles comptent comme découvertes.
     for (const p of this.personnages) observer(this, p, RAYON_CONNAISSANCE_INITIALE);
@@ -626,6 +642,8 @@ export class Simulation implements Monde {
   tick1(): void {
     if (this.horloge.estAube() && this.tick > 0) this.nouveauJour();
     this.regenererGisements();
+    this.peuplerFaune();
+    if (this.tick % 6 === 0) for (const t of this.troupeaux.values()) heureTroupeau(this, t);
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
     const ordre = this.rng.fork(`tick/${this.tick}`).melanger(this.vivants());
@@ -667,6 +685,8 @@ export class Simulation implements Monde {
         tickVieQuotidien(this, p);
         if (p.vivant) passeQuotidienneCorps(this, p);
       }
+      this.jourFaune();
+      this.regenererBassins();
     }
     for (const p of this.vivants()) {
       p.drapeaux.faimMinDuJour = p.besoins.faim;
@@ -679,6 +699,90 @@ export class Simulation implements Monde {
     for (const p of this.vivants()) this.reflechirPour(p);
   }
 
+  /**
+   * Peuple de troupeaux chaque morceau du monde nouvellement généré, à partir
+   * d'un flux aléatoire propre au morceau (même monde, même faune).
+   */
+  private peuplerFaune(): void {
+    if (this.grille.nombreMorceaux === this.morceauxPeuples.size) return;
+    for (const m of this.grille.morceauxGeneres()) {
+      const cle = cleMorceau(m.cx, m.cy);
+      if (this.morceauxPeuples.has(cle)) continue;
+      this.morceauxPeuples.add(cle);
+      const rng = this.rng.fork(`faune/${m.cx}:${m.cy}`);
+      for (const t of peuplerMorceau(m, rng, () => `faune-${++this.compteurTroupeaux}`))
+        this.troupeaux.set(t.id, t);
+    }
+  }
+
+  /** Aube : démographie de la faune (mises bas, hiver, scissions, meutes). */
+  private jourFaune(): void {
+    const nouveaux: Troupeau[] = [];
+    for (const t of [...this.troupeaux.values()]) {
+      const { evenements, scission } = jourTroupeau(
+        this,
+        t,
+        () => `faune-${++this.compteurTroupeaux}`,
+      );
+      if (scission !== null) nouveaux.push(scission);
+      for (const e of evenements) {
+        const profil = PROFILS[e.troupeau.espece];
+        this.emettre(
+          "faune",
+          null,
+          {
+            genre: e.genre,
+            espece: e.troupeau.espece,
+            nom: profil.pluriel,
+            nombre: e.nombre,
+            taille: e.troupeau.taille,
+            troupeau: e.troupeau.id,
+            proie: e.proie !== undefined ? PROFILS[e.proie.espece].nom : null,
+          },
+          e.genre === "meute" || e.genre === "disparition" || e.genre === "naissances" ? 3 : 2,
+          e.troupeau.position,
+        );
+      }
+    }
+    for (const t of nouveaux) this.troupeaux.set(t.id, t);
+    for (const t of [...this.troupeaux.values()]) if (t.taille <= 0) this.troupeaux.delete(t.id);
+  }
+
+  /**
+   * Bancs de poissons : croissance logistique par bassin (un morceau du monde),
+   * répartie sur les gisements les plus entamés ; un bassin presque vide
+   * se repeuple lentement depuis les bassins voisins.
+   */
+  private regenererBassins(): void {
+    const bassins = new Map<number, Gisement[]>();
+    for (const t of this.grille.tuilesAvecGisement()) {
+      const g = t.gisement;
+      if (g?.type !== "poisson") continue;
+      const cle =
+        (Math.floor(t.x / COTE_BASSIN) + 1048576) * 2097152 +
+        (Math.floor(t.y / COTE_BASSIN) + 1048576);
+      const liste = bassins.get(cle);
+      if (liste === undefined) bassins.set(cle, [g]);
+      else liste.push(g);
+    }
+    for (const bancs of bassins.values()) {
+      let n = 0;
+      let k = 0;
+      for (const g of bancs) {
+        n += g.quantite;
+        k += g.max;
+      }
+      if (k <= 0 || n >= k) continue;
+      let croissance = CROISSANCE_POISSON * n * (1 - n / k);
+      if (n < 0.1 * k) croissance += IMMIGRATION_POISSON;
+      const manque = k - n;
+      for (const g of bancs) {
+        const part = ((g.max - g.quantite) / manque) * croissance;
+        g.quantite = Math.min(g.max, g.quantite + part);
+      }
+    }
+  }
+
   private regenererGisements(): void {
     const moment = this.horloge.moment();
     const facteurBaies =
@@ -688,6 +792,14 @@ export class Simulation implements Monde {
       const gisement = tuile.gisement;
       if (gisement === null || gisement.tauxRegen <= 0 || gisement.quantite >= gisement.max)
         continue;
+      // Les bancs de poissons croissent par bassin, à l'aube.
+      if (gisement.type === "poisson") continue;
+      // Une souche ne repousse qu'après cent quatre-vingts jours.
+      if (gisement.epuiseDepuis != null) {
+        if (this.tick - gisement.epuiseDepuis < JOURS_REPOUSSE_SOUCHE * this.horloge.ticksParJour)
+          continue;
+        gisement.epuiseDepuis = null;
+      }
       const facteur = gisement.type === "baies" || gisement.type === "herbes" ? facteurBaies : 1;
       if (facteur <= 0) continue;
       gisement.quantite = Math.min(

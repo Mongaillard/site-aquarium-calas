@@ -117,7 +117,7 @@ export class Panneaux {
       .map(([n, c]) => `<span class="pastille" style="background:${c}"></span>${e(n)}`)
       .join(" ");
     $("legende").innerHTML =
-      `${biomes}<br>${ressources}<br>personnages : vêtement = famille, contour = moral · huttes, maisons, entrepôts, feux · pointillé = chantier · clic : inspecter · <label><input type="checkbox" id="brouillard-case" checked /> brouillard d'exploration (b)</label>`;
+      `${biomes}<br>${ressources}<br>personnages : vêtement = famille, contour = moral · bêtes : cerfs, sangliers, mouflons, lièvres, aurochs, loups (×n = taille du troupeau) · huttes, maisons, entrepôts, feux · pointillé = chantier · clic : inspecter · <label><input type="checkbox" id="brouillard-case" checked /> brouillard d'exploration (b)</label>`;
   }
 
   /** Met à jour les panneaux visibles ; `force` ignore le cache de version. */
@@ -502,6 +502,13 @@ export class Panneaux {
       </div>
       <h3>Bâtiments</h3><div class="puces">${batiments}</div>
       <h3>Stocks</h3><div class="puces">${stocks}</div>
+      <h3>Faune</h3>
+      ${
+        s.faune.length > 0
+          ? `<table class="saisons"><tr><th>espèce</th><th>troupeaux</th><th>bêtes</th></tr>${s.faune.map((f) => `<tr><td>${e(f.nom)}</td><td>${f.troupeaux}</td><td>${f.betes}</td></tr>`).join("")}</table>`
+          : "<p class='discret'>aucune bête aperçue</p>"
+      }
+      <div class="discret">Chasses : ${s.chasses.reussies} réussie${s.chasses.reussies > 1 ? "s" : ""}, ${s.chasses.ratees} ratée${s.chasses.ratees > 1 ? "s" : ""}</div>
       <h3>Savoirs du village</h3>
       ${
         s.savoirs.length > 0

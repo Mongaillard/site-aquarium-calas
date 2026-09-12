@@ -55,6 +55,7 @@ function tirerGisement(rng: Rng, biome: Biome): Gisement | null {
         max,
         tauxRegen: profil.tauxRegen,
         outilRequis: profil.outilRequis,
+        epuiseDepuis: null,
       };
     }
   }

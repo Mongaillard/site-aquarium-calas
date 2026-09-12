@@ -29,6 +29,8 @@ export interface Gisement {
   /** Quantité régénérée par jour (0 = non renouvelable). */
   readonly tauxRegen: number;
   readonly outilRequis: Outil | null;
+  /** Arbres abattus : tick de l'abattage ; la souche repousse après 180 jours. */
+  epuiseDepuis?: number | null;
 }
 
 interface ProfilGisement {
@@ -64,7 +66,6 @@ export const GISEMENTS_PAR_BIOME: Record<Biome, readonly ProfilGisement[]> = {
     { type: "herbes", probabilite: 0.06, min: 2, max: 5, tauxRegen: 0.5, outilRequis: null },
     { type: "fibres", probabilite: 0.25, min: 3, max: 8, tauxRegen: 1, outilRequis: null },
     { type: "bois", probabilite: 0.04, min: 1, max: 2, tauxRegen: 0.2, outilRequis: null },
-    { type: "gibier", probabilite: 0.04, min: 1, max: 3, tauxRegen: 0.2, outilRequis: "lance" },
   ],
   foret: [
     { type: "bois", probabilite: 0.2, min: 1, max: 3, tauxRegen: 0.3, outilRequis: null },
@@ -78,7 +79,6 @@ export const GISEMENTS_PAR_BIOME: Record<Biome, readonly ProfilGisement[]> = {
     },
     { type: "baies", probabilite: 0.25, min: 3, max: 8, tauxRegen: 0.5, outilRequis: null },
     { type: "herbes", probabilite: 0.05, min: 2, max: 5, tauxRegen: 0.5, outilRequis: null },
-    { type: "gibier", probabilite: 0.08, min: 1, max: 4, tauxRegen: 0.2, outilRequis: "lance" },
   ],
   colline: [{ type: "pierre", probabilite: 0.4, min: 8, max: 25, tauxRegen: 0, outilRequis: null }],
   montagne: [

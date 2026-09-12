@@ -158,6 +158,15 @@ const NOMS_RESSOURCES_EV: Readonly<Record<string, string>> = {
   cuir: "du cuir",
 };
 
+export const NOMS_ESPECE: Readonly<Record<string, string>> = {
+  cerf: "cerfs",
+  sanglier: "sangliers",
+  mouflon: "mouflons",
+  lievre: "lièvres",
+  aurochs: "aurochs",
+  loup: "loups",
+};
+
 export const NOMS_LIEU: Readonly<Record<string, string>> = {
   main: "à la main",
   bras: "au bras",
@@ -291,6 +300,35 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       return `${qui} est à bout de forces (fatigue ${String(d.fatigue)}).`;
     case "accouchement":
       return `${qui} accouche${d.accoucheuse ? `, assistée par ${String(d.accoucheuse)}` : ", seule"} (risque ${String(d.risque)} %).`;
+    case "chasse": {
+      const nom = String(d.nom);
+      if (d.reussie === true)
+        return `${qui} rapporte ${String(d.betes)} ${nom}${Number(d.betes) > 1 ? "s" : ""}${Number(d.rabatteurs) > 0 ? ` (battue à ${String(Number(d.rabatteurs) + 1)})` : ""}${d.arc === true ? ", à l'arc" : ""}.`;
+      return `${qui} rate un ${nom}${Number(d.rabatteurs) > 0 ? " malgré les rabatteurs" : ""}.`;
+    }
+    case "faune": {
+      const nom = String(d.nom);
+      switch (String(d.genre)) {
+        case "naissances":
+          return `Des ${nom} mettent bas : ${String(d.nombre)} petit${Number(d.nombre) > 1 ? "s" : ""} (troupeau de ${String(d.taille)}).`;
+        case "scission":
+          return `Un troupeau de ${nom} se scinde : ${String(d.nombre)} bêtes partent au loin.`;
+        case "migration":
+          return `Les ${nom} gagnent la forêt pour l'hiver.`;
+        case "retour":
+          return `Les ${nom} reviennent sur leurs pâtures d'été.`;
+        case "hiver":
+          return d.espece === "loup"
+            ? `Une meute affamée perd un loup.`
+            : `L'hiver emporte ${String(d.nombre)} ${nom}.`;
+        case "disparition":
+          return `Il n'y a plus de ${nom} par ici.`;
+        case "meute":
+          return `Une meute de loups prend un ${String(d.proie)}.`;
+        default:
+          return `${nom} : ${String(d.genre)}`;
+      }
+    }
     case "claude":
       return d.genre === "pensee"
         ? `🧠 ${qui} pense : « ${String(d.texte)} »`

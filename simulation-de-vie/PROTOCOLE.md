@@ -146,6 +146,27 @@ reproductible (P1).
 
 Chaque gisement a une `quantite`, un `max`, un `tauxRegen` et un `outilRequis` optionnel.
 
+**La faune (M9).** Le gibier n'est plus un gisement : `Simulation.troupeaux` porte une entité
+par troupeau ou meute (`Troupeau` : espèce, position, gîte et gîte d'été, taille, méfiance,
+état pâture / fuite / gîte, cible, faim pour les prédateurs, flux aléatoire propre). Chaque
+morceau du monde est peuplé à sa génération (`peuplerMorceau`, flux `faune/cx:cy`) selon la
+part de ses biomes favorables (`PROFILS` par espèce : biomes, taille initiale et maximale,
+rayon de pâture, distance de fuite, vitesse, viande et cuir par bête, dangerosité, naissances,
+mortalité d'hiver, réussite de base, densité). Toutes les six ticks, `heureTroupeau` fait fuir
+le troupeau devant un humain à moins de `fuite × (0,5 + méfiance)` tuiles ou une meute à six
+tuiles, le ramène au gîte la nuit, le fait pâturer le jour (cible tirée dans le rayon du gîte)
+et traque la proie la plus proche pour une meute affamée ; au-delà de 48 tuiles de tout humain,
+rien ne bouge. À l'aube, `jourTroupeau` fait retomber la méfiance, met bas au dixième jour du
+printemps, tire la mortalité d'hiver, migre vers la forêt au premier jour de l'hiver, scinde
+les grands troupeaux, nourrit ou affame les meutes ; les troupeaux vidés disparaissent. Les
+bêtes vues deviennent des lieux de gibier (`connaissance`, `outilRequis: "lance"`) ; le
+planificateur mène à portée et l'action `chasser` tire la réussite (base par espèce + 0,06 par
+niveau de chasse + 0,15 à l'arc + 0,2 par rabatteur à moins de six tuiles, jusqu'à deux,
+− 0,3 × méfiance), fait fuir et rend méfiant, et laisse un sanglier ou un aurochs mordre le
+chasseur qui le rate. Forêt : un arbre abattu (`epuiseDepuis`) ne repousse qu'après 180 jours.
+Pêche : les bancs croissent par bassin de 8 × 8 tuiles (logistique, 0,2 par jour à mi-charge,
+immigration d'un poisson par jour sous 10 % de la capacité).
+
 ### 4.3 Temps, saisons, météo
 
 - Horloge : tick → minute, heure, jour, saison, année. **[DÉCISION]** 30 jours par saison,

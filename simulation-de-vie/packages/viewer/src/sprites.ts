@@ -494,3 +494,100 @@ export function personnage(ctx: Ctx, x: number, y: number, a: AspectPersonnage):
   ctx.arc(cx + 0.05 * s, ty + 0.02 * s, 0.02 * s, 0, Math.PI * 2);
   ctx.fill();
 }
+
+export interface AspectTroupeau {
+  readonly espece: string;
+  readonly taille: number;
+  readonly predateur: boolean;
+  readonly marche: boolean;
+  readonly phase: number;
+  readonly echelle: number;
+}
+
+const ROBES: Readonly<Record<string, { corps: string; ventre: string; taille: number }>> = {
+  cerf: { corps: "#8b5a2b", ventre: "#c9a27a", taille: 1 },
+  sanglier: { corps: "#3a2a20", ventre: "#5a4636", taille: 0.85 },
+  mouflon: { corps: "#9c8b7a", ventre: "#d8cbb8", taille: 0.8 },
+  lievre: { corps: "#a89886", ventre: "#e0d6c8", taille: 0.45 },
+  aurochs: { corps: "#4a2f1a", ventre: "#6b4a30", taille: 1.3 },
+  loup: { corps: "#6f6f74", ventre: "#a5a5aa", taille: 0.9 },
+};
+
+/** Une bête : corps, tête, pattes, et selon l'espèce des bois, des cornes ou des oreilles. */
+function bete(ctx: Ctx, cx: number, sol: number, espece: string, s: number, pas: number): void {
+  const robe = ROBES[espece] ?? ROBES.cerf ?? { corps: "#8b5a2b", ventre: "#c9a27a", taille: 1 };
+  const k = s * robe.taille;
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.beginPath();
+  ctx.ellipse(cx, sol, 0.28 * k, 0.07 * k, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Pattes.
+  ctx.fillStyle = robe.corps;
+  ctx.fillRect(cx - 0.2 * k, sol - 0.22 * k, 0.07 * k, 0.22 * k + pas);
+  ctx.fillRect(cx + 0.12 * k, sol - 0.22 * k, 0.07 * k, 0.22 * k - pas);
+  // Corps.
+  ctx.beginPath();
+  ctx.ellipse(cx, sol - 0.3 * k, 0.3 * k, 0.16 * k, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = robe.ventre;
+  ctx.beginPath();
+  ctx.ellipse(cx, sol - 0.25 * k, 0.22 * k, 0.07 * k, 0, 0, Math.PI);
+  ctx.fill();
+  // Tête, à droite.
+  ctx.fillStyle = robe.corps;
+  ctx.beginPath();
+  ctx.ellipse(cx + 0.32 * k, sol - 0.42 * k, 0.11 * k, 0.09 * k, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 0.03 * k;
+  ctx.strokeStyle = robe.corps;
+  if (espece === "cerf") {
+    ctx.beginPath();
+    ctx.moveTo(cx + 0.3 * k, sol - 0.5 * k);
+    ctx.lineTo(cx + 0.22 * k, sol - 0.68 * k);
+    ctx.moveTo(cx + 0.26 * k, sol - 0.6 * k);
+    ctx.lineTo(cx + 0.16 * k, sol - 0.66 * k);
+    ctx.moveTo(cx + 0.36 * k, sol - 0.5 * k);
+    ctx.lineTo(cx + 0.42 * k, sol - 0.68 * k);
+    ctx.stroke();
+  } else if (espece === "aurochs" || espece === "mouflon") {
+    ctx.beginPath();
+    ctx.moveTo(cx + 0.28 * k, sol - 0.5 * k);
+    ctx.quadraticCurveTo(cx + 0.2 * k, sol - 0.62 * k, cx + 0.3 * k, sol - 0.62 * k);
+    ctx.moveTo(cx + 0.38 * k, sol - 0.5 * k);
+    ctx.quadraticCurveTo(cx + 0.46 * k, sol - 0.62 * k, cx + 0.36 * k, sol - 0.62 * k);
+    ctx.stroke();
+  } else if (espece === "lievre" || espece === "loup") {
+    ctx.fillRect(cx + 0.26 * k, sol - 0.58 * k, 0.04 * k, 0.12 * k);
+    ctx.fillRect(cx + 0.34 * k, sol - 0.58 * k, 0.04 * k, 0.12 * k);
+  } else if (espece === "sanglier") {
+    ctx.fillStyle = "#f0e6d8";
+    ctx.fillRect(cx + 0.4 * k, sol - 0.4 * k, 0.05 * k, 0.04 * k);
+  }
+}
+
+/** Un troupeau : une à trois bêtes serrées, et le nombre quand il dépasse trois. */
+export function troupeau(ctx: Ctx, x: number, y: number, a: AspectTroupeau): void {
+  const s = a.echelle;
+  const sol = y + 0.95;
+  const n = Math.min(3, Math.max(1, a.taille));
+  const pas = a.marche ? Math.sin(a.phase * Math.PI * 2) * 0.05 * s : 0;
+  const decalages = n === 1 ? [0] : n === 2 ? [-0.22, 0.22] : [-0.3, 0.05, 0.35];
+  for (let i = 0; i < n; i++) {
+    const dx = decalages[i] ?? 0;
+    bete(
+      ctx,
+      x + 0.5 + dx * s,
+      sol - (i % 2) * 0.12 * s,
+      a.espece,
+      s * 0.8,
+      pas * (i % 2 === 0 ? 1 : -1),
+    );
+  }
+  if (a.taille > 3) {
+    ctx.fillStyle = a.predateur ? "#ffb3b3" : "#f4efe6";
+    ctx.font = `${0.32 * s}px sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(`×${String(a.taille)}`, x + 0.85, sol - 0.6 * s);
+  }
+}

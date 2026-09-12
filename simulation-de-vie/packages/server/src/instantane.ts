@@ -16,6 +16,8 @@ import {
   avancementGrossesse,
   capacites,
   estEpuise,
+  PROFILS,
+  recensement,
   codeBiome,
   decrireAction,
   decrireIntention,
@@ -32,6 +34,7 @@ import type {
   GisementEtat,
   MessageEtat,
   MessageFiche,
+  TroupeauEtat,
   MessageInit,
   PersonnageEtat,
   PersonneCourte,
@@ -190,6 +193,25 @@ export class BilanSaisons {
   }
 }
 
+/** Les troupeaux sur des tuiles découvertes : le viewer ne voit que ce que la colonie a vu. */
+export function etatTroupeaux(sim: Simulation): MessageEtat["troupeaux"] {
+  const resultat: TroupeauEtat[] = [];
+  for (const t of sim.troupeaux.values()) {
+    if (t.taille <= 0 || !sim.grille.estDecouverte(t.position.x, t.position.y)) continue;
+    resultat.push({
+      id: t.id,
+      espece: t.espece,
+      nom: PROFILS[t.espece].pluriel,
+      x: t.position.x,
+      y: t.position.y,
+      taille: t.taille,
+      etat: t.etat,
+      predateur: PROFILS[t.espece].predateur,
+    });
+  }
+  return resultat;
+}
+
 export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques {
   const s = sim.statistiques();
   const parType: Record<string, number> = {};
@@ -223,6 +245,11 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     tuiles: sim.grille.nombreTuiles,
     morceaux: sim.grille.nombreMorceaux,
     savoirs: savoirsDuVillage(sim),
+    faune: recensement(sim),
+    chasses: {
+      reussies: sim.journal.parType("chasse").filter((e) => e.details.reussie === true).length,
+      ratees: sim.journal.parType("chasse").filter((e) => e.details.reussie !== true).length,
+    },
   };
 }
 
@@ -279,6 +306,7 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     pause: ctx.pause,
     personnages: sim.personnages.map((p) => etatPersonnage(sim, p)),
     batiments: etatBatiments(sim),
+    troupeaux: etatTroupeaux(sim),
     gisements: ctx.suivi.differentiel(sim),
     evenements: sim.journal.tous().slice(ctx.indexJournal).map(evenementEtat),
     stats: statistiques(sim, ctx.bilan),

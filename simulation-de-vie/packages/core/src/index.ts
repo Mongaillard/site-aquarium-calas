@@ -20,6 +20,16 @@ export type { Position, Tuile, Morceau, Generateur } from "./monde/grille.js";
 export { genererGrille, choisirBiome, SEUILS } from "./monde/generation.js";
 export type { OptionsGeneration } from "./monde/generation.js";
 export { hacherGrille } from "./monde/hachage.js";
+export {
+  ESPECES,
+  PROFILS,
+  RAYON_ACTIVITE,
+  JOURS_REPOUSSE_SOUCHE,
+  CROISSANCE_POISSON,
+  recensement,
+  troupeauxVisiblesDepuis,
+} from "./monde/faune.js";
+export type { Espece, EtatTroupeau, ProfilEspece, Troupeau } from "./monde/faune.js";
 export { rendreAscii, LEGENDE_ASCII } from "./monde/ascii.js";
 export type { OptionsAscii } from "./monde/ascii.js";
 export { Simulation } from "./simulation.js";

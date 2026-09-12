@@ -57,6 +57,7 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
     pause: false,
     personnages,
     batiments: [],
+    troupeaux: [],
     gisements: [],
     evenements,
     stats: {

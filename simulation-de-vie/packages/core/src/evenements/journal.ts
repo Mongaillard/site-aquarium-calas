@@ -54,6 +54,8 @@ export const TYPES_EVENEMENT = [
   "carence",
   "epuisement",
   "accouchement",
+  "chasse",
+  "faune",
 ] as const;
 export type TypeEvenement = (typeof TYPES_EVENEMENT)[number];
 

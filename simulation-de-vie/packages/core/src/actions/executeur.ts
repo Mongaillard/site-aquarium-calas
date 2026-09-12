@@ -31,7 +31,14 @@ import { SEUILS_COUPLE, accepteCour, eligibles, gainAttirance, unir } from "../s
 import { rayonVision } from "../cerveau/perception.js";
 import { avancementGrossesse, peutConcevoir } from "../agents/vie.js";
 import { COUT_EAU_PIROGUE, estTuileEau, trouverChemin } from "./chemin.js";
-import { capacites, enregistrerRepas, soignerAvec, tirerAccident } from "../agents/corps.js";
+import {
+  blesser,
+  capacites,
+  enregistrerRepas,
+  soignerAvec,
+  tirerAccident,
+} from "../agents/corps.js";
+import { PROFILS, faireFuir } from "../monde/faune.js";
 import type { Action } from "./types.js";
 import { INVENTIONS, LECONS, estLecon } from "../savoirs/catalogue.js";
 import { apprendre, connait } from "../savoirs/lecons.js";
@@ -121,6 +128,8 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       return action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
     case "soigner":
       return tickSoigner(monde, p, action);
+    case "chasser":
+      return tickChasser(monde, p, action);
   }
 }
 
@@ -638,14 +647,8 @@ function tickRecolter(
 
   // Un filet prend deux fois plus de poisson qu'une canne.
   const auFilet = gisement.type === "poisson" && possede(p.corps.inventaire, "filet");
-  const aLArc = gisement.type === "gibier" && possede(p.corps.inventaire, "arc");
-  // Accidents : la hache glisse, le sanglier mord.
+  // Accident : la hache glisse.
   if (gisement.type === "bois" && tirerAccident(monde, p, "bois", niv) !== null) return TERMINEE;
-  if (
-    gisement.type === "gibier" &&
-    tirerAccident(monde, p, "chasse", niveau(p.experience.chasse)) !== null
-  )
-    return TERMINEE;
   const manipulation = capacites(
     p,
     monde.config.vie.joursParAnnee,
@@ -654,9 +657,7 @@ function tickRecolter(
   const parAction = Math.max(
     1,
     Math.floor(
-      (1 + Math.floor(niv / 2)) *
-        (outil === "hache_pierre" || auFilet || aLArc ? 2 : 1) *
-        manipulation,
+      (1 + Math.floor(niv / 2)) * (outil === "hache_pierre" || auFilet ? 2 : 1) * manipulation,
     ),
   );
   const rendement = Math.min(
@@ -666,9 +667,6 @@ function tickRecolter(
   );
   const pris = ajouter(p.corps.inventaire, gisement.type, rendement);
   gisement.quantite -= pris;
-  // Le gibier donne aussi du cuir, pour les vêtements.
-  if (gisement.type === "gibier" && pris > 0)
-    ajouter(p.corps.inventaire, "cuir", Math.ceil(pris / 2));
   gagnerExperience(p.experience, "recolte", 2);
   const outilUse =
     outil === null
@@ -691,6 +689,123 @@ function tickRecolter(
   if (gisement.quantite < 1) {
     monde.emettre("gisement_epuise", p, { ressource: gisement.type }, 3, action.cible);
     if (gisement.tauxRegen === 0 && tuile) tuile.gisement = null;
+    // Un arbre abattu laisse une souche, qui repousse en cent quatre-vingts jours.
+    if (gisement.type === "bois" && gisement.outilRequis === "hache_pierre")
+      gisement.epuiseDepuis = monde.horloge.tick;
+  }
+  return TERMINEE;
+}
+
+/**
+ * Chasse d'un troupeau à portée : seul on réussit trois fois sur dix, à
+ * plusieurs (rabatteurs à moins de six tuiles) bien plus ; l'arc porte plus
+ * loin et rapporte parfois deux bêtes ; le troupeau fuit et se méfie, et une
+ * bête dangereuse acculée peut blesser le chasseur qui la rate.
+ */
+function tickChasser(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "chasser" }>,
+): Resultat {
+  const t = monde.troupeaux.get(action.troupeau);
+  if (t === undefined || t.taille <= 0) return echec("le gibier a disparu");
+  if (p.corps.stade === "enfant") return echec("trop jeune pour chasser");
+  const inv = p.corps.inventaire;
+  if (!outilSatisfait(inv, "lance")) return echec("outil requis : lance");
+  const arc = possede(inv, "arc");
+  const portee = arc ? 6 : 3;
+  if (Grille.distance(p.corps.position, t.position) > portee) {
+    const lieu = p.connaissance.get(cleLieu(t.position.x, t.position.y));
+    if (lieu !== undefined) lieu.quantiteVue = t.taille;
+    return echec("le gibier s'est éloigné");
+  }
+  if (placeLibre(inv) <= 0) return echec("inventaire plein");
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+
+  const profil = PROFILS[t.espece];
+  const niv = niveau(p.experience.chasse);
+  const rabatteurs = monde.personnages.filter(
+    (a) =>
+      a.vivant &&
+      a.id !== p.id &&
+      a.corps.stade !== "enfant" &&
+      Grille.distance(a.corps.position, t.position) <= 6 &&
+      ((a.actionEnCours?.type === "chasser" && a.actionEnCours.troupeau === t.id) ||
+        (a.intention?.type === "recolter" && a.intention.ressource === "gibier")),
+  ).length;
+  const auPiege = possede(inv, "piege") && !possede(inv, "lance") && !arc;
+  const probabilite = Math.max(
+    0.05,
+    Math.min(
+      0.9,
+      profil.reussiteBase +
+        0.06 * niv +
+        (arc ? 0.15 : 0) +
+        (auPiege ? (t.espece === "lievre" || t.espece === "sanglier" ? 0.15 : 0.05) : 0) +
+        0.2 * Math.min(2, rabatteurs) -
+        0.3 * t.mefiance -
+        (t.etat === "fuite" ? 0.1 : 0),
+    ),
+  );
+  const reussie = p.rng.chance(probabilite);
+  if (reussie) {
+    const betes = arc && niv >= 3 && t.taille >= 2 && p.rng.chance(0.3) ? 2 : 1;
+    t.taille -= betes;
+    const quantite = ajouter(inv, "gibier", profil.viande * betes);
+    const cuir = profil.cuir > 0 ? ajouter(inv, "cuir", profil.cuir * betes) : 0;
+    gagnerExperience(p.experience, "chasse", 6);
+    monde.emettre(
+      "chasse",
+      p,
+      { espece: t.espece, nom: profil.nom, reussie: true, betes, quantite, cuir, rabatteurs, arc },
+      5,
+      t.position,
+    );
+    if (t.taille > 0) faireFuir(t, p.corps.position, 0.3);
+  } else {
+    gagnerExperience(p.experience, "chasse", 2);
+    faireFuir(t, p.corps.position, 0.15);
+    monde.emettre(
+      "chasse",
+      p,
+      {
+        espece: t.espece,
+        nom: profil.nom,
+        reussie: false,
+        betes: 0,
+        quantite: 0,
+        cuir: 0,
+        rabatteurs,
+        arc,
+      },
+      3,
+      t.position,
+    );
+    if (profil.dangereux && p.rng.chance(t.espece === "sanglier" ? 0.25 : 0.15))
+      blesser(
+        monde,
+        p,
+        "morsure",
+        2,
+        p.rng.chance(0.5) ? "jambe" : "bras",
+        `acculé${p.identite.sexe === "F" ? "e" : ""} par un ${profil.nom}`,
+      );
+  }
+  const outilUse = possede(inv, "lance") ? "lance" : arc ? "arc" : "piege";
+  if (userObjet(inv, outilUse)) monde.emettre("outil_casse", p, { outil: outilUse }, 3);
+  const cle = cleLieu(t.position.x, t.position.y);
+  if (t.taille > 0) {
+    p.connaissance.set(cle, {
+      x: t.position.x,
+      y: t.position.y,
+      type: "gibier",
+      outilRequis: "lance",
+      quantiteVue: t.taille,
+      tickVu: monde.horloge.tick,
+    });
+  } else {
+    p.connaissance.delete(cle);
   }
   return TERMINEE;
 }

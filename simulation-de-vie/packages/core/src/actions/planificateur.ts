@@ -34,6 +34,9 @@ import { partenaireDe } from "../social/couple.js";
 import { relationAvec } from "../agents/personnage.js";
 import { trouverChemin } from "./chemin.js";
 import { connait } from "../savoirs/lecons.js";
+import { cleLieu } from "../agents/personnage.js";
+import { PROFILS } from "../monde/faune.js";
+import type { Troupeau } from "../monde/faune.js";
 import type { Action, Intention } from "./types.js";
 
 export type ResultatPlan =
@@ -151,7 +154,7 @@ function planifierRechauffement(monde: Monde, p: Personnage): ResultatPlan {
 
 /**
  * Meilleure nourriture que le personnage sait aller chercher : poisson (canne),
- * gibier (lance) ou baies, la plus nourrissante d'abord.
+ * baies, et en dernier recours le gibier, qu'il faut encore attraper.
  */
 export function meilleureNourritureConnue(p: Personnage): Ressource | null {
   const inv = p.corps.inventaire;
@@ -164,7 +167,7 @@ export function meilleureNourritureConnue(p: Personnage): Ressource | null {
     else if (l.type === "poisson") poisson = true;
     else if (l.type === "baies") baies = true;
   }
-  return gibier ? "gibier" : poisson ? "poisson" : baies ? "baies" : null;
+  return poisson ? "poisson" : baies ? "baies" : gibier ? "gibier" : null;
 }
 
 /**
@@ -384,6 +387,7 @@ function planifierRecolte(
   repetitions: number,
   puisManger: boolean,
 ): ResultatPlan {
+  if (ressource === "gibier") return planifierChasse(monde, p, puisManger);
   const inv = p.corps.inventaire;
   const lieux = lieuxConnusTries(p, ressource).filter(
     (l) => l.quantiteVue >= 1 && outilSatisfait(inv, l.outilRequis),
@@ -412,6 +416,75 @@ function planifierRecolte(
     return ok(plan);
   }
   return echec(`gisement de ${ressource} inaccessible`);
+}
+
+/**
+ * Chasse : on rejoint le troupeau vu en dernier (les lieux de gibier sont les
+ * positions où l'on a aperçu des bêtes), à portée de lance ou d'arc. Un
+ * troupeau qui n'est plus près de l'endroit noté est oublié.
+ */
+function planifierChasse(monde: Monde, p: Personnage, puisManger: boolean): ResultatPlan {
+  const inv = p.corps.inventaire;
+  if (!outilSatisfait(inv, "lance")) return echec("il faut une lance, un arc ou un piège");
+  const liberation = placeLibre(inv) <= 0 ? libererPlace(monde, p, ["gibier"]) : [];
+  if (placeLibre(inv) <= 0 && liberation.length === 0) return echec("inventaire plein");
+  const portee = possede(inv, "arc") ? 5 : 2;
+  const lieux = lieuxConnusTries(p, "gibier");
+  if (lieux.length === 0) return echec("aucun gibier connu");
+  // Les troupeaux encore près de l'endroit noté, les plus rentables d'abord
+  // (viande par bête, proximité, méfiance) ; les autres sont oubliés.
+  const candidats = new Map<string, { troupeau: Troupeau; score: number }>();
+  for (const lieu of lieux) {
+    let troupeau: Troupeau | null = null;
+    let distance = Infinity;
+    for (const t of monde.troupeaux.values()) {
+      if (t.taille <= 0 || PROFILS[t.espece].predateur) continue;
+      const d = Grille.distance(t.position, lieu);
+      if (d <= 10 && d < distance) {
+        distance = d;
+        troupeau = t;
+      }
+    }
+    if (troupeau === null) {
+      p.connaissance.delete(cleLieu(lieu.x, lieu.y));
+      continue;
+    }
+    const d = Grille.distance(p.corps.position, troupeau.position);
+    const score =
+      (PROFILS[troupeau.espece].viande + PROFILS[troupeau.espece].cuir) / (1 + d / 8) -
+      troupeau.mefiance * 2;
+    const deja = candidats.get(troupeau.id);
+    if (deja === undefined || deja.score < score) candidats.set(troupeau.id, { troupeau, score });
+  }
+  const tries = [...candidats.values()].sort((a, b) => b.score - a.score);
+  for (const { troupeau } of tries.slice(0, ESSAIS_MAX)) {
+    const plan: Action[] = [...liberation];
+    if (Grille.distance(p.corps.position, troupeau.position) > portee) {
+      const aller = allerPresDe(monde, p, troupeau.position);
+      if (aller === null) continue;
+      // On s'arrête dès qu'on est à portée : inutile d'aller coller le troupeau.
+      if (aller.type === "deplacer" && aller.chemin !== null) {
+        const chemin = aller.chemin;
+        while (chemin.length > 1) {
+          const avantDernier = chemin[chemin.length - 2];
+          if (
+            avantDernier === undefined ||
+            Grille.distance(avantDernier, troupeau.position) > portee
+          )
+            break;
+          chemin.pop();
+        }
+        const dernier = chemin[chemin.length - 1];
+        plan.push(dernier === undefined ? aller : { ...aller, cible: dernier, chemin });
+      } else {
+        plan.push(aller);
+      }
+    }
+    plan.push({ type: "chasser", troupeau: troupeau.id, ticksRestants: 2 });
+    if (puisManger) plan.push({ type: "manger", ressource: "gibier", ticksRestants: null });
+    return ok(plan);
+  }
+  return echec("le gibier est hors d'atteinte");
 }
 
 /** Dormir : à l'abri si possible, sinon près d'un feu, sinon sur place. */

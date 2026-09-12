@@ -78,8 +78,14 @@ export class RuleBrain implements Cerveau {
     const connait = (type: Ressource): boolean =>
       lieux.some((l) => l.type === type && l.quantiteVue >= 1 && l.outilRequis === null);
     const connaitEau = connait("eau");
+    // Le gibier se chasse avec une arme : on le « connaît » dès qu'on a vu des bêtes.
+    const connaitGibier = lieux.some((l) => l.type === "gibier" && l.quantiteVue >= 1);
     const connaitNourriture = (Object.keys(NOURRITURE) as Ressource[]).some(connait);
     const adulte = stade !== "enfant";
+    const armeDeChasse =
+      perception.moi.possede("lance") ||
+      perception.moi.possede("arc") ||
+      perception.moi.possede("piege");
     const nuit = perception.moment.estNuit;
     const froid = urgence(besoins.chaleur);
     const candidats: Candidat[] = [];
@@ -242,6 +248,19 @@ export class RuleBrain implements Cerveau {
       });
     }
 
+    // Une lance ouvre l'accès au gibier, quand on en a vu.
+    if (adulte && connaitGibier && !armeDeChasse && placeLibre > 0) {
+      candidats.push({
+        intention: { type: "fabriquer", recette: "lance" },
+        score:
+          0.3 +
+          personnalite.conscience * 0.2 +
+          urgence(besoins.faim) * 0.4 +
+          (sait("vetements_chauds") && perception.moi.cuir < 3 ? 0.3 : 0) +
+          (perception.troupeauxVisibles.some((t) => !t.predateur) ? 0.2 : 0),
+      });
+    }
+
     // Une canne à pêche ouvre l'accès au poisson.
     if (adulte && perception.connaitPoisson && !perception.possedeCanne && placeLibre > 0) {
       candidats.push({
@@ -357,9 +376,7 @@ export class RuleBrain implements Cerveau {
         {
           invention: "piege",
           utile:
-            connait("gibier") &&
-            !perception.moi.possede("piege") &&
-            !perception.moi.possede("lance"),
+            connaitGibier && !perception.moi.possede("piege") && !perception.moi.possede("lance"),
         },
         {
           invention: "pirogue",
@@ -368,7 +385,7 @@ export class RuleBrain implements Cerveau {
         { invention: "osselets", utile: besoins.moral < 60 && !perception.moi.possede("osselets") },
         {
           invention: "arc",
-          utile: connait("gibier") && !perception.moi.possede("arc"),
+          utile: connaitGibier && !perception.moi.possede("arc"),
         },
         {
           invention: "couche",
@@ -546,13 +563,32 @@ export class RuleBrain implements Cerveau {
       });
     }
 
+    // Du gibier en vue : on chasse, d'autant plus qu'on a faim et que d'autres rabattent déjà.
+    const gibierEnVue = perception.troupeauxVisibles.find((t) => !t.predateur);
+    if (adulte && gibierEnVue !== undefined && armeDeChasse && placeLibre > 1) {
+      const battue = perception.personnesVisibles.some((v) => v.chasse);
+      candidats.push({
+        intention: { type: "recolter", ressource: "gibier" },
+        score:
+          0.55 +
+          urgence(besoins.faim) * 1.0 +
+          (battue ? 0.35 : 0) +
+          (saisonFroide ? 0.2 : 0) +
+          (sait("vetements_chauds") && perception.moi.cuir < 3 ? 0.3 : 0) +
+          (gibierEnVue.taille >= 4 ? 0.1 : 0) +
+          personnalite.ouverture * 0.2 -
+          gibierEnVue.distance / 30 -
+          gibierEnVue.mefiance * 0.4,
+      });
+    }
+
     // Chasser pour le cuir quand on sait ce qu'il vaut.
     if (
       adulte &&
       sait("vetements_chauds") &&
       !perception.moi.possede("vetement_cuir") &&
       perception.moi.cuir < 3 &&
-      connait("gibier") &&
+      connaitGibier &&
       placeLibre > 1
     ) {
       candidats.push({

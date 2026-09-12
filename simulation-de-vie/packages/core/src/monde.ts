@@ -12,6 +12,7 @@ import { SEUIL_SAVOIR } from "./savoirs/catalogue.js";
 import type { Position } from "./monde/grille.js";
 import type { Horloge } from "./monde/horloge.js";
 import type { Meteo } from "./monde/meteo.js";
+import type { Troupeau } from "./monde/faune.js";
 import type { Rng } from "./rng.js";
 
 export interface Monde {
@@ -21,6 +22,8 @@ export interface Monde {
   readonly rng: Rng;
   readonly personnages: readonly Personnage[];
   readonly batiments: ReadonlyMap<string, Batiment>;
+  /** La faune : un objet par troupeau ou meute (jalon « la faune vit »). */
+  readonly troupeaux: ReadonlyMap<string, Troupeau>;
   readonly meteo: Meteo;
   emettre(
     type: TypeEvenement,

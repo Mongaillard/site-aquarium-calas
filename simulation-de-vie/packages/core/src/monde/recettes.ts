@@ -87,7 +87,7 @@ export const RECETTES = {
     produit: { objet: "lance" },
     ingredients: { bois: 3, pierre: 1 },
     competence: "artisanat",
-    niveauRequis: 1,
+    niveauRequis: 0,
     atelier: null,
     duree: 4,
   },
