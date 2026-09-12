@@ -2,7 +2,8 @@
 
 Monde 2D sans limite, généré au fil des explorations, peuplé de personnages autonomes, chacun
 doté d'une identité et d'une IA propres. La spécification complète est dans [`PROTOCOLE.md`](./PROTOCOLE.md) ; l'avancement
-par phase est dans [`CHANGELOG.md`](./CHANGELOG.md).
+par phase est dans [`CHANGELOG.md`](./CHANGELOG.md) ; la suite prévue (huit jalons de réalisme)
+est dans [`FEUILLE_DE_ROUTE.md`](./FEUILLE_DE_ROUTE.md).
 
 ## Démarrage
 
