@@ -43,6 +43,16 @@ export interface Morceau {
   nbDecouvertes: number;
 }
 
+/** État sauvegardé de la grille (voir `Grille.etat`). */
+export interface EtatGrille {
+  readonly morceaux: readonly {
+    readonly cx: number;
+    readonly cy: number;
+    readonly decouvertes: readonly number[];
+    readonly gisements: readonly (readonly [number, Gisement])[];
+  }[];
+}
+
 /** Produit les tuiles d'un morceau ; ne doit dépendre que de (cx, cy) et de la graine. */
 export type Generateur = (cx: number, cy: number) => (Tuile | null)[];
 
@@ -138,6 +148,42 @@ export class Grille {
     this.nbTuiles += nbTuiles;
     this.dernier = m;
     return m;
+  }
+
+  /**
+   * État pour la sauvegarde : les morceaux générés (dans l'ordre), leurs tuiles
+   * découvertes et tous leurs gisements. Les tuiles elles-mêmes se regénèrent de
+   * la graine ; les bâtiments sont sauvés à part et raccrochés à la restauration.
+   */
+  etat(): EtatGrille {
+    return {
+      morceaux: this.ordre.map((m) => {
+        const decouvertes: number[] = [];
+        for (let i = 0; i < m.decouvertes.length; i++)
+          if (m.decouvertes[i] === 1) decouvertes.push(i);
+        const gisements: [number, Gisement][] = [];
+        m.tuiles.forEach((t, i) => {
+          if (t?.gisement) gisements.push([i, { ...t.gisement }]);
+        });
+        return { cx: m.cx, cy: m.cy, decouvertes, gisements };
+      }),
+    };
+  }
+
+  /** Regénère les morceaux dans le même ordre et y remet découvertes et gisements. */
+  restaurer(etat: EtatGrille): void {
+    for (const em of etat.morceaux) {
+      const m = this.morceau(em.cx, em.cy);
+      for (const t of m.tuiles) if (t !== null) t.gisement = null;
+      for (const [i, g] of em.gisements) {
+        const t = m.tuiles[i];
+        if (t) t.gisement = { ...g };
+      }
+      for (const i of em.decouvertes) {
+        const t = m.tuiles[i];
+        if (t) this.decouvrir(t.x, t.y);
+      }
+    }
   }
 
   /** Le morceau (cx, cy) s'il a déjà été généré, sans le générer. */

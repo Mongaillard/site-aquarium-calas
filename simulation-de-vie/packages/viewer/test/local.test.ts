@@ -15,6 +15,37 @@ function attendre(condition: () => boolean, delaiMs = 5000): Promise<void> {
 }
 
 describe("LiaisonLocale", () => {
+  it("reprend un monde sauvegardé sans pré-simulation, au même tick", async () => {
+    const messages: MessageServeur[] = [];
+    const source = new LiaisonLocale(
+      { seed: 42, joursAvance: 1, ticksParSeconde: 1 },
+      (m) => messages.push(m),
+      () => undefined,
+    );
+    source.connecter();
+    await attendre(() => messages.some((m) => m.type === "etat"));
+    source.envoyer({ type: "pause" });
+    source.envoyer({ type: "tick" });
+    const sauvegarde = source.sauvegarder();
+    source.fermer();
+    expect(sauvegarde?.tick).toBe(145);
+    const recus: MessageServeur[] = [];
+    const progressions: number[] = [];
+    const reprise = new LiaisonLocale(
+      { seed: 42, joursAvance: 5, ticksParSeconde: 1, sauvegarde },
+      (m) => recus.push(m),
+      () => undefined,
+      (j) => progressions.push(j),
+    );
+    reprise.connecter();
+    await attendre(() => recus.some((m) => m.type === "etat"));
+    const etat = recus.find((m) => m.type === "etat");
+    expect(etat?.type === "etat" && etat.tick).toBe(145);
+    expect(progressions).toEqual([]);
+    expect(reprise.simulation?.vivants().length).toBe(12);
+    reprise.fermer();
+  });
+
   it("prépare le monde, envoie init puis etat, et répond aux commandes comme le serveur", async () => {
     const messages: MessageServeur[] = [];
     const progressions: number[] = [];

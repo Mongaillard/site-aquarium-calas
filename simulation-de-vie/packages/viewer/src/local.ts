@@ -4,7 +4,7 @@
  * et pour les pages publiées.
  */
 import { Simulation } from "@sdv/core";
-import type { SimConfigPartielle } from "@sdv/core";
+import type { Sauvegarde, SimConfigPartielle } from "@sdv/core";
 import type { Commande, MessageEtat, MessageServeur } from "@sdv/protocole";
 import {
   BilanSaisons,
@@ -21,6 +21,8 @@ export interface OptionsLocales {
   readonly joursAvance: number;
   readonly ticksParSeconde: number;
   readonly config?: SimConfigPartielle;
+  /** Reprendre un monde sauvegardé au lieu d'en créer un (pas de pré-simulation). */
+  readonly sauvegarde?: unknown;
 }
 
 export class LiaisonLocale implements Liaison {
@@ -51,12 +53,15 @@ export class LiaisonLocale implements Liaison {
   }
 
   connecter(): void {
-    const sim = Simulation.creer({ ...this.options.config, seed: this.options.seed });
+    const reprise = this.options.sauvegarde !== undefined;
+    const sim = reprise
+      ? Simulation.restaurer(this.options.sauvegarde)
+      : Simulation.creer({ ...this.options.config, seed: this.options.seed });
     this.sim = sim;
     this.onConnexion(true);
     this.onMessage(messageInit(sim));
-    // Pré-simulation jour par jour, sans bloquer la page.
-    const total = this.options.joursAvance;
+    // Pré-simulation jour par jour, sans bloquer la page (aucune après une reprise).
+    const total = reprise ? 0 : this.options.joursAvance;
     let jour = 0;
     const etape = (): void => {
       if (this.ferme) return;
@@ -134,6 +139,11 @@ export class LiaisonLocale implements Liaison {
 
   get simulation(): Simulation | null {
     return this.sim;
+  }
+
+  /** L'état complet du monde, à ranger où l'on veut (null tant que le monde n'est pas prêt). */
+  sauvegarder(): Sauvegarde | null {
+    return this.sim === null || this.preparation !== null ? null : this.sim.sauvegarder();
   }
 
   private pas(): void {

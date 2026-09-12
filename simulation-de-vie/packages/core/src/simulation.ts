@@ -90,7 +90,7 @@ import { Horloge } from "./monde/horloge.js";
 import { EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
 import type { Meteo } from "./monde/meteo.js";
 import { Rng } from "./rng.js";
-import type { FaveurEtat, QuestionConseil } from "@sdv/protocole";
+import type { FaveurEtat, Pouvoir, QuestionConseil } from "@sdv/protocole";
 import {
   FAVEUR_EVENEMENTS,
   FAVEUR_OFFRANDE,
@@ -105,6 +105,17 @@ import {
 } from "./monde/divin.js";
 import type { PriereEtat } from "@sdv/protocole";
 import type { Espece } from "./monde/faune.js";
+import {
+  EVENEMENTS_GARDES,
+  FORMAT_SAUVEGARDE,
+  VERSION_SAUVEGARDE,
+  decoder,
+  encoder,
+  estSauvegarde,
+} from "./sauvegarde.js";
+import type { Sauvegarde } from "./sauvegarde.js";
+import type { EtatGrille } from "./monde/grille.js";
+import type { EtatRng } from "./rng.js";
 import type { CommandePouvoir, EtatFaveur, ResultatPouvoir } from "./monde/divin.js";
 import {
   FILE_MAX,
@@ -160,6 +171,42 @@ export type ResultatConseil =
 /** Rayon, en tuiles, de ce que la colonie connaît de son berceau au premier jour. */
 const RAYON_CONNAISSANCE_INITIALE = 14;
 
+/** Tout ce qu'une simulation possède en propre (sérialisé structurellement). */
+interface EtatSimulation {
+  readonly config: SimConfig;
+  readonly rng: EtatRng;
+  readonly tick: number;
+  readonly grille: EtatGrille;
+  readonly personnages: Personnage[];
+  readonly batiments: Batiment[];
+  readonly troupeaux: Troupeau[];
+  readonly betail: Bete[];
+  readonly danger: EtatDanger;
+  readonly morceauxPeuples: number[];
+  readonly compteurs: {
+    readonly betail: number;
+    readonly troupeaux: number;
+    readonly personnages: number;
+    readonly batiments: number;
+    readonly questions: number;
+  };
+  readonly conseilsDuJour: number;
+  readonly derniereEpidemieAnnee: number;
+  readonly meteo: Meteo;
+  readonly faveur: {
+    readonly valeur: number;
+    readonly miracles: number;
+    readonly reputation: number;
+    readonly prieres: number;
+    readonly offrandes: number;
+    readonly exaucees: number;
+    readonly recharges: [Pouvoir, number][];
+  };
+  readonly questionEnCours: QuestionConseil | null;
+  readonly fileConseils: { id: string; motifs: Motif[]; score: number }[];
+  readonly journal: ReturnType<Journal["etat"]>;
+}
+
 export class Simulation implements Monde {
   readonly journal = new Journal();
   readonly personnages: Personnage[];
@@ -190,14 +237,48 @@ export class Simulation implements Monde {
     readonly rng: Rng,
     readonly horloge: Horloge,
     readonly grille: Grille,
+    etat: EtatSimulation | null = null,
   ) {
-    this.personnages = genererPopulation(rng, config, grille);
-    this.compteurPersonnages = this.personnages.length;
-    this.danger = etatDangerInitial(horloge.ticksParJour);
-    this.peuplerFaune();
-    // La colonie s'installe en terrain reconnu : chacun connaît déjà les environs
-    // du berceau (points d'eau, gisements), et ces tuiles comptent comme découvertes.
-    for (const p of this.personnages) observer(this, p, RAYON_CONNAISSANCE_INITIALE);
+    if (etat !== null) {
+      // Restauration : tout vient de la sauvegarde, rien n'est généré.
+      this.personnages = etat.personnages;
+      this.danger = etat.danger;
+      for (const b of etat.batiments) {
+        this.batiments.set(b.id, b);
+        const t = grille.tuileOuNull(b.position.x, b.position.y);
+        if (t) t.batiment = b;
+      }
+      for (const t of etat.troupeaux) this.troupeaux.set(t.id, t);
+      for (const b of etat.betail) this.betail.set(b.id, b);
+      for (const m of etat.morceauxPeuples) this.morceauxPeuples.add(m);
+      this.compteurBetail = etat.compteurs.betail;
+      this.compteurTroupeaux = etat.compteurs.troupeaux;
+      this.compteurPersonnages = etat.compteurs.personnages;
+      this.compteurBatiments = etat.compteurs.batiments;
+      this.compteurQuestions = etat.compteurs.questions;
+      this.conseilsDuJour = etat.conseilsDuJour;
+      this.derniereEpidemieAnnee = etat.derniereEpidemieAnnee;
+      this.meteo = etat.meteo;
+      this.faveur.valeur = etat.faveur.valeur;
+      this.faveur.miracles = etat.faveur.miracles;
+      this.faveur.reputation = etat.faveur.reputation;
+      this.faveur.prieres = etat.faveur.prieres;
+      this.faveur.offrandes = etat.faveur.offrandes;
+      this.faveur.exaucees = etat.faveur.exaucees;
+      for (const [k, v] of etat.faveur.recharges) this.faveur.recharges.set(k, v);
+      this.questionEnCours = etat.questionEnCours;
+      this.fileConseils.push(...etat.fileConseils);
+      this.journal.restaurer(etat.journal);
+      for (const p of this.personnages) this.cerveaux.set(p.id, new RuleBrain(p));
+    } else {
+      this.personnages = genererPopulation(rng, config, grille);
+      this.compteurPersonnages = this.personnages.length;
+      this.danger = etatDangerInitial(horloge.ticksParJour);
+      this.peuplerFaune();
+      // La colonie s'installe en terrain reconnu : chacun connaît déjà les environs
+      // du berceau (points d'eau, gisements), et ces tuiles comptent comme découvertes.
+      for (const p of this.personnages) observer(this, p, RAYON_CONNAISSANCE_INITIALE);
+    }
     this.journal.ecouter((e) => {
       this.memoriser(e);
       const gain = FAVEUR_EVENEMENTS[e.type];
@@ -211,6 +292,7 @@ export class Simulation implements Monde {
         }
       }
     });
+    if (etat !== null) return;
     for (const p of this.personnages) {
       this.cerveaux.set(p.id, new RuleBrain(p));
       this.emettre(
@@ -700,6 +782,82 @@ export class Simulation implements Monde {
       berceau: config.monde.berceau,
     });
     return Simulation.creerAvecGrille(config, grille);
+  }
+
+  // ------------------------------------------------------------ sauvegarde
+
+  /** L'état complet du monde, prêt à être rangé (JSON) et restauré à l'identique. */
+  sauvegarder(): Sauvegarde {
+    const etat: EtatSimulation = {
+      config: this.config,
+      rng: this.rng.etat(),
+      tick: this.tick,
+      grille: this.grille.etat(),
+      personnages: this.personnages,
+      batiments: [...this.batiments.values()],
+      troupeaux: [...this.troupeaux.values()],
+      betail: [...this.betail.values()],
+      danger: this.danger,
+      morceauxPeuples: [...this.morceauxPeuples],
+      compteurs: {
+        betail: this.compteurBetail,
+        troupeaux: this.compteurTroupeaux,
+        personnages: this.compteurPersonnages,
+        batiments: this.compteurBatiments,
+        questions: this.compteurQuestions,
+      },
+      conseilsDuJour: this.conseilsDuJour,
+      derniereEpidemieAnnee: this.derniereEpidemieAnnee,
+      meteo: this.meteo,
+      faveur: {
+        valeur: this.faveur.valeur,
+        miracles: this.faveur.miracles,
+        reputation: this.faveur.reputation,
+        prieres: this.faveur.prieres,
+        offrandes: this.faveur.offrandes,
+        exaucees: this.faveur.exaucees,
+        recharges: [...this.faveur.recharges.entries()],
+      },
+      questionEnCours: this.questionEnCours,
+      fileConseils: this.fileConseils,
+      journal: this.journal.etat(EVENEMENTS_GARDES),
+    };
+    return {
+      format: FORMAT_SAUVEGARDE,
+      version: VERSION_SAUVEGARDE,
+      date: Date.now(),
+      seed: String(this.config.seed),
+      tick: this.tick,
+      jour: Math.floor(this.tick / this.horloge.ticksParJour),
+      vivants: this.vivants().length,
+      etat: encoder(etat),
+    };
+  }
+
+  /** Restaure un monde sauvegardé ; lève une erreur si le format n'est pas le bon. */
+  static restaurer(sauvegarde: unknown): Simulation {
+    if (!estSauvegarde(sauvegarde)) throw new Error("Ce n'est pas une sauvegarde de simulation.");
+    if (sauvegarde.version !== VERSION_SAUVEGARDE)
+      throw new Error(
+        `Sauvegarde en version ${String(sauvegarde.version)}, cette simulation lit la version ${String(VERSION_SAUVEGARDE)}.`,
+      );
+    const etat = decoder(sauvegarde.etat) as EtatSimulation;
+    const config = etat.config;
+    const rng = Rng.depuisEtat(etat.rng);
+    const grille = genererGrille(Rng.depuisGraine(config.seed).fork("monde"), {
+      echelleRelief: config.monde.echelleRelief,
+      echelleContinents: config.monde.echelleContinents,
+      berceau: config.monde.berceau,
+    });
+    grille.restaurer(etat.grille);
+    const horloge = new Horloge(
+      {
+        minutesParTick: config.temps.minutesParTick,
+        joursParSaison: config.monde.joursParSaison,
+      },
+      etat.tick,
+    );
+    return new Simulation(config, rng, horloge, grille, etat);
   }
 
   /** Crée une simulation sur une grille fournie (tests, scénarios). */

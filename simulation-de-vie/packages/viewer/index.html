@@ -22,7 +22,11 @@
           <label for="graine-entree" class="discret">graine</label>
           <input id="graine-entree" type="text" inputmode="numeric" size="6" value="42" />
           <button type="submit" id="btn-nouveau">Nouveau monde</button>
+          <button type="button" id="btn-sauvegardes" title="Sauvegarder ou reprendre une partie">
+            💾
+          </button>
         </form>
+        <button id="btn-reprendre" class="btn-reprendre" type="button" hidden></button>
         <button
           id="btn-dieu"
           class="btn-dieu"
@@ -111,6 +115,20 @@
         </aside>
       </main>
     </div>
+    <dialog id="dlg-sauvegardes" class="dialogue">
+      <h2>Sauvegardes</h2>
+      <p class="discret">
+        Rangées dans ce navigateur (IndexedDB) : elles restent d'une visite à l'autre sur cet
+        appareil. La page sauvegarde toute seule tous les trois jours simulés.
+      </p>
+      <form id="form-sauver" class="ligne">
+        <input id="nom-sauvegarde" type="text" placeholder="nom de la partie" maxlength="40" />
+        <button type="submit">💾 Sauver maintenant</button>
+      </form>
+      <ol id="liste-sauvegardes" class="liste"></ol>
+      <div id="statut-sauvegardes" class="discret"></div>
+      <div class="ligne"><button type="button" id="btn-fermer-sauvegardes">Fermer</button></div>
+    </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

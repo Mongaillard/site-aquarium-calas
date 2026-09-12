@@ -111,6 +111,25 @@ export class Journal {
     return this.evenements.length;
   }
 
+  /** État pour la sauvegarde : les `garder` derniers événements et tous les compteurs. */
+  etat(garder = Infinity): { evenements: Evenement[]; compteurs: [TypeEvenement, number][] } {
+    return {
+      evenements: this.evenements.slice(Math.max(0, this.evenements.length - garder)),
+      compteurs: [...this.compteurs.entries()],
+    };
+  }
+
+  /** Remplace le contenu par un état sauvegardé (sans prévenir les auditeurs). */
+  restaurer(etat: {
+    evenements: readonly Evenement[];
+    compteurs: readonly (readonly [TypeEvenement, number])[];
+  }): void {
+    this.evenements.length = 0;
+    this.evenements.push(...etat.evenements);
+    this.compteurs.clear();
+    for (const [t, n] of etat.compteurs) this.compteurs.set(t, n);
+  }
+
   tous(): readonly Evenement[] {
     return this.evenements;
   }

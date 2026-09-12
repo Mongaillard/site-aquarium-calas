@@ -330,3 +330,12 @@ export {
 export type { Motif, Priorite, ChoixConseil } from "./cerveau/conseil.js";
 export type { Ambition } from "./agents/personnage.js";
 export type { Conseil, ResultatConseil } from "./simulation.js";
+export {
+  VERSION_SAUVEGARDE,
+  FORMAT_SAUVEGARDE,
+  EVENEMENTS_GARDES,
+  encoder,
+  decoder,
+  estSauvegarde,
+} from "./sauvegarde.js";
+export type { Sauvegarde } from "./sauvegarde.js";

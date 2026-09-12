@@ -53,6 +53,18 @@ export class FluxMemoire {
     return this.souvenirs.length;
   }
 
+  /** État complet, pour la sauvegarde. */
+  etat(): { souvenirs: Souvenir[]; prochainId: number } {
+    return { souvenirs: this.souvenirs.map((s) => ({ ...s })), prochainId: this.prochainId };
+  }
+
+  /** Remplace le contenu par un état sauvegardé. */
+  restaurer(etat: { souvenirs: readonly Souvenir[]; prochainId: number }): void {
+    this.souvenirs.length = 0;
+    for (const s of etat.souvenirs) this.souvenirs.push({ ...s });
+    this.prochainId = etat.prochainId;
+  }
+
   tous(): readonly Souvenir[] {
     return this.souvenirs;
   }

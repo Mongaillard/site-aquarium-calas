@@ -2,6 +2,28 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M15 – Sauvegarde et reprise (2026-09-12)
+
+- **Sauvegarde complète du moteur** (`packages/core/src/sauvegarde.ts`, `Simulation.sauvegarder()`
+  et `Simulation.restaurer()`) : sérialisation structurelle de tout l'état (personnages avec
+  mémoire, relations et générateurs aléatoires, bâtiments, troupeaux, bétail, danger, faveur,
+  question ouverte et file des conseils, compteurs, météo), avec des marqueurs pour ce que JSON
+  ne dit pas (Map, Set, Infinity, Rng, flux de mémoire). Les tuiles se regénèrent de la graine ;
+  seuls les gisements, les découvertes et les bâtiments de chaque morceau sont sauvés. Le
+  journal garde ses trois mille derniers événements et tous ses compteurs. Un monde restauré
+  continue **à l'identique** (test : mêmes soixante jours de journal après restauration, avec
+  des miracles et une question ouverte). Format versionné (`format`, `version`), refusé s'il
+  ne correspond pas.
+- **Côté page** (mode local, mobile et page publiée) : bouton « 💾 » à côté de « Nouveau
+  monde », boîte de dialogue pour sauver sous un nom, reprendre ou supprimer ; sauvegarde
+  automatique « auto » au plus une fois par minute quand le monde a avancé, et dès que la page
+  passe à l'arrière-plan ; au chargement, un bouton « ↩ Reprendre la partie (jour N) » propose
+  la dernière sauvegarde automatique. Rangé dans IndexedDB du navigateur : quelques mégaoctets
+  (4 Mo à 30 jours, 12 Mo à 300 jours, un quart de seconde à écrire) sans limite gênante, mais
+  propre à l'appareil et au navigateur.
+- Pas encore : une sauvegarde partagée entre appareils (base de l'artefact ou fichier),
+  l'export en fichier (bloqué dans la page publiée), une sauvegarde côté serveur.
+
 ## M14 – Le mode Dieu, v2 : foi, prières, autel, réputation, trois pouvoirs, lisibilité (2026-09-12)
 
 - **Foi** : chaque personnage a une foi de 0 à 10, née de ses valeurs (tradition ou harmonie 3,

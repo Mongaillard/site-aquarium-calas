@@ -899,6 +899,15 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
 - Sobriété : un appel à la fois, déclenché par un décès, une invention ou la sélection d'un
   personnage ; jamais en boucle.
 
+## 8 quater. Sauvegarde telle que réalisée (M15)
+
+- `Simulation.sauvegarder()` rend un objet JSON versionné ; `Simulation.restaurer()` en refait
+  un monde qui continue à l'identique (P1 : même journal à venir). La sérialisation est
+  structurelle (chaque champ parcouru), les tuiles se regénèrent de la graine, le journal est
+  tronqué à ses trois mille derniers événements (compteurs conservés).
+- La page range les sauvegardes dans IndexedDB (nommées, plus « auto ») ; le serveur n'en a pas
+  encore.
+
 ## 8 ter. Mode Dieu et conseil de Claude tels que réalisés (M13)
 
 - **[DÉCISION]** L'observateur influence, il ne commande pas. Un pouvoir change le monde

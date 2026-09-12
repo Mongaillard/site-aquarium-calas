@@ -63,6 +63,12 @@ autour de chaque personnage est visible, et la carte se dévoile au fil des expl
 touche `b` (ou la case de la légende) l'enlève ; l'onglet Statistiques indique la part du monde
 découverte.
 
+Sauvegarde (mode local et page publiée) : le bouton « 💾 » sauve la partie sous un nom, la
+reprend ou la supprime ; la page sauvegarde toute seule chaque minute et quand elle passe à
+l'arrière-plan, et propose « ↩ Reprendre la partie » au chargement suivant. Tout est rangé dans
+le navigateur (IndexedDB), propre à l'appareil. Un monde restauré continue exactement comme
+l'original.
+
 Pour développer le viewer avec rechargement à chaud : lancez le serveur (`pnpm --filter
 @sdv/server start -- --seed 42`) puis `pnpm viewer:dev` (http://localhost:5173).
 

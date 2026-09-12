@@ -10,6 +10,14 @@ import { LiaisonLocale } from "./local.js";
 import { CerveauClaude, sampleDeLaPage } from "./claude.js";
 import { Panneaux } from "./panneaux.js";
 import { Rendu } from "./rendu.js";
+import {
+  NOM_AUTO,
+  decrireSauvegarde,
+  ecrireSauvegarde,
+  lireSauvegarde,
+  listerSauvegardes,
+  supprimerSauvegarde,
+} from "./sauvegarde.js";
 import type { Liaison } from "./reseau.js";
 import { Reseau, urlWebSocket } from "./reseau.js";
 
@@ -63,11 +71,16 @@ const progression = (jour: number, total: number): void => {
     el.textContent = jour < total ? `préparation du monde : jour ${jour}/${total}` : "en direct";
 };
 
-function creerLiaison(graine: string): Liaison {
+function creerLiaison(graine: string, sauvegarde?: unknown): Liaison {
   if (!modeLocal) return new Reseau(urlWebSocket(window.location), recevoir, connexion);
   const seed = /^-?\d+$/.test(graine) ? Number.parseInt(graine, 10) : graine;
   return new LiaisonLocale(
-    { seed, joursAvance: Number.isFinite(joursAvance) ? joursAvance : 20, ticksParSeconde: 4 },
+    {
+      seed,
+      joursAvance: Number.isFinite(joursAvance) ? joursAvance : 20,
+      ticksParSeconde: 4,
+      ...(sauvegarde !== undefined ? { sauvegarde } : {}),
+    },
     recevoir,
     connexion,
     progression,
@@ -96,16 +109,155 @@ const basculerSuivi = (): void => {
 };
 const panneaux = new Panneaux(magasin, { envoyer, selectionner, basculerSuivi });
 
+/** Remplace le monde courant par un nouveau (graine) ou par une sauvegarde. */
+function relancer(graine: string, sauvegarde?: unknown): void {
+  liaison.fermer();
+  magasin.reinitialiser();
+  liaison = creerLiaison(graine, sauvegarde);
+  liaison.connecter();
+  panneaux.afficherOnglet("inspecteur");
+}
+
+// Sauvegardes (mode local) : boîte de dialogue, sauvegarde automatique, reprise au chargement.
+const dlgSauvegardes = element("dlg-sauvegardes", HTMLDialogElement);
+const listeSauvegardes = element("liste-sauvegardes", HTMLOListElement);
+const statutSauvegardes = element("statut-sauvegardes", HTMLDivElement);
+const nomSauvegarde = element("nom-sauvegarde", HTMLInputElement);
+const btnReprendre = element("btn-reprendre", HTMLButtonElement);
+const statutSauvegarde = (texte: string): void => {
+  statutSauvegardes.textContent = texte;
+  const el = document.getElementById("connexion");
+  if (el && !dlgSauvegardes.open) el.textContent = texte;
+};
+/** Sauvegarde le monde courant sous ce nom ; vrai si c'est fait. */
+async function sauvegarderSous(nom: string): Promise<boolean> {
+  const s = liaison instanceof LiaisonLocale ? liaison.sauvegarder() : null;
+  if (s === null) return false;
+  try {
+    await ecrireSauvegarde(nom, s);
+    return true;
+  } catch (erreur: unknown) {
+    statutSauvegarde(
+      `Sauvegarde impossible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+    );
+    return false;
+  }
+}
+async function rafraichirListeSauvegardes(): Promise<void> {
+  let entrees: Awaited<ReturnType<typeof listerSauvegardes>> = [];
+  try {
+    entrees = await listerSauvegardes();
+  } catch (erreur: unknown) {
+    statutSauvegarde(
+      `Stockage indisponible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+    );
+  }
+  listeSauvegardes.replaceChildren(
+    ...entrees.map((e) => {
+      const li = document.createElement("li");
+      const texte = document.createElement("span");
+      texte.textContent = decrireSauvegarde(e);
+      const charger = document.createElement("button");
+      charger.type = "button";
+      charger.textContent = "📂 Reprendre";
+      charger.addEventListener("click", () => {
+        void chargerSauvegarde(e.nom);
+      });
+      const supprimer = document.createElement("button");
+      supprimer.type = "button";
+      supprimer.textContent = "🗑";
+      supprimer.title = "Supprimer cette sauvegarde";
+      supprimer.addEventListener("click", () => {
+        void supprimerSauvegarde(e.nom).then(rafraichirListeSauvegardes);
+      });
+      li.append(texte, charger, supprimer);
+      return li;
+    }),
+  );
+  if (entrees.length === 0) {
+    const li = document.createElement("li");
+    li.className = "discret";
+    li.textContent = "aucune sauvegarde pour l'instant";
+    listeSauvegardes.append(li);
+  }
+}
+async function chargerSauvegarde(nom: string): Promise<void> {
+  try {
+    const s = await lireSauvegarde(nom);
+    if (s === null) {
+      statutSauvegarde("Cette sauvegarde n'existe plus.");
+      return;
+    }
+    dlgSauvegardes.close();
+    btnReprendre.hidden = true;
+    relancer(s.seed, s);
+    graineEntree.value = s.seed;
+    statutSauvegarde(`Partie reprise au jour ${String(s.jour)}.`);
+  } catch (erreur: unknown) {
+    statutSauvegarde(
+      `Reprise impossible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+    );
+  }
+}
+let derniereSauvegardeAutoA = 0;
+let dernierTickSauve = -1;
+const INTERVALLE_AUTO_MS = 60_000;
+/** Sauvegarde automatique : au plus une par minute, seulement si le monde a avancé. */
+function sauvegardeAutomatique(maintenant: number, force = false): void {
+  if (!modeLocal) return;
+  const tick = magasin.etat?.tick ?? -1;
+  if (tick < 0 || tick === dernierTickSauve) return;
+  if (!force && maintenant - derniereSauvegardeAutoA < INTERVALLE_AUTO_MS) return;
+  derniereSauvegardeAutoA = maintenant;
+  void sauvegarderSous(NOM_AUTO).then((fait) => {
+    if (fait) dernierTickSauve = tick;
+  });
+}
+
 if (modeLocal) {
   formulaireLocal.hidden = false;
   graineEntree.value = graineInitiale;
   formulaireLocal.addEventListener("submit", (ev) => {
     ev.preventDefault();
-    liaison.fermer();
-    magasin.reinitialiser();
-    liaison = creerLiaison(graineEntree.value.trim() || "42");
-    liaison.connecter();
-    panneaux.afficherOnglet("inspecteur");
+    relancer(graineEntree.value.trim() || "42");
+  });
+  element("btn-sauvegardes", HTMLButtonElement).addEventListener("click", () => {
+    void rafraichirListeSauvegardes();
+    dlgSauvegardes.showModal();
+  });
+  element("form-sauver", HTMLFormElement).addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const nom =
+      nomSauvegarde.value.trim() ||
+      `Partie du jour ${String(magasin.etat?.moment.jourAbsolu ?? 0)}`;
+    void sauvegarderSous(nom).then((fait) => {
+      statutSauvegarde(fait ? `« ${nom} » sauvegardée.` : "Le monde n'est pas encore prêt.");
+      void rafraichirListeSauvegardes();
+    });
+  });
+  element("btn-fermer-sauvegardes", HTMLButtonElement).addEventListener("click", () => {
+    dlgSauvegardes.close();
+  });
+  btnReprendre.addEventListener("click", () => {
+    const nom = btnReprendre.dataset.nom;
+    if (nom !== undefined) void chargerSauvegarde(nom);
+  });
+  // Au chargement : la sauvegarde la plus récente (automatique ou nommée) se propose d'un clic.
+  void listerSauvegardes()
+    .then((entrees) => {
+      const derniere = entrees[0];
+      if (derniere === undefined) return;
+      btnReprendre.hidden = false;
+      btnReprendre.dataset.nom = derniere.nom;
+      btnReprendre.textContent = `↩ Reprendre ${derniere.nom === NOM_AUTO ? "la partie" : `« ${derniere.nom} »`} (jour ${String(derniere.jour)}, ${String(derniere.vivants)} vivants)`;
+    })
+    .catch(() => undefined);
+  // Quand la page passe à l'arrière-plan ou se ferme (mobile), on sauvegarde tout de suite.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") sauvegardeAutomatique(performance.now(), true);
+  });
+  window.addEventListener("pagehide", () => {
+    sauvegardeAutomatique(performance.now(), true);
   });
 }
 
@@ -634,6 +786,7 @@ function boucle(maintenant: number): void {
   if (maintenant - dernierPanneau > 250) {
     panneaux.rafraichir();
     rafraichirPouvoirs();
+    sauvegardeAutomatique(maintenant);
     const questions = magasin.etat?.questions.length ?? 0;
     badgeConseils.hidden = questions === 0;
     badgeConseils.textContent = String(questions);
