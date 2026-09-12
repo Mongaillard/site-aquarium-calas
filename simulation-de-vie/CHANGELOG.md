@@ -2,6 +2,51 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M14 – Le mode Dieu, v2 : foi, prières, autel, réputation, trois pouvoirs, lisibilité (2026-09-12)
+
+- **Foi** : chaque personnage a une foi de 0 à 10, née de ses valeurs (tradition ou harmonie 3,
+  curiosité ou liberté 1, sinon 2), héritée à moitié des parents, nourrie par les miracles vus
+  (+1 pour un bienfait, +2 pour une épreuve, +2 pour une prière exaucée) et usée d'un point par
+  saison sans miracle, jamais sous la foi native des valeurs. Le témoin d'un miracle y voit la main du ciel (« Le ciel nous a fait une
+  grâce ») ou une chance / un malheur selon sa foi et la **réputation** du dieu (−10..10 :
+  +1 par bienfait, −2 par épreuve ; un dieu redouté voit ses grâces mises sur le compte du
+  hasard, un dieu vénéré ses coups sur celui du sort). Jauge de foi dans la fiche, foi moyenne
+  dans Statistiques, réputation dans la barre de pouvoirs.
+- **Prières** : intention et action `prier` (adulte de foi ≥ 3, une fois par jour, jamais à la
+  place d'une urgence : un moment pris entre deux tâches quand la faim, le froid, la sécurité ou
+  le moral sont sous 40, que la faim ou le froid durent depuis des jours, ou qu'on est blessé ou
+  malade) ; sujet tiré du besoin le plus criant (faim, froid, soin, sécurité, moral,
+  protection) ; événement `priere`, souvenir, faveur +1. Une colonie ordinaire prie environ une
+  fois par jour dans les périodes difficiles. Une prière reste ouverte trois jours : un bienfait qui y répond (Ondée ou
+  Sève pour la faim, Braise ou Éclaircie pour le froid, Main qui guérit pour un soin, Souffle
+  pour le moral…) sur la personne ou à dix tuiles l'**exauce** (foi +2, faveur +2, souvenir
+  « Le ciel m'a entendu »). Les prières en attente s'affichent en mode Dieu, en haut à droite de
+  la carte, avec les pouvoirs qui les exaucent ; un clic ouvre la fiche.
+- **Autel** : nouveau bâtiment (quatre pierres, deux bois, travail 8), bâti par une famille
+  logée dont la foi moyenne atteint 5 (un par village). On y va prier quand il est à vingt
+  tuiles, et l'on y laisse une **offrande** de nourriture (faveur +2 de plus).
+- **Trois pouvoirs** : Troupeau offert (16 ✦, dix jours : quatre mouflons paissent sur la tuile,
+  à chasser ou apprivoiser), Idée soufflée (12 ✦ : l'invention qui manque devient une idée),
+  Loups au bord du halo (12 ✦, épreuve : une meute affamée arrive et devient la menace du
+  soir, prise en charge par le directeur de danger ; refusée si une menace est déjà ouverte).
+  Touches 1 à 9 puis 0 ; les deux derniers pouvoirs se choisissent au clic.
+- **Lisibilité** : une pastille « ❓ Inès demande conseil » dans la barre ouvre d'un clic la
+  fiche du demandeur ; la fiche montre la question telle que le moteur l'a posée (motifs en
+  clair, options proposées) puis la réponse de Claude (option choisie, pensée, but) ou la raison
+  d'une question sans suite ; le dernier conseil reste visible. Les lignes du Journal sont
+  cliquables (fiche de la personne concernée). L'aide de la barre de pouvoirs explique la
+  faveur ; le Journal dit ce qu'une prière demande et quelle prière un miracle a exaucée.
+- **Vitesses** ×128 et ×256 (la liaison locale plafonne à 480 ticks par seconde, le serveur à
+  256 par pas).
+- Calibration : la prière est une action de plus dans la journée des croyants, et les
+  trajectoires changent (mêmes graines, autres histoires). Sur cinq graines et 450 jours, sans
+  aucune intervention : 18, 16, 17, 28 et 15 vivants (graines 7, 42, 11, 2024, 99), soit la
+  même moyenne qu'en M12 (19), sans effondrement : le monde de la graine 42, qui tombait à 6,
+  tient à 16 ; les graines 7, 11 et 99 perdent quelques vivants dans des hivers de famine.
+- Pas encore (v3) : les épreuves lourdes (gel précoce, sécheresse, fièvre envoyée, secousse),
+  l'Épiphanie, les niveaux de culte et le gardien de l'autel, les leçons « le ciel écoute » /
+  « le ciel frappe » / « ne pas attendre le ciel », la migration conseillée.
+
 ## M13 – Le mode Dieu et le conseil de Claude (2026-09-12)
 
 Deux façons d'influencer sans jamais commander : l'observateur exerce des pouvoirs sur le

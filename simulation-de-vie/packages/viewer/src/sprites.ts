@@ -328,6 +328,25 @@ export function champ(ctx: Ctx, x: number, y: number, seme: boolean, stade: numb
   }
 }
 
+/** Autel : une dalle de pierre, deux montants, une petite flamme. */
+export function autel(ctx: Ctx, x: number, y: number, temps: number): void {
+  ctx.fillStyle = "#b9b09a";
+  ctx.fillRect(x + 0.2, y + 0.55, 0.6, 0.12);
+  ctx.fillStyle = "#8f8778";
+  ctx.fillRect(x + 0.26, y + 0.67, 0.12, 0.25);
+  ctx.fillRect(x + 0.62, y + 0.67, 0.12, 0.25);
+  ctx.fillStyle = "#d8c68a";
+  ctx.fillRect(x + 0.44, y + 0.35, 0.12, 0.2);
+  const f = 0.06 + 0.03 * Math.sin(temps / 120);
+  ctx.fillStyle = "#ffb347";
+  ctx.beginPath();
+  ctx.moveTo(x + 0.5, y + 0.2 - f);
+  ctx.lineTo(x + 0.56, y + 0.35);
+  ctx.lineTo(x + 0.44, y + 0.35);
+  ctx.closePath();
+  ctx.fill();
+}
+
 export function tombe(ctx: Ctx, x: number, y: number): void {
   ctx.fillStyle = "#777777";
   ctx.beginPath();

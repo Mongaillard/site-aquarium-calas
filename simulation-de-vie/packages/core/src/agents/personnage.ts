@@ -102,6 +102,42 @@ export interface Ambition {
   readonly lieuxAuDepart: number;
 }
 
+/** Une prière : ce qu'on a demandé au ciel, et si le ciel a répondu dans les trois jours. */
+export interface Priere {
+  readonly tick: number;
+  readonly sujet: SujetPriere;
+  readonly autel: boolean;
+  exaucee: boolean;
+}
+
+export const SUJETS_PRIERE = ["faim", "froid", "soin", "securite", "moral", "protection"] as const;
+export type SujetPriere = (typeof SUJETS_PRIERE)[number];
+
+/** Le dernier conseil demandé à Claude : la question, et ce qu'il en est sorti. */
+export interface DernierConseil {
+  readonly questionId: string;
+  readonly tick: number;
+  readonly motifs: readonly string[];
+  readonly options: readonly {
+    readonly id: string;
+    readonly libelle: string;
+    readonly pourquoi: string;
+  }[];
+  readonly choix: string | null;
+  readonly libelle: string | null;
+  readonly pensee: string;
+  readonly but: string | null;
+  readonly applique: boolean;
+  readonly raison: string | null;
+}
+
+/** Foi initiale : la tradition et l'harmonie y portent, la curiosité et la liberté s'en défient. */
+export function foiInitiale(valeurs: readonly string[]): number {
+  if (valeurs.includes("tradition") || valeurs.includes("harmonie")) return 3;
+  if (valeurs.includes("curiosite") || valeurs.includes("liberte")) return 1;
+  return 2;
+}
+
 export interface Personnage {
   readonly id: string;
   readonly identite: Identite;
@@ -123,6 +159,16 @@ export interface Personnage {
   penseeClaude: { texte: string; tick: number } | null;
   /** Ambition en cours ou dernière issue (conseil de Claude). */
   ambition: Ambition | null;
+  /** Le dernier conseil demandé à Claude (question et réponse). */
+  dernierConseil: DernierConseil | null;
+  /** Foi 0..10 : qui croit au ciel prie, et voit un miracle où d'autres voient une chance. */
+  foi: number;
+  /** Tick du dernier miracle vu (−1 : jamais) ; une saison sans miracle use la foi. */
+  dernierMiracleVu: number;
+  /** Tick de la dernière prière (une par jour au plus). */
+  dernierePriere: number;
+  /** La prière en attente (ou la dernière). */
+  priere: Priere | null;
   /** Modificateurs d'humeur datés (deuil, blessure, naissance…). */
   readonly humeur: Modificateur[];
   readonly relations: Map<string, Relation>;
@@ -207,6 +253,11 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
     savoirs: new Map(),
     penseeClaude: null,
     ambition: null,
+    dernierConseil: null,
+    foi: foiInitiale(identite.valeurs),
+    dernierMiracleVu: -1,
+    dernierePriere: -1,
+    priere: null,
     humeur: [],
     relations: new Map(),
     memoire: new FluxMemoire({

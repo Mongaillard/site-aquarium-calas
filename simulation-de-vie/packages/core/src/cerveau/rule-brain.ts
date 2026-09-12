@@ -611,6 +611,28 @@ export class RuleBrain implements Cerveau {
       });
     }
 
+    // Prier : qui croit au ciel s'adresse à lui quand ça va mal (un besoin bas maintenant, ou
+    // des jours de faim, de froid ou de moral bas), une fois par jour, jamais à la place d'une
+    // urgence : c'est un moment pris entre deux tâches.
+    if (
+      adulte &&
+      perception.moi.foi >= 3 &&
+      perception.moi.peutPrier &&
+      !nuit &&
+      (besoins.faim < 40 ||
+        besoins.chaleur < 40 ||
+        besoins.securite < 40 ||
+        besoins.moral < 40 ||
+        perception.moi.joursDeGene > 0 ||
+        corps.blesse ||
+        corps.malade)
+    ) {
+      candidats.push({
+        intention: { type: "prier" },
+        score: 0.55 + perception.moi.foi * 0.04 + (perception.autelConnu ? 0.15 : 0),
+      });
+    }
+
     // Du gibier en vue : on chasse, d'autant plus qu'on a faim et que d'autres rabattent déjà.
     const gibierEnVue = perception.troupeauxVisibles.find((t) => !t.predateur);
     if (adulte && gibierEnVue !== undefined && armeDeChasse && placeLibre > 1) {

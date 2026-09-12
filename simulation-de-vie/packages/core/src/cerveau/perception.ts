@@ -267,7 +267,14 @@ export interface Perception {
     readonly explorerPlusLoin: boolean;
     /** Priorité choisie sur les conseils de Claude (ambition en cours), s'il y en a une. */
     readonly priorite: Priorite | null;
+    /** Foi 0..10, et si l'on n'a pas encore prié aujourd'hui. */
+    readonly foi: number;
+    readonly peutPrier: boolean;
+    /** Jours consécutifs de faim, de froid ou de moral bas (le plus long des trois). */
+    readonly joursDeGene: number;
   };
+  /** Un autel terminé à vingt tuiles. */
+  readonly autelConnu: boolean;
   readonly moment: Moment;
   readonly meteo: Meteo;
   readonly rayon: number;
@@ -504,7 +511,17 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
       },
       explorerPlusLoin: p.drapeaux.explorerPlusLoinJusqua > monde.horloge.tick,
       priorite: prioriteEnCours(p),
+      foi: p.foi,
+      joursDeGene: Math.max(p.drapeaux.joursFaim, p.drapeaux.joursFroid, p.drapeaux.joursMoralBas),
+      peutPrier:
+        p.dernierePriere < 0 || monde.horloge.tick - p.dernierePriere >= monde.horloge.ticksParJour,
     },
+    autelConnu: [...monde.batiments.values()].some(
+      (b) =>
+        b.type === "autel" &&
+        b.etat === "termine" &&
+        Grille.distance(b.position, p.corps.position) <= 20,
+    ),
     moment,
     meteo: monde.meteo,
     rayon,

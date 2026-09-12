@@ -155,6 +155,10 @@ export interface Statistiques {
   readonly ambitions: readonly AmbitionStat[];
   /** Miracles exercés par l'observateur. */
   readonly miracles: number;
+  /** Foi moyenne des vivants (0..10), prières et prières exaucées. */
+  readonly foiMoyenne: number;
+  readonly prieres: number;
+  readonly exaucees: number;
 }
 
 export interface SavoirStat {
@@ -213,6 +217,9 @@ export const POUVOIRS = [
   "foudre",
   "songe",
   "regard",
+  "troupeau",
+  "idee",
+  "loups",
 ] as const;
 export type Pouvoir = (typeof POUVOIRS)[number];
 
@@ -324,7 +331,60 @@ export const FICHES_POUVOIR: Readonly<Record<Pouvoir, FichePouvoir>> = {
     bienfait: true,
     description: "Le brouillard se lève sur les alentours (la colonie ne le sait pas).",
   },
+  troupeau: {
+    nom: "Troupeau offert",
+    emoji: "🐏",
+    cout: 16,
+    cible: "tuile",
+    rayon: 0,
+    rechargeJours: 10,
+    bienfait: true,
+    description: "Quatre mouflons paissent ici : de la viande, ou des bêtes à apprivoiser.",
+  },
+  idee: {
+    nom: "Idée soufflée",
+    emoji: "💡",
+    cout: 12,
+    cible: "personnage",
+    rayon: 0,
+    rechargeJours: 3,
+    bienfait: true,
+    description: "Une personne a soudain l'idée de l'invention qui lui manque.",
+  },
+  loups: {
+    nom: "Loups au bord du halo",
+    emoji: "🐺",
+    cout: 12,
+    cible: "tuile",
+    rayon: 0,
+    rechargeJours: 5,
+    bienfait: false,
+    description: "Une meute affamée arrive ici et menacera le village dès ce soir.",
+  },
 };
+
+/** Ce qu'une prière demande, et les pouvoirs qui l'exaucent. */
+export const SUJETS_PRIERE = ["faim", "froid", "soin", "securite", "moral", "protection"] as const;
+export type SujetPriere = (typeof SUJETS_PRIERE)[number];
+export const POUVOIRS_EXAUCANT: Readonly<Record<SujetPriere, readonly Pouvoir[]>> = {
+  faim: ["pluie", "seve", "troupeau"],
+  froid: ["eclaircie", "braise"],
+  soin: ["guerison"],
+  securite: ["souffle", "braise"],
+  moral: ["souffle"],
+  protection: ["souffle", "braise", "eclaircie"],
+};
+
+/** Une prière en attente : la quête que le ciel peut exaucer dans les trois jours. */
+export interface PriereEtat {
+  readonly personnageId: string;
+  readonly prenom: string;
+  readonly sujet: SujetPriere;
+  readonly tick: number;
+  readonly autel: boolean;
+  readonly x: number;
+  readonly y: number;
+}
 
 export interface FaveurEtat {
   readonly valeur: number;
@@ -333,6 +393,12 @@ export interface FaveurEtat {
   readonly recharges: Readonly<Record<string, number>>;
   /** Miracles exercés depuis le début. */
   readonly miracles: number;
+  /** Réputation du dieu −10..10 : les bienfaits la font monter, les épreuves la font chuter. */
+  readonly reputation: number;
+  /** Prières entendues, offrandes reçues, prières exaucées. */
+  readonly prieres: number;
+  readonly offrandes: number;
+  readonly exaucees: number;
 }
 
 /** Contexte d'une demande de conseil, construit par le moteur (jamais par la page). */
@@ -428,6 +494,8 @@ export interface MessageEtat {
   readonly faveur: FaveurEtat;
   /** Questions ouvertes à Claude (au plus une). */
   readonly questions: readonly QuestionConseil[];
+  /** Prières en attente (trois jours au plus), les plus récentes d'abord. */
+  readonly prieres: readonly PriereEtat[];
 }
 
 export interface RelationFiche {
@@ -541,6 +609,28 @@ export interface MessageFiche {
   readonly ambition: AmbitionFiche | null;
   /** Le bouton « Demander conseil » est-il possible maintenant ? */
   readonly conseilPossible: boolean;
+  /** La question ouverte, ou le dernier conseil demandé (question, options, réponse). */
+  readonly conseil: ConseilFiche | null;
+  readonly foi: number;
+  readonly priere: {
+    readonly sujet: SujetPriere;
+    readonly tick: number;
+    readonly exaucee: boolean;
+    readonly autel: boolean;
+  } | null;
+}
+
+export interface ConseilFiche {
+  readonly questionId: string;
+  readonly etat: "ouverte" | "repondue" | "sans_suite";
+  readonly tick: number;
+  readonly motifs: readonly string[];
+  readonly options: readonly OptionConseil[];
+  readonly choix: string | null;
+  readonly libelle: string | null;
+  readonly pensee: string;
+  readonly but: string | null;
+  readonly raison: string | null;
 }
 
 export interface MessageErreur {
@@ -587,7 +677,7 @@ export type Commande =
   | { readonly type: "demander_conseil"; readonly id: string };
 
 /** Vitesses proposées par l'interface (ticks de jeu par seconde réelle). */
-export const VITESSES: readonly number[] = [1, 4, 16, 64];
+export const VITESSES: readonly number[] = [1, 4, 16, 64, 128, 256];
 
 /** Analyse une commande reçue (JSON) ; renvoie `null` si elle est invalide. */
 export function analyserCommande(texte: string): Commande | null {

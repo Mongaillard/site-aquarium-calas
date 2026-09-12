@@ -18,6 +18,7 @@ export const TYPES_BATIMENT = [
   "fumoir",
   "enclos",
   "champ",
+  "autel",
 ] as const;
 export type TypeBatiment = (typeof TYPES_BATIMENT)[number];
 
@@ -155,6 +156,19 @@ export const PLANS_BATIMENT: Record<TypeBatiment, PlanBatiment> = {
     atelier: null,
     sourceEau: false,
     ascii: "=",
+  },
+  autel: {
+    nom: "autel",
+    materiaux: { pierre: 4, bois: 2 },
+    travail: 8,
+    capaciteDormeurs: 0,
+    capaciteStock: 0,
+    chaleur: 0,
+    rayonChaleur: 0,
+    abri: false,
+    atelier: null,
+    sourceEau: false,
+    ascii: "^",
   },
   fumoir: {
     nom: "fumoir",

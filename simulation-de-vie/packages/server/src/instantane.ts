@@ -41,6 +41,7 @@ import type {
   AmbitionFiche,
   AmbitionStat,
   BatimentEtat,
+  ConseilFiche,
   BilanSaison,
   EvenementEtat,
   GisementEtat,
@@ -292,6 +293,47 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     },
     ambitions: ambitionsEnCours(sim),
     miracles: sim.faveur.miracles,
+    foiMoyenne: foiMoyenne(sim),
+    prieres: sim.faveur.prieres,
+    exaucees: sim.faveur.exaucees,
+  };
+}
+
+export function foiMoyenne(sim: Simulation): number {
+  const vivants = sim.vivants();
+  if (vivants.length === 0) return 0;
+  return Math.round((vivants.reduce((t, p) => t + p.foi, 0) / vivants.length) * 10) / 10;
+}
+
+/** La question ouverte de cette personne, sinon son dernier conseil. */
+export function conseilFiche(sim: Simulation, p: Personnage): ConseilFiche | null {
+  const q = sim.questionEnCours;
+  if (q?.personnageId === p.id)
+    return {
+      questionId: q.id,
+      etat: "ouverte",
+      tick: q.tick,
+      motifs: q.motifs,
+      options: q.options,
+      choix: null,
+      libelle: null,
+      pensee: "",
+      but: null,
+      raison: null,
+    };
+  const d = p.dernierConseil;
+  if (d === null) return null;
+  return {
+    questionId: d.questionId,
+    etat: d.applique ? "repondue" : "sans_suite",
+    tick: d.tick,
+    motifs: d.motifs,
+    options: d.options,
+    choix: d.choix,
+    libelle: d.libelle,
+    pensee: d.pensee,
+    but: d.but,
+    raison: d.raison,
   };
 }
 
@@ -426,6 +468,7 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     rayonVision: rayonVision(sim, sim.horloge.moment()),
     faveur: sim.etatFaveur(),
     questions: sim.questionsEnAttente(),
+    prieres: sim.prieresOuvertes(),
   };
 }
 
@@ -543,6 +586,8 @@ export function pensee(sim: Simulation, p: Personnage): string {
       return `Cet outil est ébréché, je le répare tant qu'il tient.`;
     case "abattre":
       return "On n'a plus rien ; il va falloir abattre une bête.";
+    case "prier":
+      return "Que le ciel m'entende.";
   }
 }
 
@@ -642,6 +687,16 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
     metier: sim.titre(p),
     ambition: ambitionFiche(sim, p),
     conseilPossible: sim.conseilPossible(p),
+    conseil: conseilFiche(sim, p),
+    foi: p.foi,
+    priere: p.priere
+      ? {
+          sujet: p.priere.sujet,
+          tick: p.priere.tick,
+          exaucee: p.priere.exaucee,
+          autel: p.priere.autel,
+        }
+      : null,
     humeur: p.humeur
       .filter((m) => m.jusqua > sim.tick)
       .map((m) => ({ cle: m.cle, valeur: Math.round(m.valeur) })),

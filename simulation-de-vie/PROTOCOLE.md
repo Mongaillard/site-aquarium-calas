@@ -924,6 +924,16 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   chaque aube et la déclare accomplie ou abandonnée. C'est la trace visible de « où il va ».
 - Sobriété inchangée : un appel à la fois, conseils espacés d'au moins vingt secondes réelles,
   quatre questions par jour simulé au plus, cinq jours de silence par personne.
+- **v2 (M14)** : la foi (0..10, valeurs, héritage à moitié, miracles vus, une saison sans
+  miracle) décide de l'attribution d'un miracle au ciel ou au hasard, avec la réputation du dieu
+  (−10..10). Les prières sont une intention du cerveau à règles (`prier`, une par jour, foi ≥ 3,
+  un besoin sous 40) ; le moteur en fait des événements `priere` (faveur +1, offrande à l'autel
+  +2) et les tient ouvertes trois jours : un bienfait de sujet correspondant, sur la personne ou
+  à dix tuiles, les exauce (foi +2, faveur +2). L'autel est un bâtiment ordinaire (famille logée
+  de foi moyenne ≥ 5, un par village). Trois pouvoirs de plus : Troupeau offert, Idée soufflée,
+  Loups au bord du halo (qui passe par le directeur de danger, jamais à côté). La fiche expose
+  la question posée à Claude (motifs, options) et la réponse, pour que l'observateur voie ce que
+  le moteur a proposé et ce que Claude a choisi.
 
 ## 15 bis. Savoirs : leçons et inventions
 

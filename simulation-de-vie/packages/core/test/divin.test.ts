@@ -60,6 +60,8 @@ describe("mode Dieu : faveur et pouvoirs", () => {
       raison: "faveur_insuffisante",
     });
     sim.faveur.valeur = 20;
+    // Des témoins qui croient : ils verront la main du ciel.
+    for (const x of sim.vivants()) x.foi = 5;
     const r = sim.exercer({ pouvoir: "pluie", x: pos.x, y: pos.y });
     expect(r.ok).toBe(true);
     expect(sim.meteo).toBe("pluie");

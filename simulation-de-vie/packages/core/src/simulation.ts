@@ -93,12 +93,18 @@ import { Rng } from "./rng.js";
 import type { FaveurEtat, QuestionConseil } from "@sdv/protocole";
 import {
   FAVEUR_EVENEMENTS,
+  FAVEUR_OFFRANDE,
   FAVEUR_PAR_JOUR,
+  FAVEUR_PRIERE,
+  JOURS_PRIERE,
   etatFaveurInitial,
   exercer as exercerPouvoir,
   faveurEtat,
   gagnerFaveur,
+  saisonSansMiracle,
 } from "./monde/divin.js";
+import type { PriereEtat } from "@sdv/protocole";
+import type { Espece } from "./monde/faune.js";
 import type { CommandePouvoir, EtatFaveur, ResultatPouvoir } from "./monde/divin.js";
 import {
   FILE_MAX,
@@ -196,6 +202,14 @@ export class Simulation implements Monde {
       this.memoriser(e);
       const gain = FAVEUR_EVENEMENTS[e.type];
       if (gain !== undefined && this.tick > 0) gagnerFaveur(this.faveur, gain);
+      if (e.type === "priere") {
+        this.faveur.prieres += 1;
+        gagnerFaveur(this.faveur, FAVEUR_PRIERE);
+        if (typeof e.details.offrande === "string") {
+          this.faveur.offrandes += 1;
+          gagnerFaveur(this.faveur, FAVEUR_OFFRANDE);
+        }
+      }
     });
     for (const p of this.personnages) {
       this.cerveaux.set(p.id, new RuleBrain(p));
@@ -306,6 +320,50 @@ export class Simulation implements Monde {
   /** La faveur, telle que le protocole la transporte. */
   etatFaveur(): FaveurEtat {
     return faveurEtat(this.faveur);
+  }
+
+  /** Fait naître un troupeau (ou une meute) : troupeau offert, loups envoyés. */
+  ajouterTroupeau(position: Position, espece: Espece, taille: number): Troupeau {
+    const id = `faune-${String(++this.compteurTroupeaux)}`;
+    const t: Troupeau = {
+      id,
+      espece,
+      position: { ...position },
+      gite: { ...position },
+      giteEte: { ...position },
+      taille,
+      mefiance: 0,
+      etat: "pature",
+      cible: null,
+      faim: 0,
+      derniereMiseBas: 0,
+      proieHumaine: null,
+      enMenace: false,
+      rng: this.rng.fork(id),
+    };
+    this.troupeaux.set(id, t);
+    this.emettre("faune", null, { genre: "arrivee", espece, taille, source: "divin" }, 4, position);
+    return t;
+  }
+
+  /** Les prières en attente d'une réponse du ciel (trois jours), les plus récentes d'abord. */
+  prieresOuvertes(): PriereEtat[] {
+    const T = this.horloge.ticksParJour;
+    const resultat: PriereEtat[] = [];
+    for (const p of this.vivants()) {
+      const pr = p.priere;
+      if (pr === null || pr.exaucee || this.tick - pr.tick > JOURS_PRIERE * T) continue;
+      resultat.push({
+        personnageId: p.id,
+        prenom: p.identite.prenom,
+        sujet: pr.sujet,
+        tick: pr.tick,
+        autel: pr.autel,
+        x: p.corps.position.x,
+        y: p.corps.position.y,
+      });
+    }
+    return resultat.sort((a, b) => b.tick - a.tick);
   }
 
   // ---------------------------------------------------- demander à Claude
@@ -423,6 +481,19 @@ export class Simulation implements Monde {
     const p = this.personnage(q.personnageId);
     const fermer = (raison: string): void => {
       this.questionEnCours = null;
+      if (p !== undefined)
+        p.dernierConseil = {
+          questionId: q.id,
+          tick: this.tick,
+          motifs: q.motifs,
+          options: q.options,
+          choix: conseil.choix === "aucun" ? null : conseil.choix,
+          libelle: null,
+          pensee: conseil.pensee.trim().slice(0, 300),
+          but: null,
+          applique: false,
+          raison,
+        };
       this.emettre(
         "conseil",
         p ?? null,
@@ -449,6 +520,18 @@ export class Simulation implements Monde {
     }
     this.questionEnCours = null;
     const ambition = appliquerConseil(this, p, option, conseil);
+    p.dernierConseil = {
+      questionId: q.id,
+      tick: this.tick,
+      motifs: q.motifs,
+      options: q.options,
+      choix: option.id,
+      libelle: option.libelle,
+      pensee: ambition.pensee,
+      but: ambition.but,
+      applique: true,
+      raison: null,
+    };
     this.emettre(
       "conseil",
       p,
@@ -767,6 +850,8 @@ export class Simulation implements Monde {
     enfant.besoins.faim = 80;
     enfant.besoins.soif = 80;
     enfant.corps.sante = 60;
+    // La foi s'hérite à moitié, sans descendre sous celle que donnent ses propres valeurs.
+    enfant.foi = Math.max(enfant.foi, Math.round((mere.foi + pere.foi) / 4));
     this.personnages.push(enfant);
     this.cerveaux.set(id, new RuleBrain(enfant));
     for (const parent of [mere, pere]) {
@@ -959,6 +1044,7 @@ export class Simulation implements Monde {
     if (this.tick > 0) {
       this.conseilsDuJour = 0;
       gagnerFaveur(this.faveur, FAVEUR_PAR_JOUR);
+      if (moment.jourDeSaison === 1) saisonSansMiracle(this);
       for (const p of this.vivants()) {
         jourCompteurs(p);
         const issue = jourAmbition(this, p);

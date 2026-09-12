@@ -1,7 +1,8 @@
 /** Point d'entrée du viewer : liaison (serveur ou locale), rendu, interactions souris et tactiles. */
 import "./style.css";
 import type { Commande, MessageServeur, Pouvoir } from "@sdv/protocole";
-import { FICHES_POUVOIR, POUVOIRS, VITESSES } from "@sdv/protocole";
+import { FICHES_POUVOIR, POUVOIRS, POUVOIRS_EXAUCANT, VITESSES } from "@sdv/protocole";
+import { LIBELLES_SUJET, libelleReputation } from "./format.js";
 import type { Camera } from "./camera.js";
 import { cadrer, centrerSur, deplacer, versMonde, zoomer } from "./camera.js";
 import { Magasin } from "./etat.js";
@@ -330,6 +331,10 @@ const aidePouvoir = element("pouvoir-aide", HTMLDivElement);
 const btnAppliquer = element("btn-appliquer", HTMLButtonElement);
 const faveurJauge = element("faveur-jauge", HTMLElement);
 const faveurNum = element("faveur-num", HTMLSpanElement);
+const reputationEl = element("reputation", HTMLDivElement);
+const prieresEl = element("prieres", HTMLDivElement);
+const btnQuestion = element("btn-question", HTMLButtonElement);
+const TOUCHES_POUVOIR = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 let cibleTactile: { sx: number; sy: number } | null = null;
 const boutonsPouvoir = new Map<Pouvoir, HTMLButtonElement>();
 POUVOIRS.forEach((pouvoir, i) => {
@@ -340,7 +345,8 @@ POUVOIRS.forEach((pouvoir, i) => {
   b.dataset.pouvoir = pouvoir;
   b.title = `${fiche.nom} (${String(fiche.cout)} ✦${fiche.rechargeJours > 0 ? `, ${String(fiche.rechargeJours)} j de recharge` : ""}) — ${fiche.description}`;
   b.setAttribute("aria-pressed", "false");
-  b.innerHTML = `<span class="touche">${String(i + 1)}</span>${fiche.emoji}<span class="cout">${String(fiche.cout)}</span><span class="recharge" hidden></span>`;
+  const touche = TOUCHES_POUVOIR[i];
+  b.innerHTML = `${touche === undefined ? "" : `<span class="touche">${touche}</span>`}${fiche.emoji}<span class="cout">${String(fiche.cout)}</span><span class="recharge" hidden></span>`;
   b.addEventListener("click", () => {
     armer(magasin.pouvoirArme === pouvoir ? null : pouvoir);
   });
@@ -357,7 +363,7 @@ function armer(pouvoir: Pouvoir | null): void {
   const fiche = pouvoir === null ? null : FICHES_POUVOIR[pouvoir];
   aidePouvoir.textContent =
     fiche === null
-      ? "Choisissez un pouvoir, puis touchez la carte."
+      ? "Faveur ✦ : +1 par jour, plus quand la colonie prospère ou prie. Choisissez un pouvoir (coût en bas à droite), puis touchez la carte."
       : `${fiche.nom} : ${fiche.cible === "personnage" ? "touchez une personne" : fiche.cible === "batiment" ? "touchez un bâtiment" : "touchez une tuile connue"}. ${fiche.description}`;
 }
 function desarmer(): void {
@@ -442,7 +448,36 @@ function rafraichirPouvoirs(): void {
   }
   if (magasin.pouvoirArme !== null && boutonsPouvoir.get(magasin.pouvoirArme)?.disabled === true)
     desarmer();
+  reputationEl.textContent = `Réputation du ciel : ${libelleReputation(f.reputation)} · ${String(f.prieres)} prière${f.prieres > 1 ? "s" : ""}, ${String(f.exaucees)} exaucée${f.exaucees > 1 ? "s" : ""}`;
+  // Les prières en attente : ce que la colonie demande au ciel, et ce qui l'exaucerait.
+  const prieres = etat.prieres.slice(0, 4);
+  prieresEl.hidden = prieres.length === 0;
+  if (
+    prieresEl.dataset.cle !== prieres.map((p) => `${p.personnageId}:${String(p.tick)}`).join("|")
+  ) {
+    prieresEl.dataset.cle = prieres.map((p) => `${p.personnageId}:${String(p.tick)}`).join("|");
+    prieresEl.replaceChildren(
+      ...prieres.map((p) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        const pouvoirs = POUVOIRS_EXAUCANT[p.sujet]
+          .map((x) => `${FICHES_POUVOIR[x].emoji} ${FICHES_POUVOIR[x].nom}`)
+          .join(", ");
+        b.innerHTML = `🙏 ${p.prenom} prie pour ${LIBELLES_SUJET[p.sujet] ?? p.sujet}<span class="discret">exaucer : ${pouvoirs}</span>`;
+        b.title = "Voir la fiche";
+        b.addEventListener("click", () => {
+          selectionner(p.personnageId);
+        });
+        return b;
+      }),
+    );
+  }
 }
+
+btnQuestion.addEventListener("click", () => {
+  const id = btnQuestion.dataset.id;
+  if (id !== undefined) selectionner(id);
+});
 
 // Légende repliable (utile sur petit écran).
 const legende = element("legende", HTMLDivElement);
@@ -553,8 +588,8 @@ window.addEventListener("keydown", (ev) => {
       basculerBrouillard();
       break;
     default: {
-      const n = Number.parseInt(ev.key, 10);
-      const pouvoir = Number.isInteger(n) && n >= 1 ? POUVOIRS[n - 1] : undefined;
+      const i = TOUCHES_POUVOIR.indexOf(ev.key);
+      const pouvoir = i >= 0 ? POUVOIRS[i] : undefined;
       if (pouvoir !== undefined) {
         if (!magasin.modeDieu) basculerModeDieu(true);
         armer(magasin.pouvoirArme === pouvoir ? null : pouvoir);
@@ -602,6 +637,14 @@ function boucle(maintenant: number): void {
     const questions = magasin.etat?.questions.length ?? 0;
     badgeConseils.hidden = questions === 0;
     badgeConseils.textContent = String(questions);
+    // La question ouverte, en un clic : la pastille de la barre ouvre la fiche du demandeur.
+    const q = magasin.etat?.questions[0];
+    btnQuestion.hidden = q === undefined;
+    if (q !== undefined) {
+      const texte = `❓ ${q.contexte.prenom} demande conseil${cerveauClaude.conseilsActifs ? " (Claude réfléchit)" : ""}`;
+      if (btnQuestion.textContent !== texte) btnQuestion.textContent = texte;
+      btnQuestion.dataset.id = q.personnageId;
+    }
     dernierPanneau = maintenant;
     if (cerveauClaude.estActif || cerveauClaude.conseilsActifs) {
       void cerveauClaude.tick(maintenant).then(() => {

@@ -49,6 +49,7 @@
         >
           💬 Conseils<span id="badge-conseils" class="badge" hidden></span>
         </button>
+        <button id="btn-question" class="btn-question" type="button" hidden></button>
         <div id="connexion" class="connexion">connexion…</div>
       </header>
       <main id="principal">
@@ -62,11 +63,16 @@
               <i id="faveur-jauge"></i><span id="faveur-num">✦ 0</span>
             </div>
             <div id="palette" class="palette"></div>
-            <div id="pouvoir-aide" class="aide discret">
-              Choisissez un pouvoir, puis touchez la carte.
+            <div class="colonne">
+              <div id="pouvoir-aide" class="aide discret">
+                Faveur ✦ : +1 par jour, plus quand la colonie prospère ou prie. Choisissez un
+                pouvoir (coût en bas à droite), puis touchez la carte.
+              </div>
+              <div id="reputation" class="reputation discret"></div>
             </div>
             <button id="btn-appliquer" class="btn-appliquer" type="button" hidden>✓ Ici</button>
           </div>
+          <div id="prieres" class="prieres" hidden></div>
         </div>
         <aside id="panneau">
           <nav id="onglets">

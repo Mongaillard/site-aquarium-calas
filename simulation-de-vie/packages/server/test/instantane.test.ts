@@ -88,6 +88,7 @@ describe("instantanés", () => {
     expect(e2.questions[0]?.personnageId).toBe(p.id);
     expect(e2.questions[0]?.options.length).toBeGreaterThan(0);
     expect(messageFiche(s, p.id)?.conseilPossible).toBe(false);
+    expect(messageFiche(s, p.id)?.conseil).toMatchObject({ etat: "ouverte", choix: null });
     const q = e2.questions[0];
     if (!q) throw new Error("vide");
     const option = q.options.find((o) => o.id.startsWith("priorite:")) ?? q.options[0];
@@ -113,6 +114,16 @@ describe("instantanés", () => {
       issue: "en_cours",
       joursRestants: 5,
     });
+    const fiche = messageFiche(s, p.id);
+    expect(fiche?.conseil).toMatchObject({
+      etat: "repondue",
+      choix: option.id,
+      but: "tenir jusqu'au printemps",
+    });
+    expect(fiche?.conseil?.options.length).toBeGreaterThan(0);
+    expect(fiche?.foi).toBeGreaterThanOrEqual(0);
+    expect(fiche?.priere).toBeNull();
+    expect(e3.prieres).toEqual([]);
     s.exercer({ pouvoir: "regard", x: p.corps.position.x, y: p.corps.position.y });
     const e4 = messageEtat(s, { ticksParSeconde: 4, pause: false, suivi, bilan, indexJournal: 0 });
     expect(e4.stats.miracles).toBe(1);

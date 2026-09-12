@@ -474,6 +474,9 @@ export class Rendu {
       case "tombe":
         sprites.tombe(ctx, b.x, b.y);
         break;
+      case "autel":
+        sprites.autel(ctx, b.x, b.y, maintenant);
+        break;
       case "enclos":
         sprites.enclos(ctx, b.x, b.y);
         break;

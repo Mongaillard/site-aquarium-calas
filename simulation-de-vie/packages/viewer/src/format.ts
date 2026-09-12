@@ -37,6 +37,7 @@ export const LETTRES_BATIMENT: Readonly<Record<string, string>> = {
   fumoir: "S",
   enclos: "O",
   champ: "=",
+  autel: "^",
 };
 
 export const COULEURS_BATIMENT: Readonly<Record<string, string>> = {
@@ -51,6 +52,7 @@ export const COULEURS_BATIMENT: Readonly<Record<string, string>> = {
   fumoir: "#8a6a3a",
   enclos: "#a0783c",
   champ: "#8fa63a",
+  autel: "#d8c68a",
 };
 
 export const NOMS_BATIMENT: Readonly<Record<string, string>> = {
@@ -65,6 +67,7 @@ export const NOMS_BATIMENT: Readonly<Record<string, string>> = {
   fumoir: "fumoir",
   enclos: "enclos",
   champ: "champ",
+  autel: "autel",
 };
 
 export const LIBELLES_METEO: Readonly<Record<string, string>> = {
@@ -86,6 +89,7 @@ export const LIBELLES_TYPE: Readonly<Record<string, string>> = {
   divin: "miracle",
   conseil: "conseil de Claude",
   ambition: "ambition",
+  priere: "prière",
   arrivee: "arrivée",
   deces: "décès",
   intention: "intention",
@@ -124,6 +128,34 @@ export const LIBELLES_TYPE: Readonly<Record<string, string>> = {
   heritage: "héritage",
   adoption: "adoption",
 };
+
+/** Motifs d'une demande de conseil, en clair. */
+export const LIBELLES_MOTIF: Readonly<Record<string, string>> = {
+  besoin_sans_idee: "un besoin sans idée pour y répondre",
+  inconfort_chronique: "un inconfort qui dure (faim, froid ou moral)",
+  echec_repete: "des échecs répétés",
+  sans_projet: "aucun projet",
+  observateur: "à votre demande",
+};
+
+/** Ce qu'une prière demande. */
+export const LIBELLES_SUJET: Readonly<Record<string, string>> = {
+  faim: "que la faim cesse",
+  froid: "un peu de chaleur",
+  soin: "guérir",
+  securite: "être protégé",
+  moral: "retrouver courage",
+  protection: "que rien n'arrive aux siens",
+};
+
+/** Réputation du dieu, en un mot. */
+export function libelleReputation(r: number): string {
+  if (r >= 7) return "vénéré";
+  if (r >= 3) return "bienveillant";
+  if (r > -3) return "discret";
+  if (r > -7) return "redouté";
+  return "cruel";
+}
 
 export function couleurFamille(nomFamille: string): string {
   return `hsl(${teinteFamille(nomFamille)} 70% 58%)`;
@@ -407,10 +439,15 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       }
     }
     case "divin":
-      return `✨ ${String(d.nom)} en (${String(d.x)}, ${String(d.y)}) : ${String(d.effet)}${d.reaction !== null && d.reaction !== undefined && qui ? ` — ${qui} : « ${String(d.reaction)} »` : ""}`;
+      return `✨ ${String(d.nom)} en (${String(d.x)}, ${String(d.y)}) : ${String(d.effet)}${d.reaction !== null && d.reaction !== undefined && qui ? ` — ${qui} : « ${String(d.reaction)} »` : ""}${typeof d.exauces === "string" && d.exauces !== "" ? ` — prière exaucée : ${d.exauces}` : ""}`;
+    case "priere":
+      return `🙏 ${qui} prie pour ${LIBELLES_SUJET[String(d.sujet)] ?? String(d.sujet)}${d.autel === true ? " à l'autel" : ""}${typeof d.offrande === "string" ? ` et offre ${d.offrande}` : ""}.`;
     case "conseil":
       if (d.etape === "question")
-        return `💬 ${qui} demande conseil à Claude (${String(d.motifs).replace(/_/g, " ").replace(/,/g, ", ")}).`;
+        return `💬 ${qui} demande conseil à Claude : ${String(d.motifs)
+          .split(",")
+          .map((m) => LIBELLES_MOTIF[m] ?? m)
+          .join(", ")} (cliquez pour voir la question).`;
       return d.applique === true
         ? `💬 ${qui} a demandé conseil : ${String(d.libelle)} — « ${String(d.pensee)} » (${String(d.jours)} j pour : ${String(d.but)})`
         : d.raison === "expiree"

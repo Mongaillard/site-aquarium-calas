@@ -16,7 +16,7 @@ import {
   objet,
 } from "../agents/inventaire.js";
 import { cleLieu, relationAvec } from "../agents/personnage.js";
-import type { Personnage } from "../agents/personnage.js";
+import type { Personnage, SujetPriere } from "../agents/personnage.js";
 import { PLANS_BATIMENT, materiauxLivres, materiauxManquants } from "../monde/batiments.js";
 import { INFO_BIOME } from "../monde/biomes.js";
 import { Grille } from "../monde/grille.js";
@@ -152,6 +152,8 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       return tickReparer(monde, p, action);
     case "abattre":
       return tickAbattre(monde, p, action);
+    case "prier":
+      return tickPrier(monde, p, action);
     case "defendre": {
       const cible = monde.personnages.find((x) => x.id === action.cible);
       if (!cible?.vivant) return echec("personne à défendre");
@@ -890,6 +892,72 @@ function tickBoire(
 }
 
 /** Abattre une bête de la famille : sa viande et son cuir, quand la faim l'exige. */
+/** Ce que l'on demande au ciel : le besoin le plus criant. */
+export function sujetDePriere(p: Personnage): SujetPriere {
+  const b = p.besoins;
+  const d = p.drapeaux;
+  if (b.faim < 40 || d.joursFaim > 0) return "faim";
+  if (b.chaleur < 40 || d.joursFroid > 0) return "froid";
+  if (p.corps.etat.blessures.length > 0 || p.corps.etat.maladies.length > 0) return "soin";
+  if (b.securite < 40) return "securite";
+  if (b.moral < 40 || d.joursMoralBas > 0) return "moral";
+  return "protection";
+}
+
+const OFFRANDES: readonly Ressource[] = [
+  "poisson_fume",
+  "repas_cuit",
+  "poisson",
+  "gibier",
+  "baies",
+];
+
+function tickPrier(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "prier" }>,
+): Resultat {
+  const autel = action.autel === null ? null : (monde.batiments.get(action.autel) ?? null);
+  if (action.autel !== null && autel === null) return echec("plus d'autel");
+  if (autel !== null && Grille.distance(p.corps.position, autel.position) > 1)
+    return echec("l'autel est trop loin");
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+  const tick = monde.horloge.tick;
+  const sujet = sujetDePriere(p);
+  let offrande: Ressource | null = null;
+  if (autel !== null) {
+    const r = OFFRANDES.find((x) => quantite(p.corps.inventaire, x) >= 1);
+    if (r !== undefined && retirer(p.corps.inventaire, r, 1) === 1) offrande = r;
+  }
+  p.priere = { tick, sujet, autel: autel !== null, exaucee: false };
+  p.dernierePriere = tick;
+  monde.emettre(
+    "priere",
+    p,
+    { sujet, autel: autel !== null, offrande, foi: p.foi },
+    5,
+    autel?.position ?? null,
+  );
+  p.memoire.ajouter(
+    tick,
+    "reflexion",
+    `J'ai prié le ciel (${SUJETS_TEXTE[sujet]})${offrande === null ? "" : `, et laissé ${offrande} sur l'autel`}.`,
+    4,
+    [],
+  );
+  return TERMINEE;
+}
+
+const SUJETS_TEXTE: Readonly<Record<SujetPriere, string>> = {
+  faim: "pour que la faim cesse",
+  froid: "pour un peu de chaleur",
+  soin: "pour guérir",
+  securite: "pour être protégé",
+  moral: "pour retrouver courage",
+  protection: "pour que rien n'arrive aux miens",
+};
+
 function tickAbattre(
   monde: Monde,
   p: Personnage,

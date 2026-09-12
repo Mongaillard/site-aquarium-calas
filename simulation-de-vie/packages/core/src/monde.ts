@@ -214,6 +214,11 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
   )
     return "puits";
   if (famille >= 3 && !acces.some((b) => b.type === "maison")) return "maison";
+  // Une famille qui croit bâtit un autel (un seul par village).
+  const membres = membresFamille(monde, p);
+  const foiMoyenne = membres.reduce((t, m) => t + m.foi, 0) / Math.max(1, membres.length);
+  if (foiMoyenne >= 5 && ![...monde.batiments.values()].some((b) => b.type === "autel"))
+    return "autel";
   // Le fumoir, une fois inventé, dès que le poisson s'entasse.
   if (
     (p.savoirs.get("fumoir")?.force ?? 0) >= SEUIL_SAVOIR &&

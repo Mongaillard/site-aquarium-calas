@@ -158,11 +158,24 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
       champs: 0,
       ambitions: [],
       miracles: 0,
+      foiMoyenne: 2,
+      prieres: 0,
+      exaucees: 0,
     },
     decouvertes: [],
     rayonVision: 6,
-    faveur: { valeur: 20, max: 40, recharges: {}, miracles: 0 },
+    faveur: {
+      valeur: 20,
+      max: 40,
+      recharges: {},
+      miracles: 0,
+      reputation: 0,
+      prieres: 0,
+      offrandes: 0,
+      exaucees: 0,
+    },
     questions: [],
+    prieres: [],
   };
 }
 

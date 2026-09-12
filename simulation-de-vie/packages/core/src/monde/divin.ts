@@ -5,9 +5,19 @@
  * (souvenir, humeur) sans jamais recevoir d'ordre. Tout est journalisé sous le
  * type `divin`, pour le rejeu.
  */
-import { FICHES_POUVOIR } from "@sdv/protocole";
+import { FICHES_POUVOIR, POUVOIRS_EXAUCANT } from "@sdv/protocole";
 import type { FaveurEtat, Pouvoir } from "@sdv/protocole";
+import { INVENTIONS, SEUIL_SAVOIR } from "../savoirs/catalogue.js";
+import type { Invention } from "../savoirs/catalogue.js";
+import { besoinRessenti } from "../savoirs/inventions.js";
+import { FAIM_MEUTE } from "./faune.js";
+import type { Espece, Troupeau } from "./faune.js";
+import { INFO_BIOME } from "./biomes.js";
+import { estEau } from "../monde.js";
+import { prochainCrepuscule } from "./danger.js";
+import type { EtatDanger } from "./danger.js";
 import { ajouterHumeur, blesser } from "../agents/corps.js";
+import { foiInitiale } from "../agents/personnage.js";
 import type { Personnage } from "../agents/personnage.js";
 import { PROFILS_MALADIE } from "../agents/maladies.js";
 import type { TypeEvenement } from "../evenements/journal.js";
@@ -39,15 +49,65 @@ export const RAYON_TEMOIN = 10;
 /** Rayon de la peur quand la foudre tombe. */
 export const RAYON_PEUR = 8;
 
+/** Réputation du dieu : bornes, et seuils de foi pour attribuer un miracle au ciel. */
+export const REPUTATION_MAX = 10;
+/** Foi nécessaire pour voir la main du ciel dans un bienfait (davantage si le dieu est redouté). */
+export const FOI_ATTRIBUTION_BIENFAIT = 4;
+export const FOI_ATTRIBUTION_EPREUVE = 2;
+/** Une prière est exaucée si le ciel répond dans ce délai, en jours. */
+export const JOURS_PRIERE = 3;
+/** Rayon dans lequel un bienfait exauce les prières alentour. */
+export const RAYON_EXAUCEMENT = 10;
+/** Faveur gagnée par prière, et en plus par offrande, et par prière exaucée. */
+export const FAVEUR_PRIERE = 1;
+export const FAVEUR_OFFRANDE = 2;
+export const FAVEUR_EXAUCEMENT = 2;
+/** Taille du troupeau offert. */
+export const TAILLE_TROUPEAU_OFFERT = 4;
+
 export interface EtatFaveur {
   valeur: number;
   readonly max: number;
   readonly recharges: Map<Pouvoir, number>;
   miracles: number;
+  reputation: number;
+  prieres: number;
+  offrandes: number;
+  exaucees: number;
 }
 
 export function etatFaveurInitial(): EtatFaveur {
-  return { valeur: FAVEUR_INITIALE, max: FAVEUR_MAX, recharges: new Map(), miracles: 0 };
+  return {
+    valeur: FAVEUR_INITIALE,
+    max: FAVEUR_MAX,
+    recharges: new Map(),
+    miracles: 0,
+    reputation: 0,
+    prieres: 0,
+    offrandes: 0,
+    exaucees: 0,
+  };
+}
+
+/** Le témoin voit-il la main du ciel, ou une chance / un malheur ? */
+export function attribueAuCiel(foi: number, bienfait: boolean, reputation: number): boolean {
+  if (bienfait) return foi >= FOI_ATTRIBUTION_BIENFAIT + (reputation <= -5 ? 2 : 0);
+  return foi >= FOI_ATTRIBUTION_EPREUVE + (reputation >= 5 ? 2 : 0);
+}
+
+/**
+ * Une saison sans miracle vu use la foi d'un point, jamais sous la foi native
+ * (celle des valeurs) : ce que les miracles ont donné s'érode, le fond reste.
+ */
+export function saisonSansMiracle(monde: Monde): void {
+  const T = monde.horloge.ticksParJour;
+  const saison = monde.config.monde.joursParSaison * T;
+  for (const p of monde.personnages) {
+    if (!p.vivant || p.corps.stade === "enfant") continue;
+    if (p.dernierMiracleVu < 0 && monde.horloge.tick < saison) continue;
+    if (monde.horloge.tick - Math.max(0, p.dernierMiracleVu) >= saison)
+      p.foi = Math.max(foiInitiale(p.identite.valeurs), p.foi - 1);
+  }
 }
 
 export function gagnerFaveur(etat: EtatFaveur, n: number): void {
@@ -57,7 +117,16 @@ export function gagnerFaveur(etat: EtatFaveur, n: number): void {
 export function faveurEtat(etat: EtatFaveur): FaveurEtat {
   const recharges: Record<string, number> = {};
   for (const [k, v] of etat.recharges) recharges[k] = v;
-  return { valeur: etat.valeur, max: etat.max, recharges, miracles: etat.miracles };
+  return {
+    valeur: etat.valeur,
+    max: etat.max,
+    recharges,
+    miracles: etat.miracles,
+    reputation: etat.reputation,
+    prieres: etat.prieres,
+    offrandes: etat.offrandes,
+    exaucees: etat.exaucees,
+  };
 }
 
 export interface CommandePouvoir {
@@ -74,9 +143,12 @@ export type ResultatPouvoir =
   | { readonly ok: true; readonly effet: string; readonly temoin: Personnage | null }
   | { readonly ok: false; readonly raison: RaisonRefus };
 
-/** Le monde, avec la météo modifiable (la simulation l'est ; l'interface la protège). */
+/** Le monde, avec ce que seuls les miracles changent : la météo, la faune, le danger. */
 export interface MondeDivin extends Monde {
   meteo: Meteo;
+  readonly danger: EtatDanger;
+  /** Fait naître un troupeau ou une meute à cet endroit. */
+  ajouterTroupeau(position: Position, espece: Espece, taille: number): Troupeau;
 }
 
 function temoinProche(monde: Monde, pos: Position, rayon: number): Personnage | null {
@@ -147,6 +219,16 @@ export function exercer(
     case "regard":
       resultat = regard(monde, pos);
       break;
+    case "troupeau":
+      resultat = troupeauOffert(monde, pos);
+      break;
+    case "idee":
+      resultat =
+        cible === undefined ? { ok: false, raison: "cible_invalide" } : ideeSoufflee(monde, cible);
+      break;
+    case "loups":
+      resultat = loups(monde, pos);
+      break;
   }
   if (!resultat.ok) return resultat;
   etat.valeur -= fiche.cout;
@@ -154,12 +236,51 @@ export function exercer(
   if (fiche.rechargeJours > 0) etat.recharges.set(commande.pouvoir, tick + fiche.rechargeJours * T);
   const temoin = resultat.temoin;
   let reaction: string | null = null;
+  let attribue = false;
   if (temoin !== null) {
+    // Le témoin y voit la main du ciel selon sa foi et la réputation du dieu ; sa foi grandit.
+    attribue = attribueAuCiel(temoin.foi, fiche.bienfait, etat.reputation);
     reaction = fiche.bienfait
-      ? `Le ciel nous a fait une grâce : ${resultat.effet}`
-      : `Le ciel nous a frappés : ${resultat.effet}`;
+      ? attribue
+        ? `Le ciel nous a fait une grâce : ${resultat.effet}`
+        : `Une chance inespérée : ${resultat.effet}`
+      : attribue
+        ? `Le ciel nous a frappés : ${resultat.effet}`
+        : `Un malheur : ${resultat.effet}`;
     temoin.memoire.ajouter(tick, "observation", reaction, fiche.bienfait ? 7 : 8, [], pos);
     ajouterHumeur(temoin, "miracle", fiche.bienfait ? 8 : -12, 3 * T, tick);
+    temoin.foi = Math.min(10, temoin.foi + (fiche.bienfait ? 1 : 2));
+    temoin.dernierMiracleVu = tick;
+  }
+  if (commande.pouvoir !== "regard")
+    etat.reputation = Math.max(
+      -REPUTATION_MAX,
+      Math.min(REPUTATION_MAX, etat.reputation + (fiche.bienfait ? 1 : -2)),
+    );
+  // Les prières que ce bienfait exauce (sujet correspondant, à dix tuiles ou sur la cible).
+  const exauces: string[] = [];
+  if (fiche.bienfait) {
+    for (const p of monde.personnages) {
+      const priere = p.priere;
+      if (!p.vivant || priere === null || priere.exaucee) continue;
+      if (tick - priere.tick > JOURS_PRIERE * T) continue;
+      if (!POUVOIRS_EXAUCANT[priere.sujet].includes(commande.pouvoir)) continue;
+      if (p.id !== cible?.id && Grille.distance(p.corps.position, pos) > RAYON_EXAUCEMENT) continue;
+      priere.exaucee = true;
+      p.foi = Math.min(10, p.foi + 2);
+      p.dernierMiracleVu = tick;
+      etat.exaucees += 1;
+      gagnerFaveur(etat, FAVEUR_EXAUCEMENT);
+      p.memoire.ajouter(
+        tick,
+        "reflexion",
+        `Le ciel m'a entendu${p.identite.sexe === "F" ? "e" : ""} : ${resultat.effet}.`,
+        8,
+        [],
+      );
+      ajouterHumeur(p, "exaucee", 10, 5 * T, tick);
+      exauces.push(p.identite.prenom);
+    }
   }
   monde.emettre(
     "divin",
@@ -172,12 +293,86 @@ export function exercer(
       cible: cible?.id ?? null,
       effet: resultat.effet,
       reaction,
+      attribue,
+      exauces: exauces.join(", "),
       cout: fiche.cout,
     },
     commande.pouvoir === "regard" ? 1 : fiche.bienfait ? 6 : 8,
     pos,
   );
   return resultat;
+}
+
+function troupeauOffert(monde: MondeDivin, pos: Position): ResultatPouvoir {
+  const t = monde.grille.tuileSiGeneree(pos.x, pos.y);
+  if (
+    t === null ||
+    !INFO_BIOME[t.biome].praticable ||
+    t.batiment !== null ||
+    estEau(monde, pos.x, pos.y)
+  )
+    return { ok: false, raison: "cible_invalide" };
+  const troupeau = monde.ajouterTroupeau(pos, "mouflon", TAILLE_TROUPEAU_OFFERT);
+  return {
+    ok: true,
+    effet: `${String(troupeau.taille)} mouflons paissent là où il n'y avait rien`,
+    temoin: temoinProche(monde, pos, RAYON_TEMOIN),
+  };
+}
+
+function ideeSoufflee(monde: Monde, p: Personnage): ResultatPouvoir {
+  if (p.corps.stade === "enfant") return { ok: false, raison: "cible_invalide" };
+  const inconnues = (Object.keys(INVENTIONS) as Invention[]).filter(
+    (i) => (p.savoirs.get(i)?.force ?? 0) < SEUIL_SAVOIR,
+  );
+  const invention = inconnues.find((i) => besoinRessenti(monde, p, i)) ?? inconnues[0];
+  if (invention === undefined) return { ok: false, raison: "sans_effet" };
+  const tick = monde.horloge.tick;
+  apprendre(p, invention, SEUIL_SAVOIR, "une inspiration", tick);
+  p.memoire.ajouter(
+    tick,
+    "reflexion",
+    `Une idée m'est venue d'un coup. ${INVENTIONS[invention].idee}`,
+    7,
+    [],
+  );
+  monde.emettre("idee", p, { invention, nom: INVENTIONS[invention].nom, source: "divin" }, 6);
+  return {
+    ok: true,
+    effet: `${p.identite.prenom} a l'idée : ${INVENTIONS[invention].nom}`,
+    temoin: p,
+  };
+}
+
+function loups(monde: MondeDivin, pos: Position): ResultatPouvoir {
+  const t = monde.grille.tuileSiGeneree(pos.x, pos.y);
+  if (
+    t === null ||
+    !INFO_BIOME[t.biome].praticable ||
+    t.batiment !== null ||
+    estEau(monde, pos.x, pos.y)
+  )
+    return { ok: false, raison: "cible_invalide" };
+  if (monde.danger.menace !== null) return { ok: false, raison: "sans_effet" };
+  const tick = monde.horloge.tick;
+  const meute = monde.ajouterTroupeau(pos, "loup", 3);
+  meute.faim = FAIM_MEUTE + 2;
+  meute.enMenace = true;
+  monde.danger.attaquesSaison += 1;
+  monde.danger.menace = {
+    meute: meute.id,
+    depuis: tick,
+    preavis: prochainCrepuscule(tick, 0, monde.horloge.ticksParJour),
+    cible: null,
+    alarmeDonnee: false,
+    tracesVues: false,
+  };
+  monde.emettre("menace", null, { genre: "menace", meute: meute.id, source: "divin" }, 6, pos);
+  return {
+    ok: true,
+    effet: "une meute affamée rôde, elle viendra ce soir",
+    temoin: temoinProche(monde, pos, RAYON_TEMOIN),
+  };
 }
 
 function gisementsAutour(monde: Monde, pos: Position, rayon: number): number {

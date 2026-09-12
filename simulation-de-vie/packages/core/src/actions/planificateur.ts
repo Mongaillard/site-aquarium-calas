@@ -125,6 +125,8 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       return planifierVeille(monde, p);
     case "reparer":
       return planifierReparationOutil(monde, p, intention.objet);
+    case "prier":
+      return planifierPriere(monde, p);
     case "abattre": {
       const bete = monde.betail.get(intention.bete);
       if (bete === undefined) return echec("plus de bête");
@@ -136,6 +138,27 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       return ok(plan);
     }
   }
+}
+
+/** Prier : à l'autel s'il y en a un à vingt tuiles, sinon sur place. */
+function planifierPriere(monde: Monde, p: Personnage): ResultatPlan {
+  const pos = p.corps.position;
+  let autel: Batiment | null = null;
+  let distance = 20;
+  for (const b of monde.batiments.values()) {
+    if (b.type !== "autel" || b.etat !== "termine") continue;
+    const d = Grille.distance(pos, b.position);
+    if (d < distance) {
+      distance = d;
+      autel = b;
+    }
+  }
+  if (autel === null) return ok([{ type: "prier", autel: null, ticksRestants: 3 }]);
+  const priere: Action = { type: "prier", autel: autel.id, ticksRestants: 4 };
+  if (Grille.distance(pos, autel.position) <= 1) return ok([priere]);
+  const aller = allerPresDe(monde, p, autel.position);
+  if (aller === null) return ok([{ type: "prier", autel: null, ticksRestants: 3 }]);
+  return ok([aller, priere]);
 }
 
 /** Réparer un outil ébréché : il faut une bûche. */

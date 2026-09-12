@@ -89,7 +89,7 @@ L'élevage, les champs et les métiers, en trois générations.
 
 Ce qu'on verra : des brebis derrière la palissade, des champs qui changent de couleur, « le pêcheur » sous un prénom, « elle a échangé trois poissons contre une hache » dans le Journal.
 
-### Jalon D — Le mode Dieu — livré en v1 (M13 : faveur, neuf pouvoirs, effets et gestes, demander à Claude, ambitions)
+### Jalon D — Le mode Dieu — livré en v1 et v2 (M13 : faveur, neuf pouvoirs, effets et gestes, demander à Claude, ambitions ; M14 : foi, prières, autel, réputation, trois pouvoirs)
 
 L'observateur devient un personnage de l'histoire : un dieu qui aide ou éprouve, et à qui l'on
 demande conseil. Trois études (game design, interaction, boucle de conseil) ont fixé le cadre.
@@ -97,11 +97,13 @@ demande conseil. Trois études (game design, interaction, boucle de conseil) ont
 - **v1 (livrée)** : faveur et recharges ; Ondée, Éclaircie, Sève, Souffle, Main qui guérit,
   Braise, Foudre, Songe, Regard ; barre de pouvoirs, halo, appui long, effets ; questions à
   Claude déclenchées par des motifs mesurables, catalogue fermé, ambitions suivies.
-- **v2** : la foi (0–10 par personnage, héritée à moitié, nourrie par les miracles vus) et
-  l'attribution du miracle au ciel ou au hasard ; les prières (intention `prier`, événement
-  `priere` : les quêtes du joueur) ; l'autel et les offrandes ; la réputation du dieu (un dieu
-  cruel rend les bienfaits moins crus, un dieu bon rend les épreuves plus dures) ; Troupeau
-  offert, Idée soufflée, Loups au bord du halo ; la migration conseillée (déménager le foyer).
+- **v2 (livrée, sauf la migration)** : la foi (0–10 par personnage, héritée à moitié, nourrie
+  par les miracles vus) et l'attribution du miracle au ciel ou au hasard ; les prières
+  (intention `prier`, événement `priere` : les quêtes du joueur) ; l'autel et les offrandes ; la
+  réputation du dieu (un dieu cruel rend les bienfaits moins crus, un dieu bon rend les
+  épreuves plus dures) ; Troupeau offert, Idée soufflée, Loups au bord du halo. La migration
+  conseillée (déménager le foyer) est reportée en v3 : elle demande un site de construction
+  loin de l'ancien foyer, que le planificateur ne sait pas encore choisir.
 - **v3** : les épreuves lourdes (gel précoce, sécheresse, fièvre envoyée, secousse), l'Épiphanie,
   les niveaux de culte, les lieux interdits, les leçons « le ciel écoute », « le ciel frappe »,
   « ne pas attendre le ciel ».

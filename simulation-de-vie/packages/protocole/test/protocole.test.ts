@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  VITESSES,
   analyserCommande,
   decouperTranscription,
   opaciteNuit,
@@ -35,6 +36,20 @@ describe("protocole", () => {
       analyserCommande('{"type":"pouvoir","pouvoir":"songe","x":0,"y":0,"cibleId":"p-0001"}'),
     ).toEqual({ type: "pouvoir", pouvoir: "songe", x: 0, y: 0, cibleId: "p-0001" });
     expect(analyserCommande('{"type":"pouvoir","pouvoir":"apocalypse","x":0,"y":0}')).toBeNull();
+    for (const p of ["troupeau", "idee", "loups"])
+      expect(analyserCommande(JSON.stringify({ type: "pouvoir", pouvoir: p, x: 0, y: 0 }))).toEqual(
+        {
+          type: "pouvoir",
+          pouvoir: p,
+          x: 0,
+          y: 0,
+        },
+      );
+    expect(VITESSES).toEqual([1, 4, 16, 64, 128, 256]);
+    expect(analyserCommande('{"type":"vitesse","ticksParSeconde":256}')).toEqual({
+      type: "vitesse",
+      ticksParSeconde: 256,
+    });
     expect(analyserCommande('{"type":"pouvoir","pouvoir":"pluie","x":1.5,"y":0}')).toBeNull();
     expect(analyserCommande('{"type":"pouvoir","pouvoir":"pluie","x":1e9,"y":0}')).toBeNull();
     const conseil = {

@@ -47,7 +47,10 @@ Le bouton « ✨ Dieu » (touche `g`) ouvre une barre de pouvoirs : Ondée, Écl
 Souffle, Main qui guérit, Braise, Foudre, Songe, Regard, payés en faveur (✦) gagnée chaque jour
 et quand la colonie prospère. Un pouvoir armé se pose d'un clic (ou d'un appui long, sur
 mobile) sur une tuile connue, une personne ou un bâtiment ; les personnages interprètent le
-miracle, ils n'obéissent pas.
+miracle, ils n'obéissent pas. Chacun a une **foi** : qui croit prie le ciel quand ça va mal
+(les prières en attente s'affichent en mode Dieu, avec les pouvoirs qui les exaucent), une
+famille croyante bâtit un autel où laisser des offrandes, et la réputation du dieu décide si
+l'on voit sa main ou le hasard dans ce qui arrive.
 
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la

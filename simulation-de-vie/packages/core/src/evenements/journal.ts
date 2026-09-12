@@ -72,6 +72,7 @@ export const TYPES_EVENEMENT = [
   "divin",
   "conseil",
   "ambition",
+  "priere",
 ] as const;
 export type TypeEvenement = (typeof TYPES_EVENEMENT)[number];
 

@@ -6,7 +6,9 @@ import {
   COULEURS_BIOME,
   COULEURS_RESSOURCE,
   LIBELLES_METEO,
+  LIBELLES_MOTIF,
   LIBELLES_SAISON,
+  LIBELLES_SUJET,
   LIBELLES_TYPE,
   NOMS_BATIMENT,
   NOMS_CARENCE,
@@ -292,17 +294,50 @@ export class Panneaux {
     const question = enQuestion
       ? `<div class="question">❓ Question ouverte à Claude… (activez 💬 Conseils pour qu'il réponde)</div>`
       : "";
+    const conseil = this.htmlConseil(f);
     if (a === null)
-      return `<h3>Ambition</h3>${question}<p class="discret">aucune pour l'instant ${bouton}</p>`;
+      return `<h3>Ambition et conseil</h3>${question}${conseil}<p class="discret">aucune ambition pour l'instant ${bouton}</p>`;
     const etat =
       a.issue === "en_cours"
         ? `${a.joursRestants} jour${a.joursRestants > 1 ? "s" : ""} restant${a.joursRestants > 1 ? "s" : ""}`
         : a.issue === "accomplie"
           ? "accomplie ✓"
           : "abandonnée";
-    return `<h3>Ambition</h3>${question}
+    return `<h3>Ambition et conseil</h3>${question}${conseil}
       <div class="ambition ${a.issue === "en_cours" ? "" : "finie"}">🎯 <span class="but">${e(a.but)}</span> — ${e(a.cible)}, ${e(etat)}${a.pensee ? `<div class="discret">« ${e(a.pensee)} »</div>` : ""}</div>
       <div>${bouton}</div>`;
+  }
+
+  /** La question posée à Claude (motifs, options) et sa réponse, telles que le moteur les a vues. */
+  private htmlConseil(f: MessageFiche): string {
+    const c = f.conseil;
+    if (c === null) return "";
+    const init = this.magasin.init;
+    const quand = init
+      ? formaterTick(c.tick, init.ticksParJour, init.joursParSaison)
+      : String(c.tick);
+    const motifs = c.motifs.map((m) => LIBELLES_MOTIF[m] ?? m).join(", ");
+    const options = c.options
+      .map(
+        (o) =>
+          `<li class="${o.id === c.choix ? "choisi" : ""}">${o.id === c.choix ? "✓ " : ""}${e(o.libelle)} <span class="discret">— ${e(o.pourquoi)}</span></li>`,
+      )
+      .join("");
+    const entete =
+      c.etat === "ouverte"
+        ? `❓ <b>Question posée à Claude</b> (${e(quand)}) — ${e(motifs)}.`
+        : c.etat === "repondue"
+          ? `💬 <b>Claude a conseillé</b> (${e(quand)}) : <b>${e(c.libelle ?? c.choix ?? "")}</b>${c.pensee ? ` — « ${e(c.pensee)} »` : ""}${c.but ? `<div class="discret">But : ${e(c.but)}</div>` : ""}`
+          : `💬 <b>Question sans suite</b> (${e(quand)}) : ${e(
+              c.raison === "expiree"
+                ? "personne n'a répondu (activez 💬 Conseils)"
+                : c.raison === "aucun"
+                  ? "Claude n'a rien trouvé qui convienne"
+                  : c.raison === "remplacee"
+                    ? "une autre question l'a remplacée"
+                    : "la réponse n'était pas au catalogue",
+            )}`;
+    return `<div class="conseil">${entete}<div class="discret" style="margin-top:4px">Options proposées${c.etat === "ouverte" ? " (Claude choisira l'une d'elles)" : ""} :</div><ul>${options}</ul></div>`;
   }
 
   private htmlFiche(f: MessageFiche): string {
@@ -417,6 +452,9 @@ export class Panneaux {
       <div class="puces">${blessures}${corpsPuces}${capacitesTexte}${!blessures && !corpsPuces && !capacitesTexte ? "<span class='discret'>en forme</span>" : ""}</div>
       <h3>Humeur</h3>
       <div class="puces">${humeur}</div>
+      <h3>Foi</h3>
+      <div class="jauges"><span>foi</span><div class="jauge"><i style="width:${f.foi * 10}%;background:#ffd479"></i></div><span class="num">${f.foi}/10</span></div>
+      <div class="discret">${f.foi >= 3 ? "prie le ciel quand ça va mal" : "ne prie guère"}${f.priere ? ` · dernière prière : ${e(LIBELLES_SUJET[f.priere.sujet] ?? f.priere.sujet)}${f.priere.autel ? " à l'autel" : ""}${f.priere.exaucee ? " — exaucée ✓" : ""}` : ""}</div>
       <h3>Famille</h3>
       <div>Parents : ${liste(f.famille.parents)} · Partenaire : ${f.famille.partenaire ? personne(f.famille.partenaire) : "—"}</div>
       <div>Enfants : ${liste(f.famille.enfants)} · Fratrie : ${liste(f.famille.fratrie)}</div>
@@ -467,12 +505,20 @@ export class Panneaux {
         ev.type === "dialogue" && typeof ev.details.transcription === "string"
           ? `<div class="discret">${e(ev.details.transcription)}</div>`
           : "";
+      const acteur = ev.acteur ?? (typeof ev.details.cible === "string" ? ev.details.cible : null);
       lignes.push(
-        `<li class="${classe}"><span class="quand">${e(quand)}</span>${e(resumerEvenement(ev, (id) => this.magasin.nom(id)))}${detail}</li>`,
+        `<li class="${classe}"${acteur !== null ? ` data-id="${e(acteur)}" title="Voir la fiche"` : ""}><span class="quand">${e(quand)}</span>${e(resumerEvenement(ev, (id) => this.magasin.nom(id)))}${detail}</li>`,
       );
     }
     $("liste-journal").innerHTML =
       lignes.join("") || "<li class='discret'>rien pour l'instant</li>";
+    // Un clic sur une ligne ouvre la fiche de la personne concernée.
+    for (const l of $("liste-journal").querySelectorAll<HTMLElement>("li[data-id]")) {
+      l.addEventListener("click", () => {
+        this.inter.selectionner(l.dataset.id ?? null);
+        this.afficherOnglet("inspecteur");
+      });
+    }
   }
 
   private remplirFiltres(): void {
@@ -538,7 +584,7 @@ export class Panneaux {
         ${tuile(s.vivants, "vivants")}${tuile(s.enfants, "enfants")}${tuile(s.population, "population totale")}${tuile(s.morts, "morts")}
         ${tuile(s.naissances, "naissances")}${tuile(s.unions, "unions")}${tuile(s.generations, "générations")}${tuile(s.dialogues, "dialogues")}
         ${tuile(s.batiments, "bâtiments")}${tuile(s.chantiers, "chantiers")}${tuile(s.evenements, "événements")}${tuile(s.tick, "ticks")}
-        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}
+        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}${tuile(s.foiMoyenne, "foi moyenne /10")}${tuile(`${s.prieres} · ${s.exaucees}`, "prières · exaucées")}
       </div>
       <h3>Où ils vont</h3>
       ${

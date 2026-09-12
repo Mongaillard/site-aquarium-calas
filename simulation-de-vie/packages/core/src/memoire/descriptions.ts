@@ -92,6 +92,8 @@ export function decrireEvenement(
       return null;
     case "conseil":
       return null;
+    case "priere":
+      return temoin ? `${qui} a prié le ciel.` : null;
     case "ambition":
       return temoin
         ? d.issue === "accomplie"
