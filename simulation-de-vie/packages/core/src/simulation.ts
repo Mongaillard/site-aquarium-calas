@@ -36,6 +36,10 @@ import { reflechir } from "./memoire/reflexion.js";
 import { relationFamiliale } from "./social/relations.js";
 import type { Monde } from "./monde.js";
 import { PLANS_BATIMENT, creerChantier } from "./monde/batiments.js";
+import { INFO_BIOME } from "./monde/biomes.js";
+import { INVENTIONS, LECONS } from "./savoirs/catalogue.js";
+import { apprenants, apprendre, tirerLecons } from "./savoirs/lecons.js";
+import { inventer } from "./savoirs/inventions.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
 import { genererGrille } from "./monde/generation.js";
 import { Grille } from "./monde/grille.js";
@@ -160,7 +164,7 @@ export class Simulation implements Monde {
     }
   }
 
-  /** Réflexion du soir pour un personnage : produit des événements `reflexion`. */
+  /** Réflexion du soir pour un personnage : produit des événements `reflexion`, parfois une idée. */
   reflechirPour(p: Personnage): void {
     for (const r of reflechir(this, p)) {
       this.emettre(
@@ -168,6 +172,58 @@ export class Simulation implements Monde {
         p,
         { texte: r.texte, cle: r.cle, sujets: r.sujets.join(",") },
         r.importance,
+      );
+    }
+    const idee = inventer(this, p);
+    if (idee !== null) {
+      this.emettre("idee", p, { invention: idee, nom: INVENTIONS[idee].nom }, 6);
+      p.memoire.ajouter(this.tick, "reflexion", `J'ai une idée. ${INVENTIONS[idee].idee}`, 7, []);
+    }
+  }
+
+  /**
+   * À chaque mort, une tombe et une morale : la famille et les témoins retiennent
+   * une ou deux leçons, qui changeront leurs décisions et se transmettront.
+   */
+  private tirerLeconsDe(defunt: Personnage, cause: string): void {
+    const lecons = tirerLecons(this, defunt, cause);
+    const f = defunt.identite.sexe === "F";
+    const epitaphe =
+      lecons[0] !== undefined
+        ? `${defunt.identite.prenom}, mort${f ? "e" : ""} de ${cause}. ${LECONS[lecons[0]].morale}`
+        : `Ici repose ${defunt.identite.prenom}, mort${f ? "e" : ""} de ${cause}.`;
+    const tuile = this.grille.tuileOuNull(defunt.corps.position.x, defunt.corps.position.y);
+    if (tuile !== null && tuile.batiment === null && INFO_BIOME[tuile.biome].constructible) {
+      const tombe = this.fonderChantier("tombe", defunt.corps.position, defunt);
+      tombe.etat = "termine";
+      tombe.travailRestant = 0;
+      tombe.termineAuTick = this.tick;
+      tombe.epitaphe = epitaphe;
+    }
+    for (const lecon of lecons) {
+      const eleves = apprenants(this, defunt).filter((p) =>
+        apprendre(p, lecon, 1, defunt.identite.prenom, this.tick),
+      );
+      for (const p of eleves) {
+        p.memoire.ajouter(
+          this.tick,
+          "reflexion",
+          `La mort de ${defunt.identite.prenom} m'a appris ceci : ${LECONS[lecon].morale}`,
+          8,
+          [defunt.id],
+        );
+      }
+      this.emettre(
+        "lecon",
+        defunt,
+        {
+          cause,
+          lecon,
+          titre: LECONS[lecon].titre,
+          morale: LECONS[lecon].morale,
+          apprenants: eleves.length,
+        },
+        8,
       );
     }
   }
@@ -609,6 +665,7 @@ export class Simulation implements Monde {
     this.emettre("deces", p, { cause, prenom: p.identite.prenom, ageJours: p.corps.ageJours }, 10);
     heriter(this, p); // avant le deuil, qui rompt l'union
     deuil(this, p, cause);
+    this.tirerLeconsDe(p, cause);
     for (const enfant of this.personnages) {
       if (enfant.vivant && (enfant.identite.parents?.includes(p.id) ?? false))
         adopter(this, enfant);

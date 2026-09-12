@@ -56,6 +56,7 @@ function etat(decouvertes: number[]): MessageEtat {
       tuilesDecouvertes: decouvertes.length / 3,
       tuiles: 1024,
       morceaux: 1,
+      savoirs: [],
     },
     decouvertes,
     rayonVision: 6,

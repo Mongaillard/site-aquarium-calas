@@ -32,6 +32,12 @@ Personnage (pensée, besoins, famille, relations, souvenirs), Journal, Conversat
 Statistiques, Population. Cliquez sur un personnage ou un bâtiment pour l'inspecter, appuyez
 sur `s` pour que la caméra suive le personnage sélectionné.
 
+Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
+tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la
+curiosité donnent des idées, puis des inventions (filet, piège, pirogue, osselets) que la
+colonie apprend à faire. L'onglet Statistiques liste les savoirs du village, la fiche d'un
+personnage ce qu'il a retenu.
+
 Un brouillard d'exploration couvre ce que la colonie n'a jamais vu : au départ, seul un halo
 autour de chaque personnage est visible, et la carte se dévoile au fil des explorations. La
 touche `b` (ou la case de la légende) l'enlève ; l'onglet Statistiques indique la part du monde

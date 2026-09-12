@@ -791,6 +791,23 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
 
 ---
 
+## 15 bis. Savoirs : leçons et inventions
+
+- **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue
+  fermé (`provisions_hiver`, `rentrer_quand_on_gele`, `enfants_dabord`, `partager_en_hiver`,
+  `puits_pres_du_village`). La famille, le partenaire, les amis et les témoins proches la
+  retiennent ; une tombe porte l'épitaphe. Chaque leçon a un effet précis sur le cerveau
+  (seuils, scores, bâtiment nécessaire).
+- **Invention** : catalogue fermé d'inventions que le moteur sait appliquer (`filet`,
+  `piege`, `pirogue`, `osselets`), chacune avec un besoin déclencheur, une recette et un effet.
+  Le soir, un adulte qui ressent le besoin peut avoir l'idée (curiosité = ouverture) ; il
+  fabrique un prototype qui peut rater ; la réussite fait de l'idée un savoir de la famille.
+- **Transmission** : par le dialogue (sujet `savoir`, avec l'origine), aux adolescents par
+  leurs parents. **[DÉCISION]** Les savoirs ne s'oublient pas ; une idée non réalisée
+  s'efface au bout de vingt jours.
+- **Cerveau Claude (M5)** : la morale et le récit d'une invention peuvent être rédigés par
+  Claude, mais le savoir appliqué est toujours l'un des identifiants du catalogue.
+
 ## 16. Configuration (`sim.config.json`)
 
 ```jsonc

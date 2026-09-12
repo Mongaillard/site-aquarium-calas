@@ -40,6 +40,11 @@ export const TYPES_EVENEMENT = [
   "stade",
   "heritage",
   "adoption",
+  "lecon",
+  "idee",
+  "invention",
+  "prototype_rate",
+  "jeu",
 ] as const;
 export type TypeEvenement = (typeof TYPES_EVENEMENT)[number];
 

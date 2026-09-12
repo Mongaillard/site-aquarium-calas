@@ -239,6 +239,16 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       return `${qui} hérite de ${cible("defunt")}.`;
     case "adoption":
       return `${qui} recueille ${String(d.prenom)}.`;
+    case "lecon":
+      return `De la mort de ${qui} (${String(d.cause)}), ${String(d.apprenants)} personne${Number(d.apprenants) > 1 ? "s" : ""} retiennent : « ${String(d.morale)} »`;
+    case "idee":
+      return `${qui} a une idée : ${String(d.nom)}.`;
+    case "invention":
+      return `${qui} réussit son ${String(d.nom)} : la famille sait désormais le faire.`;
+    case "prototype_rate":
+      return `${qui} rate son prototype de ${String(d.nom)}.`;
+    case "jeu":
+      return `${qui} joue aux osselets avec ${cible("avec")}.`;
     default:
       return `${qui} ${e.type}`;
   }

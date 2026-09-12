@@ -1,4 +1,5 @@
 /** Personnage : identité + corps + besoins + état de décision. */
+import type { Savoir, SavoirAcquis } from "../savoirs/catalogue.js";
 import type { Action, Intention } from "../actions/types.js";
 import type { Position } from "../monde/grille.js";
 import type { Outil, Ressource } from "../monde/ressources.js";
@@ -84,6 +85,8 @@ export interface Personnage {
   actionEnCours: Action | null;
   /** Lieux connus, indexés par "x,y". */
   readonly connaissance: Map<string, LieuConnu>;
+  /** Leçons et inventions retenues, avec leur force et leur origine. */
+  readonly savoirs: Map<Savoir, SavoirAcquis>;
   readonly relations: Map<string, Relation>;
   readonly memoire: FluxMemoire;
   /** Réputation -100..100, modifiée par les témoins de ses actes. */
@@ -162,6 +165,7 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
     plan: [],
     actionEnCours: null,
     connaissance: new Map(),
+    savoirs: new Map(),
     relations: new Map(),
     memoire: new FluxMemoire({
       ticksParJour: options.ticksParJour,

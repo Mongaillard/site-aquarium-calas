@@ -2,6 +2,7 @@
  * Cycle de vie (sections 8.1 à 8.4) : grossesse, naissance, stades, mort
  * naturelle, héritage, deuil, adoption, apprentissage par observation.
  */
+import { apprendre } from "../savoirs/lecons.js";
 import { gagnerExperience } from "./competences.js";
 import type { Competence } from "./competences.js";
 import { probabiliteMortNaturelle } from "./genetique.js";
@@ -57,7 +58,16 @@ export function tickVieQuotidien(monde: Monde, p: Personnage): void {
   const { joursParAnnee, ageAdulte, ageAncien } = monde.config.vie;
   const ancien = mettreAJourStade(p, joursParAnnee, ageAdulte, ageAncien);
   if (ancien !== null) {
-    if (p.corps.stade === "adolescent") personnaliteAdolescente(monde, p);
+    if (p.corps.stade === "adolescent") {
+      personnaliteAdolescente(monde, p);
+      // Ce que les parents savent, l'adolescent le sait aussi.
+      for (const id of p.identite.parents ?? []) {
+        const parent = monde.personnages.find((x) => x.id === id);
+        if (parent === undefined) continue;
+        for (const [s, v] of parent.savoirs)
+          if (v.force >= 1) apprendre(p, s, 1, v.origine, monde.horloge.tick);
+      }
+    }
     monde.emettre(
       "stade",
       p,

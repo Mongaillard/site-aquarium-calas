@@ -214,7 +214,7 @@ export class Panneaux {
       ${
         b.etat === "chantier"
           ? `<h3>Chantier</h3><div class="jauges"><span>travail</span><div class="jauge"><i style="width:${avancement}%;background:#6cc2ff"></i></div><span class="num">${avancement}%</span></div><div>Matériaux manquants : ${manquants || "<span class='discret'>aucun, il ne reste qu'à travailler</span>"}</div>`
-          : `<h3>État</h3><div class="jauges"><span>solidité</span><div class="jauge ${b.solidite < 40 ? "critique" : b.solidite < 60 ? "bas" : ""}"><i style="width:${b.solidite}%"></i></div><span class="num">${b.solidite}</span></div>${b.type === "feu_de_camp" ? `<div>${b.allume ? "🔥 allumé" : "éteint (une bûche suffit à le rallumer)"}</div>` : ""}${b.capaciteDormeurs > 0 ? `<div>${b.capaciteDormeurs} place${b.capaciteDormeurs > 1 ? "s" : ""} pour dormir (les enfants se serrent)</div>` : ""}`
+          : `<h3>État</h3><div class="jauges"><span>solidité</span><div class="jauge ${b.solidite < 40 ? "critique" : b.solidite < 60 ? "bas" : ""}"><i style="width:${b.solidite}%"></i></div><span class="num">${b.solidite}</span></div>${b.type === "feu_de_camp" ? `<div>${b.allume ? "🔥 allumé" : "éteint (une bûche suffit à le rallumer)"}</div>` : ""}${b.capaciteDormeurs > 0 ? `<div>${b.capaciteDormeurs} place${b.capaciteDormeurs > 1 ? "s" : ""} pour dormir (les enfants se serrent)</div>` : ""}${b.epitaphe ? `<p class="epitaphe">${e(b.epitaphe)}</p>` : ""}`
       }
       ${stock !== null ? `<h3>Stock</h3><div class="puces">${stock}</div>` : ""}
       <h3>Présents</h3>
@@ -298,6 +298,13 @@ export class Panneaux {
         ),
         ...f.inventaire.objets.map((o) => `<span class="puce">🔧 ${e(o)}</span>`),
       ].join("") || "<span class='discret'>vide</span>";
+    const savoirs =
+      f.savoirs
+        .map(
+          (s) =>
+            `<span class="puce" title="${e(s.texte)}${s.origine ? ` — ${e(s.origine)}` : ""}">${s.genre === "lecon" ? "📜" : "💡"} ${e(s.titre)}${s.force < 1 ? " (idée)" : ""}</span>`,
+        )
+        .join("") || "<span class='discret'>rien encore</span>";
     const souvenirs = (l: MessageFiche["souvenirsRecents"]): string =>
       l.length > 0
         ? `<ol class="liste">${l.map((s) => `<li class="${s.importance >= 6 ? "majeur" : s.importance >= 3 ? "important" : ""}"><span class="quand">${e(tick(s.tick))}</span>${e(s.texte)}</li>`).join("")}</ol>`
@@ -333,6 +340,8 @@ export class Panneaux {
       <div class="puces">${inventaire}</div>
       <h3>Compétences</h3>
       <div class="puces">${competences}</div>
+      <h3>Savoirs</h3>
+      <div class="puces">${savoirs}</div>
       <h3>Identité</h3>
       <p>${e(f.biographie)}</p>
       <p class="discret">« ${e(f.motto)} »</p>
@@ -447,6 +456,12 @@ export class Panneaux {
       </div>
       <h3>Bâtiments</h3><div class="puces">${batiments}</div>
       <h3>Stocks</h3><div class="puces">${stocks}</div>
+      <h3>Savoirs du village</h3>
+      ${
+        s.savoirs.length > 0
+          ? `<table class="saisons"><tr><th>savoir</th><th>porté par</th></tr>${s.savoirs.map((v) => `<tr><td title="${e(v.texte)}">${v.genre === "lecon" ? "📜" : "💡"} ${e(v.titre)}</td><td>${v.porteurs}</td></tr>`).join("")}</table>`
+          : "<p class='discret'>aucune leçon ni invention encore</p>"
+      }
       <h3>Par saison</h3>
       <table class="saisons"><tr><th>saison</th><th>naissances</th><th>décès</th></tr>${saisons || "<tr><td colspan='3' class='discret'>rien encore</td></tr>"}</table>`;
   }

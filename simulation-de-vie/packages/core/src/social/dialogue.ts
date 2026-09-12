@@ -4,6 +4,9 @@
  * Le cerveau LLM (M5) remplacera `composerDialogue` par un appel modèle qui
  * renvoie la même structure.
  */
+import { possede } from "../agents/inventaire.js";
+import { INVENTIONS, LECONS, estLecon } from "../savoirs/catalogue.js";
+import type { Savoir } from "../savoirs/catalogue.js";
 import { NOURRITURE, nourritureDisponible, quantite } from "../agents/inventaire.js";
 import { relationAvec } from "../agents/personnage.js";
 import type { LieuConnu, Personnage } from "../agents/personnage.js";
@@ -46,9 +49,18 @@ export type EffetDialogue =
       readonly vers: string;
       readonly ressource: Ressource;
       readonly quantite: number;
-    };
+    }
+  | {
+      readonly type: "savoir";
+      readonly de: string;
+      readonly vers: string;
+      readonly savoir: Savoir;
+      readonly origine: string | null;
+    }
+  | { readonly type: "jeu"; readonly de: string; readonly vers: string };
 
-export type SujetDialogue = "salutations" | "nouvelles" | "invitation" | "dispute" | "entraide";
+export type SujetDialogue =
+  "salutations" | "nouvelles" | "invitation" | "dispute" | "entraide" | "savoir" | "jeu";
 
 export interface Dialogue {
   readonly sujet: SujetDialogue;
@@ -172,9 +184,20 @@ export function composerDialogue(monde: Monde, a: Personnage, b: Personnage): Di
     sujet = "entraide";
   }
 
-  // Nouvelles : échange de lieux utiles dans les deux sens.
-  const deAversB = lieuxAPartager(a, b, 2);
-  const deBversA = lieuxAPartager(b, a, 2);
+  // Savoirs : une leçon ou une invention que l'un connaît et pas l'autre (prioritaire).
+  const savoirAB = savoirAPartager(a, b);
+  const savoirBA = savoirAB === null ? savoirAPartager(b, a) : null;
+  const transmission =
+    savoirAB !== null
+      ? { de: a, vers: b, s: savoirAB }
+      : savoirBA !== null
+        ? { de: b, vers: a, s: savoirBA }
+        : null;
+
+  // Nouvelles : échange de lieux utiles dans les deux sens (moins quand on a un savoir à dire).
+  const maxLieux = transmission === null ? 2 : 1;
+  const deAversB = lieuxAPartager(a, b, maxLieux);
+  const deBversA = lieuxAPartager(b, a, maxLieux);
   for (const lieu of deAversB) {
     dire(a, phraseInformation(b, lieu, tu));
     effets.push({ type: "information", de: a.id, vers: b.id, lieu });
@@ -186,6 +209,28 @@ export function composerDialogue(monde: Monde, a: Personnage, b: Personnage): Di
   if (deAversB.length + deBversA.length > 0) {
     dire(deBversA.length > 0 ? a : b, tu ? "Bon à savoir, merci." : "Bon à savoir, merci.");
     if (sujet === "salutations") sujet = "nouvelles";
+  }
+
+  if (transmission !== null) {
+    const { de, vers, s } = transmission;
+    dire(de, phraseSavoir(s.savoir, s.origine, tu));
+    dire(vers, tu ? "Je m'en souviendrai." : "Je m'en souviendrai.");
+    effets.push({ type: "savoir", de: de.id, vers: vers.id, savoir: s.savoir, origine: s.origine });
+    sujet = "savoir";
+  }
+
+  // Jeu : une partie d'osselets remonte le moral.
+  if (
+    (possede(a.corps.inventaire, "osselets") || possede(b.corps.inventaire, "osselets")) &&
+    (a.besoins.moral < 85 || b.besoins.moral < 85 || a.besoins.social < 70) &&
+    !estNuit
+  ) {
+    const joueur = possede(a.corps.inventaire, "osselets") ? a : b;
+    const autre = joueur === a ? b : a;
+    dire(joueur, tu ? "On fait une partie d'osselets ?" : "Une partie d'osselets, ça vous dit ?");
+    dire(autre, tu ? "Volontiers, ça change les idées." : "Volontiers, ça change les idées.");
+    effets.push({ type: "jeu", de: joueur.id, vers: autre.id });
+    sujet = "jeu";
   }
 
   // Invitation : confiance suffisante et l'autre n'a pas d'abri.
@@ -228,7 +273,31 @@ export function composerDialogue(monde: Monde, a: Personnage, b: Personnage): Di
   });
 
   // Bornes : 2 à 6 répliques.
-  return { sujet, repliques: repliques.slice(0, 6), effets };
+  return { sujet, repliques: repliques.slice(0, 8), effets };
+}
+
+/** Un savoir que `de` connaît bien et que `vers` ignore encore, s'il y en a un. */
+function savoirAPartager(
+  de: Personnage,
+  vers: Personnage,
+): { savoir: Savoir; origine: string | null } | null {
+  for (const [savoir, acquis] of de.savoirs) {
+    if (acquis.force < 1) continue;
+    if ((vers.savoirs.get(savoir)?.force ?? 0) >= 1) continue;
+    return { savoir, origine: acquis.origine };
+  }
+  return null;
+}
+
+function phraseSavoir(savoir: Savoir, origine: string | null, tu: boolean): string {
+  if (estLecon(savoir)) {
+    const morale = LECONS[savoir].morale;
+    return origine !== null
+      ? `Depuis la mort de ${origine}, on le sait : ${morale.charAt(0).toLowerCase()}${morale.slice(1)}`
+      : morale;
+  }
+  const c = INVENTIONS[savoir].confidence;
+  return tu ? `Tu sais quoi ? ${c}` : `Vous savez quoi ? ${c}`;
 }
 
 /** Texte compact d'un dialogue pour le journal. */

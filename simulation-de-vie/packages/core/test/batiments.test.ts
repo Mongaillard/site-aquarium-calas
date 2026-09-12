@@ -298,10 +298,10 @@ describe("fabrication", () => {
     });
     ajouter(a.corps.inventaire, "fibres", 6);
     expect(
-      executerTick(sim, a, { type: "fabriquer", recette: "filet", ticksRestants: null }),
+      executerTick(sim, a, { type: "fabriquer", recette: "pioche", ticksRestants: null }),
     ).toMatchObject({
       statut: "echec",
-      raison: "niveau 3 requis en artisanat",
+      raison: "niveau 2 requis en artisanat",
     });
     ajouter(a.corps.inventaire, "baies", 1);
     expect(

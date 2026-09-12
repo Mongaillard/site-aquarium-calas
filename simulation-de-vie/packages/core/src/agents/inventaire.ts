@@ -1,4 +1,5 @@
 /** Inventaire d'un personnage ou d'un stock : ressources en vrac et objets. */
+import type { Outil } from "../monde/ressources.js";
 import type { Objet, TypeObjet } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
 
@@ -57,6 +58,15 @@ export function transferer(de: Inventaire, vers: Inventaire, r: Ressource, n: nu
   retirer(de, r, possible);
   ajouter(vers, r, possible);
   return possible;
+}
+
+/** Un outil requis peut être remplacé par une invention : le filet pêche, le piège chasse. */
+export function outilSatisfait(inv: Inventaire, outil: Outil | null): boolean {
+  if (outil === null) return true;
+  if (possede(inv, outil)) return true;
+  if (outil === "canne_a_peche") return possede(inv, "filet");
+  if (outil === "lance") return possede(inv, "piege");
+  return false;
 }
 
 export function ajouterObjet(inv: Inventaire, objet: Objet): boolean {

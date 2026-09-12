@@ -11,6 +11,9 @@ export const TYPES_OBJET = [
   "vetement_cuir",
   "pot_argile",
   "bandage",
+  "piege",
+  "pirogue",
+  "osselets",
 ] as const;
 export type TypeObjet = (typeof TYPES_OBJET)[number];
 
@@ -34,6 +37,14 @@ export interface Recette {
   readonly atelier: Atelier | null;
   /** Durée en ticks au niveau requis. */
   readonly duree: number;
+  /** Recette d'invention : il faut en avoir eu l'idée (ou l'avoir apprise) pour la fabriquer. */
+  readonly invention?: "filet" | "piege" | "pirogue" | "osselets";
+}
+
+/** L'invention qu'exige une recette, s'il y en a une. */
+export function inventionDeRecette(nom: NomRecette): Recette["invention"] {
+  const recette: Recette = RECETTES[nom];
+  return recette.invention;
 }
 
 export const RECETTES = {
@@ -76,11 +87,42 @@ export const RECETTES = {
   filet: {
     nom: "filet",
     produit: { objet: "filet" },
-    ingredients: { fibres: 6 },
+    ingredients: { fibres: 6, bois: 1 },
     competence: "artisanat",
-    niveauRequis: 3,
+    niveauRequis: 1,
     atelier: null,
     duree: 6,
+    invention: "filet",
+  },
+  piege: {
+    nom: "piège",
+    produit: { objet: "piege" },
+    ingredients: { bois: 3, fibres: 2 },
+    competence: "artisanat",
+    niveauRequis: 0,
+    atelier: null,
+    duree: 5,
+    invention: "piege",
+  },
+  pirogue: {
+    nom: "pirogue",
+    produit: { objet: "pirogue" },
+    ingredients: { bois: 8, fibres: 4 },
+    competence: "artisanat",
+    niveauRequis: 1,
+    atelier: null,
+    duree: 12,
+    invention: "pirogue",
+  },
+  osselets: {
+    nom: "osselets",
+    produit: { objet: "osselets" },
+    ingredients: { pierre: 3 },
+    competence: "artisanat",
+    niveauRequis: 0,
+    atelier: null,
+    duree: 3,
+    invention: "osselets",
   },
   corde: {
     nom: "corde",
@@ -146,4 +188,7 @@ export const SOLIDITE_INITIALE: Record<TypeObjet, number> = {
   vetement_cuir: 100,
   pot_argile: 100,
   bandage: 1,
+  piege: 25,
+  pirogue: 200,
+  osselets: 100,
 };

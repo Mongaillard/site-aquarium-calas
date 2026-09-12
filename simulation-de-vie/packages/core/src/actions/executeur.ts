@@ -11,6 +11,7 @@ import {
   retirer,
   transferer,
   userObjet,
+  outilSatisfait,
 } from "../agents/inventaire.js";
 import { cleLieu, relationAvec } from "../agents/personnage.js";
 import type { Personnage } from "../agents/personnage.js";
@@ -19,7 +20,7 @@ import { INFO_BIOME } from "../monde/biomes.js";
 import { Grille } from "../monde/grille.js";
 import type { Position } from "../monde/grille.js";
 import { EFFETS_METEO } from "../monde/meteo.js";
-import { RECETTES, SOLIDITE_INITIALE } from "../monde/recettes.js";
+import { RECETTES, SOLIDITE_INITIALE, inventionDeRecette } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
 import { atelierAdjacent, autorise, eauAdjacente, feuProche } from "../monde.js";
 import type { Monde } from "../monde.js";
@@ -29,8 +30,11 @@ import { ajusterRelation } from "../social/relations.js";
 import { SEUILS_COUPLE, accepteCour, eligibles, gainAttirance, unir } from "../social/couple.js";
 import { rayonVision } from "../cerveau/perception.js";
 import { avancementGrossesse, peutConcevoir } from "../agents/vie.js";
-import { trouverChemin } from "./chemin.js";
+import { COUT_EAU_PIROGUE, estTuileEau, trouverChemin } from "./chemin.js";
 import type { Action } from "./types.js";
+import { INVENTIONS, LECONS, estLecon } from "../savoirs/catalogue.js";
+import { apprendre, connait } from "../savoirs/lecons.js";
+import { membresFamille } from "../monde.js";
 
 export type Resultat =
   | { readonly statut: "encours" }
@@ -353,6 +357,28 @@ function tickParler(
         }
         break;
       }
+      case "savoir": {
+        if (apprendre(vers, effet.savoir, 1, effet.origine, tick)) {
+          const titre = estLecon(effet.savoir)
+            ? LECONS[effet.savoir].morale
+            : INVENTIONS[effet.savoir].confidence;
+          vers.memoire.ajouter(
+            tick,
+            "reflexion",
+            `${de.identite.prenom} m'a appris quelque chose : ${titre}`,
+            6,
+            [de.id],
+          );
+          informations.push(`savoir:${effet.savoir}→${vers.id}`);
+        }
+        break;
+      }
+      case "jeu": {
+        de.besoins.moral = clamp(de.besoins.moral + 10);
+        vers.besoins.moral = clamp(vers.besoins.moral + 10);
+        monde.emettre("jeu", de, { avec: vers.id, jeu: "osselets" }, 3);
+        break;
+      }
       case "don": {
         const n = transferer(
           de.corps.inventaire,
@@ -498,8 +524,9 @@ function tickDeplacer(
   action: Extract<Action, { type: "deplacer" }>,
 ): Resultat {
   const pos = p.corps.position;
+  const pirogue = possede(p.corps.inventaire, "pirogue");
   if (action.chemin === null) {
-    action.chemin = trouverChemin(monde.grille, pos, action.cible);
+    action.chemin = trouverChemin(monde.grille, pos, action.cible, { traverseEau: pirogue });
     if (action.chemin === null) return echec("destination inaccessible");
   }
   if (action.chemin.length === 0) return TERMINEE;
@@ -507,11 +534,14 @@ function tickDeplacer(
   while (action.chemin.length > 0) {
     const suivante = action.chemin[0];
     if (suivante === undefined) break;
-    if (!monde.grille.estPraticable(suivante.x, suivante.y)) return echec("chemin bloqué");
+    const biome = monde.grille.tuileOuNull(suivante.x, suivante.y)?.biome;
+    if (biome === undefined) return echec("chemin bloqué");
+    // L'eau profonde ne se traverse qu'en pirogue ; l'eau peu profonde se passe à gué.
+    const info = INFO_BIOME[biome];
+    const enPirogue = !info.praticable && pirogue && estTuileEau(biome);
+    if (!info.praticable && !enPirogue) return echec("chemin bloqué");
     const diag = suivante.x !== pos.x && suivante.y !== pos.y;
-    const cout =
-      INFO_BIOME[monde.grille.tuile(suivante.x, suivante.y).biome].coutDeplacement *
-      (diag ? Math.SQRT2 : 1);
+    const cout = (enPirogue ? COUT_EAU_PIROGUE : info.coutDeplacement) * (diag ? Math.SQRT2 : 1);
     if (action.progression < cout) break;
     action.progression -= cout;
     p.corps.position = { x: suivante.x, y: suivante.y };
@@ -533,8 +563,7 @@ function tickRecolter(
   }
   if (Grille.distance(p.corps.position, action.cible) > 1) return echec("gisement trop loin");
   const outil = gisement.outilRequis;
-  if (outil !== null && !possede(p.corps.inventaire, outil))
-    return echec(`outil requis : ${outil}`);
+  if (!outilSatisfait(p.corps.inventaire, outil)) return echec(`outil requis : ${outil ?? ""}`);
   if (p.corps.stade === "enfant") return echec("trop jeune pour récolter");
   if (gisement.quantite < 1) return echec("gisement épuisé");
   if (placeLibre(p.corps.inventaire) <= 0) return echec("inventaire plein");
@@ -544,7 +573,9 @@ function tickRecolter(
   action.ticksRestants -= 1;
   if (action.ticksRestants > 0) return ENCOURS;
 
-  const parAction = (1 + Math.floor(niv / 2)) * (outil === "hache_pierre" ? 2 : 1);
+  // Un filet prend deux fois plus de poisson qu'une canne.
+  const auFilet = gisement.type === "poisson" && possede(p.corps.inventaire, "filet");
+  const parAction = (1 + Math.floor(niv / 2)) * (outil === "hache_pierre" || auFilet ? 2 : 1);
   const rendement = Math.min(
     Math.floor(gisement.quantite),
     parAction,
@@ -553,7 +584,17 @@ function tickRecolter(
   const pris = ajouter(p.corps.inventaire, gisement.type, rendement);
   gisement.quantite -= pris;
   gagnerExperience(p.experience, "recolte", 2);
-  if (outil !== null && userObjet(p.corps.inventaire, outil)) {
+  const outilUse =
+    outil === null
+      ? null
+      : possede(p.corps.inventaire, outil)
+        ? outil
+        : outil === "canne_a_peche"
+          ? "filet"
+          : outil === "lance"
+            ? "piege"
+            : outil;
+  if (outilUse !== null && userObjet(p.corps.inventaire, outilUse)) {
     monde.emettre("outil_casse", p, { outil }, 3);
   }
   const connu = p.connaissance.get(cleLieu(action.cible.x, action.cible.y));
@@ -627,6 +668,9 @@ function tickFabriquer(
 ): Resultat {
   const recette = RECETTES[action.recette];
   if (p.corps.stade === "enfant") return echec("trop jeune pour fabriquer");
+  const invention = inventionDeRecette(action.recette);
+  const forceIdee = invention === undefined ? 1 : (p.savoirs.get(invention)?.force ?? 0);
+  if (invention !== undefined && !connait(p, invention)) return echec("je ne sais pas faire cela");
   const niv = niveau(p.experience[recette.competence]);
   if (niv < recette.niveauRequis)
     return echec(`niveau ${recette.niveauRequis} requis en ${recette.competence}`);
@@ -654,7 +698,37 @@ function tickFabriquer(
       type: recette.produit.objet,
       solidite: SOLIDITE_INITIALE[recette.produit.objet],
     };
+    if (invention !== undefined && forceIdee < 1 && p.rng.chance(0.35)) {
+      // Prototype raté : le temps est perdu, les matériaux restent, on réessaiera.
+      monde.emettre("prototype_rate", p, { invention, nom: INVENTIONS[invention].nom }, 4);
+      p.memoire.ajouter(
+        monde.horloge.tick,
+        "action",
+        `Mon ${INVENTIONS[invention].nom} n'a pas tenu. Je recommencerai autrement.`,
+        4,
+        [],
+      );
+      return TERMINEE;
+    }
     if (!ajouterObjet(p.corps.inventaire, objet)) return echec("inventaire plein");
+    if (invention !== undefined && forceIdee < 1) {
+      apprendre(p, invention, 1, p.identite.prenom, monde.horloge.tick);
+      for (const m of membresFamille(monde, p))
+        apprendre(m, invention, 1, p.identite.prenom, monde.horloge.tick);
+      monde.emettre(
+        "invention",
+        p,
+        { invention, nom: INVENTIONS[invention].nom, domaine: INVENTIONS[invention].domaine },
+        9,
+      );
+      p.memoire.ajouter(
+        monde.horloge.tick,
+        "reflexion",
+        `Ça marche ! ${INVENTIONS[invention].confidence}`,
+        9,
+        [],
+      );
+    }
   } else {
     ajouter(p.corps.inventaire, recette.produit.ressource, recette.produit.quantite);
   }

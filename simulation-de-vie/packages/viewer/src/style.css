@@ -466,6 +466,13 @@ table.saisons td:first-child {
     grid-template-columns: 60px 1fr 30px;
   }
 }
+.epitaphe {
+  font-style: italic;
+  color: var(--discret);
+  border-left: 3px solid var(--bord);
+  padding-left: 8px;
+  margin: 8px 0;
+}
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

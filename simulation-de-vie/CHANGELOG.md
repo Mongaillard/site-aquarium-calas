@@ -2,6 +2,35 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M7b – Savoirs : leçons et inventions (2026-09-12)
+
+- Leçons tirées des décès : à chaque mort, le moteur fait l'autopsie de la situation (cause,
+  saison, besoins, abri à portée, stocks des autres familles, puits) et en déduit une ou deux
+  morales parmi cinq : provisions avant l'hiver, rentrer quand on gèle, les enfants d'abord,
+  partager en hiver, un puits au village. La famille, le partenaire, les amis et les témoins
+  proches les retiennent (souvenir d'importance 8, événement `lecon`), une tombe est dressée
+  sur place avec la morale gravée en épitaphe.
+- Les savoirs changent les décisions : seuil de froid relevé et retour à l'abri plus tôt,
+  provisions dès l'été et avec plus d'ardeur, dons de nourriture aux autres familles en saison
+  froide et aux enfants d'abord, construction d'un puits.
+- Inventions : quatre inventions dans un catalogue fermé que le moteur sait appliquer. Le filet
+  (pêche doublée), le piège (gibier sans lance), la pirogue (traverser l'eau profonde, donc
+  atteindre d'autres rivages du monde sans limite) et les osselets (partie entre deux personnes
+  qui remonte le moral). Un besoin ressenti et de la curiosité donnent une idée le soir
+  (événement `idee`), puis un prototype qui peut rater (`prototype_rate`) avant de réussir
+  (`invention`, importance 9) ; une idée jamais réalisée s'efface en vingt jours ; on réinvente
+  rarement ce qu'un autre sait déjà.
+- Transmission : un savoir passe par le dialogue (« Depuis la mort de Timéo, on le sait… »,
+  « Tu sais quoi ? … »), avec son origine, et les adolescents héritent des savoirs de leurs
+  parents. Sur quatre mondes et 220 jours : les quatre inventions apparaissent, une vingtaine de
+  porteurs chacune, 15 à 28 parties d'osselets.
+- Protocole, serveur, viewer : fiche « Savoirs » (📜 leçons, 💡 inventions, idées en cours,
+  origine au survol), tableau « Savoirs du village » dans les Statistiques, épitaphe sur la
+  carte d'une tombe, nouveaux événements dans le Journal.
+- Tests : 177 au total (+7) : autopsie, tombe et apprentissage familial, effet d'une leçon sur
+  l'urgence, transmission par le dialogue, idée → prototype → invention partagée, outils de
+  remplacement, pirogue.
+
 ## M7a – Monde sans limite (2026-09-12)
 
 - Moteur : la grille n'a plus de bords. Le monde est découpé en morceaux de 32 × 32 tuiles

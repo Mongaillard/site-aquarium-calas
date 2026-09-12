@@ -42,6 +42,8 @@ describe("instantanés", () => {
     expect(e1.stats.tuilesDecouvertes).toBe(s.grille.nombreDecouvertes);
     expect(e1.stats.tuiles).toBe(s.grille.nombreTuiles);
     expect(e1.stats.morceaux).toBe(s.grille.nombreMorceaux);
+    expect(Array.isArray(e1.stats.savoirs)).toBe(true);
+    expect(e1.batiments.every((b) => "epitaphe" in b)).toBe(true);
     const e2 = messageEtat(s, {
       ticksParSeconde: 4,
       pause: false,

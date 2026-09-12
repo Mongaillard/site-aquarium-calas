@@ -82,6 +82,15 @@ class FilePriorite {
 export interface OptionsChemin {
   /** Nombre maximal de nœuds développés avant abandon. */
   readonly maxNoeuds?: number;
+  /** Avec une pirogue : l'eau devient praticable (à ce coût par tuile). */
+  readonly traverseEau?: boolean;
+}
+
+/** Coût d'une tuile d'eau en pirogue. */
+export const COUT_EAU_PIROGUE = 1.3;
+
+export function estTuileEau(biome: string): boolean {
+  return biome === "eau_profonde" || biome === "eau_peu_profonde";
 }
 
 /**
@@ -127,10 +136,14 @@ export function trouverChemin(
       const tuile = grille.tuileOuNull(nx, ny);
       if (tuile === null) continue;
       const info = INFO_BIOME[tuile.biome];
-      if (!info.praticable) continue;
+      const enPirogue =
+        !info.praticable && options.traverseEau === true && estTuileEau(tuile.biome);
+      if (!info.praticable && !enPirogue) continue;
       const iVoisin = idx(nx, ny);
       if (ferme.has(iVoisin)) continue;
-      const cout = info.coutDeplacement * (dx !== 0 && dy !== 0 ? Math.SQRT2 : 1);
+      const cout =
+        (enPirogue ? COUT_EAU_PIROGUE : info.coutDeplacement) *
+        (dx !== 0 && dy !== 0 ? Math.SQRT2 : 1);
       const gVoisin = gCourant + cout;
       if (gVoisin < (g.get(iVoisin) ?? Infinity)) {
         g.set(iVoisin, gVoisin);

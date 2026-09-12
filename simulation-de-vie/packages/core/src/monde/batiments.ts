@@ -159,6 +159,8 @@ export interface Batiment {
   allume: boolean;
   readonly fondeAuTick: number;
   termineAuTick: number | null;
+  /** Tombes : ce qu'on y grave. */
+  epitaphe: string | null;
 }
 
 export function creerChantier(
@@ -185,6 +187,7 @@ export function creerChantier(
     allume: false,
     fondeAuTick: tick,
     termineAuTick: null,
+    epitaphe: null,
   };
 }
 

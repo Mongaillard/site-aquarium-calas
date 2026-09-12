@@ -187,6 +187,16 @@ export function decrireEvenement(
         ? `${qui} a recueilli ${enfant}.`
         : `J'ai recueilli ${enfant}, qui n'a plus personne.`;
     }
+    case "invention":
+      return temoin ? `J'ai vu ${qui} réussir son ${String(d.nom ?? "invention")}.` : null;
+    case "jeu":
+      return temoin
+        ? null
+        : `J'ai joué aux osselets avec ${noms.prenom(String(d.avec ?? ""))} ; ça fait du bien.`;
+    case "lecon":
+    case "idee":
+    case "prototype_rate":
+      return null; // souvenirs ajoutés explicitement par le moteur
     case "meteo":
     case "arrivee":
     case "intention":

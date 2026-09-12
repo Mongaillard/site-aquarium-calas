@@ -6,6 +6,7 @@ import {
   placeLibre,
   possede,
   quantite,
+  outilSatisfait,
 } from "../agents/inventaire.js";
 import type { LieuConnu, Personnage } from "../agents/personnage.js";
 import { PLANS_BATIMENT, materiauxManquants } from "../monde/batiments.js";
@@ -13,7 +14,7 @@ import type { Batiment, TypeBatiment } from "../monde/batiments.js";
 import { INFO_BIOME } from "../monde/biomes.js";
 import { Grille } from "../monde/grille.js";
 import type { Position } from "../monde/grille.js";
-import { RECETTES } from "../monde/recettes.js";
+import { RECETTES, inventionDeRecette } from "../monde/recettes.js";
 import type { NomRecette } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
 import {
@@ -32,6 +33,7 @@ import type { Monde } from "../monde.js";
 import { partenaireDe } from "../social/couple.js";
 import { relationAvec } from "../agents/personnage.js";
 import { trouverChemin } from "./chemin.js";
+import { connait } from "../savoirs/lecons.js";
 import type { Action, Intention } from "./types.js";
 
 export type ResultatPlan =
@@ -130,7 +132,7 @@ export function meilleureNourritureConnue(p: Personnage): Ressource | null {
   let poisson = false;
   let baies = false;
   for (const l of p.connaissance.values()) {
-    if (l.quantiteVue < 1 || (l.outilRequis !== null && !possede(inv, l.outilRequis))) continue;
+    if (l.quantiteVue < 1 || !outilSatisfait(inv, l.outilRequis)) continue;
     if (l.type === "gibier") gibier = true;
     else if (l.type === "poisson") poisson = true;
     else if (l.type === "baies") baies = true;
@@ -234,7 +236,9 @@ function allerPresDe(monde: Monde, p: Personnage, cible: Position): Action | nul
   if (Grille.distance(pos, cible) <= 1) return null;
   const destination = destinationPourAtteindre(monde, pos, cible);
   if (destination === null) return null;
-  const chemin = trouverChemin(monde.grille, pos, destination);
+  const chemin = trouverChemin(monde.grille, pos, destination, {
+    traverseEau: possede(p.corps.inventaire, "pirogue"),
+  });
   if (chemin === null) return null;
   return { type: "deplacer", cible: destination, chemin, progression: 0 };
 }
@@ -243,7 +247,9 @@ function allerPresDe(monde: Monde, p: Personnage, cible: Position): Action | nul
 function allerSur(monde: Monde, p: Personnage, cible: Position): Action | null {
   const pos = p.corps.position;
   if (pos.x === cible.x && pos.y === cible.y) return null;
-  const chemin = trouverChemin(monde.grille, pos, cible);
+  const chemin = trouverChemin(monde.grille, pos, cible, {
+    traverseEau: possede(p.corps.inventaire, "pirogue"),
+  });
   if (chemin === null) return null;
   return { type: "deplacer", cible, chemin, progression: 0 };
 }
@@ -353,7 +359,7 @@ function planifierRecolte(
 ): ResultatPlan {
   const inv = p.corps.inventaire;
   const lieux = lieuxConnusTries(p, ressource).filter(
-    (l) => l.quantiteVue >= 1 && (l.outilRequis === null || possede(inv, l.outilRequis)),
+    (l) => l.quantiteVue >= 1 && outilSatisfait(inv, l.outilRequis),
   );
   if (lieux.length === 0) return echec(`aucun gisement de ${ressource} exploitable connu`);
   const liberation = placeLibre(inv) <= 0 ? libererPlace(monde, p, [ressource]) : [];
@@ -451,7 +457,10 @@ function planifierExploration(monde: Monde, p: Personnage): ResultatPlan {
   }
   candidats.sort((a, b) => b.score - a.score);
   for (const c of candidats.slice(0, ESSAIS_MAX)) {
-    const chemin = trouverChemin(monde.grille, pos, c.cible, { maxNoeuds: 4_000 });
+    const chemin = trouverChemin(monde.grille, pos, c.cible, {
+      maxNoeuds: 4_000,
+      traverseEau: possede(p.corps.inventaire, "pirogue"),
+    });
     if (chemin !== null && chemin.length > 0) {
       return ok([{ type: "deplacer", cible: c.cible, chemin, progression: 0 }]);
     }
@@ -661,6 +670,8 @@ export function choisirSite(monde: Monde, p: Personnage, type: TypeBatiment): Po
 function planifierFabrication(monde: Monde, p: Personnage, nom: NomRecette): ResultatPlan {
   const recette = RECETTES[nom];
   const inv = p.corps.inventaire;
+  const invention = inventionDeRecette(nom);
+  if (invention !== undefined && !connait(p, invention)) return echec("je ne sais pas faire cela");
   if (niveau(p.experience[recette.competence]) < recette.niveauRequis) {
     return echec(`niveau ${recette.niveauRequis} requis en ${recette.competence}`);
   }

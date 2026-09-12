@@ -73,6 +73,8 @@ export interface BatimentEtat {
   readonly manquants: Readonly<Record<string, number>>;
   readonly capaciteDormeurs: number;
   readonly nom: string;
+  /** Tombes : la morale qu'on y a gravée. */
+  readonly epitaphe: string | null;
 }
 
 /**
@@ -120,6 +122,26 @@ export interface Statistiques {
   readonly tuilesDecouvertes: number;
   readonly tuiles: number;
   readonly morceaux: number;
+  /** Leçons et inventions connues dans la colonie, avec le nombre de vivants qui les portent. */
+  readonly savoirs: readonly SavoirStat[];
+}
+
+export interface SavoirStat {
+  readonly id: string;
+  readonly genre: "lecon" | "invention";
+  readonly titre: string;
+  readonly texte: string;
+  readonly porteurs: number;
+}
+
+/** Un savoir d'une personne : leçon retenue ou invention (idée en cours si force < 1). */
+export interface SavoirFiche {
+  readonly id: string;
+  readonly genre: "lecon" | "invention";
+  readonly titre: string;
+  readonly texte: string;
+  readonly force: number;
+  readonly origine: string | null;
 }
 
 export interface MessageEtat {
@@ -214,6 +236,7 @@ export interface MessageFiche {
   readonly enceinte: { readonly avancement: number; readonly pere: string } | null;
   readonly lieuxConnus: number;
   readonly nombreSouvenirs: number;
+  readonly savoirs: readonly SavoirFiche[];
 }
 
 export interface MessageErreur {

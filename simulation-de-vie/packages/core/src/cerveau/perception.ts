@@ -1,4 +1,8 @@
 /** Construction de la perception d'un personnage (section 10.2, sous-ensemble M2). */
+import { INVENTIONS, SEUIL_SAVOIR } from "../savoirs/catalogue.js";
+import type { Invention, Savoir } from "../savoirs/catalogue.js";
+import { savoirsConnus } from "../savoirs/lecons.js";
+import type { TypeObjet } from "../monde/recettes.js";
 import type { Besoins } from "../agents/besoins.js";
 import type { Personnalite } from "../agents/identite.js";
 import {
@@ -71,7 +75,11 @@ export interface ProjetPercu {
 
 /** Perception minimale évaluée à chaque tick pour les réflexes d'urgence. */
 export interface PerceptionLegere {
-  readonly moi: { readonly besoins: Readonly<Besoins>; readonly nourritureEnPoche: boolean };
+  readonly moi: {
+    readonly besoins: Readonly<Besoins>;
+    readonly nourritureEnPoche: boolean;
+    readonly savoirs: ReadonlySet<Savoir>;
+  };
   readonly abriDisponible: boolean;
   readonly feuConnu: boolean;
 }
@@ -86,7 +94,11 @@ export function feuConnu(monde: Monde): boolean {
 
 export function percevoirLeger(monde: Monde, p: Personnage): PerceptionLegere {
   return {
-    moi: { besoins: p.besoins, nourritureEnPoche: quantiteNourriture(p.corps.inventaire) > 0 },
+    moi: {
+      besoins: p.besoins,
+      nourritureEnPoche: quantiteNourriture(p.corps.inventaire) > 0,
+      savoirs: savoirsConnus(p),
+    },
     abriDisponible: abriDisponible(monde, p) !== null,
     feuConnu: feuConnu(monde),
   };
@@ -130,6 +142,11 @@ export interface Perception {
     readonly valeurs: readonly string[];
     readonly prudenceNourriture: boolean;
     readonly chercheAbri: boolean;
+    /** Leçons et inventions que je connais. */
+    readonly savoirs: ReadonlySet<Savoir>;
+    /** Inventions dont j'ai l'idée mais pas encore le prototype réussi. */
+    readonly ideesEnCours: readonly Invention[];
+    readonly possede: (objet: TypeObjet) => boolean;
     readonly explorerPlusLoin: boolean;
   };
   readonly moment: Moment;
@@ -312,6 +329,11 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
       valeurs: p.identite.valeurs,
       prudenceNourriture: p.drapeaux.prudenceNourritureJusqua > monde.horloge.tick,
       chercheAbri: p.drapeaux.chercheAbriJusqua > monde.horloge.tick,
+      savoirs: savoirsConnus(p),
+      ideesEnCours: [...p.savoirs.entries()]
+        .filter(([k, v]) => k in INVENTIONS && v.force >= SEUIL_SAVOIR && v.force < 1)
+        .map(([k]) => k as Invention),
+      possede: (objet) => possede(inv, objet),
       explorerPlusLoin: p.drapeaux.explorerPlusLoinJusqua > monde.horloge.tick,
     },
     moment,

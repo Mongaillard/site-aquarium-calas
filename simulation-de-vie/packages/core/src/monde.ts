@@ -181,6 +181,11 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
   if (!acces.some((b) => b.type === "feu_de_camp" && (b.etat === "chantier" || b.allume)))
     return "feu_de_camp";
   if (!acces.some((b) => PLANS_BATIMENT[b.type].capaciteStock > 0)) return "entrepot";
+  if (
+    (p.savoirs.get("puits_pres_du_village")?.force ?? 0) >= 0.6 &&
+    ![...monde.batiments.values()].some((b) => b.type === "puits")
+  )
+    return "puits";
   if (famille >= 3 && !acces.some((b) => b.type === "maison")) return "maison";
   return null;
 }

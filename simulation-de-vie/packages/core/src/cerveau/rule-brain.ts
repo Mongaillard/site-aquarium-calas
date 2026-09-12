@@ -2,6 +2,8 @@
  * Cerveau à règles (section 10.6) : sélection par score d'utilité pondéré par
  * la personnalité, avec un bruit seedé de ±10 %.
  */
+import { INVENTIONS } from "../savoirs/catalogue.js";
+import type { Invention, Savoir } from "../savoirs/catalogue.js";
 import { NOURRITURE } from "../agents/inventaire.js";
 import { urgence } from "../agents/besoins.js";
 import type { Personnage } from "../agents/personnage.js";
@@ -36,8 +38,11 @@ export class RuleBrain implements Cerveau {
     if (b.soif < SEUILS_URGENCE.soif) return { type: "boire" };
     // Le froid tue plus vite que la faim : quand on gèle et qu'une chaleur est
     // à portée, on rentre d'abord, sauf si l'on a de quoi manger sur soi.
-    const gele =
-      b.chaleur < SEUILS_URGENCE.chaleur && (perception.abriDisponible || perception.feuConnu);
+    // Qui a retenu la leçon rentre plus tôt.
+    const seuilChaleur = perception.moi.savoirs.has("rentrer_quand_on_gele")
+      ? SEUILS_URGENCE.chaleur + 15
+      : SEUILS_URGENCE.chaleur;
+    const gele = b.chaleur < seuilChaleur && (perception.abriDisponible || perception.feuConnu);
     const affame = b.faim < SEUILS_URGENCE.faim;
     if (gele && !(affame && perception.moi.nourritureEnPoche)) return { type: "se_rechauffer" };
     if (affame) return { type: "manger" };
@@ -96,12 +101,20 @@ export class RuleBrain implements Cerveau {
     }
 
     const saisonFroide = perception.saison === "automne" || perception.saison === "hiver";
+    const sait = (s: Savoir): boolean => perception.moi.savoirs.has(s);
 
-    // Se réchauffer au feu ou à l'abri quand on a froid.
-    if (besoins.chaleur < 60 && (perception.feuConnu || perception.abriDisponible)) {
+    // Se réchauffer au feu ou à l'abri quand on a froid (plus tôt si l'on a retenu la leçon).
+    if (
+      besoins.chaleur < (sait("rentrer_quand_on_gele") ? 75 : 60) &&
+      (perception.feuConnu || perception.abriDisponible)
+    ) {
       candidats.push({
         intention: { type: "se_rechauffer" },
-        score: urgence(besoins.chaleur) * 4 + (saisonFroide ? 0.3 : 0) + (nuit ? 0.3 : 0),
+        score:
+          urgence(besoins.chaleur) * 4 +
+          (saisonFroide ? 0.3 : 0) +
+          (nuit ? 0.3 : 0) +
+          (sait("rentrer_quand_on_gele") ? 0.3 : 0),
       });
     }
 
@@ -119,17 +132,23 @@ export class RuleBrain implements Cerveau {
       });
     }
 
-    // Provisions : en automne, on remplit les stocks pour l'hiver.
+    // Provisions : en automne, on remplit les stocks pour l'hiver ; qui a retenu la
+    // leçon s'y met dès l'été et y tient davantage.
+    const prevoyant = sait("provisions_hiver");
     if (
       adulte &&
       nourriture !== null &&
       perception.stockAccessible &&
       placeLibre > 3 &&
-      saisonFroide
+      (saisonFroide || (prevoyant && perception.saison === "ete"))
     ) {
       candidats.push({
         intention: { type: "recolter", ressource: nourriture },
-        score: 0.35 + personnalite.conscience * 0.5 + (perception.saison === "automne" ? 0.2 : 0),
+        score:
+          0.35 +
+          personnalite.conscience * 0.5 +
+          (perception.saison === "automne" ? 0.2 : 0) +
+          (prevoyant ? 0.4 : 0),
       });
     }
     if (adulte && perception.stockAccessible && perception.nourritureEnPocheQuantite >= 6) {
@@ -183,18 +202,29 @@ export class RuleBrain implements Cerveau {
       }
     }
 
-    // Offrir à quelqu'un qui a faim quand on a des vivres.
-    const affames = perception.personnesVisibles.filter((v) => v.aFaim && !v.endormi);
+    // Offrir à quelqu'un qui a faim quand on a des vivres ; en hiver, qui a retenu la
+    // leçon partage même avec les autres familles, et donne aux enfants d'abord.
+    const partageur = sait("partager_en_hiver") && saisonFroide;
+    const affames = perception.personnesVisibles
+      .filter((v) => v.aFaim && !v.endormi)
+      .sort((x, y) => Number(y.stade === "enfant") - Number(x.stade === "enfant"));
     const v0 = affames[0];
     if (
       adulte &&
       v0 !== undefined &&
       perception.moi.ressourceNourriture !== null &&
-      perception.moi.nourritureCrue >= 3
+      (perception.moi.nourritureCrue >= 3 ||
+        (partageur && perception.nourritureEnPocheQuantite >= 2))
     ) {
       candidats.push({
         intention: { type: "offrir", cible: v0.id, ressource: perception.moi.ressourceNourriture },
-        score: 0.3 + personnalite.agreabilite * 0.7 + (v0.famille ? 0.3 : 0) + v0.affinite / 200,
+        score:
+          0.3 +
+          personnalite.agreabilite * 0.7 +
+          (v0.famille ? 0.3 : 0) +
+          v0.affinite / 200 +
+          (partageur ? 0.5 : 0) +
+          (sait("enfants_dabord") && v0.stade === "enfant" ? 0.6 : 0),
       });
     }
 
@@ -223,8 +253,46 @@ export class RuleBrain implements Cerveau {
           cible: enfantAffame.id,
           ressource: perception.moi.ressourceNourriture,
         },
-        score: 1.2 + personnalite.agreabilite * 0.3,
+        score: 1.2 + personnalite.agreabilite * 0.3 + (sait("enfants_dabord") ? 0.4 : 0),
       });
+    }
+
+    // Inventions : réaliser une idée, puis s'équiper de ce qu'on sait faire.
+    if (adulte && placeLibre > 0) {
+      for (const idee of perception.moi.ideesEnCours) {
+        candidats.push({
+          intention: { type: "fabriquer", recette: INVENTIONS[idee].recette },
+          score: 0.55 + personnalite.ouverture * 0.3 + personnalite.conscience * 0.2,
+        });
+      }
+      const equipement: { invention: Invention; utile: boolean }[] = [
+        {
+          invention: "filet",
+          utile: perception.connaitPoisson && !perception.moi.possede("filet"),
+        },
+        {
+          invention: "piege",
+          utile:
+            connait("gibier") &&
+            !perception.moi.possede("piege") &&
+            !perception.moi.possede("lance"),
+        },
+        {
+          invention: "pirogue",
+          utile: personnalite.ouverture > 0.5 && !perception.moi.possede("pirogue"),
+        },
+        { invention: "osselets", utile: besoins.moral < 60 && !perception.moi.possede("osselets") },
+      ];
+      for (const { invention, utile } of equipement) {
+        if (!utile || !sait(invention) || perception.moi.ideesEnCours.includes(invention)) continue;
+        candidats.push({
+          intention: { type: "fabriquer", recette: INVENTIONS[invention].recette },
+          score:
+            0.35 +
+            personnalite.conscience * 0.3 +
+            (invention === "osselets" ? urgence(besoins.moral) : 0),
+        });
+      }
     }
 
     // Un parent sans vivres va en chercher pour son enfant.

@@ -7,7 +7,12 @@ import {
   COMPETENCES,
   PLANS_BATIMENT,
   TAILLE_MORCEAU,
+  INVENTIONS,
+  LECONS,
+  SEUIL_SAVOIR,
   cleMorceau,
+  estLecon,
+  titreSavoir,
   avancementGrossesse,
   codeBiome,
   decrireAction,
@@ -17,7 +22,7 @@ import {
   partenaireDe,
   rayonVision,
 } from "@sdv/core";
-import type { Evenement, Personnage, Simulation, Intention } from "@sdv/core";
+import type { Evenement, Personnage, Simulation, Intention, Savoir } from "@sdv/core";
 import type {
   BatimentEtat,
   BilanSaison,
@@ -28,6 +33,7 @@ import type {
   MessageInit,
   PersonnageEtat,
   PersonneCourte,
+  SavoirStat,
   Statistiques,
 } from "@sdv/protocole";
 
@@ -86,6 +92,7 @@ export function etatBatiments(sim: Simulation): BatimentEtat[] {
     famille: b.famille,
     proprietaire: b.proprietaire,
     solidite: Math.round(b.solidite),
+    epitaphe: b.epitaphe,
     allume: b.allume,
     stock: b.stock ? { ...b.stock.ressources } : null,
     travailRestant: Math.max(0, Math.round(b.travailRestant)),
@@ -211,7 +218,32 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     tuilesDecouvertes: sim.grille.nombreDecouvertes,
     tuiles: sim.grille.nombreTuiles,
     morceaux: sim.grille.nombreMorceaux,
+    savoirs: savoirsDuVillage(sim),
   };
+}
+
+function texteSavoir(id: Savoir): string {
+  return estLecon(id) ? LECONS[id].morale : INVENTIONS[id].confidence;
+}
+
+/** Savoirs connus d'au moins un vivant, les plus répandus d'abord. */
+export function savoirsDuVillage(sim: Simulation): SavoirStat[] {
+  const ids = [...Object.keys(LECONS), ...Object.keys(INVENTIONS)] as Savoir[];
+  const resultat: SavoirStat[] = [];
+  for (const id of ids) {
+    const porteurs = sim
+      .vivants()
+      .filter((p) => (p.savoirs.get(id)?.force ?? 0) >= SEUIL_SAVOIR).length;
+    if (porteurs === 0) continue;
+    resultat.push({
+      id,
+      genre: estLecon(id) ? "lecon" : "invention",
+      titre: titreSavoir(id),
+      texte: texteSavoir(id),
+      porteurs,
+    });
+  }
+  return resultat.sort((a, b) => b.porteurs - a.porteurs || a.titre.localeCompare(b.titre));
 }
 
 export function evenementEtat(e: Evenement): EvenementEtat {
@@ -425,6 +457,14 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
       ? { avancement: avancementGrossesse(sim, p), pere: p.corps.enceinte.pere }
       : null,
     lieuxConnus: p.connaissance.size,
+    savoirs: [...p.savoirs.entries()].map(([id, s]) => ({
+      id,
+      genre: estLecon(id) ? "lecon" : "invention",
+      titre: titreSavoir(id),
+      texte: texteSavoir(id),
+      force: s.force,
+      origine: s.origine,
+    })),
     nombreSouvenirs: p.memoire.taille,
   };
 }
