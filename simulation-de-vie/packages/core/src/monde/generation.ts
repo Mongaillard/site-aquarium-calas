@@ -93,6 +93,7 @@ export function genererGrille(rng: Rng, options: OptionsGeneration): Grille {
         altitude,
         humidite,
         gisement: null,
+        batiment: null,
       });
     }
   }

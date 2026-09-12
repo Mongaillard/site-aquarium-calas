@@ -11,6 +11,9 @@ export const RESSOURCES = [
   "fibres",
   "argile",
   "graines",
+  "cuir",
+  "corde",
+  "repas_cuit",
 ] as const;
 export type Ressource = (typeof RESSOURCES)[number];
 
@@ -38,7 +41,8 @@ interface ProfilGisement {
 
 /**
  * Gisements possibles par biome. Les probabilités sont évaluées dans l'ordre :
- * une tuile ne porte qu'un seul gisement.
+ * une tuile ne porte qu'un seul gisement. Le bois mort (sans outil) précède
+ * les arbres (hache requise) pour permettre la fabrication de la première hache.
  */
 export const GISEMENTS_PAR_BIOME: Record<Biome, readonly ProfilGisement[]> = {
   eau_profonde: [],
@@ -56,18 +60,20 @@ export const GISEMENTS_PAR_BIOME: Record<Biome, readonly ProfilGisement[]> = {
   prairie: [
     { type: "baies", probabilite: 0.1, min: 2, max: 6, tauxRegen: 0.5, outilRequis: null },
     { type: "fibres", probabilite: 0.25, min: 3, max: 8, tauxRegen: 1, outilRequis: null },
+    { type: "bois", probabilite: 0.04, min: 1, max: 2, tauxRegen: 0.2, outilRequis: null },
     { type: "gibier", probabilite: 0.04, min: 1, max: 3, tauxRegen: 0.2, outilRequis: "lance" },
   ],
   foret: [
+    { type: "bois", probabilite: 0.2, min: 1, max: 3, tauxRegen: 0.3, outilRequis: null },
     {
       type: "bois",
-      probabilite: 0.55,
+      probabilite: 0.45,
       min: 6,
       max: 20,
       tauxRegen: 0.2,
       outilRequis: "hache_pierre",
     },
-    { type: "baies", probabilite: 0.2, min: 3, max: 8, tauxRegen: 0.5, outilRequis: null },
+    { type: "baies", probabilite: 0.25, min: 3, max: 8, tauxRegen: 0.5, outilRequis: null },
     { type: "gibier", probabilite: 0.08, min: 1, max: 4, tauxRegen: 0.2, outilRequis: "lance" },
   ],
   colline: [{ type: "pierre", probabilite: 0.4, min: 8, max: 25, tauxRegen: 0, outilRequis: null }],
@@ -91,4 +97,7 @@ export const ASCII_RESSOURCE: Record<Ressource, string> = {
   fibres: '"',
   argile: "a",
   graines: "s",
+  cuir: "c",
+  corde: "r",
+  repas_cuit: "p",
 };

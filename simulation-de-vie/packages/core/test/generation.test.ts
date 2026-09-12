@@ -80,8 +80,12 @@ describe("genererGrille", () => {
     for (const t of g.toutes()) {
       if (!t.gisement) continue;
       nb++;
-      const types = GISEMENTS_PAR_BIOME[t.biome].map((p) => p.type);
-      expect(types).toContain(t.gisement.type);
+      const profils = GISEMENTS_PAR_BIOME[t.biome];
+      expect(
+        profils.some(
+          (pr) => pr.type === t.gisement?.type && pr.outilRequis === t.gisement.outilRequis,
+        ),
+      ).toBe(true);
       expect(t.gisement.quantite).toBe(t.gisement.max);
       expect(t.gisement.quantite).toBeGreaterThan(0);
     }

@@ -1,7 +1,7 @@
 /** Personnage : identité + corps + besoins + état de décision. */
 import type { Action, Intention } from "../actions/types.js";
 import type { Position } from "../monde/grille.js";
-import type { Ressource } from "../monde/ressources.js";
+import type { Outil, Ressource } from "../monde/ressources.js";
 import type { Rng } from "../rng.js";
 import { besoinsInitiaux } from "./besoins.js";
 import type { Besoins } from "./besoins.js";
@@ -30,6 +30,7 @@ export interface LieuConnu {
   readonly x: number;
   readonly y: number;
   readonly type: Ressource;
+  readonly outilRequis: Outil | null;
   quantiteVue: number;
   tickVu: number;
 }
@@ -38,6 +39,11 @@ export interface Echec {
   readonly tick: number;
   readonly action: string;
   readonly raison: string;
+}
+
+/** Projet de construction en cours : chantier auquel le personnage contribue. */
+export interface Projet {
+  readonly batimentId: string;
 }
 
 export interface Personnage {
@@ -50,6 +56,7 @@ export interface Personnage {
   causeDeces: string | null;
   tickDeces: number | null;
   intention: Intention | null;
+  projet: Projet | null;
   plan: Action[];
   actionEnCours: Action | null;
   /** Lieux connus, indexés par "x,y". */
@@ -117,6 +124,7 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
     causeDeces: null,
     tickDeces: null,
     intention: null,
+    projet: null,
     plan: [],
     actionEnCours: null,
     connaissance: new Map(),

@@ -164,7 +164,7 @@ describe("planifier", () => {
   it("manger : rien de connu → échec explicite", () => {
     const { sim, p } = scenario();
     const r = planifier(sim, p, { type: "manger" });
-    expect(r).toEqual({ ok: false, raison: "aucun gisement de baies connu" });
+    expect(r).toEqual({ ok: false, raison: "aucun gisement de baies exploitable connu" });
   });
 
   it("boire : eau connue → [deplacer, boire] vers la terre ferme adjacente", () => {

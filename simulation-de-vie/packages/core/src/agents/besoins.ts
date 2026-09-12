@@ -29,16 +29,38 @@ export interface ContexteBesoins {
   readonly ticksParJour: number;
   readonly estNuit: boolean;
   readonly dort: boolean;
+  /** Dans un abri ou une maison (sécurité, sommeil). */
   readonly aAbri: boolean;
   readonly enCompagnie: boolean;
   readonly extraversion: number;
+  /**
+   * Perte de chaleur en unités (1 unité = 100 points en 1,25 jour) : saison ×
+   * météo, 0 si le personnage est protégé.
+   */
+  readonly perteChaleur: number;
+  /** Gain de chaleur en unités : abri, maison, feu proche. */
+  readonly gainChaleur: number;
+  /** Multiplicateur de la soif (canicule). */
+  readonly facteurSoif: number;
 }
+
+export const CONTEXTE_BESOINS_DEFAUT: ContexteBesoins = {
+  ticksParJour: 144,
+  estNuit: false,
+  dort: false,
+  aAbri: false,
+  enCompagnie: false,
+  extraversion: 0.5,
+  perteChaleur: 0,
+  gainChaleur: 0,
+  facteurSoif: 1,
+};
 
 export interface EffetBesoins {
   /** Variation de santé à appliquer ce tick (négatif = dégât). */
   readonly deltaSante: number;
-  /** Causes de dégâts actives, pour le journal et la cause de décès. */
-  readonly causes: readonly ("faim" | "soif" | "froid")[];
+  /** Causes de dégâts actives, par gravité décroissante. */
+  readonly causes: readonly ("soif" | "froid" | "faim")[];
 }
 
 /** Applique un tick de décroissance / récupération et renvoie l'effet sur la santé. */
@@ -47,19 +69,25 @@ export function appliquerTickBesoins(b: Besoins, ctx: ContexteBesoins): EffetBes
   const ralenti = ctx.dort ? 0.6 : 1;
 
   b.faim = clamp(b.faim - (100 / (2 * T)) * ralenti);
-  b.soif = clamp(b.soif - (100 / T) * ralenti);
-  b.sommeil = clamp(ctx.dort ? b.sommeil + 100 / (T / 3) : b.sommeil - 100 / (1.5 * T));
+  b.soif = clamp(b.soif - (100 / T) * ralenti * ctx.facteurSoif);
+  const recuperation = ctx.aAbri ? 1.3 : 1;
+  b.sommeil = clamp(
+    ctx.dort ? b.sommeil + (100 / (T / 3)) * recuperation : b.sommeil - 100 / (1.5 * T),
+  );
 
-  if (ctx.estNuit && !ctx.aAbri) {
-    b.chaleur = clamp(b.chaleur - 100 / (1.25 * T));
+  // Chaleur : bilan gains − pertes ; sans perte ni gain, retour lent vers 100.
+  const unite = 100 / (1.25 * T);
+  const bilan = ctx.gainChaleur - ctx.perteChaleur;
+  if (bilan !== 0) {
+    b.chaleur = clamp(b.chaleur + bilan * unite);
   } else {
-    b.chaleur = clamp(b.chaleur + 100 / (T / 2));
+    b.chaleur = clamp(b.chaleur + unite * 0.5);
   }
 
   if (ctx.estNuit && !ctx.aAbri && !ctx.enCompagnie) {
     b.securite = clamp(b.securite - 100 / (2 * T));
   } else {
-    b.securite = clamp(b.securite + 100 / (T / 2));
+    b.securite = clamp(b.securite + (ctx.aAbri ? 2 : 1) * (100 / (T / 2)));
   }
 
   if (ctx.enCompagnie) {
@@ -78,7 +106,7 @@ export function appliquerTickBesoins(b: Besoins, ctx: ContexteBesoins): EffetBes
   b.moral = clamp(b.moral + (cibleMoral - b.moral) * 0.05);
 
   // Causes classées par gravité : la première sert de cause de décès.
-  const causes: ("faim" | "soif" | "froid")[] = [];
+  const causes: ("soif" | "froid" | "faim")[] = [];
   let deltaSante = 0;
   if (b.soif <= 0) {
     deltaSante -= 25 / T;

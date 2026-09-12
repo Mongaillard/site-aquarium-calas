@@ -1,17 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { appliquerTickBesoins, besoinsInitiaux, urgence } from "../src/agents/besoins.js";
+import {
+  CONTEXTE_BESOINS_DEFAUT,
+  appliquerTickBesoins,
+  besoinsInitiaux,
+  urgence,
+} from "../src/agents/besoins.js";
 import type { Besoins, ContexteBesoins } from "../src/agents/besoins.js";
 import { Rng } from "../src/rng.js";
 
 const T = 144;
-const base: ContexteBesoins = {
-  ticksParJour: T,
-  estNuit: false,
-  dort: false,
-  aAbri: false,
-  enCompagnie: false,
-  extraversion: 0.5,
-};
+const base: ContexteBesoins = { ...CONTEXTE_BESOINS_DEFAUT, ticksParJour: T };
 
 function pleins(): Besoins {
   return {
@@ -57,13 +55,28 @@ describe("besoins", () => {
     expect(dormeur.soif).toBeGreaterThan(eveille.soif);
   });
 
-  it("la chaleur baisse la nuit sans abri et remonte le jour ou à l'abri", () => {
+  it("la chaleur baisse selon les pertes et remonte selon les gains", () => {
     const b = pleins();
-    for (let i = 0; i < 60; i++) appliquerTickBesoins(b, { ...base, estNuit: true });
-    expect(b.chaleur).toBeLessThan(100);
+    for (let i = 0; i < 60; i++) appliquerTickBesoins(b, { ...base, perteChaleur: 1 });
+    expect(b.chaleur).toBeCloseTo(100 - (60 * 100) / (1.25 * T), 5);
     const apresNuit = b.chaleur;
-    for (let i = 0; i < 60; i++) appliquerTickBesoins(b, { ...base, estNuit: true, aAbri: true });
+    for (let i = 0; i < 60; i++)
+      appliquerTickBesoins(b, { ...base, perteChaleur: 1, gainChaleur: 1.5 });
     expect(b.chaleur).toBeGreaterThan(apresNuit);
+    const c = { ...pleins(), chaleur: 50 };
+    appliquerTickBesoins(c, base); // ni perte ni gain : retour lent vers 100
+    expect(c.chaleur).toBeGreaterThan(50);
+  });
+
+  it("une nuit d'hiver sans abri fait perdre 100 points de chaleur en moins d'un jour", () => {
+    const b = pleins();
+    let ticks = 0;
+    while (b.chaleur > 0 && ticks < T) {
+      appliquerTickBesoins(b, { ...base, estNuit: true, perteChaleur: 2 });
+      ticks++;
+    }
+    expect(b.chaleur).toBe(0);
+    expect(ticks).toBeLessThan(T);
   });
 
   it("inflige des dégâts de santé quand faim, soif ou chaleur sont à zéro", () => {
@@ -71,7 +84,7 @@ describe("besoins", () => {
     let total = 0;
     const causes = new Set<string>();
     for (let i = 0; i < T; i++) {
-      const e = appliquerTickBesoins(b, { ...base, estNuit: true });
+      const e = appliquerTickBesoins(b, { ...base, estNuit: true, perteChaleur: 1 });
       total += e.deltaSante;
       for (const c of e.causes) causes.add(c);
     }
@@ -83,6 +96,16 @@ describe("besoins", () => {
     let total = 0;
     for (let i = 0; i < T; i++) total += appliquerTickBesoins(pleins(), base).deltaSante;
     expect(total).toBeCloseTo(2, 1);
+  });
+
+  it("la canicule accélère la soif", () => {
+    const normal = pleins();
+    const chaud = pleins();
+    for (let i = 0; i < 20; i++) {
+      appliquerTickBesoins(normal, base);
+      appliquerTickBesoins(chaud, { ...base, facteurSoif: 1.6 });
+    }
+    expect(chaud.soif).toBeLessThan(normal.soif);
   });
 
   it("le social baisse plus vite pour un extraverti et remonte en compagnie", () => {

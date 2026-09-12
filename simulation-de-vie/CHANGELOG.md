@@ -2,6 +2,41 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M2 – Construire et fabriquer (2026-09-12)
+
+- Objets et recettes : hache de pierre, pioche, lance, canne à pêche, filet, corde,
+  vêtement de cuir, pot d'argile, repas cuit, bandage ; niveaux requis, ateliers (feu,
+  four), durabilité des outils (un outil cassé disparaît, événement journalisé).
+- Le bois mort (sans outil) apparaît en forêt et en prairie pour permettre la première
+  hache ; les arbres (hache requise) rendent le double.
+- Bâtiments : feu de camp, abri, maison, entrepôt, four, puits, palissade, tombe. Chantier
+  fondé par un personnage, matériaux livrés par n'importe quel membre autorisé, travail
+  cumulable à plusieurs, propriété (fondateur, famille, invités), usure quotidienne, effondrement
+  à zéro, réparation. Feux allumés à la fin du chantier, éteints par l'orage, rallumés avec
+  une bûche.
+- Stockage : maisons et entrepôts ont un stock ; actions `Deposer` / `Prendre` réservées aux
+  autorisés ; le planificateur puise dans le stock familial pour manger ou s'approvisionner.
+- Météo tirée par jour et par saison (clair, pluie, orage, neige, canicule) avec effets sur le
+  froid, la vitesse, la vision, la soif et la repousse des baies ; saisons avec froid de base
+  jour / nuit et repousse des baies (aucune en hiver).
+- Nouveau modèle de chaleur : pertes saison × météo, atténuées par l'abri et le vêtement de
+  cuir, compensées par l'abri, la maison ou un feu à portée.
+- Planificateur : projets de construction (rejoindre le chantier familial ou fonder, livrer,
+  s'approvisionner par récolte, stock ou fabrication, travailler), fabrication avec
+  approvisionnement, rallumage, réparation, stockage du surplus, sommeil à l'abri ou près du
+  feu, repas depuis le stock.
+- `RuleBrain` : candidats construire (priorité abri → feu → entrepôt → maison), fabriquer une
+  hache, cuisiner, stocker ; réflexe de froid.
+- CLI : météo du jour, bâtiments et chantiers sur la carte, tableau des bâtiments.
+- Boucle principale : une urgence vitale (soif, faim) prime sur le sommeil forcé par
+  l'épuisement ; un inventaire plein est vidé (dépôt ou abandon) avant une récolte vitale ou
+  un approvisionnement. Ces deux cas provoquaient des morts par boucle sans issue.
+- Tests : 93 au total (+23) dont l'intégration « ≥ 3 abris en 30 jours, chantiers partagés »
+  et deux tests de non-régression sur les boucles ci-dessus ; 12/12 survivants à 30 jours
+  vérifiés sur six graines.
+- Non couvert (M3+) : dialogue et relations explicites (la famille est encore définie par le nom),
+  agriculture, puits et four ne sont pas encore choisis par le cerveau à règles.
+
 ## M1 – Corps et survie (2026-09-12)
 
 - Personnages : identité complète (prénom, famille, sexe, Big Five dérivé d'un génome à

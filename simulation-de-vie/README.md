@@ -19,7 +19,7 @@ empreinte, puis fait avancer l'horloge du nombre de jours demandé.
 
 ```
 packages/core/src
-  monde/        grille, génération, biomes, ressources, horloge, rendu ASCII
+  monde/        grille, génération, biomes, ressources, horloge, météo, recettes, bâtiments, rendu ASCII
   agents/       identité, génome, besoins, inventaire, compétences, population
   actions/      types d'actions et d'intentions, A*, planificateur, exécuteur
   cerveau/      interface Cerveau, perception, RuleBrain (règles)

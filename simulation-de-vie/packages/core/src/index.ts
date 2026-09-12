@@ -94,3 +94,55 @@ export type { Evenement, TypeEvenement, Auditeur } from "./evenements/journal.js
 export { estEau, eauAdjacente, personnagesVivants } from "./monde.js";
 export type { Monde } from "./monde.js";
 export type { Statistiques } from "./simulation.js";
+export { METEOS, EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
+export type { Meteo, EffetsMeteo, EffetsSaison } from "./monde/meteo.js";
+export {
+  TYPES_OBJET,
+  RECETTES,
+  NOMS_RECETTES,
+  recette,
+  SOLIDITE_INITIALE,
+} from "./monde/recettes.js";
+export type {
+  TypeObjet,
+  Objet,
+  Recette,
+  NomRecette,
+  Atelier,
+  ProduitRecette,
+} from "./monde/recettes.js";
+export {
+  TYPES_BATIMENT,
+  PLANS_BATIMENT,
+  creerChantier,
+  materiauxManquants,
+  materiauxLivres,
+} from "./monde/batiments.js";
+export type { TypeBatiment, PlanBatiment, Batiment } from "./monde/batiments.js";
+export {
+  transferer,
+  ajouterObjet,
+  objet,
+  possede,
+  userObjet,
+  NOURRITURE_CRUE,
+  quantiteNourriture,
+} from "./agents/inventaire.js";
+export type { Projet } from "./agents/personnage.js";
+export {
+  autorise,
+  batimentEn,
+  batimentsAccessibles,
+  dormeurs,
+  abriDisponible,
+  feuProche,
+  atelierAdjacent,
+  membresFamille,
+  prochainBatimentNecessaire,
+  chantierFamilial,
+  feuEteint,
+  batimentAReparer,
+} from "./monde.js";
+export { choisirSite, libererPlace } from "./actions/planificateur.js";
+export type { ProjetPercu } from "./cerveau/perception.js";
+export { CONTEXTE_BESOINS_DEFAUT } from "./agents/besoins.js";

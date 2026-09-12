@@ -5,8 +5,12 @@
 import type { Personnage } from "./agents/personnage.js";
 import type { SimConfig } from "./config.js";
 import type { Evenement, TypeEvenement } from "./evenements/journal.js";
-import type { Grille, Position } from "./monde/grille.js";
+import type { Batiment, TypeBatiment } from "./monde/batiments.js";
+import { PLANS_BATIMENT } from "./monde/batiments.js";
+import { Grille } from "./monde/grille.js";
+import type { Position } from "./monde/grille.js";
 import type { Horloge } from "./monde/horloge.js";
+import type { Meteo } from "./monde/meteo.js";
 import type { Rng } from "./rng.js";
 
 export interface Monde {
@@ -15,6 +19,8 @@ export interface Monde {
   readonly horloge: Horloge;
   readonly rng: Rng;
   readonly personnages: readonly Personnage[];
+  readonly batiments: ReadonlyMap<string, Batiment>;
+  readonly meteo: Meteo;
   emettre(
     type: TypeEvenement,
     acteur: Personnage | null,
@@ -22,15 +28,25 @@ export interface Monde {
     importance?: number,
     position?: Position | null,
   ): void;
+  /** Fonde un chantier sur une tuile libre ; renvoie le bâtiment créé. */
+  fonderChantier(type: TypeBatiment, position: Position, fondateur: Personnage): Batiment;
+  /** Retire un bâtiment du monde (effondrement). */
+  detruireBatiment(id: string): void;
 }
 
 /** Vrai si la tuile est de l'eau (source de boisson). */
 export function estEau(monde: Monde, x: number, y: number): boolean {
   const t = monde.grille.tuileOuNull(x, y);
-  return t !== null && (t.biome === "eau_profonde" || t.biome === "eau_peu_profonde");
+  if (t === null) return false;
+  if (t.biome === "eau_profonde" || t.biome === "eau_peu_profonde") return true;
+  return (
+    t.batiment !== null &&
+    t.batiment.etat === "termine" &&
+    PLANS_BATIMENT[t.batiment.type].sourceEau
+  );
 }
 
-/** Vrai si une tuile d'eau est à distance ≤ 1 de la position. */
+/** Vrai si une source d'eau est à distance ≤ 1 de la position. */
 export function eauAdjacente(monde: Monde, pos: Position): boolean {
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
@@ -42,4 +58,136 @@ export function eauAdjacente(monde: Monde, pos: Position): boolean {
 
 export function personnagesVivants(monde: Monde): Personnage[] {
   return monde.personnages.filter((p) => p.vivant);
+}
+
+/** Le personnage a-t-il le droit d'utiliser ce bâtiment ? */
+export function autorise(b: Batiment, p: Personnage): boolean {
+  return (
+    b.proprietaire === p.id || b.autorises.includes(p.id) || b.famille === p.identite.nomFamille
+  );
+}
+
+export function batimentEn(monde: Monde, pos: Position): Batiment | null {
+  return monde.grille.tuileOuNull(pos.x, pos.y)?.batiment ?? null;
+}
+
+/** Bâtiments (terminés ou non) auxquels le personnage a accès, triés par distance. */
+export function batimentsAccessibles(monde: Monde, p: Personnage, type?: TypeBatiment): Batiment[] {
+  const pos = p.corps.position;
+  return [...monde.batiments.values()]
+    .filter((b) => (type === undefined || b.type === type) && autorise(b, p))
+    .sort(
+      (a, b) =>
+        Grille.distance(pos, a.position) - Grille.distance(pos, b.position) ||
+        a.id.localeCompare(b.id),
+    );
+}
+
+/** Nombre de personnages endormis sur la tuile d'un bâtiment. */
+export function dormeurs(monde: Monde, b: Batiment): number {
+  let n = 0;
+  for (const p of monde.personnages) {
+    if (
+      p.vivant &&
+      p.corps.endormi &&
+      p.corps.position.x === b.position.x &&
+      p.corps.position.y === b.position.y
+    )
+      n++;
+  }
+  return n;
+}
+
+/** Abri terminé, accessible, avec une place libre, le plus proche. */
+export function abriDisponible(monde: Monde, p: Personnage): Batiment | null {
+  for (const b of batimentsAccessibles(monde, p)) {
+    if (b.etat !== "termine" || !PLANS_BATIMENT[b.type].abri) continue;
+    const surPlace =
+      p.corps.position.x === b.position.x && p.corps.position.y === b.position.y && p.corps.endormi
+        ? 1
+        : 0;
+    if (dormeurs(monde, b) - surPlace < PLANS_BATIMENT[b.type].capaciteDormeurs) return b;
+  }
+  return null;
+}
+
+/** Feu de camp allumé à portée de la position (rayon du plan), le plus proche. */
+export function feuProche(monde: Monde, pos: Position): Batiment | null {
+  let meilleur: Batiment | null = null;
+  let distanceMin = Infinity;
+  for (const b of monde.batiments.values()) {
+    if (b.etat !== "termine" || !b.allume) continue;
+    const plan = PLANS_BATIMENT[b.type];
+    if (plan.atelier !== "feu") continue;
+    const d = Grille.distance(pos, b.position);
+    if (d <= plan.rayonChaleur && d < distanceMin) {
+      distanceMin = d;
+      meilleur = b;
+    }
+  }
+  return meilleur;
+}
+
+/** Atelier (feu allumé ou four terminé) à distance ≤ 1. */
+export function atelierAdjacent(
+  monde: Monde,
+  pos: Position,
+  atelier: "feu" | "four",
+): Batiment | null {
+  for (const b of monde.batiments.values()) {
+    if (b.etat !== "termine" || PLANS_BATIMENT[b.type].atelier !== atelier) continue;
+    if (atelier === "feu" && !b.allume) continue;
+    if (Grille.distance(pos, b.position) <= 1) return b;
+  }
+  return null;
+}
+
+/** Membres vivants de la famille (même nom) d'un personnage, lui compris. */
+export function membresFamille(monde: Monde, p: Personnage): Personnage[] {
+  return monde.personnages.filter(
+    (a) => a.vivant && a.identite.nomFamille === p.identite.nomFamille,
+  );
+}
+
+/**
+ * Prochain bâtiment dont le personnage (et sa famille) a besoin, par priorité :
+ * abris pour tous, puis un feu, puis un lieu de stockage, puis une maison.
+ * Les chantiers en cours comptent comme capacité future.
+ */
+export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBatiment | null {
+  if (p.corps.stade === "enfant") return null;
+  const acces = batimentsAccessibles(monde, p);
+  const famille = membresFamille(monde, p).length;
+  let capacite = 0;
+  for (const b of acces) capacite += PLANS_BATIMENT[b.type].capaciteDormeurs;
+  if (capacite < famille) return "abri";
+  // Un feu éteint compte comme un feu à (r)allumer.
+  if (!acces.some((b) => b.type === "feu_de_camp" && (b.etat === "chantier" || b.allume)))
+    return "feu_de_camp";
+  if (!acces.some((b) => PLANS_BATIMENT[b.type].capaciteStock > 0)) return "entrepot";
+  if (famille >= 3 && !acces.some((b) => b.type === "maison")) return "maison";
+  return null;
+}
+
+/** Chantier de ce type appartenant à la famille, s'il en existe un. */
+export function chantierFamilial(monde: Monde, p: Personnage, type: TypeBatiment): Batiment | null {
+  return batimentsAccessibles(monde, p, type).find((b) => b.etat === "chantier") ?? null;
+}
+
+/** Feu de camp familial terminé mais éteint, le plus proche. */
+export function feuEteint(monde: Monde, p: Personnage): Batiment | null {
+  return (
+    batimentsAccessibles(monde, p, "feu_de_camp").find((b) => b.etat === "termine" && !b.allume) ??
+    null
+  );
+}
+
+/** Bâtiment familial terminé dont la solidité est passée sous le seuil, le plus abîmé. */
+export function batimentAReparer(monde: Monde, p: Personnage, seuil = 60): Batiment | null {
+  let pire: Batiment | null = null;
+  for (const b of batimentsAccessibles(monde, p)) {
+    if (b.etat !== "termine" || b.solidite >= seuil) continue;
+    if (pire === null || b.solidite < pire.solidite) pire = b;
+  }
+  return pire;
 }

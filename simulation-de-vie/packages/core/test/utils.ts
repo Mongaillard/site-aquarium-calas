@@ -21,7 +21,7 @@ export function grilleUniforme(
   const tuiles: Tuile[] = [];
   for (let y = 0; y < hauteur; y++) {
     for (let x = 0; x < largeur; x++) {
-      tuiles.push({ x, y, biome, altitude: 0.2, humidite: 0, gisement: null });
+      tuiles.push({ x, y, biome, altitude: 0.2, humidite: 0, gisement: null, batiment: null });
     }
   }
   const grille = new Grille(largeur, hauteur, tuiles);

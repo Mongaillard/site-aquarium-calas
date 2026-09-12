@@ -13,6 +13,19 @@ export const TYPES_EVENEMENT = [
   "repas",
   "endormi",
   "reveil",
+  "fabrication",
+  "chantier_fonde",
+  "livraison",
+  "batiment_termine",
+  "batiment_repare",
+  "batiment_effondre",
+  "feu_eteint",
+  "feu_rallume",
+  "depot",
+  "retrait",
+  "outil_casse",
+  "jete",
+  "meteo",
 ] as const;
 export type TypeEvenement = (typeof TYPES_EVENEMENT)[number];
 

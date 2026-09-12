@@ -11,6 +11,7 @@ import {
   LEGENDE_ASCII,
   BIOMES,
   nomComplet,
+  PLANS_BATIMENT,
 } from "@sdv/core";
 import type { Personnage } from "@sdv/core";
 
@@ -38,9 +39,16 @@ function entier(valeur: string | undefined, defaut: number, nom: string): number
   return n;
 }
 
-/** Carte avec les personnages vivants superposés (`@`). */
+/** Carte avec les bâtiments et les personnages vivants superposés (`@`). */
 function carteAvecPersonnages(sim: Simulation, ressources: boolean): string {
   const lignes = rendreAscii(sim.grille, { ressources }).split("\n");
+  for (const b of sim.batiments.values()) {
+    const { x, y } = b.position;
+    const ligne = lignes[y];
+    if (ligne === undefined) continue;
+    const c = b.etat === "chantier" ? "?" : PLANS_BATIMENT[b.type].ascii;
+    lignes[y] = `${ligne.slice(0, x)}${c}${ligne.slice(x + 1)}`;
+  }
   for (const p of sim.vivants()) {
     const { x, y } = p.corps.position;
     const ligne = lignes[y];
@@ -56,9 +64,10 @@ function jauge(v: number): string {
 
 function ligneStatut(sim: Simulation, p: Personnage): string {
   const b = p.besoins;
-  const inv = Object.entries(p.corps.inventaire.ressources)
-    .map(([r, n]) => `${r}×${n}`)
-    .join(" ");
+  const inv = [
+    ...Object.entries(p.corps.inventaire.ressources).map(([r, n]) => `${r}×${n}`),
+    ...p.corps.inventaire.objets.map((o) => `[${o.type}]`),
+  ].join(" ");
   const etat = p.vivant
     ? p.corps.endormi
       ? "dort  "
@@ -123,7 +132,13 @@ function commandeRun(argv: string[]): number {
 
   if (values.verbose) {
     sim.journal.ecouter((e) => {
-      if (e.type === "deces" || e.type === "gisement_epuise") {
+      if (
+        e.type === "deces" ||
+        e.type === "batiment_termine" ||
+        e.type === "batiment_effondre" ||
+        e.type === "feu_eteint" ||
+        e.type === "outil_casse"
+      ) {
         console.log(`  [${sim.horloge.formater(e.tick)}] ${e.type} ${JSON.stringify(e.details)}`);
       }
     });
@@ -138,8 +153,9 @@ function commandeRun(argv: string[]): number {
     const recoltes = sim.journal.compte("recolte");
     const repas = sim.journal.compte("repas");
     console.log(
-      `Jour ${String(j + 1).padStart(3)} : vivants ${apres.vivants}/${sim.personnages.length}` +
+      `Jour ${String(j + 1).padStart(3)} (${apres.meteo.padEnd(8)}) : vivants ${apres.vivants}/${sim.personnages.length}` +
         (apres.morts > avant.morts ? `  (+${apres.morts - avant.morts} décès)` : "") +
+        `  bâtiments ${apres.batiments} (+${apres.chantiers} chantiers)` +
         `  récoltes ${recoltes}  repas ${repas}  événements ${apres.evenements}`,
     );
   }
@@ -151,10 +167,28 @@ function commandeRun(argv: string[]): number {
   if (!values["sans-carte"]) {
     console.log(carteAvecPersonnages(sim, values.ressources));
     console.log();
-    console.log(`${LEGENDE_ASCII}\n@ personnage`);
+    console.log(
+      `${LEGENDE_ASCII}\n@ personnage   ? chantier   f feu   A abri   M maison   E entrepôt`,
+    );
     console.log();
   }
 
+  console.log("Bâtiments :");
+  for (const b of sim.batiments.values()) {
+    const plan = PLANS_BATIMENT[b.type];
+    const proprietaire = sim.personnage(b.proprietaire)?.identite ?? null;
+    console.log(
+      `  ${b.id} ${plan.nom.padEnd(12)} ${b.etat.padEnd(8)} (${b.position.x},${b.position.y})  ` +
+        `${b.famille.padEnd(10)} ${proprietaire ? proprietaire.prenom : "?"}  solidité ${b.solidite}` +
+        (b.type === "feu_de_camp" && b.etat === "termine"
+          ? b.allume
+            ? "  allumé"
+            : "  éteint"
+          : "") +
+        (b.stock ? `  stock ${JSON.stringify(b.stock.ressources)}` : ""),
+    );
+  }
+  console.log();
   console.log("Personnages :");
   for (const p of sim.personnages) console.log(ligneStatut(sim, p));
   return 0;

@@ -1,6 +1,7 @@
 /** Grille de tuiles (section 4.1). */
 import type { Biome } from "./biomes.js";
 import { INFO_BIOME } from "./biomes.js";
+import type { Batiment } from "./batiments.js";
 import type { Gisement } from "./ressources.js";
 
 export interface Position {
@@ -17,6 +18,7 @@ export interface Tuile {
   /** Humidité normalisée dans [-1, 1]. */
   readonly humidite: number;
   gisement: Gisement | null;
+  batiment: Batiment | null;
 }
 
 const VOISINAGE_8: readonly (readonly [number, number])[] = [

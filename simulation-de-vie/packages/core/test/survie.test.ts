@@ -49,10 +49,66 @@ describe("survie (intégration M1)", () => {
     expect(sim.statistiques()).toMatchObject({ vivants: 0, morts: 1 });
   });
 
+  it("M2 : au moins 3 abris terminés en 30 jours, et la colonie reste vivante", () => {
+    const sim = Simulation.creer({ seed: 42 });
+    for (let j = 0; j < 30; j++) sim.avancerJusquaAube();
+    const abris = sim.batimentsTermines("abri").length + sim.batimentsTermines("maison").length;
+    expect(abris).toBeGreaterThanOrEqual(3);
+    expect(sim.batimentsTermines("feu_de_camp").length).toBeGreaterThanOrEqual(1);
+    expect(sim.statistiques().vivants).toBeGreaterThanOrEqual(10);
+    expect(sim.journal.compte("fabrication")).toBeGreaterThan(0);
+    // Les chantiers sont partagés : au moins un bâtiment a reçu des livraisons de plusieurs personnes.
+    const livreursParBatiment = new Map<string, Set<string>>();
+    for (const e of sim.journal.parType("livraison")) {
+      const id = String(e.details.batiment);
+      livreursParBatiment.set(id, (livreursParBatiment.get(id) ?? new Set()).add(e.acteur ?? "?"));
+    }
+    expect([...livreursParBatiment.values()].some((s) => s.size >= 2)).toBe(true);
+  }, 60_000);
+
+  it("épuisé et assoiffé, un personnage va boire au lieu de s'endormir sur place", () => {
+    const sim = Simulation.creer({
+      seed: 5,
+      monde: { largeur: 48, hauteur: 32 },
+      population: { initiale: 1, familles: 1 },
+    });
+    const p = sim.personnages[0];
+    if (p === undefined) throw new Error("pas de personnage");
+    sim.avancer(144); // découvre les environs
+    p.besoins.sommeil = 0;
+    p.besoins.soif = 10;
+    p.besoins.faim = 90;
+    let soifMax = 0;
+    for (let i = 0; i < 144; i++) {
+      sim.tick1();
+      soifMax = Math.max(soifMax, p.besoins.soif);
+    }
+    expect(p.vivant).toBe(true);
+    expect(soifMax).toBeGreaterThan(90); // il a bu avant de dormir
+  });
+
+  it("affamé avec un inventaire plein, un personnage libère de la place puis mange", () => {
+    const sim = Simulation.creer({
+      seed: 5,
+      monde: { largeur: 48, hauteur: 32 },
+      population: { initiale: 1, familles: 1 },
+    });
+    const p = sim.personnages[0];
+    if (p === undefined) throw new Error("pas de personnage");
+    sim.avancer(144);
+    p.corps.inventaire.ressources = {};
+    p.corps.inventaire.ressources.pierre = p.corps.inventaire.capacite;
+    p.besoins.faim = 10;
+    sim.avancer(144);
+    expect(p.vivant).toBe(true);
+    expect(sim.journal.compte("jete") + sim.journal.compte("depot")).toBeGreaterThan(0);
+    expect(p.besoins.faim).toBeGreaterThan(30);
+  });
+
   it("les gisements renouvelables se régénèrent", () => {
     const sim = Simulation.creer({ seed: 42, population: { initiale: 0 } });
-    const gisement = [...sim.grille.toutes()].find((t) => t.gisement?.type === "baies")?.gisement;
-    if (!gisement) throw new Error("pas de baies");
+    const gisement = [...sim.grille.toutes()].find((t) => t.gisement?.type === "fibres")?.gisement;
+    if (!gisement) throw new Error("pas de fibres");
     gisement.quantite = 0;
     sim.avancer(144);
     expect(gisement.quantite).toBeCloseTo(gisement.tauxRegen, 5);

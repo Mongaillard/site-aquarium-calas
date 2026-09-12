@@ -1,11 +1,32 @@
 /** Planificateur : intention → suite d'actions atomiques (section 6, « Planification »). */
-import { nourritureDisponible } from "../agents/inventaire.js";
+import { niveau } from "../agents/competences.js";
+import {
+  NOURRITURE,
+  nourritureDisponible,
+  placeLibre,
+  possede,
+  quantite,
+} from "../agents/inventaire.js";
 import type { LieuConnu, Personnage } from "../agents/personnage.js";
+import { PLANS_BATIMENT, materiauxManquants } from "../monde/batiments.js";
+import type { Batiment, TypeBatiment } from "../monde/batiments.js";
 import { INFO_BIOME } from "../monde/biomes.js";
 import { Grille } from "../monde/grille.js";
 import type { Position } from "../monde/grille.js";
+import { RECETTES } from "../monde/recettes.js";
+import type { NomRecette } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
-import { eauAdjacente, estEau } from "../monde.js";
+import {
+  abriDisponible,
+  batimentAReparer,
+  batimentsAccessibles,
+  chantierFamilial,
+  eauAdjacente,
+  estEau,
+  feuEteint,
+  feuProche,
+  prochainBatimentNecessaire,
+} from "../monde.js";
 import type { Monde } from "../monde.js";
 import { trouverChemin } from "./chemin.js";
 import type { Action, Intention } from "./types.js";
@@ -14,6 +35,8 @@ export type ResultatPlan =
   { readonly ok: true; readonly plan: Action[] } | { readonly ok: false; readonly raison: string };
 
 const ESSAIS_MAX = 3;
+const ok = (plan: Action[]): ResultatPlan => ({ ok: true, plan });
+const echec = (raison: string): ResultatPlan => ({ ok: false, raison });
 
 export function planifier(monde: Monde, p: Personnage, intention: Intention): ResultatPlan {
   switch (intention.type) {
@@ -22,67 +45,150 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
     case "manger":
       return planifierManger(monde, p);
     case "recolter":
-      return planifierRecolte(monde, p, intention.ressource, false);
+      return planifierRecolte(monde, p, intention.ressource, 1, false);
     case "dormir":
-      return { ok: true, plan: [{ type: "dormir", ticksDormis: 0 }] };
+      return planifierDormir(monde, p);
     case "explorer":
       return planifierExploration(monde, p);
     case "attendre":
-      return { ok: true, plan: [{ type: "attendre", ticksRestants: intention.ticks }] };
+      return ok([{ type: "attendre", ticksRestants: intention.ticks }]);
+    case "construire":
+      return planifierConstruction(monde, p);
+    case "fabriquer":
+      return planifierFabrication(monde, p, intention.recette);
+    case "stocker":
+      return planifierStockage(monde, p);
   }
+}
+
+/** Déplacement vers une tuile à distance ≤ 1 de `cible` (ou `null` si inaccessible). */
+function allerPresDe(monde: Monde, p: Personnage, cible: Position): Action | null {
+  const pos = p.corps.position;
+  if (Grille.distance(pos, cible) <= 1) return null;
+  const destination = destinationPourAtteindre(monde, pos, cible);
+  if (destination === null) return null;
+  const chemin = trouverChemin(monde.grille, pos, destination);
+  if (chemin === null) return null;
+  return { type: "deplacer", cible: destination, chemin, progression: 0 };
+}
+
+/** Déplacement exactement sur `cible`. */
+function allerSur(monde: Monde, p: Personnage, cible: Position): Action | null {
+  const pos = p.corps.position;
+  if (pos.x === cible.x && pos.y === cible.y) return null;
+  const chemin = trouverChemin(monde.grille, pos, cible);
+  if (chemin === null) return null;
+  return { type: "deplacer", cible, chemin, progression: 0 };
 }
 
 function planifierBoire(monde: Monde, p: Personnage): ResultatPlan {
   const pos = p.corps.position;
-  if (eauAdjacente(monde, pos))
-    return { ok: true, plan: [{ type: "boire", cible: pos, ticksRestants: null }] };
+  if (eauAdjacente(monde, pos)) return ok([{ type: "boire", cible: pos, ticksRestants: null }]);
   const lieux = lieuxConnusTries(p, "eau");
-  if (lieux.length === 0) return { ok: false, raison: "aucun point d'eau connu" };
+  if (lieux.length === 0) return echec("aucun point d'eau connu");
   for (const lieu of lieux.slice(0, ESSAIS_MAX)) {
-    const destination = destinationPourAtteindre(monde, pos, lieu);
-    if (destination === null) continue;
-    const chemin = trouverChemin(monde.grille, pos, destination);
-    if (chemin === null) continue;
-    return {
-      ok: true,
-      plan: [
-        { type: "deplacer", cible: destination, chemin, progression: 0 },
-        { type: "boire", cible: destination, ticksRestants: null },
-      ],
-    };
+    const aller = allerPresDe(monde, p, lieu);
+    if (aller === null) continue;
+    return ok([
+      aller,
+      { type: "boire", cible: aller.type === "deplacer" ? aller.cible : pos, ticksRestants: null },
+    ]);
   }
-  return { ok: false, raison: "point d'eau inaccessible" };
+  return echec("point d'eau inaccessible");
 }
 
 function planifierManger(monde: Monde, p: Personnage): ResultatPlan {
   const ressource = nourritureDisponible(p.corps.inventaire);
-  if (ressource !== null)
-    return { ok: true, plan: [{ type: "manger", ressource, ticksRestants: null }] };
-  return planifierRecolte(monde, p, "baies", true);
+  if (ressource !== null) return ok([{ type: "manger", ressource, ticksRestants: null }]);
+
+  // Nourriture dans un stock familial proche ?
+  for (const b of batimentsAccessibles(monde, p)) {
+    if (b.etat !== "termine" || b.stock === null) continue;
+    const dansStock = nourritureDisponible(b.stock);
+    if (dansStock === null) continue;
+    if (Grille.distance(p.corps.position, b.position) > 20) break;
+    const plan: Action[] = [];
+    const aller = allerPresDe(monde, p, b.position);
+    if (aller) plan.push(aller);
+    plan.push({ type: "prendre", batimentId: b.id, ressource: dansStock, quantite: 3 });
+    plan.push({ type: "manger", ressource: dansStock, ticksRestants: null });
+    return ok(plan);
+  }
+  return planifierRecolte(monde, p, "baies", 1, true);
 }
 
+/**
+ * Récolte de `ressource` : jusqu'à `repetitions` actions sur le gisement connu
+ * le plus proche que l'on peut exploiter (outil possédé si requis).
+ */
 function planifierRecolte(
   monde: Monde,
   p: Personnage,
   ressource: Ressource,
+  repetitions: number,
   puisManger: boolean,
 ): ResultatPlan {
-  const pos = p.corps.position;
-  const lieux = lieuxConnusTries(p, ressource).filter((l) => l.quantiteVue >= 1);
-  if (lieux.length === 0) return { ok: false, raison: `aucun gisement de ${ressource} connu` };
+  const inv = p.corps.inventaire;
+  const lieux = lieuxConnusTries(p, ressource).filter(
+    (l) => l.quantiteVue >= 1 && (l.outilRequis === null || possede(inv, l.outilRequis)),
+  );
+  if (lieux.length === 0) return echec(`aucun gisement de ${ressource} exploitable connu`);
+  const liberation = placeLibre(inv) <= 0 ? libererPlace(monde, p, [ressource]) : [];
+  if (placeLibre(inv) <= 0 && liberation.length === 0) return echec("inventaire plein");
+  const placeLiberee = liberation.reduce(
+    (t, a) => t + (a.type === "jeter" || a.type === "deposer" ? a.quantite : 0),
+    0,
+  );
   for (const lieu of lieux.slice(0, ESSAIS_MAX)) {
-    const destination = destinationPourAtteindre(monde, pos, lieu);
-    if (destination === null) continue;
-    const chemin = trouverChemin(monde.grille, pos, destination);
-    if (chemin === null) continue;
-    const plan: Action[] = [
-      { type: "deplacer", cible: destination, chemin, progression: 0 },
-      { type: "recolter", cible: { x: lieu.x, y: lieu.y }, ticksRestants: null },
-    ];
+    const plan: Action[] = [...liberation];
+    const aller = allerPresDe(monde, p, lieu);
+    if (aller === null && Grille.distance(p.corps.position, lieu) > 1) continue;
+    if (aller) plan.push(aller);
+    const parAction = 1 + Math.floor(niveau(p.experience.recolte) / 2);
+    const place = Math.max(1, placeLibre(inv) + placeLiberee);
+    const n = Math.max(
+      1,
+      Math.min(repetitions, Math.floor(lieu.quantiteVue / parAction), Math.ceil(place / parAction)),
+    );
+    for (let i = 0; i < n; i++)
+      plan.push({ type: "recolter", cible: { x: lieu.x, y: lieu.y }, ticksRestants: null });
     if (puisManger) plan.push({ type: "manger", ressource, ticksRestants: null });
-    return { ok: true, plan };
+    return ok(plan);
   }
-  return { ok: false, raison: `gisement de ${ressource} inaccessible` };
+  return echec(`gisement de ${ressource} inaccessible`);
+}
+
+/** Dormir : à l'abri si possible, sinon près d'un feu, sinon sur place. */
+function planifierDormir(monde: Monde, p: Personnage): ResultatPlan {
+  const abri = abriDisponible(monde, p);
+  if (abri !== null) {
+    const aller = allerSur(monde, p, abri.position);
+    return ok(
+      aller ? [aller, { type: "dormir", ticksDormis: 0 }] : [{ type: "dormir", ticksDormis: 0 }],
+    );
+  }
+  if (feuProche(monde, p.corps.position) === null) {
+    const feu = feuLePlusProche(monde, p.corps.position, 12);
+    if (feu !== null) {
+      const aller = allerPresDe(monde, p, feu.position);
+      if (aller) return ok([aller, { type: "dormir", ticksDormis: 0 }]);
+    }
+  }
+  return ok([{ type: "dormir", ticksDormis: 0 }]);
+}
+
+function feuLePlusProche(monde: Monde, pos: Position, rayonMax: number): Batiment | null {
+  let meilleur: Batiment | null = null;
+  let dMin = Infinity;
+  for (const b of monde.batiments.values()) {
+    if (b.type !== "feu_de_camp" || b.etat !== "termine" || !b.allume) continue;
+    const d = Grille.distance(pos, b.position);
+    if (d <= rayonMax && d < dMin) {
+      dMin = d;
+      meilleur = b;
+    }
+  }
+  return meilleur;
 }
 
 /** Cible d'exploration : direction dont le voisinage est le moins connu, à 8–14 tuiles. */
@@ -113,19 +219,275 @@ function planifierExploration(monde: Monde, p: Personnage): ResultatPlan {
   for (const c of candidats.slice(0, ESSAIS_MAX)) {
     const chemin = trouverChemin(monde.grille, pos, c.cible, { maxNoeuds: 4_000 });
     if (chemin !== null && chemin.length > 0) {
-      return { ok: true, plan: [{ type: "deplacer", cible: c.cible, chemin, progression: 0 }] };
+      return ok([{ type: "deplacer", cible: c.cible, chemin, progression: 0 }]);
     }
   }
   // Repli : un pas au hasard sur une tuile praticable voisine.
   const voisins = monde.grille
     .voisins(pos.x, pos.y)
     .filter((t) => INFO_BIOME[t.biome].praticable && !estEau(monde, t.x, t.y));
-  if (voisins.length === 0) return { ok: false, raison: "aucune direction praticable" };
+  if (voisins.length === 0) return echec("aucune direction praticable");
   const v = p.rng.choisir(voisins);
-  return {
-    ok: true,
-    plan: [{ type: "deplacer", cible: { x: v.x, y: v.y }, chemin: null, progression: 0 }],
-  };
+  return ok([{ type: "deplacer", cible: { x: v.x, y: v.y }, chemin: null, progression: 0 }]);
+}
+
+/**
+ * Construction (section 7.2) : rejoindre ou fonder un chantier, livrer ce que
+ * l'on porte, aller chercher ce qui manque, puis travailler.
+ */
+function planifierConstruction(monde: Monde, p: Personnage): ResultatPlan {
+  const inv = p.corps.inventaire;
+  let chantier: Batiment | null = p.projet
+    ? (monde.batiments.get(p.projet.batimentId) ?? null)
+    : null;
+  if (chantier === null || chantier.etat === "termine") {
+    p.projet = null;
+    const type = prochainBatimentNecessaire(monde, p);
+    if (type === null) return planifierReparation(monde, p);
+    if (type === "feu_de_camp") {
+      const feu = feuEteint(monde, p);
+      if (feu !== null) return planifierRallumage(monde, p, feu);
+    }
+    chantier = chantierFamilial(monde, p, type);
+    if (chantier === null) return planifierFondation(monde, p, type);
+    p.projet = { batimentId: chantier.id };
+  }
+
+  const manquants = materiauxManquants(chantier);
+  const aLivrer = (Object.keys(manquants) as Ressource[]).some((r) => quantite(inv, r) > 0);
+  if (aLivrer || Object.keys(manquants).length === 0) {
+    const plan: Action[] = [];
+    const aller = allerPresDe(monde, p, chantier.position);
+    if (aller) plan.push(aller);
+    plan.push({ type: "construire", batimentId: chantier.id, ticksTravail: 0 });
+    return ok(plan);
+  }
+  return planifierApprovisionnement(monde, p, manquants, `chantier ${chantier.type}`);
+}
+
+/** Rallumer un feu éteint : une bûche suffit. */
+function planifierRallumage(monde: Monde, p: Personnage, feu: Batiment): ResultatPlan {
+  if (quantite(p.corps.inventaire, "bois") < 1)
+    return planifierApprovisionnement(monde, p, { bois: 1 }, "le feu");
+  const plan: Action[] = [];
+  const aller = allerPresDe(monde, p, feu.position);
+  if (aller) plan.push(aller);
+  plan.push({ type: "construire", batimentId: feu.id, ticksTravail: 0 });
+  return ok(plan);
+}
+
+/** Réparer le bâtiment familial le plus abîmé, s'il y en a un. */
+function planifierReparation(monde: Monde, p: Personnage): ResultatPlan {
+  const b = batimentAReparer(monde, p);
+  if (b === null) return echec("rien à construire");
+  const plan: Action[] = [];
+  const aller = allerPresDe(monde, p, b.position);
+  if (aller) plan.push(aller);
+  plan.push({ type: "construire", batimentId: b.id, ticksTravail: 0 });
+  return ok(plan);
+}
+
+/** Va chercher la ressource manquante la plus urgente (récolte ou fabrication). */
+function planifierApprovisionnement(
+  monde: Monde,
+  p: Personnage,
+  manquants: Partial<Record<Ressource, number>>,
+  pourquoi: string,
+): ResultatPlan {
+  const inv = p.corps.inventaire;
+  if (placeLibre(inv) <= 0) {
+    const liberation = libererPlace(monde, p, Object.keys(manquants) as Ressource[]);
+    if (liberation.length === 0) return echec(`inventaire plein pour ${pourquoi}`);
+    return ok(liberation);
+  }
+  const ordre = (Object.entries(manquants) as [Ressource, number][]).sort((a, b) => b[1] - a[1]);
+  let derniereRaison = `rien à approvisionner pour ${pourquoi}`;
+  for (const [r, deficit] of ordre) {
+    // Dans un stock familial ?
+    for (const b of batimentsAccessibles(monde, p)) {
+      if (b.etat !== "termine" || b.stock === null || quantite(b.stock, r) <= 0) continue;
+      const plan: Action[] = [];
+      const aller = allerPresDe(monde, p, b.position);
+      if (aller) plan.push(aller);
+      plan.push({
+        type: "prendre",
+        batimentId: b.id,
+        ressource: r,
+        quantite: Math.min(deficit, placeLibre(inv)),
+      });
+      return ok(plan);
+    }
+    // Récolte directe.
+    const recolte = planifierRecolte(monde, p, r, Math.min(4, deficit), false);
+    if (recolte.ok) return recolte;
+    derniereRaison = recolte.raison;
+    // Fabrication sans atelier (corde…).
+    const nomRecette = (Object.keys(RECETTES) as NomRecette[]).find((n) => {
+      const rec = RECETTES[n];
+      return "ressource" in rec.produit && rec.produit.ressource === r && rec.atelier === null;
+    });
+    if (nomRecette !== undefined) {
+      const fabrication = planifierFabrication(monde, p, nomRecette);
+      if (fabrication.ok) return fabrication;
+      derniereRaison = fabrication.raison;
+    }
+  }
+  return echec(derniereRaison);
+}
+
+/**
+ * Libère de la place dans un inventaire plein : dépôt dans un stock proche si
+ * possible, sinon abandon de la ressource la plus encombrante hors nourriture
+ * et hors ressources à garder. Renvoie les actions (vide si rien à faire).
+ */
+export function libererPlace(monde: Monde, p: Personnage, garder: readonly Ressource[]): Action[] {
+  const inv = p.corps.inventaire;
+  const candidats = (Object.entries(inv.ressources) as [Ressource, number][])
+    .filter(([r]) => NOURRITURE[r] === undefined && !garder.includes(r))
+    .sort((a, b) => b[1] - a[1]);
+  const plusEncombrant = candidats[0];
+  if (plusEncombrant === undefined) return [];
+  const [ressource, n] = plusEncombrant;
+  const quantiteALiberer = Math.max(3, Math.ceil(n / 2));
+  const stock = batimentsAccessibles(monde, p).find(
+    (b) =>
+      b.etat === "termine" &&
+      b.stock !== null &&
+      placeLibre(b.stock) > 0 &&
+      Grille.distance(p.corps.position, b.position) <= 10,
+  );
+  if (stock !== undefined) {
+    const aller = allerPresDe(monde, p, stock.position);
+    const depot: Action = {
+      type: "deposer",
+      batimentId: stock.id,
+      ressource,
+      quantite: quantiteALiberer,
+    };
+    return aller ? [aller, depot] : [depot];
+  }
+  return [{ type: "jeter", ressource, quantite: quantiteALiberer }];
+}
+
+/** Choix d'un site puis fondation du chantier. */
+function planifierFondation(monde: Monde, p: Personnage, type: TypeBatiment): ResultatPlan {
+  const site = choisirSite(monde, p, type);
+  if (site === null) return echec(`aucun site pour ${type}`);
+  const plan: Action[] = [];
+  const aller = allerPresDe(monde, p, site);
+  if (aller) plan.push(aller);
+  plan.push({ type: "fonder", batimentType: type, cible: site });
+  return ok(plan);
+}
+
+/**
+ * Site de construction : tuile constructible libre, proche des bâtiments de la
+ * famille (ou de soi), à moins de 8 tuiles d'un point d'eau connu si possible.
+ */
+export function choisirSite(monde: Monde, p: Personnage, type: TypeBatiment): Position | null {
+  const acces = batimentsAccessibles(monde, p);
+  const centre = acces[0]?.position ?? p.corps.position;
+  const eaux = lieuxConnusTries(p, "eau");
+  let meilleur: Position | null = null;
+  let meilleurScore = Infinity;
+  for (let dy = -6; dy <= 6; dy++) {
+    for (let dx = -6; dx <= 6; dx++) {
+      const x = centre.x + dx;
+      const y = centre.y + dy;
+      const t = monde.grille.tuileOuNull(x, y);
+      if (
+        t === null ||
+        !INFO_BIOME[t.biome].constructible ||
+        t.batiment !== null ||
+        t.gisement !== null
+      )
+        continue;
+      if (estEau(monde, x, y)) continue;
+      const pos = { x, y };
+      // Ne pas coller les bâtiments les uns aux autres (sauf feu, qui doit être près des abris).
+      let voisinBati = 0;
+      for (const v of monde.grille.voisins(x, y)) if (v.batiment !== null) voisinBati++;
+      const distEau =
+        eaux.length > 0 ? Math.min(...eaux.slice(0, 5).map((e) => Grille.distance(pos, e))) : 8;
+      const score =
+        Grille.distance(centre, pos) +
+        Math.max(0, distEau - 8) * 2 +
+        (type === "feu_de_camp" ? (voisinBati > 0 ? -1 : 1) : voisinBati * 1.5) +
+        (Grille.distance(pos, p.corps.position) > 12 ? 5 : 0);
+      if (score < meilleurScore && monde.grille.estPraticable(x, y)) {
+        meilleurScore = score;
+        meilleur = pos;
+      }
+    }
+  }
+  return meilleur;
+}
+
+/** Fabrication : réunir les ingrédients, rejoindre l'atelier si besoin, fabriquer. */
+function planifierFabrication(monde: Monde, p: Personnage, nom: NomRecette): ResultatPlan {
+  const recette = RECETTES[nom];
+  const inv = p.corps.inventaire;
+  if (niveau(p.experience[recette.competence]) < recette.niveauRequis) {
+    return echec(`niveau ${recette.niveauRequis} requis en ${recette.competence}`);
+  }
+  const manquants: Partial<Record<Ressource, number>> = {};
+  for (const [r, n] of Object.entries(recette.ingredients) as [Ressource, number][]) {
+    const deficit = n - quantite(inv, r);
+    if (deficit > 0) manquants[r] = deficit;
+  }
+  if (Object.keys(manquants).length > 0)
+    return planifierApprovisionnement(monde, p, manquants, recette.nom);
+  const plan: Action[] = [];
+  if (recette.atelier !== null) {
+    const atelier = atelierLePlusProche(monde, p.corps.position, recette.atelier);
+    if (atelier === null) return echec(`aucun atelier ${recette.atelier} connu`);
+    const aller = allerPresDe(monde, p, atelier.position);
+    if (aller) plan.push(aller);
+  }
+  plan.push({ type: "fabriquer", recette: nom, ticksRestants: null });
+  return ok(plan);
+}
+
+function atelierLePlusProche(
+  monde: Monde,
+  pos: Position,
+  atelier: "feu" | "four",
+): Batiment | null {
+  let meilleur: Batiment | null = null;
+  let dMin = Infinity;
+  for (const b of monde.batiments.values()) {
+    if (b.etat !== "termine" || PLANS_BATIMENT[b.type].atelier !== atelier) continue;
+    if (atelier === "feu" && !b.allume) continue;
+    const d = Grille.distance(pos, b.position);
+    if (d < dMin) {
+      dMin = d;
+      meilleur = b;
+    }
+  }
+  return meilleur;
+}
+
+/** Stockage : déposer le surplus (tout sauf un peu de nourriture) dans le stock familial le plus proche. */
+function planifierStockage(monde: Monde, p: Personnage): ResultatPlan {
+  const inv = p.corps.inventaire;
+  const stock = batimentsAccessibles(monde, p).find(
+    (b) => b.etat === "termine" && b.stock !== null && placeLibre(b.stock) > 0,
+  );
+  if (stock === undefined) return echec("aucun stock accessible");
+  const plan: Action[] = [];
+  const aller = allerPresDe(monde, p, stock.position);
+  if (aller) plan.push(aller);
+  let depose = 0;
+  for (const [r, n] of Object.entries(inv.ressources) as [Ressource, number][]) {
+    const garder = NOURRITURE[r] !== undefined ? 2 : 0;
+    const surplus = n - garder;
+    if (surplus > 0) {
+      plan.push({ type: "deposer", batimentId: stock.id, ressource: r, quantite: surplus });
+      depose += surplus;
+    }
+  }
+  if (depose === 0) return echec("rien à stocker");
+  return ok(plan);
 }
 
 /** Lieux connus d'un type, du plus proche au plus lointain (distance de Tchebychev). */
