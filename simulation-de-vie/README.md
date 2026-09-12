@@ -23,11 +23,12 @@ pnpm serve -- --seed 42 --jours 30 --vitesse 4   # http://localhost:8080
 ```
 
 Le serveur fait tourner la simulation en temps réel (vitesse réglable depuis l'interface) et la
-diffuse par WebSocket. La page montre la carte animée (biomes, gisements, bâtiments,
-personnages colorés par famille, bulles de dialogue, jour / nuit) et cinq panneaux :
+diffuse par WebSocket. La page montre la carte illustrée et animée (biomes, arbres, gisements,
+huttes et maisons, feux, personnages dessinés aux couleurs de leur famille qui marchent d'une
+case à l'autre, bulles de dialogue, jour / nuit) et cinq panneaux :
 Personnage (pensée, besoins, famille, relations, souvenirs), Journal, Conversations,
-Statistiques, Population. Cliquez sur un personnage pour l'inspecter, appuyez sur `s` pour
-que la caméra le suive.
+Statistiques, Population. Cliquez sur un personnage ou un bâtiment pour l'inspecter, appuyez
+sur `s` pour que la caméra suive le personnage sélectionné.
 
 Pour développer le viewer avec rechargement à chaud : lancez le serveur (`pnpm --filter
 @sdv/server start -- --seed 42`) puis `pnpm viewer:dev` (http://localhost:5173).

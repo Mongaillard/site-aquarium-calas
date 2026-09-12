@@ -1,17 +1,12 @@
-/** Rendu de la carte sur canvas 2D : biomes, gisements, bâtiments, personnages, bulles, nuit. */
+/** Rendu illustré de la carte : fond pré-rendu, gisements, bâtiments, personnages animés, bulles, nuit. */
 import { LEVER_COUCHER, opaciteNuit } from "@sdv/protocole";
-import type { PersonnageEtat } from "@sdv/protocole";
+import type { BatimentEtat, PersonnageEtat } from "@sdv/protocole";
 import type { Camera } from "./camera.js";
 import { versEcran, versMonde } from "./camera.js";
 import type { Magasin } from "./etat.js";
-import {
-  COULEURS_BATIMENT,
-  COULEURS_BIOME,
-  COULEURS_RESSOURCE,
-  LETTRES_BATIMENT,
-  couleurFamille,
-  couleurMoral,
-} from "./format.js";
+import { RESOLUTION_FOND, construireFond } from "./fond.js";
+import { couleurFamille, couleurMoral } from "./format.js";
+import * as sprites from "./sprites.js";
 
 export class Rendu {
   private fond: HTMLCanvasElement | null = null;
@@ -27,132 +22,108 @@ export class Rendu {
     this.ctx = ctx;
   }
 
-  /** Image des biomes, calculée une fois par message `init` (1 pixel par tuile). */
-  private fondBiomes(): HTMLCanvasElement | null {
+  private fondCarte(): HTMLCanvasElement | null {
     const init = this.magasin.init;
     if (init === null) return null;
     if (this.fond !== null && this.fondPour === init) return this.fond;
-    const c = document.createElement("canvas");
-    c.width = init.largeur;
-    c.height = init.hauteur;
-    const ctx = c.getContext("2d");
-    if (ctx === null) return null;
-    const image = ctx.createImageData(init.largeur, init.hauteur);
-    for (let i = 0; i < init.biomes.length; i++) {
-      const nom = init.nomsBiomes[init.biomes[i] ?? 0] ?? "prairie";
-      const [r, g, b] = hexVersRgb(COULEURS_BIOME[nom] ?? "#7db85a");
-      image.data[i * 4] = r;
-      image.data[i * 4 + 1] = g;
-      image.data[i * 4 + 2] = b;
-      image.data[i * 4 + 3] = 255;
-    }
-    ctx.putImageData(image, 0, 0);
-    this.fond = c;
+    this.fond = construireFond(init);
     this.fondPour = init;
-    return c;
+    return this.fond;
   }
 
-  dessiner(cam: Camera, maintenant: number, survol: string | null): void {
+  dessiner(
+    cam: Camera,
+    maintenant: number,
+    survol: string | null,
+    survolBatiment: string | null,
+  ): void {
     const { canvas, ctx, magasin } = this;
     const init = magasin.init;
     const etat = magasin.etat;
     ctx.fillStyle = "#0f1216";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (init === null) return;
-    const fond = this.fondBiomes();
+    const fond = this.fondCarte();
     if (fond === null) return;
 
+    // Fenêtre visible en tuiles, pour ne dessiner que le nécessaire.
+    const hg = versMonde(cam, 0, 0);
+    const bd = versMonde(cam, canvas.width, canvas.height);
+    const visible = (x: number, y: number): boolean =>
+      x >= hg.x - 2 && x <= bd.x + 1 && y >= hg.y - 2 && y <= bd.y + 1;
+
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = cam.echelle < RESOLUTION_FOND;
     ctx.translate(cam.dx, cam.dy);
     ctx.scale(cam.echelle, cam.echelle);
-    ctx.drawImage(fond, 0, 0);
+    ctx.drawImage(fond, 0, 0, init.largeur, init.hauteur);
 
-    // Gisements : petits carrés colorés, visibles à partir d'une certaine échelle.
+    // Gisements.
     if (cam.echelle >= 5) {
-      const taille = cam.echelle >= 12 ? 0.45 : 0.35;
       for (const g of magasin.gisements.values()) {
-        if (g.quantite <= 0) continue;
-        ctx.fillStyle = COULEURS_RESSOURCE[g.type] ?? "#ffffff";
-        ctx.globalAlpha = 0.85;
-        ctx.fillRect(g.x + (1 - taille) / 2, g.y + (1 - taille) / 2, taille, taille);
+        if (g.quantite <= 0 || !visible(g.x, g.y)) continue;
+        sprites.gisement(ctx, g.x, g.y, g.type, g.outil, g.quantite / 8);
       }
-      ctx.globalAlpha = 1;
+    } else {
+      for (const g of magasin.gisements.values()) {
+        if (g.quantite <= 0 || !visible(g.x, g.y)) continue;
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        ctx.fillRect(g.x + 0.3, g.y + 0.3, 0.4, 0.4);
+      }
     }
 
+    const nuit = etat?.moment.estNuit ?? false;
     if (etat !== null) {
-      // Bâtiments.
-      for (const b of etat.batiments) {
-        ctx.fillStyle =
-          b.etat === "chantier" ? "rgba(255,255,255,0.25)" : (COULEURS_BATIMENT[b.type] ?? "#888");
-        ctx.fillRect(b.x + 0.08, b.y + 0.08, 0.84, 0.84);
-        if (b.etat === "chantier") {
-          ctx.strokeStyle = "#fff";
-          ctx.lineWidth = 0.08;
-          ctx.setLineDash([0.15, 0.1]);
-          ctx.strokeRect(b.x + 0.08, b.y + 0.08, 0.84, 0.84);
-          ctx.setLineDash([]);
-        }
-        if (b.type === "feu_de_camp" && b.allume && b.etat === "termine") {
-          ctx.fillStyle = "rgba(255,180,60,0.18)";
-          ctx.beginPath();
-          ctx.arc(b.x + 0.5, b.y + 0.5, 2.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        if (cam.echelle >= 9) {
-          ctx.fillStyle = b.type === "feu_de_camp" && !b.allume ? "#999" : "#fff";
-          ctx.font = "0.6px sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(LETTRES_BATIMENT[b.type] ?? "?", b.x + 0.5, b.y + 0.52);
-        }
+      // Bâtiments, du haut vers le bas pour les recouvrements.
+      const batiments = [...etat.batiments].sort((a, b) => a.y - b.y);
+      for (const b of batiments) {
+        if (!visible(b.x, b.y)) continue;
+        this.dessinerBatiment(
+          b,
+          nuit,
+          maintenant,
+          b.id === magasin.selectionBatiment || b.id === survolBatiment,
+        );
       }
 
-      // Personnages : cercle coloré par famille, contour selon le moral.
-      for (const p of etat.personnages) {
-        if (!p.vivant) continue;
-        const rayon = p.stade === "enfant" ? 0.24 : p.stade === "adolescent" ? 0.32 : 0.4;
-        const cx = p.x + 0.5;
-        const cy = p.y + 0.5;
-        ctx.beginPath();
-        ctx.arc(cx, cy, rayon, 0, Math.PI * 2);
-        ctx.fillStyle = couleurFamille(p.nomFamille);
-        ctx.fill();
-        ctx.lineWidth = p.id === magasin.selection ? 0.16 : 0.08;
-        ctx.strokeStyle = p.id === magasin.selection ? "#ffffff" : couleurMoral(p.besoins.moral);
-        ctx.stroke();
-        if (p.id === survol) {
-          ctx.beginPath();
-          ctx.arc(cx, cy, rayon + 0.18, 0, Math.PI * 2);
-          ctx.strokeStyle = "rgba(255,255,255,0.7)";
-          ctx.lineWidth = 0.06;
-          ctx.stroke();
-        }
-        if (p.endormi && cam.echelle >= 7) {
-          ctx.fillStyle = "#cfe6ff";
-          ctx.font = "0.5px sans-serif";
-          ctx.textAlign = "left";
-          ctx.textBaseline = "alphabetic";
-          ctx.fillText("z", cx + rayon * 0.6, cy - rayon * 0.6);
-        }
-        if (p.enceinte) {
-          ctx.beginPath();
-          ctx.arc(cx + rayon * 0.55, cy + rayon * 0.55, 0.12, 0, Math.PI * 2);
-          ctx.fillStyle = "#ffa0d0";
-          ctx.fill();
-        }
+      // Personnages, triés par ordre vertical (ceux du bas devant).
+      const positions = etat.personnages
+        .filter((p) => p.vivant)
+        .map((p) => ({
+          p,
+          pos: magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y, enMouvement: false },
+        }))
+        .sort((a, b) => a.pos.y - b.pos.y);
+      for (const { p, pos } of positions) {
+        if (!visible(pos.x, pos.y)) continue;
+        sprites.personnage(ctx, pos.x, pos.y, {
+          couleur: couleurFamille(p.nomFamille),
+          contour: couleurMoral(p.besoins.moral),
+          teint: sprites.TEINTS[p.teint] ?? "#f3d3b3",
+          cheveux: sprites.CHEVEUX[p.cheveux] ?? "#4a2e1a",
+          sexe: p.sexe,
+          echelle: p.stade === "enfant" ? 0.6 : p.stade === "adolescent" ? 0.8 : 1,
+          endormi: p.endormi,
+          marche: pos.enMouvement,
+          phase: (maintenant / 400) % 1,
+          enceinte: p.enceinte,
+          selection: p.id === magasin.selection,
+          survol: p.id === survol,
+        });
       }
     }
     ctx.restore();
 
-    // Prénoms (espace écran, lisibles quel que soit le zoom).
-    if (etat !== null && cam.echelle >= 10) {
+    // Prénoms (espace écran).
+    if (etat !== null && cam.echelle >= 12) {
       ctx.font = "11px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
       for (const p of etat.personnages) {
         if (!p.vivant) continue;
-        const e = versEcran(cam, p.x + 0.5, p.y + 0.05);
+        const pos = magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y };
+        if (!visible(pos.x, pos.y)) continue;
+        const e = versEcran(cam, pos.x + 0.5, pos.y + 0.02);
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillText(p.prenom, e.x + 1, e.y + 1);
         ctx.fillStyle = "#fff";
@@ -160,20 +131,19 @@ export class Rendu {
       }
     }
 
-    // Voile nocturne.
+    // Voile nocturne et halos des feux.
     if (etat !== null) {
       const [lever, coucher] = LEVER_COUCHER[etat.moment.saison] ?? [6, 20];
       const alpha = opaciteNuit(etat.moment.heure, etat.moment.minute, lever, coucher);
       if (alpha > 0) {
         ctx.fillStyle = `rgba(10, 18, 50, ${alpha})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        // Halo des feux.
         for (const b of etat.batiments) {
           if (b.type !== "feu_de_camp" || !b.allume || b.etat !== "termine") continue;
-          const e = versEcran(cam, b.x + 0.5, b.y + 0.5);
-          const r = cam.echelle * 3;
+          const e = versEcran(cam, b.x + 0.5, b.y + 0.6);
+          const r = cam.echelle * (3 + Math.sin(maintenant / 150) * 0.15);
           const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
-          grad.addColorStop(0, `rgba(255,190,90,${alpha * 0.9})`);
+          grad.addColorStop(0, `rgba(255,190,90,${alpha * 0.95})`);
           grad.addColorStop(1, "rgba(255,190,90,0)");
           ctx.fillStyle = grad;
           ctx.fillRect(e.x - r, e.y - r, 2 * r, 2 * r);
@@ -181,8 +151,8 @@ export class Rendu {
       }
     }
 
-    // Bulles de dialogue.
-    if (etat !== null) {
+    // Bulles de dialogue (masquées quand la carte est vue de loin).
+    if (etat !== null && cam.echelle >= 7) {
       ctx.font = "12px system-ui, sans-serif";
       ctx.textBaseline = "middle";
       const affichees = new Set<string>();
@@ -191,11 +161,12 @@ export class Rendu {
         affichees.add(bulle.id);
         const p = etat.personnages.find((x) => x.id === bulle.id);
         if (p === undefined) continue;
-        const e = versEcran(cam, p.x + 0.5, p.y);
+        const pos = magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y };
+        const e = versEcran(cam, pos.x + 0.5, pos.y);
         const texte = bulle.texte.length > 60 ? `${bulle.texte.slice(0, 57)}…` : bulle.texte;
         const largeur = ctx.measureText(texte).width + 14;
         const x = Math.max(4, Math.min(canvas.width - largeur - 4, e.x - largeur / 2));
-        const y = e.y - 30;
+        const y = e.y - 34;
         ctx.fillStyle = "rgba(255,255,255,0.95)";
         arrondi(ctx, x, y, largeur, 22, 8);
         ctx.fill();
@@ -212,8 +183,70 @@ export class Rendu {
     }
   }
 
-  /** Personnage vivant le plus proche du point écran (rayon de 14 px), ou null. */
-  trouverPersonnage(cam: Camera, sx: number, sy: number): PersonnageEtat | null {
+  private dessinerBatiment(
+    b: BatimentEtat,
+    nuit: boolean,
+    maintenant: number,
+    surligne: boolean,
+  ): void {
+    const ctx = this.ctx;
+    if (surligne) {
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.lineWidth = 0.06;
+      ctx.strokeRect(b.x + 0.02, b.y + 0.02, 0.96, 0.96);
+    }
+    if (b.etat === "chantier") {
+      const avancement = b.travailTotal > 0 ? 1 - b.travailRestant / b.travailTotal : 0;
+      sprites.chantier(ctx, b.x, b.y, Object.keys(b.manquants).length > 0 ? 0 : avancement);
+      return;
+    }
+    switch (b.type) {
+      case "abri":
+        sprites.abri(ctx, b.x, b.y);
+        break;
+      case "maison":
+        sprites.maison(ctx, b.x, b.y, nuit);
+        break;
+      case "entrepot":
+        sprites.entrepot(ctx, b.x, b.y);
+        break;
+      case "feu_de_camp":
+        sprites.feu(ctx, b.x, b.y, b.allume, maintenant);
+        break;
+      case "four":
+        sprites.four(ctx, b.x, b.y);
+        break;
+      case "puits":
+        sprites.puits(ctx, b.x, b.y);
+        break;
+      case "palissade":
+        sprites.palissade(ctx, b.x, b.y);
+        break;
+      case "tombe":
+        sprites.tombe(ctx, b.x, b.y);
+        break;
+      default:
+        ctx.fillStyle = "#888";
+        ctx.fillRect(b.x + 0.1, b.y + 0.1, 0.8, 0.8);
+    }
+    if (b.solidite < 40) {
+      ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      ctx.lineWidth = 0.03;
+      ctx.beginPath();
+      ctx.moveTo(b.x + 0.3, b.y + 0.5);
+      ctx.lineTo(b.x + 0.45, b.y + 0.7);
+      ctx.lineTo(b.x + 0.4, b.y + 0.9);
+      ctx.stroke();
+    }
+  }
+
+  /** Personnage vivant le plus proche du point écran (rayon de 16 px), ou null. */
+  trouverPersonnage(
+    cam: Camera,
+    sx: number,
+    sy: number,
+    maintenant: number,
+  ): PersonnageEtat | null {
     const etat = this.magasin.etat;
     if (etat === null) return null;
     const m = versMonde(cam, sx, sy);
@@ -221,13 +254,24 @@ export class Rendu {
     let dMin = Infinity;
     for (const p of etat.personnages) {
       if (!p.vivant) continue;
-      const d = Math.hypot(p.x + 0.5 - m.x, p.y + 0.5 - m.y) * cam.echelle;
-      if (d < 14 && d < dMin) {
+      const pos = this.magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y };
+      const d = Math.hypot(pos.x + 0.5 - m.x, pos.y + 0.55 - m.y) * cam.echelle;
+      if (d < 16 && d < dMin) {
         dMin = d;
         meilleur = p;
       }
     }
     return meilleur;
+  }
+
+  /** Bâtiment sous le point écran, ou null. */
+  trouverBatiment(cam: Camera, sx: number, sy: number): BatimentEtat | null {
+    const etat = this.magasin.etat;
+    if (etat === null) return null;
+    const m = versMonde(cam, sx, sy);
+    const x = Math.floor(m.x);
+    const y = Math.floor(m.y);
+    return etat.batiments.find((b) => b.x === x && b.y === y) ?? null;
   }
 }
 
@@ -246,9 +290,4 @@ function arrondi(
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
-}
-
-function hexVersRgb(hex: string): [number, number, number] {
-  const n = Number.parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }

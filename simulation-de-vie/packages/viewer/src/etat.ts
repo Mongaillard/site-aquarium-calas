@@ -30,7 +30,17 @@ export class Magasin {
   init: MessageInit | null = null;
   etat: MessageEtat | null = null;
   fiche: MessageFiche | null = null;
-  readonly gisements = new Map<string, { x: number; y: number; type: string; quantite: number }>();
+  readonly gisements = new Map<
+    string,
+    { x: number; y: number; type: string; quantite: number; outil: string }
+  >();
+  /** Interpolation des déplacements : de (ax, ay) à (bx, by) entre t0 et t1. */
+  private readonly trajets = new Map<
+    string,
+    { ax: number; ay: number; bx: number; by: number; t0: number; t1: number }
+  >();
+  private dernierEtatA = 0;
+  selectionBatiment: string | null = null;
   readonly evenements: EvenementEtat[] = [];
   readonly conversations: Conversation[] = [];
   readonly noms = new Map<string, string>();
@@ -54,14 +64,43 @@ export class Magasin {
         this.evenements.length = 0;
         this.conversations.length = 0;
         break;
-      case "etat":
+      case "etat": {
+        const precedent = this.etat;
         this.etat = message;
         this.version += 1;
-        for (const p of message.personnages) this.noms.set(p.id, `${p.prenom} ${p.nomFamille}`);
-        for (const [x, y, type, quantite] of message.gisements) {
+        // Durée d'interpolation : l'intervalle réel entre deux états, borné.
+        const duree = Math.min(900, Math.max(80, maintenant - this.dernierEtatA));
+        this.dernierEtatA = maintenant;
+        for (const p of message.personnages) {
+          this.noms.set(p.id, `${p.prenom} ${p.nomFamille}`);
+          const t = this.trajets.get(p.id);
+          if (t === undefined) {
+            this.trajets.set(p.id, {
+              ax: p.x,
+              ay: p.y,
+              bx: p.x,
+              by: p.y,
+              t0: maintenant,
+              t1: maintenant,
+            });
+          } else if (t.bx !== p.x || t.by !== p.y) {
+            const courant = this.positionAffichee(p.id, maintenant) ?? { x: t.bx, y: t.by };
+            const saut = Math.max(Math.abs(p.x - t.bx), Math.abs(p.y - t.by)) > 6;
+            this.trajets.set(p.id, {
+              ax: saut ? p.x : courant.x,
+              ay: saut ? p.y : courant.y,
+              bx: p.x,
+              by: p.y,
+              t0: maintenant,
+              t1: maintenant + (saut ? 0 : duree),
+            });
+          }
+        }
+        if (precedent === null) this.dernierEtatA = maintenant;
+        for (const [x, y, type, quantite, outil] of message.gisements) {
           const cle = `${x},${y}`;
           if (quantite < 0) this.gisements.delete(cle);
-          else this.gisements.set(cle, { x, y, type, quantite });
+          else this.gisements.set(cle, { x, y, type, quantite, outil });
         }
         for (const e of message.evenements) {
           this.typesVus.add(e.type);
@@ -72,6 +111,7 @@ export class Magasin {
           this.evenements.splice(0, this.evenements.length - MAX_EVENEMENTS);
         this.bulles = this.bulles.filter((b) => b.fin > maintenant);
         break;
+      }
       case "fiche":
         if (message.id === this.selection) this.fiche = message;
         break;
@@ -106,10 +146,27 @@ export class Magasin {
 
   selectionner(id: string | null): void {
     this.selection = id;
+    if (id !== null) this.selectionBatiment = null;
     if (id === null) {
       this.fiche = null;
       this.suivre = false;
     }
+  }
+
+  /** Position affichée d'un personnage (interpolée), ou null s'il est inconnu. */
+  positionAffichee(
+    id: string,
+    maintenant: number,
+  ): { x: number; y: number; enMouvement: boolean } | null {
+    const t = this.trajets.get(id);
+    if (t === undefined) return null;
+    if (maintenant >= t.t1) return { x: t.bx, y: t.by, enMouvement: false };
+    const f = (maintenant - t.t0) / Math.max(1, t.t1 - t.t0);
+    return { x: t.ax + (t.bx - t.ax) * f, y: t.ay + (t.by - t.ay) * f, enMouvement: true };
+  }
+
+  batiment(id: string) {
+    return this.etat?.batiments.find((b) => b.id === id) ?? null;
   }
 
   personnage(id: string) {

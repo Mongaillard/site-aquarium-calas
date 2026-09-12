@@ -36,6 +36,7 @@ export class Panneaux {
   private derniereVersionPopulation = -1;
   private derniereVersionStats = -1;
   private derniereVersionConversations = -1;
+  private derniereVersionBatiment = -1;
   private ficheAffichee: MessageFiche | null = null;
 
   constructor(
@@ -112,7 +113,7 @@ export class Panneaux {
       .map(([n, c]) => `<span class="pastille" style="background:${c}"></span>${e(n)}`)
       .join(" ");
     $("legende").innerHTML =
-      `${biomes}<br>${ressources}<br>● personnage (couleur = famille, contour = moral) · lettres = bâtiments (A abri, M maison, E entrepôt, f feu) · pointillé = chantier`;
+      `${biomes}<br>${ressources}<br>personnages : vêtement = famille, contour = moral · huttes, maisons, entrepôts, feux · pointillé = chantier · clic : inspecter`;
   }
 
   /** Met à jour les panneaux visibles ; `force` ignore le cache de version. */
@@ -171,9 +172,63 @@ export class Panneaux {
       `${s.vivants} vivants (${s.enfants} enfants) · ${s.batiments} bâtiments · ${s.naissances} naissances · ${s.deces} décès · ${s.dialogues} dialogues`;
   }
 
+  /** Carte d'un bâtiment sélectionné (type, famille, propriétaire, occupants, stock, chantier). */
+  afficherBatiment(id: string): void {
+    const b = this.magasin.batiment(id);
+    const conteneur = $("inspecteur");
+    if (b === null) return;
+    const etat = this.magasin.etat;
+    const occupants = (etat?.personnages ?? []).filter(
+      (p) => p.vivant && p.x === b.x && p.y === b.y,
+    );
+    const stock = b.stock
+      ? Object.entries(b.stock)
+          .map(([r, n]) => `<span class="puce">${e(r)} ×${n}</span>`)
+          .join("") || "<span class='discret'>vide</span>"
+      : null;
+    const manquants = Object.entries(b.manquants)
+      .map(([r, n]) => `<span class="puce">${e(r)} ×${n}</span>`)
+      .join("");
+    const avancement =
+      b.travailTotal > 0 ? Math.round((1 - b.travailRestant / b.travailTotal) * 100) : 0;
+    conteneur.dataset.vide = "0";
+    this.ficheAffichee = null;
+    conteneur.innerHTML = `
+      <div class="entete-fiche">
+        <span class="rond" style="background:${couleurFamille(b.famille)}"></span>
+        <span class="nom">${e(NOMS_BATIMENT[b.type] ?? b.nom)} <span class="discret">${e(b.id)}</span></span>
+        <span class="actions"><button id="btn-fermer" title="Fermer (échap)">✕</button></span>
+      </div>
+      <div class="discret">famille ${e(b.famille)} · propriétaire <span class="lien" data-id="${e(b.proprietaire)}">${e(this.magasin.nom(b.proprietaire))}</span> · en (${b.x}, ${b.y})</div>
+      ${
+        b.etat === "chantier"
+          ? `<h3>Chantier</h3><div class="jauges"><span>travail</span><div class="jauge"><i style="width:${avancement}%;background:#6cc2ff"></i></div><span class="num">${avancement}%</span></div><div>Matériaux manquants : ${manquants || "<span class='discret'>aucun, il ne reste qu'à travailler</span>"}</div>`
+          : `<h3>État</h3><div class="jauges"><span>solidité</span><div class="jauge ${b.solidite < 40 ? "critique" : b.solidite < 60 ? "bas" : ""}"><i style="width:${b.solidite}%"></i></div><span class="num">${b.solidite}</span></div>${b.type === "feu_de_camp" ? `<div>${b.allume ? "🔥 allumé" : "éteint (une bûche suffit à le rallumer)"}</div>` : ""}${b.capaciteDormeurs > 0 ? `<div>${b.capaciteDormeurs} place${b.capaciteDormeurs > 1 ? "s" : ""} pour dormir (les enfants se serrent)</div>` : ""}`
+      }
+      ${stock !== null ? `<h3>Stock</h3><div class="puces">${stock}</div>` : ""}
+      <h3>Présents</h3>
+      ${occupants.length > 0 ? `<ol class="liste">${occupants.map((p) => `<li class="personne" data-id="${e(p.id)}"><span class="rond" style="background:${couleurFamille(p.nomFamille)}"></span>${e(p.prenom)} ${e(p.nomFamille)}<span class="detail">${p.endormi ? "dort" : e(p.intention ?? "—")}</span></li>`).join("")}</ol>` : "<p class='discret'>personne pour l'instant</p>"}`;
+    conteneur.querySelector("#btn-fermer")?.addEventListener("click", () => {
+      this.magasin.selectionBatiment = null;
+      this.inter.selectionner(null);
+    });
+    for (const l of conteneur.querySelectorAll<HTMLElement>("[data-id]")) {
+      l.addEventListener("click", () => {
+        this.inter.selectionner(l.dataset.id ?? null);
+      });
+    }
+  }
+
   private inspecteur(): void {
     const conteneur = $("inspecteur");
     const fiche = this.magasin.fiche;
+    if (this.magasin.selectionBatiment !== null) {
+      if (this.magasin.version !== this.derniereVersionBatiment) {
+        this.afficherBatiment(this.magasin.selectionBatiment);
+        this.derniereVersionBatiment = this.magasin.version;
+      }
+      return;
+    }
     if (this.magasin.selection === null) {
       if (this.ficheAffichee !== null || conteneur.dataset.vide !== "1") {
         conteneur.innerHTML = `<p class="discret">Cliquez sur un personnage de la carte, ou choisissez-le dans l'onglet Population.</p>`;

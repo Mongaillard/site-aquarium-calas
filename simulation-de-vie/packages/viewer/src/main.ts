@@ -22,6 +22,7 @@ const rendu = new Rendu(canvas, magasin);
 let cam: Camera = { echelle: 8, dx: 0, dy: 0 };
 let camAjustee = false;
 let survol: string | null = null;
+let survolBatiment: string | null = null;
 
 const reseau = new Reseau(
   urlWebSocket(window.location),
@@ -48,6 +49,12 @@ const selectionner = (id: string | null): void => {
   else envoyer({ type: "inspecter", id });
   panneaux.afficherOnglet("inspecteur");
 };
+const selectionnerBatiment = (id: string): void => {
+  magasin.selectionner(null);
+  envoyer({ type: "fermer_fiche" });
+  magasin.selectionBatiment = id;
+  panneaux.afficherOnglet("inspecteur");
+};
 const basculerSuivi = (): void => {
   if (magasin.selection === null) return;
   magasin.suivre = !magasin.suivre;
@@ -69,6 +76,18 @@ redimensionner();
 // Souris : glisser pour déplacer, molette pour zoomer, clic pour sélectionner.
 let glisse: { x: number; y: number; bouge: boolean } | null = null;
 const dpr = (): number => window.devicePixelRatio || 1;
+const pointCanvas = (ev: MouseEvent): { sx: number; sy: number; dedans: boolean } => {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    sx: (ev.clientX - rect.left) * dpr(),
+    sy: (ev.clientY - rect.top) * dpr(),
+    dedans:
+      ev.clientX >= rect.left &&
+      ev.clientX <= rect.right &&
+      ev.clientY >= rect.top &&
+      ev.clientY <= rect.bottom,
+  };
+};
 canvas.addEventListener("mousedown", (ev) => {
   glisse = { x: ev.clientX, y: ev.clientY, bouge: false };
   canvas.classList.add("glisse");
@@ -85,38 +104,40 @@ window.addEventListener("mousemove", (ev) => {
       glisse.y = ev.clientY;
     }
   }
-  const rect = canvas.getBoundingClientRect();
-  if (
-    ev.clientX >= rect.left &&
-    ev.clientX <= rect.right &&
-    ev.clientY >= rect.top &&
-    ev.clientY <= rect.bottom
-  ) {
-    const p = rendu.trouverPersonnage(
-      cam,
-      (ev.clientX - rect.left) * dpr(),
-      (ev.clientY - rect.top) * dpr(),
-    );
-    survol = p?.id ?? null;
-    if (p) {
-      survolEl.hidden = false;
-      survolEl.style.left = `${ev.clientX - rect.left + 14}px`;
-      survolEl.style.top = `${ev.clientY - rect.top + 14}px`;
-      survolEl.textContent = `${p.prenom} ${p.nomFamille} · ${p.stade}${p.endormi ? " · dort" : ""} · ${p.intention ?? "—"}`;
-    } else {
-      survolEl.hidden = true;
-    }
+  const { sx, sy, dedans } = pointCanvas(ev);
+  if (!dedans) return;
+  const p = rendu.trouverPersonnage(cam, sx, sy, performance.now());
+  const b = p === null ? rendu.trouverBatiment(cam, sx, sy) : null;
+  survol = p?.id ?? null;
+  survolBatiment = b?.id ?? null;
+  if (p !== null || b !== null) {
+    const rect = canvas.getBoundingClientRect();
+    survolEl.hidden = false;
+    survolEl.style.left = `${ev.clientX - rect.left + 14}px`;
+    survolEl.style.top = `${ev.clientY - rect.top + 14}px`;
+    survolEl.textContent = p
+      ? `${p.prenom} ${p.nomFamille} · ${p.stade}${p.endormi ? " · dort" : ""} · ${p.intention ?? "—"}`
+      : b
+        ? `${b.nom} des ${b.famille}${b.etat === "chantier" ? " (chantier)" : b.type === "feu_de_camp" ? (b.allume ? " · allumé" : " · éteint") : ""}`
+        : "";
+  } else {
+    survolEl.hidden = true;
   }
 });
 window.addEventListener("mouseup", (ev) => {
   if (glisse && !glisse.bouge) {
-    const rect = canvas.getBoundingClientRect();
-    const p = rendu.trouverPersonnage(
-      cam,
-      (ev.clientX - rect.left) * dpr(),
-      (ev.clientY - rect.top) * dpr(),
-    );
-    selectionner(p?.id ?? null);
+    const { sx, sy } = pointCanvas(ev);
+    const p = rendu.trouverPersonnage(cam, sx, sy, performance.now());
+    if (p !== null) {
+      selectionner(p.id);
+    } else {
+      const b = rendu.trouverBatiment(cam, sx, sy);
+      if (b !== null) selectionnerBatiment(b.id);
+      else {
+        magasin.selectionBatiment = null;
+        selectionner(null);
+      }
+    }
   }
   glisse = null;
   canvas.classList.remove("glisse");
@@ -125,19 +146,16 @@ canvas.addEventListener(
   "wheel",
   (ev) => {
     ev.preventDefault();
-    const rect = canvas.getBoundingClientRect();
+    const { sx, sy } = pointCanvas(ev);
     const facteur = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
-    cam = zoomer(cam, facteur, (ev.clientX - rect.left) * dpr(), (ev.clientY - rect.top) * dpr());
+    cam = zoomer(cam, facteur, sx, sy);
   },
   { passive: false },
 );
 
 window.addEventListener("keydown", (ev) => {
-  if (
-    (ev.target as HTMLElement | null)?.tagName === "INPUT" ||
-    (ev.target as HTMLElement | null)?.tagName === "SELECT"
-  )
-    return;
+  const cible = ev.target as HTMLElement | null;
+  if (cible?.tagName === "INPUT" || cible?.tagName === "SELECT") return;
   const etat = magasin.etat;
   switch (ev.key) {
     case " ":
@@ -154,6 +172,7 @@ window.addEventListener("keydown", (ev) => {
       basculerSuivi();
       break;
     case "Escape":
+      magasin.selectionBatiment = null;
       selectionner(null);
       break;
     case "+":
@@ -184,10 +203,10 @@ function boucle(maintenant: number): void {
     camAjustee = true;
   }
   if (magasin.suivre && magasin.selection !== null) {
-    const p = magasin.personnage(magasin.selection);
-    if (p) cam = centrerSur(cam, p.x, p.y, canvas.width, canvas.height);
+    const pos = magasin.positionAffichee(magasin.selection, maintenant);
+    if (pos) cam = centrerSur(cam, pos.x, pos.y, canvas.width, canvas.height);
   }
-  rendu.dessiner(cam, maintenant, survol);
+  rendu.dessiner(cam, maintenant, survol, survolBatiment);
   if (maintenant - dernierPanneau > 250) {
     panneaux.rafraichir();
     dernierPanneau = maintenant;

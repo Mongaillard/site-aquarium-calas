@@ -67,7 +67,7 @@ describe("instantanés", () => {
     if (!tuile) throw new Error("pas de gisement");
     tuile.gisement = null;
     const diff = suivi.differentiel(s);
-    expect(diff).toContainEqual([tuile.x, tuile.y, "", -1]);
+    expect(diff).toContainEqual([tuile.x, tuile.y, "", -1, ""]);
   });
 
   it("le bilan par saison compte naissances et décès", () => {

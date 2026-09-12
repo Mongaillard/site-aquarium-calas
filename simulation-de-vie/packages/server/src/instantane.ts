@@ -5,10 +5,12 @@
 import {
   BIOMES,
   COMPETENCES,
+  PLANS_BATIMENT,
   avancementGrossesse,
   codeBiome,
   decrireAction,
   decrireIntention,
+  materiauxManquants,
   niveau,
   partenaireDe,
 } from "@sdv/core";
@@ -70,6 +72,8 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     parents: p.identite.parents,
     partenaire: partenaireDe(sim, p)?.id ?? null,
     causeDeces: p.causeDeces,
+    teint: p.identite.apparence.teint,
+    cheveux: p.identite.apparence.cheveux,
   };
 }
 
@@ -85,6 +89,11 @@ export function etatBatiments(sim: Simulation): BatimentEtat[] {
     solidite: Math.round(b.solidite),
     allume: b.allume,
     stock: b.stock ? { ...b.stock.ressources } : null,
+    travailRestant: Math.max(0, Math.round(b.travailRestant)),
+    travailTotal: PLANS_BATIMENT[b.type].travail,
+    manquants: materiauxManquants(b),
+    capaciteDormeurs: PLANS_BATIMENT[b.type].capaciteDormeurs,
+    nom: PLANS_BATIMENT[b.type].nom,
   }));
 }
 
@@ -103,14 +112,14 @@ export class SuiviGisements {
       const q = Math.floor(t.gisement.quantite);
       if (this.derniers.get(cle) !== q) {
         this.derniers.set(cle, q);
-        resultat.push([t.x, t.y, t.gisement.type, q]);
+        resultat.push([t.x, t.y, t.gisement.type, q, t.gisement.outilRequis ?? ""]);
       }
     }
     for (const cle of [...this.derniers.keys()]) {
       if (vus.has(cle)) continue;
       this.derniers.delete(cle);
       const [x, y] = cle.split(",").map(Number);
-      resultat.push([x ?? 0, y ?? 0, "", -1]);
+      resultat.push([x ?? 0, y ?? 0, "", -1, ""]);
     }
     return resultat;
   }

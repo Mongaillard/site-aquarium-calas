@@ -12,11 +12,19 @@ Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`,
   par seconde, gisements en différentiel, événements depuis le dernier envoi), fiche détaillée
   d'un personnage à la demande, pensée intérieure en mode règles, bilan des naissances et
   décès par saison, service statique du viewer construit.
-- Nouveau paquet `@sdv/viewer` (Vite, TypeScript, canvas 2D, sans framework) : carte des
-  biomes, gisements, bâtiments (lettres, chantiers en pointillé, halo des feux), personnages
-  (cercle coloré par famille, contour selon le moral, taille selon l'âge, sommeil, grossesse),
-  prénoms au zoom, voile jour / nuit, bulles de dialogue, zoom à la molette, déplacement à la
-  souris, survol, clic pour inspecter, mode « suivre ce personnage ».
+- Nouveau paquet `@sdv/viewer` (Vite, TypeScript, canvas 2D, sans framework, aucune image
+  externe) : rendu illustré dessiné en vectoriel. Fond pré-rendu avec biomes texturés, arbres,
+  rochers, herbes, fleurs, vagues ; gisements en icônes (buissons de baies, bûches, arbres,
+  rochers, poissons, gibier, touffes de fibres, argile) ; bâtiments dessinés (huttes, maisons
+  aux fenêtres éclairées la nuit, entrepôts, fours, puits, palissades, tombes, feux qui
+  vacillent avec halo nocturne, chantiers en pointillé avec barre d'avancement, fissures des
+  bâtiments abîmés) ; personnages en petits bonshommes (vêtement à la couleur de la famille,
+  contour selon le moral, teint et cheveux de l'identité, taille selon l'âge, animation de
+  marche, sommeil allongé, grossesse), déplacements interpolés entre deux états pour un
+  mouvement fluide ; prénoms au zoom, voile jour / nuit, bulles de dialogue, zoom à la
+  molette, déplacement à la souris, survol des personnages et des bâtiments, clic pour
+  inspecter un personnage ou un bâtiment (famille, propriétaire, solidité, stock, présents,
+  avancement du chantier), mode « suivre ce personnage ».
 - Panneaux : Personnage (pensée, intention, action, plan, besoins en jauges, famille cliquable,
   relations, inventaire, compétences, identité et personnalité, souvenirs marquants et
   récents), Journal filtrable par type, par personnage et par importance, Conversations avec

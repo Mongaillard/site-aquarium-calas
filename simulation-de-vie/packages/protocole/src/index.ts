@@ -54,6 +54,8 @@ export interface PersonnageEtat {
   readonly parents: readonly [string, string] | null;
   readonly partenaire: string | null;
   readonly causeDeces: string | null;
+  readonly teint: string;
+  readonly cheveux: string;
 }
 
 export interface BatimentEtat {
@@ -67,10 +69,19 @@ export interface BatimentEtat {
   readonly solidite: number;
   readonly allume: boolean;
   readonly stock: Readonly<Record<string, number>> | null;
+  /** Chantier : travail restant et total (ticks·personne), matériaux manquants. */
+  readonly travailRestant: number;
+  readonly travailTotal: number;
+  readonly manquants: Readonly<Record<string, number>>;
+  readonly capaciteDormeurs: number;
+  readonly nom: string;
 }
 
-/** [x, y, type, quantité] ; une quantité négative signifie que le gisement a disparu. */
-export type GisementEtat = readonly [number, number, string, number];
+/**
+ * [x, y, type, quantité, outil requis ("" si aucun)] ; une quantité négative
+ * signifie que le gisement a disparu.
+ */
+export type GisementEtat = readonly [number, number, string, number, string];
 
 export interface EvenementEtat {
   readonly tick: number;
