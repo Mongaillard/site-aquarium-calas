@@ -18,7 +18,13 @@ empreinte, puis fait avancer l'horloge du nombre de jours demandé.
 ## Structure
 
 ```
-packages/core   moteur déterministe (monde, horloge, RNG, configuration, boucle)
+packages/core/src
+  monde/        grille, génération, biomes, ressources, horloge, rendu ASCII
+  agents/       identité, génome, besoins, inventaire, compétences, population
+  actions/      types d'actions et d'intentions, A*, planificateur, exécuteur
+  cerveau/      interface Cerveau, perception, RuleBrain (règles)
+  evenements/   journal d'événements
+  simulation.ts boucle principale
 packages/cli    commande `sim`
 ```
 

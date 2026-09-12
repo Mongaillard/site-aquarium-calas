@@ -23,3 +23,74 @@ export { hacherGrille } from "./monde/hachage.js";
 export { rendreAscii, LEGENDE_ASCII } from "./monde/ascii.js";
 export type { OptionsAscii } from "./monde/ascii.js";
 export { Simulation } from "./simulation.js";
+export { GENES, genomeAleatoire, phenotype } from "./agents/genetique.js";
+export type { Gene, Genome } from "./agents/genetique.js";
+export {
+  genererIdentite,
+  nomComplet,
+  biographieParDefaut,
+  mottoParDefaut,
+} from "./agents/identite.js";
+export type {
+  Identite,
+  Personnalite,
+  Apparence,
+  Sexe,
+  OptionsIdentite,
+} from "./agents/identite.js";
+export {
+  VALEURS_POSSIBLES,
+  TRAITS_POSSIBLES,
+  PRENOMS_F,
+  PRENOMS_M,
+  NOMS_FAMILLE,
+} from "./agents/noms.js";
+export type { Valeur } from "./agents/noms.js";
+export { BESOINS, besoinsInitiaux, appliquerTickBesoins, urgence } from "./agents/besoins.js";
+export type { Besoin, Besoins, ContexteBesoins, EffetBesoins } from "./agents/besoins.js";
+export {
+  creerInventaire,
+  ajouter,
+  retirer,
+  quantite,
+  total,
+  placeLibre,
+  NOURRITURE,
+  nourritureDisponible,
+} from "./agents/inventaire.js";
+export type { Inventaire } from "./agents/inventaire.js";
+export { COMPETENCES, niveau, gagnerExperience, experienceInitiale } from "./agents/competences.js";
+export type { Competence, Experience } from "./agents/competences.js";
+export {
+  creerPersonnage,
+  stadeDepuisAge,
+  capaciteInventaire,
+  cleLieu,
+  ageAnnees,
+} from "./agents/personnage.js";
+export type {
+  Personnage,
+  Corps,
+  Stade,
+  LieuConnu,
+  Echec,
+  OptionsPersonnage,
+} from "./agents/personnage.js";
+export { genererPopulation, trouverPointDeDepart } from "./agents/population.js";
+export { trouverChemin, coutChemin } from "./actions/chemin.js";
+export type { OptionsChemin } from "./actions/chemin.js";
+export { decrireAction, decrireIntention, memeIntention } from "./actions/types.js";
+export type { Action, TypeAction, Intention, TypeIntention } from "./actions/types.js";
+export { executerTick, vitesse } from "./actions/executeur.js";
+export type { Resultat } from "./actions/executeur.js";
+export { planifier, lieuxConnusTries, destinationPourAtteindre } from "./actions/planificateur.js";
+export type { ResultatPlan } from "./actions/planificateur.js";
+export { percevoir, observer, rayonVision } from "./cerveau/perception.js";
+export type { Perception, PersonneVisible } from "./cerveau/perception.js";
+export type { Cerveau } from "./cerveau/types.js";
+export { RuleBrain, SEUILS_URGENCE, SEUILS_ENVIE } from "./cerveau/rule-brain.js";
+export { Journal, TYPES_EVENEMENT } from "./evenements/journal.js";
+export type { Evenement, TypeEvenement, Auditeur } from "./evenements/journal.js";
+export { estEau, eauAdjacente, personnagesVivants } from "./monde.js";
+export type { Monde } from "./monde.js";
+export type { Statistiques } from "./simulation.js";

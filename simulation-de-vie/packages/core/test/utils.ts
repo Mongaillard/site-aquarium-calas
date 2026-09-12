@@ -1,0 +1,42 @@
+/** Outils de test : grilles synthétiques. */
+import type { Biome } from "../src/monde/biomes.js";
+import { Grille } from "../src/monde/grille.js";
+import type { Tuile } from "../src/monde/grille.js";
+import type { Gisement } from "../src/monde/ressources.js";
+
+export interface Surcharge {
+  readonly x: number;
+  readonly y: number;
+  readonly biome?: Biome;
+  readonly gisement?: Gisement;
+}
+
+/** Grille uniforme (prairie par défaut) avec surcharges ponctuelles. */
+export function grilleUniforme(
+  largeur: number,
+  hauteur: number,
+  biome: Biome = "prairie",
+  surcharges: Surcharge[] = [],
+): Grille {
+  const tuiles: Tuile[] = [];
+  for (let y = 0; y < hauteur; y++) {
+    for (let x = 0; x < largeur; x++) {
+      tuiles.push({ x, y, biome, altitude: 0.2, humidite: 0, gisement: null });
+    }
+  }
+  const grille = new Grille(largeur, hauteur, tuiles);
+  for (const s of surcharges) {
+    const t = grille.tuile(s.x, s.y);
+    const nouvelle: Tuile = { ...t, biome: s.biome ?? t.biome, gisement: s.gisement ?? null };
+    tuiles[s.y * largeur + s.x] = nouvelle;
+  }
+  return new Grille(largeur, hauteur, tuiles);
+}
+
+export function gisementBaies(quantite = 5): Gisement {
+  return { type: "baies", quantite, max: quantite, tauxRegen: 0.5, outilRequis: null };
+}
+
+export function gisementBois(quantite = 10): Gisement {
+  return { type: "bois", quantite, max: quantite, tauxRegen: 0.2, outilRequis: "hache_pierre" };
+}
