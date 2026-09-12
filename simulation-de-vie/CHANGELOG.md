@@ -2,6 +2,26 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M6 bis – Mode local et mobile (2026-09-12)
+
+- Mode local : la simulation tourne dans la page elle-même (`LiaisonLocale`, mêmes messages
+  que le serveur), sans serveur ni WebSocket. Activé par `?local` dans l'URL ou par la
+  construction `pnpm --filter @sdv/viewer build:local` (fichiers relatifs dans `dist-local/`,
+  publiables tels quels). Paramètres `?seed=` et `?jours=` (jours pré-simulés avant
+  l'affichage, 20 par défaut), champ de graine et bouton « Nouveau monde » dans la barre.
+  La pré-simulation se fait jour par jour sans bloquer l'affichage (« préparation du
+  monde : jour x/y »). Le paquet `@sdv/server` expose son module d'instantanés
+  (`@sdv/server/instantane`) pour cet usage.
+- Tactile et petits écrans : déplacement à un doigt, zoom à deux doigts, toucher pour
+  inspecter ; disposition en deux étages (carte puis panneaux) sous 900 px, en-tête compact
+  sous 520 px, légende repliée derrière un bouton « ? », caméra cadrée sur le village au
+  démarrage sur écran étroit.
+- Robustesse : la fiche demandée après un état est diffusée au pas suivant (jamais de façon
+  synchrone), et les listes lourdes (journal, population) ne sont redessinées qu'une fois
+  par seconde, pour que les touchers atteignent bien leur cible.
+- Tests : 164 au total (+1) : liaison locale de bout en bout (init, état, tick, pause, fiche,
+  reprise, fermeture).
+
 ## M6 – Viewer (2026-09-12)
 
 - Nouveau paquet `@sdv/protocole` : types des messages serveur ↔ viewer (`init`, `etat`,

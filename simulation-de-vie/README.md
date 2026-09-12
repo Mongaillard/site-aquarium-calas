@@ -33,6 +33,19 @@ sur `s` pour que la caméra suive le personnage sélectionné.
 Pour développer le viewer avec rechargement à chaud : lancez le serveur (`pnpm --filter
 @sdv/server start -- --seed 42`) puis `pnpm viewer:dev` (http://localhost:5173).
 
+### Sans serveur (mobile, page publiée)
+
+```bash
+pnpm --filter @sdv/viewer build:local   # fichiers autonomes dans packages/viewer/dist-local/
+```
+
+Dans ce mode la simulation tourne dans la page elle-même : la même interface, les mêmes
+messages, aucun serveur. Ajoutez `?seed=123&jours=40` à l'URL pour choisir la graine et le
+nombre de jours simulés avant l'affichage, ou changez la graine directement dans la barre
+(« Nouveau monde »). Sur un écran tactile : un doigt pour déplacer la carte, deux pour zoomer,
+toucher un personnage ou un bâtiment pour l'inspecter, bouton « ? » pour la légende. La page
+servie par `pnpm serve` accepte aussi `?local` pour basculer dans ce mode.
+
 ## Structure
 
 ```

@@ -3,7 +3,16 @@ import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/dist-types/**", "**/node_modules/**", "saves/**", "journal/**"] },
+  {
+    ignores: [
+      "**/dist/**",
+      "**/dist-types/**",
+      "**/dist-local/**",
+      "**/node_modules/**",
+      "saves/**",
+      "journal/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,

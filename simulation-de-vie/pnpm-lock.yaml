@@ -61,9 +61,15 @@ importers:
 
   packages/viewer:
     dependencies:
+      '@sdv/core':
+        specifier: workspace:*
+        version: link:../core
       '@sdv/protocole':
         specifier: workspace:*
         version: link:../protocole
+      '@sdv/server':
+        specifier: workspace:*
+        version: link:../server
     devDependencies:
       vite:
         specifier: ^6.3.5

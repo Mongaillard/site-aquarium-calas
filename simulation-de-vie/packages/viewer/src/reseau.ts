@@ -1,7 +1,14 @@
 /** Liaison WebSocket avec reconnexion. */
 import type { Commande, MessageServeur } from "@sdv/protocole";
 
-export class Reseau {
+/** Ce que le viewer attend d'une liaison avec la simulation, distante ou locale. */
+export interface Liaison {
+  connecter(): void;
+  envoyer(commande: Commande): void;
+  fermer(): void;
+}
+
+export class Reseau implements Liaison {
   private ws: WebSocket | null = null;
   private tentative = 0;
   private ferme = false;

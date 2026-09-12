@@ -19,5 +19,11 @@
   },
   "devDependencies": {
     "@types/ws": "^8.5.12"
+  },
+  "exports": {
+    "./instantane": {
+      "types": "./dist/instantane.d.ts",
+      "default": "./dist/instantane.js"
+    }
   }
 }

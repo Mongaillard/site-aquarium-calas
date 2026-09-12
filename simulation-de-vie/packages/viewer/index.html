@@ -18,12 +18,18 @@
           <span class="vitesses" id="vitesses"></span>
         </div>
         <div id="resume" class="resume"></div>
+        <form id="local" class="local" hidden>
+          <label for="graine-entree" class="discret">graine</label>
+          <input id="graine-entree" type="text" inputmode="numeric" size="6" value="42" />
+          <button type="submit" id="btn-nouveau">Nouveau monde</button>
+        </form>
         <div id="connexion" class="connexion">connexion…</div>
       </header>
       <main id="principal">
         <div id="zone-carte">
           <canvas id="carte"></canvas>
           <div id="legende" class="legende"></div>
+          <button id="btn-legende" class="btn-legende" title="Légende">?</button>
           <div id="survol" class="survol" hidden></div>
         </div>
         <aside id="panneau">

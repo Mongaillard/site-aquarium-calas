@@ -1,12 +1,14 @@
-/** Point d'entrée du viewer : réseau, rendu, interactions. */
+/** Point d'entrée du viewer : liaison (serveur ou locale), rendu, interactions souris et tactiles. */
 import "./style.css";
-import type { Commande } from "@sdv/protocole";
+import type { Commande, MessageServeur } from "@sdv/protocole";
 import { VITESSES } from "@sdv/protocole";
 import type { Camera } from "./camera.js";
 import { ajuster, centrerSur, deplacer, zoomer } from "./camera.js";
 import { Magasin } from "./etat.js";
+import { LiaisonLocale } from "./local.js";
 import { Panneaux } from "./panneaux.js";
 import { Rendu } from "./rendu.js";
+import type { Liaison } from "./reseau.js";
 import { Reseau, urlWebSocket } from "./reseau.js";
 
 function element<T extends HTMLElement>(id: string, type: new () => T): T {
@@ -17,6 +19,8 @@ function element<T extends HTMLElement>(id: string, type: new () => T): T {
 const canvas = element("carte", HTMLCanvasElement);
 const zone = element("zone-carte", HTMLDivElement);
 const survolEl = element("survol", HTMLDivElement);
+const formulaireLocal = element("local", HTMLFormElement);
+const graineEntree = element("graine-entree", HTMLInputElement);
 const magasin = new Magasin();
 const rendu = new Rendu(canvas, magasin);
 let cam: Camera = { echelle: 8, dx: 0, dy: 0 };
@@ -24,24 +28,52 @@ let camAjustee = false;
 let survol: string | null = null;
 let survolBatiment: string | null = null;
 
-const reseau = new Reseau(
-  urlWebSocket(window.location),
-  (m) => {
-    magasin.recevoir(m, performance.now());
-    if (m.type === "init") camAjustee = false;
-    if (m.type === "etat" && magasin.selection !== null && magasin.fiche === null) {
-      reseau.envoyer({ type: "inspecter", id: magasin.selection });
-    }
-  },
-  (connecte) => {
-    magasin.connecte = connecte;
-    if (connecte && magasin.selection !== null)
-      reseau.envoyer({ type: "inspecter", id: magasin.selection });
-  },
-);
+// Mode local : la simulation tourne dans la page (page publiée, mobile, ?local dans l'URL).
+const parametres = new URLSearchParams(window.location.search);
+const modeLocal = import.meta.env.VITE_MODE_LOCAL === "1" || parametres.has("local");
+const graineInitiale = parametres.get("seed") ?? "42";
+const joursAvance = Number.parseInt(parametres.get("jours") ?? "20", 10);
+
+let derniereDemandeFiche = 0;
+const recevoir = (m: MessageServeur): void => {
+  const maintenant = performance.now();
+  magasin.recevoir(m, maintenant);
+  if (m.type === "init") camAjustee = false;
+  if (
+    m.type === "etat" &&
+    magasin.selection !== null &&
+    magasin.fiche === null &&
+    maintenant - derniereDemandeFiche > 1000
+  ) {
+    derniereDemandeFiche = maintenant;
+    liaison.envoyer({ type: "inspecter", id: magasin.selection });
+  }
+};
+const connexion = (connecte: boolean): void => {
+  magasin.connecte = connecte;
+  if (connecte && magasin.selection !== null)
+    liaison.envoyer({ type: "inspecter", id: magasin.selection });
+};
+const progression = (jour: number, total: number): void => {
+  const el = document.getElementById("connexion");
+  if (el)
+    el.textContent = jour < total ? `préparation du monde : jour ${jour}/${total}` : "en direct";
+};
+
+function creerLiaison(graine: string): Liaison {
+  if (!modeLocal) return new Reseau(urlWebSocket(window.location), recevoir, connexion);
+  const seed = /^-?\d+$/.test(graine) ? Number.parseInt(graine, 10) : graine;
+  return new LiaisonLocale(
+    { seed, joursAvance: Number.isFinite(joursAvance) ? joursAvance : 20, ticksParSeconde: 4 },
+    recevoir,
+    connexion,
+    progression,
+  );
+}
+let liaison: Liaison = creerLiaison(graineInitiale);
 
 const envoyer = (c: Commande): void => {
-  reseau.envoyer(c);
+  liaison.envoyer(c);
 };
 const selectionner = (id: string | null): void => {
   magasin.selectionner(id);
@@ -61,6 +93,19 @@ const basculerSuivi = (): void => {
 };
 const panneaux = new Panneaux(magasin, { envoyer, selectionner, basculerSuivi });
 
+if (modeLocal) {
+  formulaireLocal.hidden = false;
+  graineEntree.value = graineInitiale;
+  formulaireLocal.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    liaison.fermer();
+    magasin.reinitialiser();
+    liaison = creerLiaison(graineEntree.value.trim() || "42");
+    liaison.connecter();
+    panneaux.afficherOnglet("inspecteur");
+  });
+}
+
 function redimensionner(): void {
   const rect = zone.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
@@ -73,21 +118,39 @@ function redimensionner(): void {
 window.addEventListener("resize", redimensionner);
 redimensionner();
 
-// Souris : glisser pour déplacer, molette pour zoomer, clic pour sélectionner.
-let glisse: { x: number; y: number; bouge: boolean } | null = null;
 const dpr = (): number => window.devicePixelRatio || 1;
-const pointCanvas = (ev: MouseEvent): { sx: number; sy: number; dedans: boolean } => {
+const pointCanvas = (
+  clientX: number,
+  clientY: number,
+): { sx: number; sy: number; dedans: boolean } => {
   const rect = canvas.getBoundingClientRect();
   return {
-    sx: (ev.clientX - rect.left) * dpr(),
-    sy: (ev.clientY - rect.top) * dpr(),
+    sx: (clientX - rect.left) * dpr(),
+    sy: (clientY - rect.top) * dpr(),
     dedans:
-      ev.clientX >= rect.left &&
-      ev.clientX <= rect.right &&
-      ev.clientY >= rect.top &&
-      ev.clientY <= rect.bottom,
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom,
   };
 };
+/** Sélectionne ce qui se trouve sous un point écran : personnage, bâtiment, ou rien. */
+function toucherA(sx: number, sy: number): void {
+  const p = rendu.trouverPersonnage(cam, sx, sy, performance.now());
+  if (p !== null) {
+    selectionner(p.id);
+    return;
+  }
+  const b = rendu.trouverBatiment(cam, sx, sy);
+  if (b !== null) selectionnerBatiment(b.id);
+  else {
+    magasin.selectionBatiment = null;
+    selectionner(null);
+  }
+}
+
+// Souris : glisser pour déplacer, molette pour zoomer, clic pour sélectionner.
+let glisse: { x: number; y: number; bouge: boolean } | null = null;
 canvas.addEventListener("mousedown", (ev) => {
   glisse = { x: ev.clientX, y: ev.clientY, bouge: false };
   canvas.classList.add("glisse");
@@ -104,7 +167,7 @@ window.addEventListener("mousemove", (ev) => {
       glisse.y = ev.clientY;
     }
   }
-  const { sx, sy, dedans } = pointCanvas(ev);
+  const { sx, sy, dedans } = pointCanvas(ev.clientX, ev.clientY);
   if (!dedans) return;
   const p = rendu.trouverPersonnage(cam, sx, sy, performance.now());
   const b = p === null ? rendu.trouverBatiment(cam, sx, sy) : null;
@@ -126,18 +189,8 @@ window.addEventListener("mousemove", (ev) => {
 });
 window.addEventListener("mouseup", (ev) => {
   if (glisse && !glisse.bouge) {
-    const { sx, sy } = pointCanvas(ev);
-    const p = rendu.trouverPersonnage(cam, sx, sy, performance.now());
-    if (p !== null) {
-      selectionner(p.id);
-    } else {
-      const b = rendu.trouverBatiment(cam, sx, sy);
-      if (b !== null) selectionnerBatiment(b.id);
-      else {
-        magasin.selectionBatiment = null;
-        selectionner(null);
-      }
-    }
+    const { sx, sy } = pointCanvas(ev.clientX, ev.clientY);
+    toucherA(sx, sy);
   }
   glisse = null;
   canvas.classList.remove("glisse");
@@ -146,12 +199,85 @@ canvas.addEventListener(
   "wheel",
   (ev) => {
     ev.preventDefault();
-    const { sx, sy } = pointCanvas(ev);
-    const facteur = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
-    cam = zoomer(cam, facteur, sx, sy);
+    const { sx, sy } = pointCanvas(ev.clientX, ev.clientY);
+    cam = zoomer(cam, ev.deltaY < 0 ? 1.15 : 1 / 1.15, sx, sy);
   },
   { passive: false },
 );
+
+// Tactile : un doigt glisse ou touche, deux doigts pincent pour zoomer.
+let doigt: { x: number; y: number; bouge: boolean } | null = null;
+let pince: { distance: number; x: number; y: number } | null = null;
+const centreEtDistance = (t: TouchList): { x: number; y: number; distance: number } => {
+  const a = t.item(0);
+  const b = t.item(1);
+  if (!a || !b) return { x: 0, y: 0, distance: 1 };
+  return {
+    x: (a.clientX + b.clientX) / 2,
+    y: (a.clientY + b.clientY) / 2,
+    distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+  };
+};
+canvas.addEventListener(
+  "touchstart",
+  (ev) => {
+    ev.preventDefault();
+    if (ev.touches.length === 1) {
+      const t = ev.touches.item(0);
+      if (t) doigt = { x: t.clientX, y: t.clientY, bouge: false };
+      pince = null;
+    } else if (ev.touches.length === 2) {
+      pince = centreEtDistance(ev.touches);
+      doigt = null;
+    }
+  },
+  { passive: false },
+);
+canvas.addEventListener(
+  "touchmove",
+  (ev) => {
+    ev.preventDefault();
+    if (ev.touches.length === 2) {
+      const c = centreEtDistance(ev.touches);
+      if (pince) {
+        const { sx, sy } = pointCanvas(c.x, c.y);
+        cam = zoomer(cam, c.distance / Math.max(1, pince.distance), sx, sy);
+        cam = deplacer(cam, (c.x - pince.x) * dpr(), (c.y - pince.y) * dpr());
+        magasin.suivre = false;
+      }
+      pince = c;
+      return;
+    }
+    const t = ev.touches.item(0);
+    if (!t || !doigt) return;
+    const ddx = t.clientX - doigt.x;
+    const ddy = t.clientY - doigt.y;
+    if (Math.abs(ddx) + Math.abs(ddy) > 8) doigt.bouge = true;
+    if (doigt.bouge) {
+      cam = deplacer(cam, ddx * dpr(), ddy * dpr());
+      magasin.suivre = false;
+      doigt.x = t.clientX;
+      doigt.y = t.clientY;
+    }
+  },
+  { passive: false },
+);
+canvas.addEventListener("touchend", (ev) => {
+  if (ev.touches.length === 0) {
+    if (doigt && !doigt.bouge) {
+      const { sx, sy } = pointCanvas(doigt.x, doigt.y);
+      toucherA(sx, sy);
+    }
+    doigt = null;
+    pince = null;
+  }
+});
+
+// Légende repliable (utile sur petit écran).
+const legende = element("legende", HTMLDivElement);
+element("btn-legende", HTMLButtonElement).addEventListener("click", () => {
+  legende.classList.toggle("ouverte");
+});
 
 window.addEventListener("keydown", (ev) => {
   const cible = ev.target as HTMLElement | null;
@@ -200,7 +326,23 @@ function boucle(maintenant: number): void {
   const init = magasin.init;
   if (init !== null && !camAjustee) {
     cam = ajuster(init.largeur, init.hauteur, canvas.width, canvas.height);
-    camAjustee = true;
+    // Sur un écran étroit, le monde entier serait illisible : on cadre le village.
+    const etat = magasin.etat;
+    if (etat !== null && canvas.width < 900 * (window.devicePixelRatio || 1)) {
+      const vivants = etat.personnages.filter((p) => p.vivant);
+      if (vivants.length > 0) {
+        const cx = vivants.reduce((t, p) => t + p.x, 0) / vivants.length;
+        const cy = vivants.reduce((t, p) => t + p.y, 0) / vivants.length;
+        cam = centrerSur(
+          { ...cam, echelle: Math.max(10, Math.min(24, canvas.width / 36)) },
+          cx,
+          cy,
+          canvas.width,
+          canvas.height,
+        );
+      }
+    }
+    if (etat !== null || !modeLocal) camAjustee = true;
   }
   if (magasin.suivre && magasin.selection !== null) {
     const pos = magasin.positionAffichee(magasin.selection, maintenant);
@@ -214,4 +356,4 @@ function boucle(maintenant: number): void {
   requestAnimationFrame(boucle);
 }
 requestAnimationFrame(boucle);
-reseau.connecter();
+liaison.connecter();

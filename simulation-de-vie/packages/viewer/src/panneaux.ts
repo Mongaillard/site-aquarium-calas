@@ -37,6 +37,7 @@ export class Panneaux {
   private derniereVersionStats = -1;
   private derniereVersionConversations = -1;
   private derniereVersionBatiment = -1;
+  private dernierRenduLent = 0;
   private ficheAffichee: MessageFiche | null = null;
 
   constructor(
@@ -125,9 +126,14 @@ export class Panneaux {
         this.inspecteur();
         break;
       case "journal":
-        if (force || version !== this.derniereVersionJournal) {
+        if (
+          force ||
+          (version !== this.derniereVersionJournal &&
+            performance.now() - this.dernierRenduLent > 1000)
+        ) {
           this.journal();
           this.derniereVersionJournal = version;
+          this.dernierRenduLent = performance.now();
         }
         break;
       case "conversations":
@@ -143,9 +149,14 @@ export class Panneaux {
         }
         break;
       case "population":
-        if (force || version !== this.derniereVersionPopulation) {
+        if (
+          force ||
+          (version !== this.derniereVersionPopulation &&
+            performance.now() - this.dernierRenduLent > 1000)
+        ) {
           this.population();
           this.derniereVersionPopulation = version;
+          this.dernierRenduLent = performance.now();
         }
         break;
     }

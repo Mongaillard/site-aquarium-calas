@@ -11,5 +11,15 @@
     "emitDeclarationOnly": true
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../protocole" }]
+  "references": [
+    {
+      "path": "../protocole"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../server"
+    }
+  ]
 }

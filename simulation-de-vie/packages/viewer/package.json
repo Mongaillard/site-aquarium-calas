@@ -6,12 +6,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "build:local": "tsc -b && VITE_MODE_LOCAL=1 vite build --base ./ --outDir dist-local"
   },
   "dependencies": {
-    "@sdv/protocole": "workspace:*"
+    "@sdv/core": "workspace:*",
+    "@sdv/protocole": "workspace:*",
+    "@sdv/server": "workspace:*"
   },
   "devDependencies": {
     "vite": "^6.3.5"

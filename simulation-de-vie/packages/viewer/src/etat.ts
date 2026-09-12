@@ -56,6 +56,24 @@ export class Magasin {
     return this.noms.get(id) ?? id;
   }
 
+  /** Oublie tout (nouveau monde). */
+  reinitialiser(): void {
+    this.init = null;
+    this.etat = null;
+    this.fiche = null;
+    this.gisements.clear();
+    this.trajets.clear();
+    this.evenements.length = 0;
+    this.conversations.length = 0;
+    this.noms.clear();
+    this.typesVus.clear();
+    this.bulles = [];
+    this.selection = null;
+    this.selectionBatiment = null;
+    this.suivre = false;
+    this.version += 1;
+  }
+
   recevoir(message: MessageServeur, maintenant: number): void {
     switch (message.type) {
       case "init":

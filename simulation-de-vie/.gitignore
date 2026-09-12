@@ -6,3 +6,4 @@ journal/
 .env
 coverage/
 dist-types/
+dist-local/
