@@ -2,7 +2,10 @@
 import type { Action, Intention } from "../actions/types.js";
 import type { Position } from "../monde/grille.js";
 import type { Outil, Ressource } from "../monde/ressources.js";
+import { FluxMemoire } from "../memoire/souvenir.js";
 import type { Rng } from "../rng.js";
+import { relationVierge } from "../social/relations.js";
+import type { Relation } from "../social/relations.js";
 import { besoinsInitiaux } from "./besoins.js";
 import type { Besoins } from "./besoins.js";
 import { experienceInitiale } from "./competences.js";
@@ -46,6 +49,18 @@ export interface Projet {
   readonly batimentId: string;
 }
 
+/** Indicateurs issus des réflexions, valables jusqu'au tick indiqué. */
+export interface Drapeaux {
+  prudenceNourritureJusqua: number;
+  chercheAbriJusqua: number;
+  explorerPlusLoinJusqua: number;
+  /** Minimums du jour, pour la réflexion du soir. */
+  faimMinDuJour: number;
+  chaleurMinDuJour: number;
+  /** Clés des réflexions déjà faites (évite les répétitions). */
+  readonly reflexionsFaites: Set<string>;
+}
+
 export interface Personnage {
   readonly id: string;
   readonly identite: Identite;
@@ -61,8 +76,15 @@ export interface Personnage {
   actionEnCours: Action | null;
   /** Lieux connus, indexés par "x,y". */
   readonly connaissance: Map<string, LieuConnu>;
+  readonly relations: Map<string, Relation>;
+  readonly memoire: FluxMemoire;
+  /** Réputation -100..100, modifiée par les témoins de ses actes. */
+  reputation: number;
+  readonly drapeaux: Drapeaux;
   dernierEchec: Echec | null;
   echecsConsecutifs: number;
+  /** Après l'échec de planification d'une urgence, on la laisse en sommeil jusqu'à ce tick. */
+  urgenceIgnoreeJusqua: number;
   /** Flux de hasard propre (bruit de décision), dérivé de la graine du monde. */
   readonly rng: Rng;
 }
@@ -73,6 +95,8 @@ export interface OptionsPersonnage extends OptionsIdentite {
   readonly joursParAnnee: number;
   readonly ageAdulte: number;
   readonly ageAncien: number;
+  readonly ticksParJour: number;
+  readonly memoire: { readonly maxSouvenirs: number; readonly demiVieRecenceJours: number };
 }
 
 export function stadeDepuisAge(
@@ -128,8 +152,24 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
     plan: [],
     actionEnCours: null,
     connaissance: new Map(),
+    relations: new Map(),
+    memoire: new FluxMemoire({
+      ticksParJour: options.ticksParJour,
+      demiVieRecenceJours: options.memoire.demiVieRecenceJours,
+      maxSouvenirs: options.memoire.maxSouvenirs,
+    }),
+    reputation: 0,
+    drapeaux: {
+      prudenceNourritureJusqua: -1,
+      chercheAbriJusqua: -1,
+      explorerPlusLoinJusqua: -1,
+      faimMinDuJour: 100,
+      chaleurMinDuJour: 100,
+      reflexionsFaites: new Set(),
+    },
     dernierEchec: null,
     echecsConsecutifs: 0,
+    urgenceIgnoreeJusqua: -1,
     rng: rng.fork("decisions"),
   };
 }
@@ -140,4 +180,14 @@ export function cleLieu(x: number, y: number): string {
 
 export function ageAnnees(p: Personnage, joursParAnnee: number): number {
   return Math.floor(p.corps.ageJours / joursParAnnee);
+}
+
+/** Relation de `p` envers `id`, créée vierge si nécessaire. */
+export function relationAvec(p: Personnage, id: string): Relation {
+  let r = p.relations.get(id);
+  if (r === undefined) {
+    r = relationVierge(id);
+    p.relations.set(id, r);
+  }
+  return r;
 }

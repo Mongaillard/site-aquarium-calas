@@ -91,7 +91,8 @@ export function appliquerTickBesoins(b: Besoins, ctx: ContexteBesoins): EffetBes
   }
 
   if (ctx.enCompagnie) {
-    b.social = clamp(b.social + 100 / (T / 2));
+    // La simple présence rassure lentement ; c'est le dialogue qui nourrit vraiment le lien.
+    b.social = clamp(b.social + 100 / (2 * T));
   } else {
     b.social = clamp(b.social - (100 / (3 * T)) * (0.5 + ctx.extraversion));
   }

@@ -146,3 +146,37 @@ export {
 export { choisirSite, libererPlace } from "./actions/planificateur.js";
 export type { ProjetPercu } from "./cerveau/perception.js";
 export { CONTEXTE_BESOINS_DEFAUT } from "./agents/besoins.js";
+export { FluxMemoire, TYPES_SOUVENIR } from "./memoire/souvenir.js";
+export type {
+  Souvenir,
+  TypeSouvenir,
+  ContexteRecuperation,
+  OptionsFlux,
+} from "./memoire/souvenir.js";
+export { decrireEvenement, importancePourTemoin } from "./memoire/descriptions.js";
+export type { Nommeur, PointDeVue } from "./memoire/descriptions.js";
+export { reflechir } from "./memoire/reflexion.js";
+export type { Reflexion } from "./memoire/reflexion.js";
+export {
+  LIENS,
+  LIENS_FIXES,
+  relationVierge,
+  relationFamiliale,
+  lienDerive,
+  compatibilite,
+  ajusterRelation,
+  tutoie,
+} from "./social/relations.js";
+export type { Lien, Relation, Ajustement } from "./social/relations.js";
+export { composerDialogue, transcrire, directionVers, lieuxAPartager } from "./social/dialogue.js";
+export type { Dialogue, Replique, EffetDialogue, SujetDialogue } from "./social/dialogue.js";
+export {
+  probabiliteAccord,
+  accepteDemande,
+  effetsDon,
+  effetsRefus,
+  effetsVol,
+} from "./social/echange.js";
+export { relationAvec } from "./agents/personnage.js";
+export type { Drapeaux } from "./agents/personnage.js";
+export { stockVolable } from "./actions/planificateur.js";

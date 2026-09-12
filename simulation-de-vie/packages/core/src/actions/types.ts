@@ -31,7 +31,26 @@ export type Action =
       readonly ressource: Ressource;
       readonly quantite: number;
     }
-  | { readonly type: "jeter"; readonly ressource: Ressource; readonly quantite: number };
+  | { readonly type: "jeter"; readonly ressource: Ressource; readonly quantite: number }
+  | { readonly type: "parler"; readonly cible: string; ticksRestants: number | null }
+  | {
+      readonly type: "offrir";
+      readonly cible: string;
+      readonly ressource: Ressource;
+      readonly quantite: number;
+    }
+  | {
+      readonly type: "demander";
+      readonly cible: string;
+      readonly ressource: Ressource;
+      readonly quantite: number;
+    }
+  | {
+      readonly type: "voler";
+      readonly batimentId: string;
+      readonly ressource: Ressource;
+      readonly quantite: number;
+    };
 
 export type TypeAction = Action["type"];
 
@@ -44,7 +63,11 @@ export type Intention =
   | { readonly type: "attendre"; readonly ticks: number }
   | { readonly type: "construire" }
   | { readonly type: "fabriquer"; readonly recette: NomRecette }
-  | { readonly type: "stocker" };
+  | { readonly type: "stocker" }
+  | { readonly type: "parler"; readonly cible: string }
+  | { readonly type: "offrir"; readonly cible: string; readonly ressource: Ressource }
+  | { readonly type: "demander"; readonly cible: string; readonly ressource: Ressource }
+  | { readonly type: "voler" };
 
 export type TypeIntention = Intention["type"];
 
@@ -56,6 +79,12 @@ export function decrireIntention(i: Intention): string {
       return `attendre:${i.ticks}`;
     case "fabriquer":
       return `fabriquer:${i.recette}`;
+    case "parler":
+      return `parler:${i.cible}`;
+    case "offrir":
+      return `offrir:${i.ressource}→${i.cible}`;
+    case "demander":
+      return `demander:${i.ressource}←${i.cible}`;
     default:
       return i.type;
   }
@@ -87,6 +116,14 @@ export function decrireAction(a: Action): string {
       return `prendre:${a.ressource}×${a.quantite}←${a.batimentId}`;
     case "jeter":
       return `jeter:${a.ressource}×${a.quantite}`;
+    case "parler":
+      return `parler:${a.cible}`;
+    case "offrir":
+      return `offrir:${a.ressource}×${a.quantite}→${a.cible}`;
+    case "demander":
+      return `demander:${a.ressource}×${a.quantite}←${a.cible}`;
+    case "voler":
+      return `voler:${a.ressource}×${a.quantite}←${a.batimentId}`;
   }
 }
 

@@ -18,6 +18,7 @@ import type { NomRecette } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
 import {
   abriDisponible,
+  autorise,
   batimentAReparer,
   batimentsAccessibles,
   chantierFamilial,
@@ -58,7 +59,81 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       return planifierFabrication(monde, p, intention.recette);
     case "stocker":
       return planifierStockage(monde, p);
+    case "parler":
+      return planifierRencontre(monde, p, intention.cible, (cible) => ({
+        type: "parler",
+        cible: cible.id,
+        ticksRestants: null,
+      }));
+    case "offrir":
+      return planifierRencontre(monde, p, intention.cible, (cible) => ({
+        type: "offrir",
+        cible: cible.id,
+        ressource: intention.ressource,
+        quantite: Math.max(1, Math.min(2, quantite(p.corps.inventaire, intention.ressource) - 1)),
+      }));
+    case "demander":
+      return planifierRencontre(monde, p, intention.cible, (cible) => ({
+        type: "demander",
+        cible: cible.id,
+        ressource: intention.ressource,
+        quantite: 2,
+      }));
+    case "voler":
+      return planifierVol(monde, p);
   }
+}
+
+/** Rejoindre une personne (≤ 2 tuiles) puis agir avec elle. */
+function planifierRencontre(
+  monde: Monde,
+  p: Personnage,
+  cibleId: string,
+  action: (cible: Personnage) => Action,
+): ResultatPlan {
+  const cible = monde.personnages.find((a) => a.id === cibleId);
+  if (!cible?.vivant) return echec("personne introuvable");
+  if (cible.corps.endormi) return echec(`${cible.identite.prenom} dort`);
+  const plan: Action[] = [];
+  if (Grille.distance(p.corps.position, cible.corps.position) > 2) {
+    const aller = allerPresDe(monde, p, cible.corps.position);
+    if (aller === null) return echec(`${cible.identite.prenom} est inaccessible`);
+    plan.push(aller);
+  }
+  plan.push(action(cible));
+  return ok(plan);
+}
+
+/** Stock d'autrui contenant de la nourriture, à moins de 15 tuiles. */
+export function stockVolable(
+  monde: Monde,
+  p: Personnage,
+): { batiment: Batiment; ressource: Ressource } | null {
+  let meilleur: { batiment: Batiment; ressource: Ressource; distance: number } | null = null;
+  for (const b of monde.batiments.values()) {
+    if (b.etat !== "termine" || b.stock === null || autorise(b, p)) continue;
+    const ressource = nourritureDisponible(b.stock);
+    if (ressource === null) continue;
+    const distance = Grille.distance(p.corps.position, b.position);
+    if (distance <= 15 && (meilleur === null || distance < meilleur.distance))
+      meilleur = { batiment: b, ressource, distance };
+  }
+  return meilleur ? { batiment: meilleur.batiment, ressource: meilleur.ressource } : null;
+}
+
+function planifierVol(monde: Monde, p: Personnage): ResultatPlan {
+  const cible = stockVolable(monde, p);
+  if (cible === null) return echec("rien à voler à portée");
+  const plan: Action[] = [];
+  const aller = allerPresDe(monde, p, cible.batiment.position);
+  if (aller) plan.push(aller);
+  plan.push({
+    type: "voler",
+    batimentId: cible.batiment.id,
+    ressource: cible.ressource,
+    quantite: 2,
+  });
+  return ok(plan);
 }
 
 /** Déplacement vers une tuile à distance ≤ 1 de `cible` (ou `null` si inaccessible). */

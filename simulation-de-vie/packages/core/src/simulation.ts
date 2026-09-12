@@ -11,7 +11,7 @@ import { executerTick } from "./actions/executeur.js";
 import { planifier } from "./actions/planificateur.js";
 import { decrireAction, decrireIntention, memeIntention } from "./actions/types.js";
 import type { Intention } from "./actions/types.js";
-import { percevoir } from "./cerveau/perception.js";
+import { percevoir, rayonVision } from "./cerveau/perception.js";
 import { RuleBrain } from "./cerveau/rule-brain.js";
 import type { Cerveau } from "./cerveau/types.js";
 import type { SimConfig, SimConfigPartielle } from "./config.js";
@@ -19,6 +19,10 @@ import { fusionnerConfig, validerConfig } from "./config.js";
 import { Journal } from "./evenements/journal.js";
 import type { Evenement, TypeEvenement } from "./evenements/journal.js";
 import { feuProche } from "./monde.js";
+import { decrireEvenement, importancePourTemoin } from "./memoire/descriptions.js";
+import type { Nommeur } from "./memoire/descriptions.js";
+import { reflechir } from "./memoire/reflexion.js";
+import { relationFamiliale } from "./social/relations.js";
 import type { Monde } from "./monde.js";
 import { PLANS_BATIMENT, creerChantier } from "./monde/batiments.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
@@ -59,6 +63,9 @@ export class Simulation implements Monde {
     for (const t of grille.toutes())
       if (t.gisement) this.gisements.push({ tuile: t, gisement: t.gisement });
     this.personnages = genererPopulation(rng, config, grille);
+    this.journal.ecouter((e) => {
+      this.memoriser(e);
+    });
     for (const p of this.personnages) {
       this.cerveaux.set(p.id, new RuleBrain(p));
       this.emettre(
@@ -68,7 +75,85 @@ export class Simulation implements Monde {
         5,
       );
     }
+    // Les membres d'une même famille initiale se connaissent comme frères et sœurs.
+    for (const a of this.personnages) {
+      for (const b of this.personnages) {
+        if (a.id !== b.id && a.identite.nomFamille === b.identite.nomFamille) {
+          a.relations.set(b.id, relationFamiliale(b.id, "fratrie"));
+        }
+      }
+    }
     this.nouveauJour();
+  }
+
+  /** Accès aux prénoms pour la mise en mots des souvenirs. */
+  readonly nommeur: Nommeur = {
+    prenom: (id) => this.personnage(id)?.identite.prenom ?? id,
+    feminin: (id) => this.personnage(id)?.identite.sexe === "F",
+  };
+
+  /**
+   * Alimente les mémoires : l'acteur (et l'interlocuteur d'un dialogue) se
+   * souviennent à la première personne ; les témoins à portée de vue, en tiers.
+   */
+  private memoriser(e: Evenement): void {
+    if (e.importance < 2 && e.type !== "dialogue") return;
+    const type =
+      e.type === "dialogue" ? "dialogue" : e.type === "reflexion" ? "reflexion" : "action";
+    const acteur = e.acteur ? this.personnage(e.acteur) : undefined;
+    if (acteur) {
+      const texte = decrireEvenement(e, "acteur", this.nommeur);
+      if (texte !== null) {
+        const sujets = String(e.details.avec ?? e.details.cible ?? e.details.sujets ?? "")
+          .split(",")
+          .filter((x) => x !== "");
+        acteur.memoire.ajouter(e.tick, type, texte, e.importance, sujets, e.position);
+      }
+    }
+    if (e.type === "dialogue" || e.type === "offre" || e.type === "demande") {
+      const autreId = String(e.details.avec ?? e.details.cible ?? "");
+      const autre = this.personnage(autreId);
+      if (autre && acteur) {
+        const texte =
+          e.type === "dialogue"
+            ? `J'ai discuté avec ${acteur.identite.prenom} (${String(e.details.sujet)}).`
+            : e.type === "offre"
+              ? `${acteur.identite.prenom} m'a donné ${String(e.details.ressource)}.`
+              : e.details.accepte === true
+                ? `J'ai donné ${String(e.details.ressource)} à ${acteur.identite.prenom} qui me le demandait.`
+                : `J'ai refusé ${String(e.details.ressource)} à ${acteur.identite.prenom}.`;
+        autre.memoire.ajouter(e.tick, type, texte, e.importance, [acteur.id], e.position);
+      }
+    }
+    if (e.importance < 3 || e.position === null) return;
+    const rayon = rayonVision(this, this.horloge.moment());
+    const exclus = new Set([e.acteur, String(e.details.avec ?? ""), String(e.details.cible ?? "")]);
+    for (const t of this.personnages) {
+      if (!t.vivant || t.corps.endormi || exclus.has(t.id)) continue;
+      if (Grille.distance(t.corps.position, e.position) > rayon) continue;
+      const texte = decrireEvenement(e, "temoin", this.nommeur);
+      if (texte === null) continue;
+      t.memoire.ajouter(
+        e.tick,
+        "observation",
+        texte,
+        importancePourTemoin(e),
+        e.acteur ? [e.acteur] : [],
+        e.position,
+      );
+    }
+  }
+
+  /** Réflexion du soir pour un personnage : produit des événements `reflexion`. */
+  reflechirPour(p: Personnage): void {
+    for (const r of reflechir(this, p)) {
+      this.emettre(
+        "reflexion",
+        p,
+        { texte: r.texte, cle: r.cle, sujets: r.sujets.join(",") },
+        r.importance,
+      );
+    }
   }
 
   /** Crée une simulation neuve à partir d'une configuration (partielle ou non). */
@@ -196,6 +281,8 @@ export class Simulation implements Monde {
   tick1(): void {
     if (this.horloge.estAube() && this.tick > 0) this.nouveauJour();
     this.regenererGisements();
+    const moment = this.horloge.moment();
+    if (moment.heure === 21 && moment.minute === 0) this.soiree();
     const ordre = this.rng.fork(`tick/${this.tick}`).melanger(this.vivants());
     for (const p of ordre) this.tickPersonnage(p);
     this.horloge.avancer(1);
@@ -230,6 +317,15 @@ export class Simulation implements Monde {
       if (b.solidite <= 0) this.detruireBatiment(b.id);
     }
     if (this.tick > 0) for (const p of this.vivants()) p.corps.ageJours += 1;
+    for (const p of this.vivants()) {
+      p.drapeaux.faimMinDuJour = p.besoins.faim;
+      p.drapeaux.chaleurMinDuJour = p.besoins.chaleur;
+    }
+  }
+
+  /** Soir (21 h) : chacun fait le bilan de sa journée. */
+  private soiree(): void {
+    for (const p of this.vivants()) this.reflechirPour(p);
   }
 
   private regenererGisements(): void {
@@ -287,6 +383,8 @@ export class Simulation implements Monde {
       facteurSoif: meteo.soif,
     });
     p.corps.sante = Math.min(100, p.corps.sante + effet.deltaSante);
+    p.drapeaux.faimMinDuJour = Math.min(p.drapeaux.faimMinDuJour, p.besoins.faim);
+    p.drapeaux.chaleurMinDuJour = Math.min(p.drapeaux.chaleurMinDuJour, p.besoins.chaleur);
     if (p.corps.sante <= 0) {
       this.mourir(p, effet.causes[0] ?? "inconnue");
       return;
@@ -303,7 +401,7 @@ export class Simulation implements Monde {
     if (cerveau === undefined) return;
 
     if (!p.corps.endormi) {
-      const urgence = cerveau.urgence(perception);
+      const urgence = this.tick >= p.urgenceIgnoreeJusqua ? cerveau.urgence(perception) : null;
       if (urgence !== null) {
         if (!memeIntention(urgence, p.intention)) {
           this.definirIntention(p, urgence);
@@ -329,6 +427,11 @@ export class Simulation implements Monde {
       } else {
         this.echouer(p, decrireIntention(intention), resultat.raison);
         p.intention = null;
+        // Une urgence impossible à planifier (aucune eau connue…) est mise en sommeil
+        // deux heures, sinon elle annulerait le repli à chaque tick sans jamais bouger.
+        if (memeIntention(intention, cerveau.urgence(perception))) {
+          p.urgenceIgnoreeJusqua = this.tick + 12;
+        }
         // Repli : bouger pour découvrir autre chose.
         const repli = planifier(this, p, { type: "explorer" });
         if (repli.ok) p.plan = repli.plan;
@@ -369,7 +472,7 @@ export class Simulation implements Monde {
   private echouer(p: Personnage, action: string, raison: string): void {
     p.dernierEchec = { tick: this.tick, action, raison };
     p.echecsConsecutifs += 1;
-    this.emettre("action_echouee", p, { action, raison }, 2);
+    this.emettre("action_echouee", p, { action, raison }, 1);
   }
 
   private mourir(p: Personnage, cause: string): void {

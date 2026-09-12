@@ -3,6 +3,7 @@
  * CLI `sim` (section 12). `sim run` génère le monde, fait tourner la simulation
  * jour par jour et affiche l'état des personnages.
  */
+import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import {
   Simulation,
@@ -29,7 +30,9 @@ Options de run :
   --population <n>     Nombre de personnages initiaux (défaut : 12)
   --ressources         Affiche les gisements sur la carte
   --sans-carte         N'affiche pas la carte ASCII
-  --verbose            Affiche les événements marquants (décès, gisements épuisés)
+  --verbose            Affiche les événements marquants (décès, bâtiments, vols…)
+  --inspect <id>       Affiche l'identité, les relations et les souvenirs d'un personnage (ex. p-0001)
+  --journal <fichier>  Écrit le journal complet au format NDJSON à la fin
 `;
 
 function entier(valeur: string | undefined, defaut: number, nom: string): number {
@@ -94,6 +97,8 @@ function commandeRun(argv: string[]): number {
       ressources: { type: "boolean", default: false },
       "sans-carte": { type: "boolean", default: false },
       verbose: { type: "boolean", default: false },
+      inspect: { type: "string" },
+      journal: { type: "string" },
     },
     strict: true,
   });
@@ -137,7 +142,9 @@ function commandeRun(argv: string[]): number {
         e.type === "batiment_termine" ||
         e.type === "batiment_effondre" ||
         e.type === "feu_eteint" ||
-        e.type === "outil_casse"
+        e.type === "outil_casse" ||
+        e.type === "vol" ||
+        e.type === "invitation"
       ) {
         console.log(`  [${sim.horloge.formater(e.tick)}] ${e.type} ${JSON.stringify(e.details)}`);
       }
@@ -191,7 +198,60 @@ function commandeRun(argv: string[]): number {
   console.log();
   console.log("Personnages :");
   for (const p of sim.personnages) console.log(ligneStatut(sim, p));
+  console.log();
+  console.log(
+    `Social : ${sim.journal.compte("dialogue")} dialogues, ${sim.journal.compte("offre")} dons, ` +
+      `${sim.journal.compte("demande")} demandes, ${sim.journal.compte("vol")} vols, ` +
+      `${sim.journal.compte("invitation")} invitations, ${sim.journal.compte("reflexion")} réflexions`,
+  );
+
+  if (values.inspect !== undefined) {
+    console.log();
+    inspecter(sim, values.inspect);
+  }
+  if (values.journal !== undefined) {
+    writeFileSync(values.journal, `${sim.journal.ndjson()}\n`, "utf8");
+    console.log(`Journal écrit : ${values.journal} (${sim.journal.taille} événements)`);
+  }
   return 0;
+}
+
+/** Fiche complète d'un personnage : identité, relations, souvenirs récents. */
+function inspecter(sim: Simulation, id: string): void {
+  const p = sim.personnage(id);
+  if (p === undefined) {
+    console.log(`Personnage inconnu : ${id}`);
+    return;
+  }
+  const i = p.identite;
+  console.log(`=== ${nomComplet(i)} (${p.id}) ===`);
+  console.log(i.biographie);
+  console.log(`« ${i.motto} »`);
+  const pers = Object.entries(i.personnalite as unknown as Record<string, number>)
+    .map(([k, v]) => `${k} ${v.toFixed(2)}`)
+    .join("  ");
+  console.log(`Personnalité : ${pers}`);
+  console.log(
+    `Réputation : ${p.reputation}   Lieux connus : ${p.connaissance.size}   Souvenirs : ${p.memoire.taille}`,
+  );
+  console.log("Relations :");
+  const relations = [...p.relations.values()].sort((a, b) => b.affinite - a.affinite);
+  for (const r of relations) {
+    const autre = sim.personnage(r.cible);
+    console.log(
+      `  ${(autre ? nomComplet(autre.identite) : r.cible).padEnd(20)} ${r.lien.padEnd(12)} ` +
+        `affinité ${String(Math.round(r.affinite)).padStart(4)}  confiance ${String(Math.round(r.confiance)).padStart(3)}  ` +
+        `dette ${String(r.dette).padStart(3)}  interactions ${r.interactions}`,
+    );
+  }
+  console.log("Souvenirs marquants :");
+  for (const s of p.memoire.recuperer({ tick: sim.tick }, 12)) {
+    console.log(`  [${sim.horloge.formater(s.tick)}] (${s.importance}) ${s.texte}`);
+  }
+  console.log("Derniers souvenirs :");
+  for (const s of p.memoire.tous().slice(-10)) {
+    console.log(`  [${sim.horloge.formater(s.tick)}] (${s.importance}) ${s.texte}`);
+  }
 }
 
 function main(argv: string[]): number {

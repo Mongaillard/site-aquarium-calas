@@ -73,6 +73,11 @@ export function genererPopulation(rngMonde: Rng, config: SimConfig, grille: Gril
       joursParAnnee: config.vie.joursParAnnee,
       ageAdulte: config.vie.ageAdulte,
       ageAncien: config.vie.ageAncien,
+      ticksParJour: 1440 / config.temps.minutesParTick,
+      memoire: {
+        maxSouvenirs: config.memoire.maxSouvenirs,
+        demiVieRecenceJours: config.memoire.demiVieRecenceJours,
+      },
     });
     prenomsUtilises.add(personnage.identite.prenom);
     personnages.push(personnage);

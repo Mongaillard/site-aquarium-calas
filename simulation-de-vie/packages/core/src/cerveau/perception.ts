@@ -2,7 +2,7 @@
 import type { Besoins } from "../agents/besoins.js";
 import type { Personnalite } from "../agents/identite.js";
 import { nourritureDisponible, placeLibre, possede, quantite } from "../agents/inventaire.js";
-import { cleLieu } from "../agents/personnage.js";
+import { cleLieu, relationAvec } from "../agents/personnage.js";
 import type { Echec, LieuConnu, Personnage, Stade } from "../agents/personnage.js";
 import type { Intention } from "../actions/types.js";
 import {
@@ -22,12 +22,23 @@ import type { Moment } from "../monde/horloge.js";
 import { EFFETS_METEO } from "../monde/meteo.js";
 import type { Meteo } from "../monde/meteo.js";
 import type { Ressource } from "../monde/ressources.js";
+import type { Souvenir } from "../memoire/souvenir.js";
+import type { Lien } from "../social/relations.js";
+import { stockVolable } from "../actions/planificateur.js";
 
 export interface PersonneVisible {
   readonly id: string;
   readonly prenom: string;
   readonly position: Position;
   readonly distance: number;
+  readonly lien: Lien;
+  readonly affinite: number;
+  readonly confiance: number;
+  readonly famille: boolean;
+  readonly endormi: boolean;
+  /** Visiblement affamé (faim < 30). */
+  readonly aFaim: boolean;
+  readonly derniereInteraction: number;
 }
 
 export interface ProjetPercu {
@@ -49,11 +60,16 @@ export interface Perception {
     readonly endormi: boolean;
     readonly placeLibre: number;
     readonly nourritureEnPoche: boolean;
+    readonly ressourceNourriture: Ressource | null;
     readonly nourritureCrue: number;
     readonly possedeHache: boolean;
     readonly intention: Intention | null;
     readonly dernierEchec: Echec | null;
     readonly projet: ProjetPercu | null;
+    readonly reputation: number;
+    readonly prudenceNourriture: boolean;
+    readonly chercheAbri: boolean;
+    readonly explorerPlusLoin: boolean;
   };
   readonly moment: Moment;
   readonly meteo: Meteo;
@@ -67,6 +83,10 @@ export interface Perception {
   readonly besoinConstruction: TypeBatiment | null;
   readonly reparationNecessaire: boolean;
   readonly connaitArbres: boolean;
+  /** Stock d'autrui contenant de la nourriture à portée (tentation). */
+  readonly stockVolable: boolean;
+  /** Souvenirs des dernières 24 h, du plus ancien au plus récent. */
+  readonly souvenirsRecents: readonly Souvenir[];
 }
 
 /** Rayon de vision courant (jour / nuit, météo). */
@@ -130,11 +150,19 @@ export function percevoir(monde: Monde, p: Personnage): Perception {
     if (!autre.vivant || autre.id === p.id) continue;
     const distance = Grille.distance(p.corps.position, autre.corps.position);
     if (distance <= rayon) {
+      const rel = relationAvec(p, autre.id);
       personnesVisibles.push({
         id: autre.id,
         prenom: autre.identite.prenom,
         position: { ...autre.corps.position },
         distance,
+        lien: rel.lien,
+        affinite: rel.affinite,
+        confiance: rel.confiance,
+        famille: autre.identite.nomFamille === p.identite.nomFamille,
+        endormi: autre.corps.endormi,
+        aFaim: autre.besoins.faim < 30,
+        derniereInteraction: rel.derniereInteraction,
       });
     }
   }
@@ -174,11 +202,16 @@ export function percevoir(monde: Monde, p: Personnage): Perception {
       endormi: p.corps.endormi,
       placeLibre: placeLibre(inv),
       nourritureEnPoche: nourritureDisponible(inv) !== null,
+      ressourceNourriture: nourritureDisponible(inv),
       nourritureCrue: quantite(inv, "baies") + quantite(inv, "poisson") + quantite(inv, "gibier"),
       possedeHache: possede(inv, "hache_pierre"),
       intention: p.intention,
       dernierEchec: p.dernierEchec,
       projet,
+      reputation: p.reputation,
+      prudenceNourriture: p.drapeaux.prudenceNourritureJusqua > monde.horloge.tick,
+      chercheAbri: p.drapeaux.chercheAbriJusqua > monde.horloge.tick,
+      explorerPlusLoin: p.drapeaux.explorerPlusLoinJusqua > monde.horloge.tick,
     },
     moment,
     meteo: monde.meteo,
@@ -194,5 +227,7 @@ export function percevoir(monde: Monde, p: Personnage): Perception {
     connaitArbres: [...p.connaissance.values()].some(
       (l) => l.type === "bois" && l.outilRequis === "hache_pierre" && l.quantiteVue >= 1,
     ),
+    stockVolable: stockVolable(monde, p) !== null,
+    souvenirsRecents: p.memoire.depuis(monde.horloge.tick - monde.horloge.ticksParJour),
   };
 }

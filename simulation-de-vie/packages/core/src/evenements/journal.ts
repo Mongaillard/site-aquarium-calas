@@ -26,6 +26,12 @@ export const TYPES_EVENEMENT = [
   "outil_casse",
   "jete",
   "meteo",
+  "dialogue",
+  "offre",
+  "demande",
+  "vol",
+  "invitation",
+  "reflexion",
 ] as const;
 export type TypeEvenement = (typeof TYPES_EVENEMENT)[number];
 

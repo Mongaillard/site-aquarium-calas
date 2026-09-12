@@ -2,6 +2,43 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M3 – Mémoire et relations (2026-09-12)
+
+- Flux de mémoire par personnage : souvenirs horodatés (observation, action, dialogue,
+  réflexion) avec importance 1..10, récupération par récence (demi-vie d'un jour) ×
+  importance × pertinence (sujets, proximité), oubli par compression des souvenirs banals non
+  consultés depuis 30 jours.
+- Mise en mots des événements à la première personne (acteur) ou en tiers (témoins à portée de
+  vue) ; l'interlocuteur d'un dialogue, d'un don ou d'une demande s'en souvient aussi.
+- Relations : lien (inconnu, connaissance, ami, partenaire, parent, enfant, fratrie, rival,
+  ennemi), affinité, confiance, attirance, dette, compteur d'interactions ; ajustements
+  amplifiés par le névrosisme et colorés par la compatibilité de personnalité ; les familles
+  initiales sont reliées en fratrie.
+- Dialogues à gabarits : salutations accordées au lien (tutoiement / vouvoiement), échange de
+  lieux utiles dans les deux sens (les personnages se transmettent des positions de
+  ressources), entraide (don à un affamé), invitation d'un proche sans abri, dispute entre
+  personnes qui se détestent ; effets sur les relations, le moral et le besoin social.
+- Échanges : `Offrir` (dette), `Demander` (probabilité d'accord selon agréabilité, affinité,
+  famille, persuasion, réputation, dette ; refus journalisé), `Voler` dans un stock d'autrui
+  (témoins : affinité et confiance en chute, réputation du voleur en baisse).
+- Réflexion du soir (21 h) en mode règles : proche fiable (confiance +5), rareté des
+  ressources, faim vécue, froid subi, dette morale ; chaque réflexion devient un souvenir
+  important et un drapeau qui oriente les décisions des jours suivants.
+- `RuleBrain` : parler (besoin social, extraversion, affinité, pas deux fois de suite avec la
+  même personne), offrir, demander, voler (dernier recours des affamés peu scrupuleux),
+  influence des drapeaux de réflexion.
+- Besoin social rééquilibré : la présence rassure lentement, le dialogue nourrit vraiment.
+- CLI : `--inspect <id>` (identité, relations, souvenirs marquants et récents),
+  `--journal <fichier>` (export NDJSON), compteurs sociaux.
+- Boucle principale : une urgence dont la planification échoue (aucun point d'eau connu…)
+  est mise en sommeil deux heures de jeu pour laisser l'exploration de repli agir ; ce cas
+  provoquait une mort par immobilité.
+- Tests : 123 au total (+30) dont l'intégration « en 30 jours, dialogues, transmissions de
+  lieux et réflexions » et le test de non-régression ci-dessus ; 12/12 survivants à 30 jours
+  vérifiés sur six graines.
+- Non couvert (M4+) : généalogie réelle (la famille reste définie par le nom), couples et
+  attirance, groupes au-delà de la famille, évolution des traits.
+
 ## M2 – Construire et fabriquer (2026-09-12)
 
 - Objets et recettes : hache de pierre, pioche, lance, canne à pêche, filet, corde,

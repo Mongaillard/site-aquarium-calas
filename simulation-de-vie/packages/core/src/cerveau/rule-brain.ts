@@ -96,7 +96,81 @@ export class RuleBrain implements Cerveau {
     if (adulte && connait("baies") && placeLibre > 0 && !nourritureEnPoche) {
       candidats.push({
         intention: { type: "recolter", ressource: "baies" },
-        score: 0.25 + personnalite.conscience * 0.45 + urgence(besoins.faim) * 0.5,
+        score:
+          0.25 +
+          personnalite.conscience * 0.45 +
+          urgence(besoins.faim) * 0.5 +
+          (perception.moi.prudenceNourriture ? 0.3 : 0),
+      });
+    }
+
+    // Parler : besoin social, extraversion, affinité ; pas deux fois de suite avec la même personne.
+    const tick = perception.moment.tick;
+    const interlocuteurs = perception.personnesVisibles.filter(
+      (v) => !v.endormi && v.derniereInteraction < tick - 36,
+    );
+    if (interlocuteurs.length > 0 && besoins.social < 90) {
+      let meilleur = interlocuteurs[0];
+      let meilleurScore = -Infinity;
+      for (const v of interlocuteurs) {
+        const sc =
+          v.affinite / 100 +
+          (v.famille ? 0.3 : 0) +
+          (v.lien === "inconnu" ? personnalite.ouverture * 0.3 : 0) -
+          v.distance * 0.02;
+        if (sc > meilleurScore) {
+          meilleurScore = sc;
+          meilleur = v;
+        }
+      }
+      if (meilleur !== undefined) {
+        candidats.push({
+          intention: { type: "parler", cible: meilleur.id },
+          score:
+            0.2 +
+            urgence(besoins.social) * 2.5 +
+            personnalite.extraversion * 0.6 +
+            Math.max(0, meilleurScore) * 0.3,
+        });
+      }
+    }
+
+    // Offrir à quelqu'un qui a faim quand on a des vivres.
+    const affames = perception.personnesVisibles.filter((v) => v.aFaim && !v.endormi);
+    const v0 = affames[0];
+    if (
+      adulte &&
+      v0 !== undefined &&
+      perception.moi.ressourceNourriture !== null &&
+      perception.moi.nourritureCrue >= 3
+    ) {
+      candidats.push({
+        intention: { type: "offrir", cible: v0.id, ressource: perception.moi.ressourceNourriture },
+        score: 0.3 + personnalite.agreabilite * 0.7 + (v0.famille ? 0.3 : 0) + v0.affinite / 200,
+      });
+    }
+
+    // Demander de la nourriture à un proche quand on en manque.
+    if (besoins.faim < 40 && !nourritureEnPoche) {
+      const proche = perception.personnesVisibles.find(
+        (v) => !v.endormi && (v.famille || v.affinite >= 20),
+      );
+      if (proche !== undefined) {
+        candidats.push({
+          intention: { type: "demander", cible: proche.id, ressource: "baies" },
+          score:
+            urgence(besoins.faim) * 1.8 +
+            (proche.famille ? 0.3 : 0) +
+            (connaitNourriture ? -0.3 : 0.2),
+        });
+      }
+    }
+
+    // Voler : dernier recours des affamés peu scrupuleux.
+    if (besoins.faim < 15 && !nourritureEnPoche && !connaitNourriture && perception.stockVolable) {
+      candidats.push({
+        intention: { type: "voler" },
+        score: urgence(besoins.faim) * 2 * (1 - personnalite.agreabilite),
       });
     }
 
@@ -115,6 +189,7 @@ export class RuleBrain implements Cerveau {
           personnalite.conscience * 0.4 +
           (projet !== null ? 0.15 : 0) +
           (besoinAbri ? 0.5 + urgence(besoins.securite) + froid : 0) +
+          (perception.moi.chercheAbri && (type === "abri" || type === "maison") ? 0.4 : 0) +
           (besoinFeu ? 0.3 + froid : 0) -
           (projet === null && perception.besoinConstruction === null ? 0.15 : 0) -
           (nuit ? 0.3 : 0),
@@ -151,7 +226,12 @@ export class RuleBrain implements Cerveau {
     candidats.push({
       intention: { type: "explorer" },
       score:
-        0.15 + personnalite.ouverture * 0.35 + manque * 0.8 - familiarite * 0.2 - (nuit ? 0.2 : 0),
+        0.15 +
+        personnalite.ouverture * 0.35 +
+        manque * 0.8 -
+        familiarite * 0.2 -
+        (nuit ? 0.2 : 0) +
+        (perception.moi.explorerPlusLoin ? 0.3 : 0),
     });
 
     candidats.push({ intention: { type: "attendre", ticks: 3 }, score: 0.05 });

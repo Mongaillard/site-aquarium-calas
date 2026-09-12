@@ -10,6 +10,7 @@ par phase est dans [`CHANGELOG.md`](./CHANGELOG.md).
 pnpm install
 pnpm check          # typecheck + lint + format + tests
 pnpm sim run --seed 42 --days 30 --ressources
+pnpm sim run --seed 42 --days 30 --sans-carte --inspect p-0001 --journal journal/evenements.ndjson
 ```
 
 `pnpm sim run` génère un monde, l'affiche en ASCII avec sa distribution de biomes et son
@@ -23,6 +24,8 @@ packages/core/src
   agents/       identité, génome, besoins, inventaire, compétences, population
   actions/      types d'actions et d'intentions, A*, planificateur, exécuteur
   cerveau/      interface Cerveau, perception, RuleBrain (règles)
+  memoire/      flux de souvenirs, mise en mots des événements, réflexion du soir
+  social/       relations, dialogues à gabarits, échanges et vol
   evenements/   journal d'événements
   simulation.ts boucle principale
 packages/cli    commande `sim`

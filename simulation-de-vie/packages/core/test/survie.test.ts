@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../src/simulation.js";
+import { grilleUniforme } from "./utils.js";
 
 /** Test d'intégration M1 (section 15) : 12 personnages, 10 jours, cerveau à règles. */
 describe("survie (intégration M1)", () => {
@@ -103,6 +104,48 @@ describe("survie (intégration M1)", () => {
     expect(p.vivant).toBe(true);
     expect(sim.journal.compte("jete") + sim.journal.compte("depot")).toBeGreaterThan(0);
     expect(p.besoins.faim).toBeGreaterThan(30);
+  });
+
+  it("M3 : en 30 jours, les personnages dialoguent, se transmettent des lieux et réfléchissent", () => {
+    const sim = Simulation.creer({ seed: 42 });
+    for (let j = 0; j < 30; j++) sim.avancerJusquaAube();
+    expect(sim.journal.compte("dialogue")).toBeGreaterThan(30);
+    const transmissions = sim.journal
+      .parType("dialogue")
+      .filter((e) => String(e.details.informations ?? "") !== "").length;
+    expect(transmissions).toBeGreaterThan(5);
+    expect(sim.journal.compte("reflexion")).toBeGreaterThan(0);
+    expect(sim.statistiques().vivants).toBeGreaterThanOrEqual(10);
+    for (const p of sim.vivants()) {
+      expect(p.memoire.taille).toBeGreaterThan(10);
+      expect([...p.relations.values()].some((r) => r.interactions > 0)).toBe(true);
+    }
+  }, 60_000);
+
+  it("assoiffé sans point d'eau connu, un personnage explore au lieu de rester sur place", () => {
+    const eau = Array.from({ length: 40 }, (_, y) => ({
+      x: 0,
+      y,
+      biome: "eau_peu_profonde" as const,
+    }));
+    const grille = grilleUniforme(40, 40, "prairie", eau);
+    const sim = Simulation.creerAvecGrille(
+      { seed: 8, population: { initiale: 1, familles: 1 } },
+      grille,
+    );
+    const p = sim.personnages[0];
+    if (p === undefined) throw new Error("pas de personnage");
+    p.corps.position = { x: 30, y: 20 };
+    p.connaissance.clear();
+    p.besoins.soif = 12;
+    p.besoins.faim = 90;
+    p.besoins.sommeil = 90;
+    sim.avancer(60);
+    expect(p.corps.position).not.toEqual({ x: 30, y: 20 });
+    const echecsEau = sim.journal
+      .parType("action_echouee")
+      .filter((e) => e.details.raison === "aucun point d'eau connu");
+    expect(echecsEau.length).toBeLessThan(10);
   });
 
   it("les gisements renouvelables se régénèrent", () => {

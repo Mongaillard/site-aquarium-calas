@@ -12,7 +12,7 @@ import {
   transferer,
   userObjet,
 } from "../agents/inventaire.js";
-import { cleLieu } from "../agents/personnage.js";
+import { cleLieu, relationAvec } from "../agents/personnage.js";
 import type { Personnage } from "../agents/personnage.js";
 import { PLANS_BATIMENT, materiauxLivres, materiauxManquants } from "../monde/batiments.js";
 import { INFO_BIOME } from "../monde/biomes.js";
@@ -23,6 +23,10 @@ import { RECETTES, SOLIDITE_INITIALE } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
 import { atelierAdjacent, autorise, eauAdjacente } from "../monde.js";
 import type { Monde } from "../monde.js";
+import { composerDialogue, transcrire } from "../social/dialogue.js";
+import { accepteDemande, effetsDon, effetsRefus, effetsVol } from "../social/echange.js";
+import { ajusterRelation } from "../social/relations.js";
+import { rayonVision } from "../cerveau/perception.js";
 import { trouverChemin } from "./chemin.js";
 import type { Action } from "./types.js";
 
@@ -79,7 +83,202 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       monde.emettre("jete", p, { ressource: action.ressource, quantite: n }, 1);
       return TERMINEE;
     }
+    case "parler":
+      return tickParler(monde, p, action);
+    case "offrir":
+      return tickOffrir(monde, p, action);
+    case "demander":
+      return tickDemander(monde, p, action);
+    case "voler":
+      return tickVoler(monde, p, action);
   }
+}
+
+/** Interlocuteur vivant, éveillé, à ≤ 2 tuiles. */
+function interlocuteur(monde: Monde, p: Personnage, id: string): Personnage | string {
+  const cible = monde.personnages.find((a) => a.id === id);
+  if (!cible?.vivant) return "interlocuteur absent";
+  if (cible.corps.endormi) return `${cible.identite.prenom} dort`;
+  if (Grille.distance(p.corps.position, cible.corps.position) > 2)
+    return `${cible.identite.prenom} est trop loin`;
+  return cible;
+}
+
+function tickParler(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "parler" }>,
+): Resultat {
+  const cible = interlocuteur(monde, p, action.cible);
+  if (typeof cible === "string") return echec(cible);
+  action.ticksRestants ??= 2 + Math.min(2, Math.round(p.identite.personnalite.extraversion * 2));
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+
+  const dialogue = composerDialogue(monde, p, cible);
+  const tick = monde.horloge.tick;
+  const informations: string[] = [];
+  for (const effet of dialogue.effets) {
+    const de = effet.de === p.id ? p : cible;
+    const vers = effet.vers === p.id ? p : cible;
+    switch (effet.type) {
+      case "information": {
+        const cle = cleLieu(effet.lieu.x, effet.lieu.y);
+        if (!vers.connaissance.has(cle))
+          vers.connaissance.set(cle, { ...effet.lieu, tickVu: tick });
+        informations.push(`${effet.lieu.type}@${effet.lieu.x},${effet.lieu.y}→${vers.id}`);
+        break;
+      }
+      case "relation":
+        ajusterRelation(
+          relationAvec(de, vers.id),
+          de.identite.personnalite,
+          vers.identite.personnalite,
+          { affinite: effet.affinite, confiance: effet.confiance },
+          tick,
+        );
+        break;
+      case "invitation": {
+        const b = monde.batiments.get(effet.batimentId);
+        if (b && !b.autorises.includes(vers.id)) {
+          b.autorises.push(vers.id);
+          monde.emettre(
+            "invitation",
+            de,
+            { cible: vers.id, batiment: b.id, type: b.type },
+            4,
+            b.position,
+          );
+        }
+        break;
+      }
+      case "don": {
+        const n = transferer(
+          de.corps.inventaire,
+          vers.corps.inventaire,
+          effet.ressource,
+          effet.quantite,
+        );
+        if (n > 0) {
+          effetsDon(de, vers, n, tick);
+          monde.emettre(
+            "offre",
+            de,
+            { cible: vers.id, ressource: effet.ressource, quantite: n },
+            3,
+          );
+        }
+        break;
+      }
+    }
+  }
+  p.besoins.social = clamp(p.besoins.social + 25);
+  cible.besoins.social = clamp(cible.besoins.social + 25);
+  if (dialogue.sujet === "dispute") {
+    p.besoins.moral = clamp(p.besoins.moral - 4);
+    cible.besoins.moral = clamp(cible.besoins.moral - 4);
+  } else {
+    p.besoins.moral = clamp(p.besoins.moral + 2);
+    cible.besoins.moral = clamp(cible.besoins.moral + 2);
+  }
+  gagnerExperience(p.experience, "persuasion", 1);
+  const prenom = (id: string): string =>
+    monde.personnages.find((a) => a.id === id)?.identite.prenom ?? id;
+  monde.emettre(
+    "dialogue",
+    p,
+    {
+      avec: cible.id,
+      sujet: dialogue.sujet,
+      repliques: dialogue.repliques.length,
+      informations: informations.join(" "),
+      transcription: transcrire(dialogue, prenom),
+    },
+    dialogue.sujet === "dispute" ? 4 : dialogue.sujet === "salutations" ? 2 : 3,
+  );
+  return TERMINEE;
+}
+
+function tickOffrir(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "offrir" }>,
+): Resultat {
+  const cible = interlocuteur(monde, p, action.cible);
+  if (typeof cible === "string") return echec(cible);
+  const n = transferer(
+    p.corps.inventaire,
+    cible.corps.inventaire,
+    action.ressource,
+    action.quantite,
+  );
+  if (n <= 0)
+    return echec(
+      placeLibre(cible.corps.inventaire) <= 0
+        ? "son inventaire est plein"
+        : `plus de ${action.ressource}`,
+    );
+  effetsDon(p, cible, n, monde.horloge.tick);
+  p.besoins.moral = clamp(p.besoins.moral + 2);
+  monde.emettre("offre", p, { cible: cible.id, ressource: action.ressource, quantite: n }, 3);
+  return TERMINEE;
+}
+
+function tickDemander(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "demander" }>,
+): Resultat {
+  const cible = interlocuteur(monde, p, action.cible);
+  if (typeof cible === "string") return echec(cible);
+  const tick = monde.horloge.tick;
+  const accepte = accepteDemande(p, cible, action.ressource, action.quantite);
+  let n = 0;
+  if (accepte) {
+    n = transferer(cible.corps.inventaire, p.corps.inventaire, action.ressource, action.quantite);
+    if (n > 0) {
+      effetsDon(cible, p, n, tick);
+      gagnerExperience(p.experience, "persuasion", 2);
+    }
+  } else {
+    effetsRefus(p, cible, tick);
+  }
+  monde.emettre(
+    "demande",
+    p,
+    { cible: cible.id, ressource: action.ressource, quantite: n, accepte: accepte && n > 0 },
+    accepte && n > 0 ? 3 : 2,
+  );
+  return accepte && n > 0 ? TERMINEE : echec(`${cible.identite.prenom} a refusé`);
+}
+
+function tickVoler(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "voler" }>,
+): Resultat {
+  const b = monde.batiments.get(action.batimentId);
+  if (b?.etat !== "termine" || b.stock === null) return echec("pas de stock ici");
+  if (autorise(b, p)) return echec("ce stock est le mien");
+  if (Grille.distance(p.corps.position, b.position) > 1) return echec("stock trop loin");
+  const n = transferer(b.stock, p.corps.inventaire, action.ressource, action.quantite);
+  if (n <= 0) return echec("rien à voler");
+  const temoins = effetsVol(monde, p, b, rayonVision(monde, monde.horloge.moment()));
+  p.besoins.moral = clamp(p.besoins.moral - p.identite.personnalite.agreabilite * 10);
+  monde.emettre(
+    "vol",
+    p,
+    {
+      batiment: b.id,
+      famille: b.famille,
+      ressource: action.ressource,
+      quantite: n,
+      temoins: temoins.length,
+    },
+    6,
+    b.position,
+  );
+  return TERMINEE;
 }
 
 function tickDeplacer(
