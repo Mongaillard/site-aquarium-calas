@@ -90,6 +90,30 @@ import { Horloge } from "./monde/horloge.js";
 import { EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
 import type { Meteo } from "./monde/meteo.js";
 import { Rng } from "./rng.js";
+import type { FaveurEtat, QuestionConseil } from "@sdv/protocole";
+import {
+  FAVEUR_EVENEMENTS,
+  FAVEUR_PAR_JOUR,
+  etatFaveurInitial,
+  exercer as exercerPouvoir,
+  faveurEtat,
+  gagnerFaveur,
+} from "./monde/divin.js";
+import type { CommandePouvoir, EtatFaveur, ResultatPouvoir } from "./monde/divin.js";
+import {
+  FILE_MAX,
+  JOURS_ENTRE_CONSEILS,
+  JOURS_ENTRE_CONSEILS_OBSERVATEUR,
+  SEUIL_CONSEIL,
+  appliquerConseil,
+  besoinSansIdee,
+  creerQuestion,
+  jourAmbition,
+  jourCompteurs,
+  motifsDeConseil,
+  scoreMotifs,
+} from "./cerveau/conseil.js";
+import type { ChoixConseil, Motif } from "./cerveau/conseil.js";
 
 export interface Statistiques {
   readonly tick: number;
@@ -113,6 +137,20 @@ export interface Inspiration {
   readonly savoir?: string;
 }
 
+/** Réponse de Claude à une question ouverte (commande `conseil`). */
+export interface Conseil extends ChoixConseil {
+  readonly questionId: string;
+  readonly personnageId: string;
+}
+
+export type ResultatConseil =
+  | { readonly ok: true; readonly effet: string }
+  | {
+      readonly ok: false;
+      readonly raison:
+        "question_inconnue" | "question_expiree" | "personnage_mort" | "option_invalide" | "aucun";
+    };
+
 /** Rayon, en tuiles, de ce que la colonie connaît de son berceau au premier jour. */
 const RAYON_CONNAISSANCE_INITIALE = 14;
 
@@ -133,6 +171,13 @@ export class Simulation implements Monde {
   private compteurPersonnages = 0;
   private readonly cerveaux = new Map<string, Cerveau>();
   private compteurBatiments = 0;
+  /** Mode Dieu : la faveur de l'observateur. */
+  readonly faveur: EtatFaveur = etatFaveurInitial();
+  /** « Demander à Claude » : la question ouverte, la file des candidats, le budget du jour. */
+  questionEnCours: QuestionConseil | null = null;
+  readonly fileConseils: { id: string; motifs: Motif[]; score: number }[] = [];
+  private conseilsDuJour = 0;
+  private compteurQuestions = 0;
 
   private constructor(
     readonly config: SimConfig,
@@ -149,6 +194,8 @@ export class Simulation implements Monde {
     for (const p of this.personnages) observer(this, p, RAYON_CONNAISSANCE_INITIALE);
     this.journal.ecouter((e) => {
       this.memoriser(e);
+      const gain = FAVEUR_EVENEMENTS[e.type];
+      if (gain !== undefined && this.tick > 0) gagnerFaveur(this.faveur, gain);
     });
     for (const p of this.personnages) {
       this.cerveaux.set(p.id, new RuleBrain(p));
@@ -243,7 +290,181 @@ export class Simulation implements Monde {
     if (idee !== null) {
       this.emettre("idee", p, { invention: idee, nom: INVENTIONS[idee].nom }, 6);
       p.memoire.ajouter(this.tick, "reflexion", `J'ai une idée. ${INVENTIONS[idee].idee}`, 7, []);
+      p.drapeaux.soirsSansIdee = 0;
+    } else {
+      p.drapeaux.soirsSansIdee = besoinSansIdee(this, p) ? p.drapeaux.soirsSansIdee + 1 : 0;
     }
+  }
+
+  // ------------------------------------------------------------ mode Dieu
+
+  /** Exerce un pouvoir de l'observateur (commande `pouvoir`). */
+  exercer(commande: CommandePouvoir): ResultatPouvoir {
+    return exercerPouvoir(this, this.faveur, commande);
+  }
+
+  /** La faveur, telle que le protocole la transporte. */
+  etatFaveur(): FaveurEtat {
+    return faveurEtat(this.faveur);
+  }
+
+  // ---------------------------------------------------- demander à Claude
+
+  /** Les questions ouvertes à Claude (au plus une). */
+  questionsEnAttente(): readonly QuestionConseil[] {
+    return this.questionEnCours === null ? [] : [this.questionEnCours];
+  }
+
+  /**
+   * L'observateur peut-il faire poser sa question à cette personne maintenant ?
+   * Sa demande passe devant une question ouverte par le moteur, jamais devant
+   * une autre demande de l'observateur.
+   */
+  conseilPossible(p: Personnage): boolean {
+    if (!p.vivant || p.corps.stade === "enfant") return false;
+    const q = this.questionEnCours;
+    if (q !== null && (q.personnageId === p.id || q.motifs.includes("observateur"))) return false;
+    const T = this.horloge.ticksParJour;
+    return (
+      p.drapeaux.conseilDemandeA < 0 ||
+      this.tick - p.drapeaux.conseilDemandeA >= JOURS_ENTRE_CONSEILS_OBSERVATEUR * T
+    );
+  }
+
+  /** Bouton « Demander conseil » : ouvre tout de suite une question pour cette personne. */
+  demanderConseil(personnageId: string): boolean {
+    const p = this.personnage(personnageId);
+    if (p === undefined || !this.conseilPossible(p)) return false;
+    const q = this.questionEnCours;
+    if (q !== null) {
+      // La question du moteur cède la place ; son auteur repassera par la file.
+      this.questionEnCours = null;
+      this.emettre(
+        "conseil",
+        this.personnage(q.personnageId) ?? null,
+        { questionId: q.id, etape: "reponse", applique: false, raison: "remplacee" },
+        2,
+      );
+    }
+    const motifs: Motif[] = ["observateur", ...motifsDeConseil(this, p)];
+    this.ouvrirQuestion(p, motifs);
+    return true;
+  }
+
+  private ouvrirQuestion(p: Personnage, motifs: readonly Motif[]): void {
+    this.compteurQuestions += 1;
+    const q = creerQuestion(this, p, motifs, this.compteurQuestions);
+    this.questionEnCours = q;
+    p.drapeaux.conseilDemandeA = this.tick;
+    this.conseilsDuJour += 1;
+    this.emettre(
+      "conseil",
+      p,
+      { questionId: q.id, etape: "question", motifs: motifs.join(","), options: q.options.length },
+      3,
+    );
+  }
+
+  /** Le soir, après la réflexion : qui est à court d'idées entre dans la file. */
+  private inscrireCandidats(): void {
+    for (const p of this.vivants()) {
+      const motifs = motifsDeConseil(this, p);
+      const score = scoreMotifs(motifs);
+      if (score < SEUIL_CONSEIL) continue;
+      if (
+        p.drapeaux.conseilDemandeA >= 0 &&
+        this.tick - p.drapeaux.conseilDemandeA < JOURS_ENTRE_CONSEILS * this.horloge.ticksParJour
+      )
+        continue;
+      if (this.fileConseils.some((c) => c.id === p.id)) continue;
+      this.fileConseils.push({ id: p.id, motifs, score });
+    }
+    this.fileConseils.sort(
+      (a, b) =>
+        b.score - a.score ||
+        (this.personnage(a.id)?.drapeaux.conseilDemandeA ?? -1) -
+          (this.personnage(b.id)?.drapeaux.conseilDemandeA ?? -1),
+    );
+    if (this.fileConseils.length > FILE_MAX) this.fileConseils.length = FILE_MAX;
+  }
+
+  /** Chaque tick : expire la question ouverte trop vieille, ouvre la suivante si le budget le permet. */
+  private gererConseils(): void {
+    const q = this.questionEnCours;
+    if (q !== null && this.tick > q.expireA) {
+      this.questionEnCours = null;
+      this.emettre(
+        "conseil",
+        this.personnage(q.personnageId) ?? null,
+        { questionId: q.id, etape: "reponse", applique: false, raison: "expiree" },
+        3,
+      );
+    }
+    if (this.questionEnCours !== null || this.fileConseils.length === 0) return;
+    if (this.conseilsDuJour >= this.config.brain.conseilsParJour) return;
+    const candidat = this.fileConseils.shift();
+    if (candidat === undefined) return;
+    const p = this.personnage(candidat.id);
+    if (p?.vivant !== true) return;
+    // Les motifs sont revérifiés au moment de poser la question.
+    const motifs = motifsDeConseil(this, p);
+    if (scoreMotifs(motifs) < SEUIL_CONSEIL) return;
+    this.ouvrirQuestion(p, motifs);
+  }
+
+  /**
+   * Applique la réponse de Claude à la question ouverte : le choix doit être
+   * une option de la question (on ne fait pas confiance à la page). Journalisé
+   * sous `conseil` pour le rejeu.
+   */
+  conseiller(conseil: Conseil): ResultatConseil {
+    const q = this.questionEnCours;
+    if (q?.id !== conseil.questionId) return { ok: false, raison: "question_inconnue" };
+    const p = this.personnage(q.personnageId);
+    const fermer = (raison: string): void => {
+      this.questionEnCours = null;
+      this.emettre(
+        "conseil",
+        p ?? null,
+        { questionId: q.id, etape: "reponse", applique: false, raison, choix: conseil.choix },
+        4,
+      );
+    };
+    if (this.tick > q.expireA) {
+      fermer("expiree");
+      return { ok: false, raison: "question_expiree" };
+    }
+    if (p === undefined || !p.vivant || p.id !== conseil.personnageId) {
+      fermer("personnage_mort");
+      return { ok: false, raison: "personnage_mort" };
+    }
+    if (conseil.choix === "aucun") {
+      fermer("aucun");
+      return { ok: false, raison: "aucun" };
+    }
+    const option = q.options.find((o) => o.id === conseil.choix);
+    if (option === undefined) {
+      fermer("option_invalide");
+      return { ok: false, raison: "option_invalide" };
+    }
+    this.questionEnCours = null;
+    const ambition = appliquerConseil(this, p, option, conseil);
+    this.emettre(
+      "conseil",
+      p,
+      {
+        questionId: q.id,
+        etape: "reponse",
+        applique: true,
+        choix: option.id,
+        libelle: option.libelle,
+        pensee: ambition.pensee,
+        but: ambition.but,
+        jours: Math.round((ambition.jusqua - ambition.depuis) / this.horloge.ticksParJour),
+      },
+      7,
+    );
+    return { ok: true, effet: option.libelle };
   }
 
   /**
@@ -690,6 +911,7 @@ export class Simulation implements Monde {
     }
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
+    this.gererConseils();
     const ordre = this.rng.fork(`tick/${this.tick}`).melanger(this.vivants());
     for (const p of ordre) this.tickPersonnage(p);
     this.horloge.avancer(1);
@@ -734,6 +956,39 @@ export class Simulation implements Monde {
       this.jourDuVillage();
       this.regenererBassins();
     }
+    if (this.tick > 0) {
+      this.conseilsDuJour = 0;
+      gagnerFaveur(this.faveur, FAVEUR_PAR_JOUR);
+      for (const p of this.vivants()) {
+        jourCompteurs(p);
+        const issue = jourAmbition(this, p);
+        if (issue !== null && p.ambition !== null) {
+          const a = p.ambition;
+          this.emettre(
+            "ambition",
+            p,
+            { genre: a.genre, cible: a.cible, but: a.but, issue },
+            issue === "accomplie" ? 7 : 5,
+          );
+          p.memoire.ajouter(
+            this.tick,
+            "reflexion",
+            issue === "accomplie"
+              ? `J'ai obtenu ce que je voulais : ${a.but}.`
+              : `J'ai renoncé : ${a.but}.`,
+            6,
+            [],
+          );
+          ajouterHumeur(
+            p,
+            "ambition",
+            issue === "accomplie" ? 10 : -5,
+            5 * this.horloge.ticksParJour,
+            this.tick,
+          );
+        }
+      }
+    }
     for (const p of this.vivants()) {
       p.drapeaux.faimMinDuJour = p.besoins.faim;
       p.drapeaux.chaleurMinDuJour = p.besoins.chaleur;
@@ -743,6 +998,7 @@ export class Simulation implements Monde {
   /** Soir (21 h) : chacun fait le bilan de sa journée. */
   private soiree(): void {
     for (const p of this.vivants()) this.reflechirPour(p);
+    this.inscrireCandidats();
   }
 
   /**

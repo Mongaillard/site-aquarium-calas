@@ -290,3 +290,43 @@ export {
 export { apparentes } from "./monde.js";
 export { construireGenealogie, descendantsVivants } from "./genealogie.js";
 export type { Genealogie, NoeudGenealogie } from "./genealogie.js";
+export {
+  FAVEUR_INITIALE,
+  FAVEUR_MAX,
+  FAVEUR_PAR_JOUR,
+  FAVEUR_EVENEMENTS,
+  BUCHES_BRAISE,
+  etatFaveurInitial,
+  faveurEtat,
+  gagnerFaveur,
+  exercer,
+} from "./monde/divin.js";
+export type { CommandePouvoir, EtatFaveur, ResultatPouvoir, RaisonRefus } from "./monde/divin.js";
+export {
+  MOTIFS,
+  POIDS_MOTIF,
+  SEUIL_CONSEIL,
+  JOURS_ENTRE_CONSEILS,
+  JOURS_ENTRE_CONSEILS_OBSERVATEUR,
+  JOURS_EXPIRATION,
+  FILE_MAX,
+  JOURS_AMBITION,
+  LIEUX_A_DECOUVRIR,
+  BONUS_PRIORITE,
+  PRIORITES,
+  DIRECTIONS,
+  motifsDeConseil,
+  scoreMotifs,
+  optionsConseil,
+  contexteConseil,
+  leconsUtiles,
+  ideesEnCours,
+  besoinSansIdee,
+  appliquerConseil,
+  jourAmbition,
+  bonusPriorite,
+  prioriteEnCours,
+} from "./cerveau/conseil.js";
+export type { Motif, Priorite, ChoixConseil } from "./cerveau/conseil.js";
+export type { Ambition } from "./agents/personnage.js";
+export type { Conseil, ResultatConseil } from "./simulation.js";

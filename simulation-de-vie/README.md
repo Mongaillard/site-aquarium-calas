@@ -36,6 +36,18 @@ sur `s` pour que la caméra suive le personnage sélectionné.
 Sur la page publiée sur claude.ai, le bouton « 🧠 Claude » laisse Claude écrire, sur le compte de
 la personne qui regarde (aucune clé ni facture à part), la pensée du personnage sélectionné,
 l'épitaphe des défunts et le récit des inventions ; le moteur reste maître de ce qu'il applique.
+Le bouton « 💬 Conseils » va plus loin : quand un personnage est à court d'idées (faim ou froid
+qui dure, échecs répétés, besoin sans idée, aucun projet), il pose une question à Claude, qui
+choisit dans un catalogue fermé (une invention à chercher, un bâtiment, une leçon, une
+priorité, une direction) ; le moteur applique ce choix et suit l'**ambition** qui en naît
+(fiche, onglet Statistiques « Où ils vont », Journal). Le bouton « Demander conseil » d'une
+fiche fait poser la question tout de suite.
+
+Le bouton « ✨ Dieu » (touche `g`) ouvre une barre de pouvoirs : Ondée, Éclaircie, Sève,
+Souffle, Main qui guérit, Braise, Foudre, Songe, Regard, payés en faveur (✦) gagnée chaque jour
+et quand la colonie prospère. Un pouvoir armé se pose d'un clic (ou d'un appui long, sur
+mobile) sur une tuile connue, une personne ou un bâtiment ; les personnages interprètent le
+miracle, ils n'obéissent pas.
 
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la
@@ -68,10 +80,10 @@ servie par `pnpm serve` accepte aussi `?local` pour basculer dans ce mode.
 
 ```
 packages/core/src
-  monde/        grille, génération, biomes, ressources, horloge, météo, recettes, bâtiments, rendu ASCII
+  monde/        grille, génération, biomes, ressources, horloge, météo, recettes, bâtiments, faune, danger, village, divin (mode Dieu)
   agents/       identité, génome et héritage, besoins, inventaire, compétences, population, cycle de vie
   actions/      types d'actions et d'intentions, A*, planificateur, exécuteur
-  cerveau/      interface Cerveau, perception, RuleBrain (règles)
+  cerveau/      interface Cerveau, perception, RuleBrain (règles), conseil (demander à Claude)
   memoire/      flux de souvenirs, mise en mots des événements, réflexion du soir
   social/       relations, dialogues à gabarits, échanges et vol, couples
   genealogie.ts arbre des filiations et des unions

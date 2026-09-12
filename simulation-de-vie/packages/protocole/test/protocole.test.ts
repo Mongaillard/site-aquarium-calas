@@ -24,6 +24,48 @@ describe("protocole", () => {
     expect(analyserCommande("42")).toBeNull();
   });
 
+  it("analyse les commandes du mode Dieu et des conseils, et borne leurs champs", () => {
+    expect(analyserCommande('{"type":"pouvoir","pouvoir":"pluie","x":3,"y":-4}')).toEqual({
+      type: "pouvoir",
+      pouvoir: "pluie",
+      x: 3,
+      y: -4,
+    });
+    expect(
+      analyserCommande('{"type":"pouvoir","pouvoir":"songe","x":0,"y":0,"cibleId":"p-0001"}'),
+    ).toEqual({ type: "pouvoir", pouvoir: "songe", x: 0, y: 0, cibleId: "p-0001" });
+    expect(analyserCommande('{"type":"pouvoir","pouvoir":"apocalypse","x":0,"y":0}')).toBeNull();
+    expect(analyserCommande('{"type":"pouvoir","pouvoir":"pluie","x":1.5,"y":0}')).toBeNull();
+    expect(analyserCommande('{"type":"pouvoir","pouvoir":"pluie","x":1e9,"y":0}')).toBeNull();
+    const conseil = {
+      type: "conseil",
+      questionId: "q-1-p-0001",
+      personnageId: "p-0001",
+      choix: "invention:fumoir",
+      pensee: "Le poisson pourrit.",
+      ambition: { but: "que personne n'ait faim", jours: 12 },
+    };
+    expect(analyserCommande(JSON.stringify(conseil))).toEqual(conseil);
+    expect(analyserCommande(JSON.stringify({ ...conseil, ambition: undefined }))).toEqual({
+      type: "conseil",
+      questionId: "q-1-p-0001",
+      personnageId: "p-0001",
+      choix: "invention:fumoir",
+      pensee: "Le poisson pourrit.",
+    });
+    expect(
+      analyserCommande(JSON.stringify({ ...conseil, ambition: { but: "x", jours: 99 } })),
+    ).toBeNull();
+    expect(analyserCommande(JSON.stringify({ ...conseil, choix: "x".repeat(200) }))).toBeNull();
+    expect(analyserCommande(JSON.stringify({ ...conseil, pensee: "x".repeat(601) }))).toBeNull();
+    expect(analyserCommande(JSON.stringify({ ...conseil, choix: "" }))).toBeNull();
+    expect(analyserCommande('{"type":"demander_conseil","id":"p-0001"}')).toEqual({
+      type: "demander_conseil",
+      id: "p-0001",
+    });
+    expect(analyserCommande('{"type":"demander_conseil"}')).toBeNull();
+  });
+
   it("la teinte de famille est stable et dans [0, 360)", () => {
     expect(teinteFamille("Vidal")).toBe(teinteFamille("Vidal"));
     expect(teinteFamille("Vidal")).not.toBe(teinteFamille("Naudin"));

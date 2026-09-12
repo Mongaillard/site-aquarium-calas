@@ -24,6 +24,14 @@
           <button type="submit" id="btn-nouveau">Nouveau monde</button>
         </form>
         <button
+          id="btn-dieu"
+          class="btn-dieu"
+          type="button"
+          title="Mode Dieu : exercer des pouvoirs sur le monde (g)"
+        >
+          ✨ Dieu
+        </button>
+        <button
           id="btn-claude"
           class="btn-claude"
           type="button"
@@ -31,6 +39,15 @@
           title="Laisser Claude écrire les pensées, épitaphes et récits (sur votre compte claude.ai)"
         >
           🧠 Claude
+        </button>
+        <button
+          id="btn-conseils"
+          class="btn-claude"
+          type="button"
+          hidden
+          title="Quand un personnage est à court d'idées, il demande conseil à Claude (sur votre compte claude.ai)"
+        >
+          💬 Conseils<span id="badge-conseils" class="badge" hidden></span>
         </button>
         <div id="connexion" class="connexion">connexion…</div>
       </header>
@@ -40,6 +57,16 @@
           <div id="legende" class="legende"></div>
           <button id="btn-legende" class="btn-legende" title="Légende">?</button>
           <div id="survol" class="survol" hidden></div>
+          <div id="pouvoirs" class="pouvoirs" hidden>
+            <div class="faveur" title="Faveur : gagnée chaque jour et quand la colonie prospère">
+              <i id="faveur-jauge"></i><span id="faveur-num">✦ 0</span>
+            </div>
+            <div id="palette" class="palette"></div>
+            <div id="pouvoir-aide" class="aide discret">
+              Choisissez un pouvoir, puis touchez la carte.
+            </div>
+            <button id="btn-appliquer" class="btn-appliquer" type="button" hidden>✓ Ici</button>
+          </div>
         </div>
         <aside id="panneau">
           <nav id="onglets">

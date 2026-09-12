@@ -262,11 +262,47 @@ export class Panneaux {
     conteneur.querySelector("#btn-fermer")?.addEventListener("click", () => {
       this.inter.selectionner(null);
     });
+    conteneur.querySelector("#btn-conseil")?.addEventListener("click", () => {
+      this.inter.envoyer({ type: "demander_conseil", id: fiche.id });
+      this.ficheAffichee = null;
+    });
     for (const l of conteneur.querySelectorAll<HTMLElement>("[data-id]")) {
       l.addEventListener("click", () => {
         this.inter.selectionner(l.dataset.id ?? null);
       });
     }
+  }
+
+  /** Bloc « Ambition » : où va cette personne, et le bouton « Demander conseil ». */
+  private htmlAmbition(f: MessageFiche): string {
+    const a = f.ambition;
+    const questions = this.magasin.etat?.questions ?? [];
+    const enQuestion = questions.some((q) => q.personnageId === f.id);
+    const autre = questions.find((q) => q.personnageId !== f.id);
+    const titre = enQuestion
+      ? "Sa question est déjà posée"
+      : autre !== undefined
+        ? `Une question est déjà ouverte pour ${this.magasin.nom(autre.personnageId)} ; une seule à la fois`
+        : f.conseilPossible
+          ? "Ce personnage pose sa question à Claude (bouton 💬 Conseils actif, sur claude.ai)"
+          : "Pas avant demain : il a déjà demandé conseil";
+    const bouton = f.vivant
+      ? `<button id="btn-conseil" ${f.conseilPossible && !enQuestion ? "" : "disabled"} title="${e(titre)}">💬 Demander conseil</button>`
+      : "";
+    const question = enQuestion
+      ? `<div class="question">❓ Question ouverte à Claude… (activez 💬 Conseils pour qu'il réponde)</div>`
+      : "";
+    if (a === null)
+      return `<h3>Ambition</h3>${question}<p class="discret">aucune pour l'instant ${bouton}</p>`;
+    const etat =
+      a.issue === "en_cours"
+        ? `${a.joursRestants} jour${a.joursRestants > 1 ? "s" : ""} restant${a.joursRestants > 1 ? "s" : ""}`
+        : a.issue === "accomplie"
+          ? "accomplie ✓"
+          : "abandonnée";
+    return `<h3>Ambition</h3>${question}
+      <div class="ambition ${a.issue === "en_cours" ? "" : "finie"}">🎯 <span class="but">${e(a.but)}</span> — ${e(a.cible)}, ${e(etat)}${a.pensee ? `<div class="discret">« ${e(a.pensee)} »</div>` : ""}</div>
+      <div>${bouton}</div>`;
   }
 
   private htmlFiche(f: MessageFiche): string {
@@ -370,6 +406,7 @@ export class Panneaux {
       </div>
       <div class="discret">${etat} · réputation ${f.reputation} · ${f.lieuxConnus} lieux connus · ${f.nombreSouvenirs} souvenirs</div>
       <div class="pensee${f.penseeDeClaude ? " claude" : ""}">${f.penseeDeClaude ? "🧠 " : ""}« ${e(f.pensee)} »</div>
+      ${this.htmlAmbition(f)}
       <h3>Maintenant</h3>
       <div>Intention : <b>${e(f.intention ?? "—")}</b>${f.projet ? ` · projet : ${e(NOMS_BATIMENT[f.projet] ?? f.projet)}` : ""}</div>
       <div class="discret">Action : ${e(f.action ?? "—")}${f.plan.length > 0 ? ` · puis ${e(f.plan.join(", "))}` : ""}</div>
@@ -501,8 +538,14 @@ export class Panneaux {
         ${tuile(s.vivants, "vivants")}${tuile(s.enfants, "enfants")}${tuile(s.population, "population totale")}${tuile(s.morts, "morts")}
         ${tuile(s.naissances, "naissances")}${tuile(s.unions, "unions")}${tuile(s.generations, "générations")}${tuile(s.dialogues, "dialogues")}
         ${tuile(s.batiments, "bâtiments")}${tuile(s.chantiers, "chantiers")}${tuile(s.evenements, "événements")}${tuile(s.tick, "ticks")}
-        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}
+        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}
       </div>
+      <h3>Où ils vont</h3>
+      ${
+        s.ambitions.length > 0
+          ? `<table class="saisons"><tr><th>qui</th><th>quoi</th><th>jours</th></tr>${s.ambitions.map((a) => `<tr><td><span class="lien" data-id="${e(a.personnageId)}">${e(a.prenom)}</span></td><td title="${e(a.but)}">${e(a.cible)}<div class="discret">${e(a.but)}</div></td><td>${a.joursRestants}</td></tr>`).join("")}</table>`
+          : "<p class='discret'>aucune ambition en cours (les conseils de Claude en donnent : bouton 💬 Conseils, ou « Demander conseil » dans une fiche)</p>"
+      }
       <h3>Bâtiments</h3><div class="puces">${batiments}</div>
       <h3>Stocks</h3><div class="puces">${stocks}</div>
       <h3>Faune</h3>
@@ -520,6 +563,12 @@ export class Panneaux {
       }
       <h3>Par saison</h3>
       <table class="saisons"><tr><th>saison</th><th>naissances</th><th>décès</th></tr>${saisons || "<tr><td colspan='3' class='discret'>rien encore</td></tr>"}</table>`;
+    for (const l of $("stats").querySelectorAll<HTMLElement>("[data-id]")) {
+      l.addEventListener("click", () => {
+        this.inter.selectionner(l.dataset.id ?? null);
+        this.afficherOnglet("inspecteur");
+      });
+    }
   }
 
   private population(): void {

@@ -1,5 +1,5 @@
 /** Rendu illustré de la carte : fond pré-rendu, gisements, bâtiments, personnages animés, bulles, nuit. */
-import { LEVER_COUCHER, opaciteNuit } from "@sdv/protocole";
+import { FICHES_POUVOIR, LEVER_COUCHER, opaciteNuit } from "@sdv/protocole";
 import type { BatimentEtat, PersonnageEtat } from "@sdv/protocole";
 import type { Camera } from "./camera.js";
 import { versEcran, versMonde } from "./camera.js";
@@ -160,6 +160,34 @@ export class Rendu {
     }
     ctx.restore();
 
+    // Mode Dieu : effets des miracles, puis halo de visée (espace écran).
+    if (etat !== null) {
+      for (const f of magasin.effets) this.dessinerEffet(cam, f, maintenant);
+      if (magasin.modeDieu && magasin.pouvoirArme !== null && magasin.reticule !== null)
+        this.dessinerHalo(cam, magasin.pouvoirArme, magasin.reticule, maintenant);
+    }
+
+    // Une question ouverte à Claude : un « ? » au-dessus de la tête.
+    if (etat !== null && cam.echelle >= 7) {
+      const questionnes = magasin.questionnes;
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const id of questionnes) {
+        const p = etat.personnages.find((x) => x.id === id);
+        if (p?.vivant !== true) continue;
+        const pos = magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y };
+        const e = versEcran(cam, pos.x + 0.5, pos.y - 0.35);
+        const y = e.y + Math.sin(maintenant / 250) * 2;
+        ctx.fillStyle = "#ffd479";
+        ctx.beginPath();
+        ctx.arc(e.x, y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#10141a";
+        ctx.fillText("?", e.x, y + 0.5);
+      }
+    }
+
     // Prénoms (espace écran).
     if (etat !== null && cam.echelle >= 12) {
       ctx.font = "11px system-ui, sans-serif";
@@ -227,6 +255,178 @@ export class Rendu {
         ctx.fillText(texte, x + 7, y + 11);
       }
     }
+  }
+
+  /** Halo de visée d'un pouvoir armé : cercle tireté tournant, rouge sur l'inconnu. */
+  private dessinerHalo(
+    cam: Camera,
+    pouvoir: keyof typeof FICHES_POUVOIR,
+    reticule: { x: number; y: number },
+    maintenant: number,
+  ): void {
+    const { ctx, magasin } = this;
+    const fiche = FICHES_POUVOIR[pouvoir];
+    const valide = magasin.biomeEn(reticule.x, reticule.y) >= 0;
+    const centre = versEcran(cam, reticule.x + 0.5, reticule.y + 0.5);
+    const r = Math.max(0.6, fiche.rayon + 0.5) * cam.echelle;
+    ctx.save();
+    ctx.strokeStyle = !valide ? "#ff5f5f" : fiche.bienfait ? "#ffd479" : "#ff9c5f";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.lineDashOffset = -(maintenant / 40) % 12;
+    ctx.beginPath();
+    ctx.arc(centre.x, centre.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.globalAlpha = 0.12;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = `${String(Math.max(14, Math.min(28, cam.echelle)))}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(fiche.emoji, centre.x, centre.y - r - 14);
+    ctx.restore();
+  }
+
+  /** Effet vectoriel d'un miracle, une seconde environ : pluie, éclair, anneau, pousses… */
+  private dessinerEffet(
+    cam: Camera,
+    f: { pouvoir: string; x: number; y: number; rayon: number; debut: number; fin: number },
+    maintenant: number,
+  ): void {
+    const { ctx, canvas } = this;
+    const t = Math.max(0, Math.min(1, (maintenant - f.debut) / Math.max(1, f.fin - f.debut)));
+    const c = versEcran(cam, f.x + 0.5, f.y + 0.5);
+    const r = Math.max(1, f.rayon + 0.5) * cam.echelle;
+    const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ctx.save();
+    ctx.lineCap = "round";
+    switch (f.pouvoir) {
+      case "pluie": {
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.strokeStyle = "rgba(160, 200, 255, 0.8)";
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 40; i++) {
+          const ang = i * 2.399;
+          const rad = r * Math.sqrt(((i * 7919) % 1000) / 1000);
+          const x = c.x + Math.cos(ang) * rad;
+          const y = c.y - r + ((t * 3 + i / 40) % 1) * 2 * r;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - 2, y + 8);
+          ctx.stroke();
+        }
+        break;
+      }
+      case "eclaircie":
+      case "regard":
+      case "guerison": {
+        const couleur =
+          f.pouvoir === "eclaircie"
+            ? "255, 236, 150"
+            : f.pouvoir === "regard"
+              ? "140, 200, 255"
+              : "255, 255, 255";
+        ctx.strokeStyle = `rgba(${couleur}, ${String(1 - t)})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, Math.max(4, r * t), 0, Math.PI * 2);
+        ctx.stroke();
+        if (f.pouvoir === "guerison") {
+          ctx.fillStyle = `rgba(255,255,255,${String(1 - t)})`;
+          for (let i = 0; i < 8; i++) {
+            const ang = (i / 8) * Math.PI * 2 + t * 2;
+            ctx.beginPath();
+            ctx.arc(
+              c.x + Math.cos(ang) * 14 * (0.5 + t),
+              c.y + Math.sin(ang) * 14 * (0.5 + t) - t * 20,
+              2,
+              0,
+              Math.PI * 2,
+            );
+            ctx.fill();
+          }
+        }
+        break;
+      }
+      case "seve": {
+        ctx.fillStyle = `rgba(120, 220, 120, ${String(1 - t * 0.7)})`;
+        for (let i = 0; i < 24; i++) {
+          const ang = i * 2.399;
+          const rad = r * Math.sqrt(((i * 104729) % 1000) / 1000);
+          const h = Math.min(1, t * 2 - i / 48) * 10;
+          if (h <= 0) continue;
+          const x = c.x + Math.cos(ang) * rad;
+          const y = c.y + Math.sin(ang) * rad;
+          ctx.beginPath();
+          ctx.moveTo(x - 3, y);
+          ctx.lineTo(x, y - h);
+          ctx.lineTo(x + 3, y);
+          ctx.closePath();
+          ctx.fill();
+        }
+        break;
+      }
+      case "souffle": {
+        ctx.strokeStyle = `rgba(180, 240, 180, ${String(1 - t)})`;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          const y = c.y - t * 30 - i * 8;
+          ctx.beginPath();
+          ctx.moveTo(c.x - 12, y);
+          ctx.quadraticCurveTo(c.x, y - 6, c.x + 12, y);
+          ctx.stroke();
+        }
+        break;
+      }
+      case "braise": {
+        const p = 0.5 + Math.sin(t * Math.PI * 4) * 0.5;
+        const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r * 3);
+        grad.addColorStop(0, `rgba(255, 170, 60, ${String(0.7 * (1 - t) * p)})`);
+        grad.addColorStop(1, "rgba(255, 170, 60, 0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(c.x - r * 3, c.y - r * 3, r * 6, r * 6);
+        break;
+      }
+      case "foudre": {
+        if (t < 0.5) {
+          ctx.strokeStyle = `rgba(255, 255, 220, ${String(1 - t * 2)})`;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(c.x + 30, 0);
+          ctx.lineTo(c.x - 8, c.y * 0.4);
+          ctx.lineTo(c.x + 10, c.y * 0.55);
+          ctx.lineTo(c.x - 4, c.y);
+          ctx.stroke();
+          if (!reduit && t < 0.15) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${String(0.5 - t * 3)})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+        }
+        ctx.strokeStyle = `rgba(255, 200, 120, ${String(1 - t)})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r * (0.5 + t), 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
+      case "songe": {
+        ctx.fillStyle = `rgba(200, 180, 255, ${String(1 - t)})`;
+        ctx.font = "16px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("☾", c.x + 10, c.y - 18 - t * 24);
+        ctx.font = "11px system-ui, sans-serif";
+        ctx.fillText("z z", c.x - 8, c.y - 10 - t * 18);
+        break;
+      }
+      default:
+        break;
+    }
+    ctx.restore();
   }
 
   private dessinerBatiment(

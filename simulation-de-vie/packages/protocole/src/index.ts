@@ -151,6 +151,10 @@ export interface Statistiques {
   /** Bêtes apprivoisées et champs. */
   readonly betail: number;
   readonly champs: number;
+  /** Où ils vont : les ambitions en cours, nées des conseils de Claude. */
+  readonly ambitions: readonly AmbitionStat[];
+  /** Miracles exercés par l'observateur. */
+  readonly miracles: number;
 }
 
 export interface SavoirStat {
@@ -194,6 +198,210 @@ export interface FauneStat {
   readonly betes: number;
 }
 
+/**
+ * Mode Dieu : les pouvoirs qu'un observateur peut exercer sur le monde. Le
+ * catalogue est fermé ; le moteur applique, journalise (`divin`) et fait
+ * payer en faveur. Les personnages interprètent, ils n'obéissent pas.
+ */
+export const POUVOIRS = [
+  "pluie",
+  "eclaircie",
+  "seve",
+  "souffle",
+  "guerison",
+  "braise",
+  "foudre",
+  "songe",
+  "regard",
+] as const;
+export type Pouvoir = (typeof POUVOIRS)[number];
+
+export interface FichePouvoir {
+  readonly nom: string;
+  readonly emoji: string;
+  /** Coût en faveur (✦). */
+  readonly cout: number;
+  /** Ce qu'il faut viser : une tuile, une personne, un bâtiment (feu ou autre). */
+  readonly cible: "tuile" | "personnage" | "batiment";
+  /** Rayon d'effet en tuiles (0 : la cible seule). */
+  readonly rayon: number;
+  /** Jours de recharge avant de pouvoir l'exercer de nouveau. */
+  readonly rechargeJours: number;
+  /** Bienfait (les témoins remercient) ou épreuve (ils craignent). */
+  readonly bienfait: boolean;
+  readonly description: string;
+}
+
+export const FICHES_POUVOIR: Readonly<Record<Pouvoir, FichePouvoir>> = {
+  pluie: {
+    nom: "Ondée",
+    emoji: "🌧️",
+    cout: 6,
+    cible: "tuile",
+    rayon: 8,
+    rechargeJours: 2,
+    bienfait: true,
+    description: "Il pleut aujourd'hui ; les baies et les fibres alentour repoussent d'un coup.",
+  },
+  eclaircie: {
+    nom: "Éclaircie",
+    emoji: "☀️",
+    cout: 8,
+    cible: "tuile",
+    rayon: 0,
+    rechargeJours: 2,
+    bienfait: true,
+    description: "Le ciel se dégage : plus d'orage ni de neige pour la journée.",
+  },
+  seve: {
+    nom: "Sève",
+    emoji: "🌱",
+    cout: 12,
+    cible: "tuile",
+    rayon: 6,
+    rechargeJours: 4,
+    bienfait: true,
+    description:
+      "Les gisements alentour se remplissent, les souches repoussent, le poisson revient.",
+  },
+  souffle: {
+    nom: "Souffle",
+    emoji: "🍃",
+    cout: 4,
+    cible: "personnage",
+    rayon: 0,
+    rechargeJours: 1,
+    bienfait: true,
+    description: "Trois jours de courage : le moral remonte, la fatigue s'envole.",
+  },
+  guerison: {
+    nom: "Main qui guérit",
+    emoji: "✨",
+    cout: 14,
+    cible: "personnage",
+    rayon: 0,
+    rechargeJours: 3,
+    bienfait: true,
+    description: "Les plaies se ferment, la fièvre tombe, la santé revient.",
+  },
+  braise: {
+    nom: "Braise",
+    emoji: "🔥",
+    cout: 5,
+    cible: "batiment",
+    rayon: 0,
+    rechargeJours: 1,
+    bienfait: true,
+    description: "Un feu se rallume avec vingt bûches ; un autre bâtiment se consolide.",
+  },
+  foudre: {
+    nom: "Foudre",
+    emoji: "⚡",
+    cout: 15,
+    cible: "tuile",
+    rayon: 1,
+    rechargeJours: 3,
+    bienfait: false,
+    description: "La foudre frappe : bâtiment ébranlé, gens brûlés, tout le monde effrayé.",
+  },
+  songe: {
+    nom: "Songe",
+    emoji: "🌙",
+    cout: 10,
+    cible: "personnage",
+    rayon: 0,
+    rechargeJours: 3,
+    bienfait: true,
+    description: "Une leçon apprise en rêve, celle qui manque le plus à cette personne.",
+  },
+  regard: {
+    nom: "Regard",
+    emoji: "👁️",
+    cout: 2,
+    cible: "tuile",
+    rayon: 12,
+    rechargeJours: 0,
+    bienfait: true,
+    description: "Le brouillard se lève sur les alentours (la colonie ne le sait pas).",
+  },
+};
+
+export interface FaveurEtat {
+  readonly valeur: number;
+  readonly max: number;
+  /** Par pouvoir, tick à partir duquel il redevient disponible. */
+  readonly recharges: Readonly<Record<string, number>>;
+  /** Miracles exercés depuis le début. */
+  readonly miracles: number;
+}
+
+/** Contexte d'une demande de conseil, construit par le moteur (jamais par la page). */
+export interface ContexteConseil {
+  readonly prenom: string;
+  readonly nomFamille: string;
+  readonly sexe: "F" | "M";
+  readonly stade: string;
+  readonly ageAnnees: number;
+  readonly motto: string;
+  readonly valeurs: readonly string[];
+  readonly traits: readonly string[];
+  readonly besoins: BesoinsEtat;
+  readonly inconfort: {
+    readonly joursFaim: number;
+    readonly joursFroid: number;
+    readonly joursMoralBas: number;
+    readonly echecsConsecutifs: number;
+    readonly dernierEchec: string | null;
+  };
+  readonly moment: { readonly saison: string; readonly jourAbsolu: number; readonly meteo: string };
+  readonly village: {
+    readonly batiments: Readonly<Record<string, number>>;
+    readonly chantiers: readonly string[];
+    readonly stocks: Readonly<Record<string, number>>;
+    readonly famille: number;
+    readonly enfants: number;
+  };
+  readonly savoirs: readonly string[];
+  readonly ideesEnCours: readonly string[];
+  readonly souvenirs: readonly string[];
+}
+
+/** Une option du catalogue fermé (`invention:fumoir`, `batiment:puits`, `priorite:provisions`…). */
+export interface OptionConseil {
+  readonly id: string;
+  readonly libelle: string;
+  readonly pourquoi: string;
+}
+
+/** Une question ouverte d'un personnage à Claude (au plus une à la fois). */
+export interface QuestionConseil {
+  readonly id: string;
+  readonly personnageId: string;
+  readonly tick: number;
+  readonly expireA: number;
+  readonly motifs: readonly string[];
+  readonly contexte: ContexteConseil;
+  readonly options: readonly OptionConseil[];
+}
+
+export interface AmbitionFiche {
+  readonly genre: string;
+  readonly cible: string;
+  readonly but: string;
+  readonly pensee: string;
+  readonly joursRestants: number;
+  readonly issue: "en_cours" | "accomplie" | "abandonnee";
+}
+
+export interface AmbitionStat {
+  readonly personnageId: string;
+  readonly prenom: string;
+  readonly nomFamille: string;
+  readonly cible: string;
+  readonly but: string;
+  readonly joursRestants: number;
+}
+
 export interface MessageEtat {
   readonly type: "etat";
   readonly tick: number;
@@ -216,6 +424,10 @@ export interface MessageEtat {
   readonly decouvertes: readonly number[];
   /** Rayon de vision courant des personnages, en tuiles (jour / nuit, météo). */
   readonly rayonVision: number;
+  /** Mode Dieu : la faveur disponible et les recharges. */
+  readonly faveur: FaveurEtat;
+  /** Questions ouvertes à Claude (au plus une). */
+  readonly questions: readonly QuestionConseil[];
 }
 
 export interface RelationFiche {
@@ -325,6 +537,10 @@ export interface MessageFiche {
   readonly corps: CorpsFiche;
   readonly humeur: readonly HumeurFiche[];
   readonly metier: string | null;
+  /** Ambition en cours ou dernière issue (conseil de Claude). */
+  readonly ambition: AmbitionFiche | null;
+  /** Le bouton « Demander conseil » est-il possible maintenant ? */
+  readonly conseilPossible: boolean;
 }
 
 export interface MessageErreur {
@@ -349,7 +565,26 @@ export type Commande =
       readonly personnageId: string;
       readonly texte: string;
       readonly savoir?: string;
-    };
+    }
+  /** Mode Dieu : exercer un pouvoir sur une tuile, une personne ou un bâtiment. */
+  | {
+      readonly type: "pouvoir";
+      readonly pouvoir: Pouvoir;
+      readonly x: number;
+      readonly y: number;
+      readonly cibleId?: string;
+    }
+  /** Réponse de Claude à une question ouverte : un choix du catalogue, une pensée, une ambition. */
+  | {
+      readonly type: "conseil";
+      readonly questionId: string;
+      readonly personnageId: string;
+      readonly choix: string;
+      readonly pensee: string;
+      readonly ambition?: { readonly but: string; readonly jours: number };
+    }
+  /** L'observateur demande qu'un personnage pose sa question à Claude. */
+  | { readonly type: "demander_conseil"; readonly id: string };
 
 /** Vitesses proposées par l'interface (ticks de jeu par seconde réelle). */
 export const VITESSES: readonly number[] = [1, 4, 16, 64];
@@ -371,6 +606,14 @@ export function analyserCommande(texte: string): Commande | null {
     personnageId?: unknown;
     texte?: unknown;
     savoir?: unknown;
+    pouvoir?: unknown;
+    x?: unknown;
+    y?: unknown;
+    cibleId?: unknown;
+    questionId?: unknown;
+    choix?: unknown;
+    pensee?: unknown;
+    ambition?: unknown;
   };
   switch (c.type) {
     case "pause":
@@ -402,6 +645,50 @@ export function analyserCommande(texte: string): Commande | null {
         ...(typeof c.savoir === "string" ? { savoir: c.savoir } : {}),
       };
     }
+    case "pouvoir": {
+      const pouvoir = c.pouvoir;
+      if (typeof pouvoir !== "string" || !(POUVOIRS as readonly string[]).includes(pouvoir))
+        return null;
+      if (!Number.isInteger(c.x) || !Number.isInteger(c.y)) return null;
+      if (Math.abs(c.x as number) > 100_000 || Math.abs(c.y as number) > 100_000) return null;
+      return {
+        type: "pouvoir",
+        pouvoir: pouvoir as Pouvoir,
+        x: c.x as number,
+        y: c.y as number,
+        ...(typeof c.cibleId === "string" && c.cibleId.length > 0 && c.cibleId.length < 64
+          ? { cibleId: c.cibleId }
+          : {}),
+      };
+    }
+    case "conseil": {
+      if (typeof c.questionId !== "string" || c.questionId.length === 0 || c.questionId.length > 96)
+        return null;
+      if (typeof c.personnageId !== "string" || c.personnageId.length === 0) return null;
+      if (typeof c.choix !== "string" || c.choix.length === 0 || c.choix.length >= 64) return null;
+      if (typeof c.pensee !== "string" || c.pensee.length > 600) return null;
+      let ambition: { but: string; jours: number } | undefined;
+      if (c.ambition !== undefined && c.ambition !== null) {
+        if (typeof c.ambition !== "object") return null;
+        const a = c.ambition as { but?: unknown; jours?: unknown };
+        if (typeof a.but !== "string" || a.but.length === 0 || a.but.length > 200) return null;
+        if (!Number.isInteger(a.jours) || (a.jours as number) < 1 || (a.jours as number) > 30)
+          return null;
+        ambition = { but: a.but, jours: a.jours as number };
+      }
+      return {
+        type: "conseil",
+        questionId: c.questionId,
+        personnageId: c.personnageId,
+        choix: c.choix,
+        pensee: c.pensee,
+        ...(ambition !== undefined ? { ambition } : {}),
+      };
+    }
+    case "demander_conseil":
+      return typeof c.id === "string" && c.id.length > 0 && c.id.length < 64
+        ? { type: "demander_conseil", id: c.id }
+        : null;
     default:
       return null;
   }

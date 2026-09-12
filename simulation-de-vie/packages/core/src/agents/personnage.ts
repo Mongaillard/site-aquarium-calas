@@ -76,6 +76,30 @@ export interface Drapeaux {
   chaleurMinDuJour: number;
   /** Clés des réflexions déjà faites (évite les répétitions). */
   readonly reflexionsFaites: Set<string>;
+  /** Jours consécutifs de faim, de froid, de moral bas (mis à jour à l'aube). */
+  joursFaim: number;
+  joursFroid: number;
+  joursMoralBas: number;
+  /** Soirs de suite où un besoin réel n'a pas fait venir d'idée. */
+  soirsSansIdee: number;
+  /** Tick de la dernière question posée à Claude (−1 : jamais). */
+  conseilDemandeA: number;
+}
+
+/**
+ * Ambition née d'un conseil de Claude : ce que la personne veut obtenir, pour
+ * combien de temps, et ce qu'il en est advenu. Une seule à la fois.
+ */
+export interface Ambition {
+  readonly genre: "invention" | "batiment" | "lecon" | "priorite" | "explorer";
+  readonly cible: string;
+  readonly but: string;
+  readonly pensee: string;
+  readonly depuis: number;
+  readonly jusqua: number;
+  issue: "en_cours" | "accomplie" | "abandonnee";
+  /** Pour `explorer` : lieux connus au départ (accompli douze lieux plus tard). */
+  readonly lieuxAuDepart: number;
 }
 
 export interface Personnage {
@@ -97,6 +121,8 @@ export interface Personnage {
   readonly savoirs: Map<Savoir, SavoirAcquis>;
   /** Pensée intérieure soufflée par Claude (M5), valable une journée. */
   penseeClaude: { texte: string; tick: number } | null;
+  /** Ambition en cours ou dernière issue (conseil de Claude). */
+  ambition: Ambition | null;
   /** Modificateurs d'humeur datés (deuil, blessure, naissance…). */
   readonly humeur: Modificateur[];
   readonly relations: Map<string, Relation>;
@@ -180,6 +206,7 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
     connaissance: new Map(),
     savoirs: new Map(),
     penseeClaude: null,
+    ambition: null,
     humeur: [],
     relations: new Map(),
     memoire: new FluxMemoire({
@@ -197,6 +224,11 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
       faimMinDuJour: 100,
       chaleurMinDuJour: 100,
       reflexionsFaites: new Set(),
+      joursFaim: 0,
+      joursFroid: 0,
+      joursMoralBas: 0,
+      soirsSansIdee: 0,
+      conseilDemandeA: -1,
     },
     dernierEchec: null,
     echecsConsecutifs: 0,

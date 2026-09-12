@@ -51,6 +51,8 @@ import { eligibles, partenaireDe, veutCourtiser } from "../social/couple.js";
 import { avancementGrossesse, peutConcevoir } from "../agents/vie.js";
 import { PROFILS, troupeauxVisiblesDepuis } from "../monde/faune.js";
 import { betesDe } from "../monde/village.js";
+import { prioriteEnCours } from "./conseil.js";
+import type { Priorite } from "./conseil.js";
 import type { Espece, EtatTroupeau } from "../monde/faune.js";
 
 export interface PersonneVisible {
@@ -263,6 +265,8 @@ export interface Perception {
       readonly malade: boolean;
     };
     readonly explorerPlusLoin: boolean;
+    /** Priorité choisie sur les conseils de Claude (ambition en cours), s'il y en a une. */
+    readonly priorite: Priorite | null;
   };
   readonly moment: Moment;
   readonly meteo: Meteo;
@@ -499,6 +503,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
         malade: p.corps.etat.maladies.length > 0,
       },
       explorerPlusLoin: p.drapeaux.explorerPlusLoinJusqua > monde.horloge.tick,
+      priorite: prioriteEnCours(p),
     },
     moment,
     meteo: monde.meteo,

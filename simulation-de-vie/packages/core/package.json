@@ -15,5 +15,8 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@sdv/protocole": "workspace:*"
   }
 }

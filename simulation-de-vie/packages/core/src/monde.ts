@@ -185,6 +185,20 @@ export function membresFamille(monde: Monde, p: Personnage): Personnage[] {
 export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBatiment | null {
   if (p.corps.stade === "enfant") return null;
   const acces = batimentsAccessibles(monde, p);
+  // Un conseil de Claude : le bâtiment voulu passe devant, s'il manque encore.
+  const ambition = p.ambition;
+  if (
+    ambition !== null &&
+    ambition.issue === "en_cours" &&
+    ambition.genre === "batiment" &&
+    ambition.cible in PLANS_BATIMENT &&
+    !acces.some(
+      (b) =>
+        b.type === ambition.cible && b.termineAuTick !== null && b.termineAuTick >= ambition.depuis,
+    ) &&
+    (ambition.cible !== "palissade" || tuileEnceinteManquante(monde, p) !== null)
+  )
+    return ambition.cible as TypeBatiment;
   const famille = membresFamille(monde, p).length;
   let capacite = 0;
   for (const b of acces) capacite += PLANS_BATIMENT[b.type].capaciteDormeurs;

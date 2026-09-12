@@ -8,7 +8,7 @@ La colonie sait aujourd'hui survivre, bâtir, parler, se reproduire, tirer des l
 
 ## 2. Les dix règles que toutes les études partagent
 
-1. **Le joueur regarde, il ne décide jamais.** Aucun bouton d'ordre. Tout ce qui ressemble à une décision est une leçon, une coutume ou un vote entre personnages.
+1. **Le joueur regarde, il ne décide jamais.** Aucun bouton d'ordre. Tout ce qui ressemble à une décision est une leçon, une coutume ou un vote entre personnages. Depuis M13, il peut _influencer_ : un pouvoir change le monde (pluie, sève, foudre…) et les personnages l'interprètent ; un conseil de Claude passe par le catalogue fermé et le moteur l'applique. Jamais un ordre direct.
 2. **Toute mort a une phrase.** Aucun décès sans cause dominante lisible, sans jours visibles avant, sans leçon possible après. « Emporté par les loups, seul, la nuit, à douze pas du feu. »
 3. **Un danger est un objet nommé.** La meute du bois noir, la fièvre des eaux, les Vareux : un cycle repéré → approche → attaque → repli, chaque étape dans le Journal, jamais de bruit de fond.
 4. **Une catastrophe par an au plus.** Épidémie, meute, raid : un budget de danger déterministe par saison, jamais deux menaces actives, jamais deux morts humaines la même nuit.
@@ -88,6 +88,23 @@ L'élevage, les champs et les métiers, en trois générations.
 - **Troc** (L) : une valeur implicite par rareté et par saison, des échanges acceptés selon l'affinité et la dette, jamais de monnaie ni de prix affiché en chiffres.
 
 Ce qu'on verra : des brebis derrière la palissade, des champs qui changent de couleur, « le pêcheur » sous un prénom, « elle a échangé trois poissons contre une hache » dans le Journal.
+
+### Jalon D — Le mode Dieu — livré en v1 (M13 : faveur, neuf pouvoirs, effets et gestes, demander à Claude, ambitions)
+
+L'observateur devient un personnage de l'histoire : un dieu qui aide ou éprouve, et à qui l'on
+demande conseil. Trois études (game design, interaction, boucle de conseil) ont fixé le cadre.
+
+- **v1 (livrée)** : faveur et recharges ; Ondée, Éclaircie, Sève, Souffle, Main qui guérit,
+  Braise, Foudre, Songe, Regard ; barre de pouvoirs, halo, appui long, effets ; questions à
+  Claude déclenchées par des motifs mesurables, catalogue fermé, ambitions suivies.
+- **v2** : la foi (0–10 par personnage, héritée à moitié, nourrie par les miracles vus) et
+  l'attribution du miracle au ciel ou au hasard ; les prières (intention `prier`, événement
+  `priere` : les quêtes du joueur) ; l'autel et les offrandes ; la réputation du dieu (un dieu
+  cruel rend les bienfaits moins crus, un dieu bon rend les épreuves plus dures) ; Troupeau
+  offert, Idée soufflée, Loups au bord du halo ; la migration conseillée (déménager le foyer).
+- **v3** : les épreuves lourdes (gel précoce, sécheresse, fièvre envoyée, secousse), l'Épiphanie,
+  les niveaux de culte, les lieux interdits, les leçons « le ciel écoute », « le ciel frappe »,
+  « ne pas attendre le ciel ».
 
 ### Jalon 13 — La société
 

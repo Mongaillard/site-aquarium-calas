@@ -39,7 +39,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      '@sdv/protocole':
+        specifier: workspace:*
+        version: link:../protocole
 
   packages/protocole: {}
 

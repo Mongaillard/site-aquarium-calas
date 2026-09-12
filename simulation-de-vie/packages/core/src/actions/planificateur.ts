@@ -39,6 +39,7 @@ import { trouverChemin } from "./chemin.js";
 import { connait } from "../savoirs/lecons.js";
 import { cleLieu } from "../agents/personnage.js";
 import { PROFILS } from "../monde/faune.js";
+import { directionVoulue } from "../cerveau/conseil.js";
 import type { Troupeau } from "../monde/faune.js";
 import type { Action, Intention } from "./types.js";
 
@@ -619,8 +620,13 @@ function planifierExploration(monde: Monde, p: Personnage): ResultatPlan {
   ];
   // Le monde n'a pas de limite : on explore autour du foyer, pas à perte de vue.
   const foyer = batimentsAccessibles(monde, p)[0]?.position ?? { x: 0, y: 0 };
+  // Une ambition d'exploration (conseil de Claude) : la direction voulue et ses deux
+  // voisines seulement, et deux fois plus loin.
+  const voulue = directionVoulue(p);
+  const rayonMax = voulue === null ? RAYON_EXPLORATION : RAYON_EXPLORATION * 2;
   const candidats: { cible: Position; score: number }[] = [];
   for (const [dx, dy] of directions) {
+    if (voulue !== null && dx * voulue[0] + dy * voulue[1] <= 0) continue;
     const distance = p.rng.entier(8, 14);
     const cible = { x: pos.x + dx * distance, y: pos.y + dy * distance };
     const tuile = monde.grille.tuileOuNull(cible.x, cible.y);
@@ -629,11 +635,11 @@ function planifierExploration(monde: Monde, p: Personnage): ResultatPlan {
     // Jamais au-delà du rayon d'exploration ; et de là-bas, on ne s'éloigne plus du foyer.
     const dCible = Grille.distance(cible, foyer);
     const dIci = Grille.distance(pos, foyer);
-    if (dCible > RAYON_EXPLORATION * 1.5) continue;
-    if (dIci > RAYON_EXPLORATION && dCible >= dIci) continue;
+    if (dCible > rayonMax * 1.5) continue;
+    if (dIci > rayonMax && dCible >= dIci) continue;
     let connus = 0;
     for (const l of p.connaissance.values()) if (Grille.distance(l, cible) <= 6) connus++;
-    const eloignement = Math.max(0, dCible - RAYON_EXPLORATION) / 2;
+    const eloignement = Math.max(0, dCible - rayonMax) / 2;
     candidats.push({ cible, score: -Math.min(connus, 10) - eloignement + p.rng.suivant() * 0.5 });
   }
   candidats.sort((a, b) => b.score - a.score);

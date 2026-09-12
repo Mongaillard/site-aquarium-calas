@@ -178,6 +178,15 @@ export class Serveur {
       case "inspiration":
         this.sim.inspirer(commande);
         break;
+      case "pouvoir":
+        this.sim.exercer(commande);
+        break;
+      case "conseil":
+        this.sim.conseiller(commande);
+        break;
+      case "demander_conseil":
+        this.sim.demanderConseil(commande.id);
+        break;
     }
     this.diffuser();
   }

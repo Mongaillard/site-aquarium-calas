@@ -6,8 +6,18 @@
  * Le moteur reste déterministe : Claude souffle un texte (et, pour une
  * épitaphe, une leçon du catalogue) ; c'est le moteur qui l'applique.
  * Les appels sont rares : jamais en boucle, un à la fois, espacés.
+ *
+ * Second mandat (« demander à Claude ») : quand le moteur ouvre une question
+ * (un personnage à court d'idées), la page la met en mots, Claude choisit une
+ * option du catalogue fermé, et le moteur applique ce choix (commande `conseil`).
  */
-import type { Commande, EvenementEtat, MessageFiche, PersonnageEtat } from "@sdv/protocole";
+import type {
+  Commande,
+  EvenementEtat,
+  MessageFiche,
+  PersonnageEtat,
+  QuestionConseil,
+} from "@sdv/protocole";
 import type { Magasin } from "./etat.js";
 
 /** Ce qu'on attend de `claude.use("sample")` : une question, une réponse texte. */
@@ -21,9 +31,19 @@ export interface OptionsClaude {
   readonly intervalleMs?: number;
   /** Leçons possibles pour une épitaphe : id → morale. */
   readonly lecons?: Readonly<Record<string, string>>;
+  /** Espacement minimal entre deux conseils, en millisecondes. */
+  readonly intervalleConseilMs?: number;
 }
 
 export type Inspiration = Extract<Commande, { type: "inspiration" }>;
+export type Conseil = Extract<Commande, { type: "conseil" }>;
+
+/** Réponse attendue de Claude à une question de conseil. */
+export interface ReponseConseil {
+  readonly choix: string;
+  readonly pensee: string;
+  readonly ambition?: { readonly but: string; readonly jours: number };
+}
 
 const LECONS_PAR_DEFAUT: Record<string, string> = {
   provisions_hiver: "L'hiver ne nourrit pas : il faut des provisions avant les premières neiges.",
@@ -61,7 +81,12 @@ function decrirePersonnage(p: PersonnageEtat): string {
 
 export class CerveauClaude {
   private actif = false;
+  private conseils = false;
   private enCours = false;
+  private dernierConseilA = -Infinity;
+  private readonly questionsTraitees = new Set<string>();
+  private readonly relances = new Map<string, number>();
+  private readonly intervalleConseilMs: number;
   private dernierAppel = -Infinity;
   private reprisePossibleA = 0;
   private indexEvenements = 0;
@@ -75,17 +100,85 @@ export class CerveauClaude {
 
   constructor(
     private readonly magasin: Magasin,
-    private readonly envoyer: (inspiration: Inspiration) => void,
+    private readonly envoyer: (commande: Inspiration | Conseil) => void,
     private readonly obtenirSample: () => Promise<Sample | null>,
     private readonly statut: (texte: string) => void,
     options: OptionsClaude = {},
   ) {
     this.intervalleMs = options.intervalleMs ?? 60_000;
+    this.intervalleConseilMs = options.intervalleConseilMs ?? 20_000;
     this.lecons = options.lecons ?? LECONS_PAR_DEFAUT;
   }
 
   get estActif(): boolean {
     return this.actif;
+  }
+
+  get conseilsActifs(): boolean {
+    return this.conseils;
+  }
+
+  activerConseils(): void {
+    this.conseils = true;
+    this.statut("Claude conseille : quand quelqu'un est à court d'idées, il lui répond.");
+  }
+
+  desactiverConseils(): void {
+    this.conseils = false;
+  }
+
+  /** Met une question du moteur en mots (exposé pour les tests). */
+  static promptConseil(q: QuestionConseil): string {
+    const c = q.contexte;
+    const b = c.besoins;
+    const f = c.sexe === "F";
+    const inconfort: string[] = [];
+    if (c.inconfort.joursFaim > 0)
+      inconfort.push(`${String(c.inconfort.joursFaim)} jour(s) de faim d'affilée`);
+    if (c.inconfort.joursFroid > 0)
+      inconfort.push(`${String(c.inconfort.joursFroid)} jour(s) à grelotter`);
+    if (c.inconfort.joursMoralBas > 0)
+      inconfort.push(`${String(c.inconfort.joursMoralBas)} jour(s) de moral bas`);
+    if (c.inconfort.echecsConsecutifs > 0)
+      inconfort.push(
+        `${String(c.inconfort.echecsConsecutifs)} échec(s) de suite${c.inconfort.dernierEchec ? ` (dernier : ${c.inconfort.dernierEchec})` : ""}`,
+      );
+    const batiments = Object.entries(c.village.batiments)
+      .map(([n, k]) => `${String(k)} ${n}`)
+      .join(", ");
+    const stocks = Object.entries(c.village.stocks)
+      .map(([r, n]) => `${r} ${String(n)}`)
+      .join(", ");
+    const options = q.options.map((o) => `- ${o.id} — ${o.libelle} — ${o.pourquoi}`).join("\n");
+    return `Tu conseilles UN personnage d'une simulation de vie (huttes, feux de camp), en français. Tu ne sais que ce qu'il sait. Question ${q.id}.
+${c.prenom} ${c.nomFamille}, ${f ? "femme" : "homme"}, ${c.stade}, ${String(c.ageAnnees)} ans. Devise : « ${c.motto} ». Valeurs : ${c.valeurs.join(", ")}. Traits : ${c.traits.join(", ")}.
+Jour ${String(c.moment.jourAbsolu)}, ${c.moment.saison}, ${c.moment.meteo}. Besoins (0 critique, 100 comblé) : faim ${String(b.faim)}, soif ${String(b.soif)}, sommeil ${String(b.sommeil)}, chaleur ${String(b.chaleur)}, social ${String(b.social)}, moral ${String(b.moral)}.
+Ce qui ne va pas : ${inconfort.length > 0 ? inconfort.join(" ; ") : "rien de précis, mais aucun projet"} (motifs : ${q.motifs.join(", ")}).
+Au village : ${batiments || "rien de bâti"} ; chantiers : ${c.village.chantiers.join(", ") || "aucun"} ; stocks : ${stocks || "vides"} ; famille de ${String(c.village.famille)} dont ${String(c.village.enfants)} enfant(s).
+${f ? "Elle" : "Il"} sait : ${c.savoirs.join(" ; ") || "rien de particulier"}. Idée en cours : ${c.ideesEnCours.join(", ") || "aucune"}.
+Derniers souvenirs :
+${c.souvenirs.map((s) => `- ${s}`).join("\n") || "- rien de notable"}
+Options possibles (choisis UN identifiant, exactement) :
+${options}
+Réponds uniquement par un objet JSON :
+{"choix": "<identifiant>", "pensee": "<1-2 phrases à la première personne, sa voix, sans emoji>", "ambition": {"but": "<ce qu'${f ? "elle" : "il"} veut obtenir, 1 phrase>", "jours": <3 à 20>}}
+"ambition" est facultatif ; "choix": "aucun" si rien ne convient.`;
+  }
+
+  /** Valide une réponse contre la question ; null si le choix n'est pas au catalogue. */
+  static validerConseil(q: QuestionConseil, json: Record<string, unknown>): ReponseConseil | null {
+    const choix = typeof json.choix === "string" ? json.choix.trim() : "";
+    if (choix !== "aucun" && !q.options.some((o) => o.id === choix)) return null;
+    const pensee = texteDe(json.pensee, 300) ?? "";
+    let ambition: { but: string; jours: number } | undefined;
+    const a = json.ambition;
+    if (typeof a === "object" && a !== null) {
+      const but = texteDe((a as { but?: unknown }).but, 200);
+      const jours = (a as { jours?: unknown }).jours;
+      if (but !== null && typeof jours === "number" && Number.isFinite(jours))
+        ambition = { but, jours: Math.max(1, Math.min(30, Math.round(jours))) };
+    }
+    return { choix, pensee, ...(ambition !== undefined ? { ambition } : {}) };
   }
 
   get appels(): number {
@@ -106,7 +199,21 @@ export class CerveauClaude {
 
   /** À appeler régulièrement (boucle d'affichage) ; décide s'il y a quelque chose à demander. */
   async tick(maintenant: number): Promise<void> {
-    if (!this.actif || this.enCours || maintenant < this.reprisePossibleA) return;
+    if ((!this.actif && !this.conseils) || this.enCours || maintenant < this.reprisePossibleA)
+      return;
+    // Les conseils passent devant : quelqu'un attend une réponse.
+    if (this.conseils) {
+      const q = this.magasin.etat?.questions[0];
+      if (
+        q !== undefined &&
+        !this.questionsTraitees.has(q.id) &&
+        maintenant - this.dernierConseilA >= this.intervalleConseilMs
+      ) {
+        await this.conseiller(q, maintenant);
+        return;
+      }
+    }
+    if (!this.actif) return;
     this.collecter();
     const evenement = this.aTraiter[0];
     if (evenement !== undefined && maintenant - this.dernierAppel >= this.intervalleMs / 3) {
@@ -212,10 +319,63 @@ Réponds uniquement par un objet JSON : {"pensee": "..."} — une ou deux phrase
     });
   }
 
+  private async conseiller(q: QuestionConseil, maintenant: number): Promise<void> {
+    this.dernierConseilA = maintenant;
+    const relance = this.relances.get(q.id) ?? 0;
+    const prompt =
+      CerveauClaude.promptConseil(q) +
+      (relance > 0 ? "\nTa réponse précédente n'était pas un identifiant de la liste." : "");
+    this.statut(`${q.contexte.prenom} demande conseil à Claude…`);
+    const boite: { reponse: ReponseConseil | null } = { reponse: null };
+    await this.appeler(
+      prompt,
+      maintenant,
+      (json) => {
+        boite.reponse = CerveauClaude.validerConseil(q, json);
+        return boite.reponse !== null;
+      },
+      "default",
+    );
+    const reponse = boite.reponse;
+    if (reponse === null) {
+      if (relance === 0 && this.conseils) {
+        // Une seule relance ; ensuite, on ferme proprement avec « aucun ».
+        this.relances.set(q.id, 1);
+        return;
+      }
+      this.questionsTraitees.add(q.id);
+      this.envoyer({
+        type: "conseil",
+        questionId: q.id,
+        personnageId: q.personnageId,
+        choix: "aucun",
+        pensee: "",
+      });
+      return;
+    }
+    const r: ReponseConseil = reponse;
+    this.questionsTraitees.add(q.id);
+    this.envoyer({
+      type: "conseil",
+      questionId: q.id,
+      personnageId: q.personnageId,
+      choix: r.choix,
+      pensee: r.pensee,
+      ...(r.ambition !== undefined ? { ambition: r.ambition } : {}),
+    });
+    const option = q.options.find((o) => o.id === r.choix);
+    this.statut(
+      option === undefined
+        ? `${q.contexte.prenom} n'a rien tiré du conseil de Claude.`
+        : `${q.contexte.prenom} va tenter : ${option.libelle}.`,
+    );
+  }
+
   private async appeler(
     prompt: string,
     maintenant: number,
     appliquer: (json: Record<string, unknown>) => boolean,
+    modelTier: "quick" | "default" = "quick",
   ): Promise<void> {
     this.enCours = true;
     this.dernierAppel = maintenant;
@@ -224,9 +384,10 @@ Réponds uniquement par un objet JSON : {"pensee": "..."} — une ou deux phrase
       if (sample === null) {
         this.statut("Claude n'est pas disponible ici (ouvrez la page sur claude.ai).");
         this.desactiver();
+        this.desactiverConseils();
         return;
       }
-      const { text } = await sample(prompt, { modelTier: "quick" });
+      const { text } = await sample(prompt, { modelTier });
       this.nombreAppels += 1;
       const json = extraireJson(text);
       if (json === null || !appliquer(json))
@@ -243,6 +404,7 @@ Réponds uniquement par un objet JSON : {"pensee": "..."} — une ou deux phrase
       if (code === "not_granted" || code === "sampling_disabled") {
         this.statut("Claude n'est pas autorisé sur cette page.");
         this.desactiver();
+        this.desactiverConseils();
       } else if (code === "rate_limited") {
         this.reprisePossibleA = maintenant + 5 * 60_000;
         this.statut("Claude est très sollicité ; nouvelle tentative dans cinq minutes.");

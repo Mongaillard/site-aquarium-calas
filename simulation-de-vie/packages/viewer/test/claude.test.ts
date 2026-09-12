@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { EvenementEtat, MessageEtat, MessageInit, PersonnageEtat } from "@sdv/protocole";
+import type {
+  EvenementEtat,
+  MessageEtat,
+  MessageInit,
+  PersonnageEtat,
+  QuestionConseil,
+} from "@sdv/protocole";
 import { CerveauClaude, extraireJson } from "../src/claude.js";
-import type { Inspiration } from "../src/claude.js";
+import type { Conseil, Inspiration } from "../src/claude.js";
 import { Magasin } from "../src/etat.js";
 
 const init: MessageInit = {
@@ -33,8 +39,69 @@ function personnage(id: string, vivant: boolean): PersonnageEtat {
     parents: null,
     partenaire: null,
     causeDeces: vivant ? null : "froid",
-    teint: 0,
-    cheveux: 0,
+    teint: "0",
+    cheveux: "0",
+    blesse: false,
+    epuise: false,
+    alerte: false,
+    malade: false,
+    metier: null,
+  };
+}
+
+function question(id: string, personnageId: string): QuestionConseil {
+  return {
+    id,
+    personnageId,
+    tick: 10,
+    expireA: 154,
+    motifs: ["inconfort_chronique"],
+    contexte: {
+      prenom: "Iris",
+      nomFamille: "Besson",
+      sexe: "F",
+      stade: "adulte",
+      ageAnnees: 28,
+      motto: "Un pas après l'autre.",
+      valeurs: ["famille"],
+      traits: ["calme"],
+      besoins: {
+        faim: 38,
+        soif: 70,
+        sommeil: 55,
+        chaleur: 62,
+        securite: 80,
+        social: 48,
+        moral: 41,
+      },
+      inconfort: {
+        joursFaim: 3,
+        joursFroid: 0,
+        joursMoralBas: 0,
+        echecsConsecutifs: 4,
+        dernierEchec: "recolter:poisson — gisement épuisé",
+      },
+      moment: { saison: "automne", jourAbsolu: 47, meteo: "pluie" },
+      village: {
+        batiments: { abri: 2, "feu de camp": 1 },
+        chantiers: [],
+        stocks: { poisson: 18, baies: 3 },
+        famille: 5,
+        enfants: 2,
+      },
+      savoirs: ["Des provisions avant l'hiver"],
+      ideesEnCours: [],
+      souvenirs: ["J'ai vu du poisson se gâter dans l'entrepôt."],
+    },
+    options: [
+      { id: "invention:fumoir", libelle: "chercher : fumoir", pourquoi: "le poisson s'entasse" },
+      { id: "batiment:puits", libelle: "bâtir : puits", pourquoi: "l'eau est loin" },
+      {
+        id: "priorite:provisions",
+        libelle: "remplir les stocks",
+        pourquoi: "une ligne de conduite",
+      },
+    ],
   };
 }
 
@@ -83,10 +150,27 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
       tuiles: 0,
       morceaux: 0,
       savoirs: [],
+      faune: [],
+      chasses: { reussies: 0, ratees: 0 },
+      attaques: 0,
+      malades: 0,
+      betail: 0,
+      champs: 0,
+      ambitions: [],
+      miracles: 0,
     },
     decouvertes: [],
     rayonVision: 6,
+    faveur: { valeur: 20, max: 40, recharges: {}, miracles: 0 },
+    questions: [],
   };
+}
+
+function etatAvecQuestions(
+  personnages: PersonnageEtat[],
+  questions: QuestionConseil[],
+): MessageEtat {
+  return { ...etat(personnages, []), questions };
 }
 
 describe("cerveau Claude côté page", () => {
@@ -285,5 +369,118 @@ describe("cerveau Claude côté page", () => {
     await cerveau.tick(100_000);
     expect(cerveau.estActif).toBe(false);
     expect(statuts.at(-1)).toContain("pas disponible");
+  });
+
+  it("met une question en mots, valide le choix de Claude et l'envoie au moteur", async () => {
+    const magasin = new Magasin();
+    magasin.recevoir(init, 0);
+    const prompts: string[] = [];
+    const envoyees: (Inspiration | Conseil)[] = [];
+    const statuts: string[] = [];
+    const cerveau = new CerveauClaude(
+      magasin,
+      (c) => envoyees.push(c),
+      () =>
+        Promise.resolve((entree: string) => {
+          prompts.push(entree);
+          return Promise.resolve({
+            text: '```json\n{"choix": "invention:fumoir", "pensee": "Le poisson pourrit pendant que mes enfants ont faim.", "ambition": {"but": "que personne chez moi n\'ait faim cet hiver", "jours": 12}}\n```',
+          });
+        }),
+      (t) => statuts.push(t),
+      { intervalleMs: 1000, intervalleConseilMs: 1000 },
+    );
+    cerveau.activerConseils();
+    const q = question("q-1-p-1", "p-1");
+    magasin.recevoir(etatAvecQuestions([personnage("p-1", true)], [q]), 10);
+    await cerveau.tick(2000);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain("Options possibles");
+    expect(prompts[0]).toContain("invention:fumoir");
+    expect(prompts[0]).toContain("faim 38");
+    expect(prompts[0]).toContain("Des provisions avant l'hiver");
+    expect(prompts[0]).toContain("q-1-p-1");
+    expect(envoyees).toEqual([
+      {
+        type: "conseil",
+        questionId: "q-1-p-1",
+        personnageId: "p-1",
+        choix: "invention:fumoir",
+        pensee: "Le poisson pourrit pendant que mes enfants ont faim.",
+        ambition: { but: "que personne chez moi n'ait faim cet hiver", jours: 12 },
+      },
+    ]);
+    expect(statuts.at(-1)).toContain("va tenter : chercher : fumoir");
+    // La même question dans l'état suivant n'est jamais reposée.
+    magasin.recevoir(etatAvecQuestions([personnage("p-1", true)], [q]), 20);
+    await cerveau.tick(4000);
+    expect(prompts).toHaveLength(1);
+    // Les conseils seuls n'écrivent pas d'épitaphe.
+    magasin.recevoir(
+      etat(
+        [personnage("p-1", false)],
+        [{ tick: 30, type: "deces", acteur: "p-1", position: null, importance: 10, details: {} }],
+      ),
+      30,
+    );
+    await cerveau.tick(8000);
+    expect(prompts).toHaveLength(1);
+  });
+
+  it("relance une seule fois un choix hors catalogue, puis ferme la question avec « aucun »", async () => {
+    const magasin = new Magasin();
+    magasin.recevoir(init, 0);
+    const prompts: string[] = [];
+    const envoyees: (Inspiration | Conseil)[] = [];
+    const cerveau = new CerveauClaude(
+      magasin,
+      (c) => envoyees.push(c),
+      () =>
+        Promise.resolve((entree: string) => {
+          prompts.push(entree);
+          return Promise.resolve({ text: '{"choix": "batiment:tour", "pensee": "Une tour !"}' });
+        }),
+      () => undefined,
+      { intervalleMs: 1000, intervalleConseilMs: 1000 },
+    );
+    cerveau.activerConseils();
+    magasin.recevoir(
+      etatAvecQuestions([personnage("p-1", true)], [question("q-2-p-1", "p-1")]),
+      10,
+    );
+    await cerveau.tick(2000);
+    expect(prompts).toHaveLength(1);
+    expect(envoyees).toHaveLength(0);
+    await cerveau.tick(2500); // trop tôt
+    expect(prompts).toHaveLength(1);
+    await cerveau.tick(4000);
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain("n'était pas un identifiant de la liste");
+    expect(envoyees).toEqual([
+      { type: "conseil", questionId: "q-2-p-1", personnageId: "p-1", choix: "aucun", pensee: "" },
+    ]);
+    await cerveau.tick(8000);
+    expect(prompts).toHaveLength(2); // jamais de troisième appel
+  });
+
+  it("valide strictement la réponse : choix au catalogue, jours bornés, pensée facultative", () => {
+    const q = question("q-3-p-1", "p-1");
+    expect(CerveauClaude.validerConseil(q, { choix: "batiment:tour" })).toBeNull();
+    expect(CerveauClaude.validerConseil(q, {})).toBeNull();
+    expect(CerveauClaude.validerConseil(q, { choix: "aucun" })).toEqual({
+      choix: "aucun",
+      pensee: "",
+    });
+    expect(
+      CerveauClaude.validerConseil(q, {
+        choix: " batiment:puits ",
+        pensee: "  De l'eau.  ",
+        ambition: { but: "un puits", jours: 99.4 },
+      }),
+    ).toEqual({
+      choix: "batiment:puits",
+      pensee: "De l'eau.",
+      ambition: { but: "un puits", jours: 30 },
+    });
   });
 });

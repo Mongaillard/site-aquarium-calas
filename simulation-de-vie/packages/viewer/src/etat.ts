@@ -6,11 +6,22 @@ import type {
   MessageInit,
   MessageServeur,
 } from "@sdv/protocole";
-import { decouperTranscription } from "@sdv/protocole";
+import { FICHES_POUVOIR, decouperTranscription } from "@sdv/protocole";
+import type { Pouvoir } from "@sdv/protocole";
 
 export interface Bulle {
   readonly id: string;
   readonly texte: string;
+  readonly debut: number;
+  readonly fin: number;
+}
+
+/** Effet visuel d'un miracle sur la carte (une seconde environ). */
+export interface Effet {
+  readonly pouvoir: string;
+  readonly x: number;
+  readonly y: number;
+  readonly rayon: number;
   readonly debut: number;
   readonly fin: number;
 }
@@ -80,6 +91,11 @@ export class Magasin {
   brouillard = true;
   /** Compteur de messages `etat` reçus (pour rafraîchir les panneaux à cadence réduite). */
   version = 0;
+  /** Mode Dieu : actif, pouvoir armé, réticule (tactile) et effets en cours. */
+  modeDieu = false;
+  pouvoirArme: Pouvoir | null = null;
+  reticule: { x: number; y: number } | null = null;
+  effets: Effet[] = [];
 
   nom(id: string): string {
     return this.noms.get(id) ?? id;
@@ -100,6 +116,8 @@ export class Magasin {
     this.selection = null;
     this.selectionBatiment = null;
     this.suivre = false;
+    this.effets = [];
+    this.reticule = null;
     this.morceaux.clear();
     this.zone = null;
     this.versionDecouvertes += 1;
@@ -238,7 +256,9 @@ export class Magasin {
           this.typesVus.add(e.type);
           this.evenements.push(e);
           if (e.type === "dialogue") this.ajouterConversation(e, maintenant);
+          if (e.type === "divin" && e.position !== null) this.ajouterEffet(e, maintenant);
         }
+        this.effets = this.effets.filter((f) => f.fin > maintenant);
         if (this.evenements.length > MAX_EVENEMENTS)
           this.evenements.splice(0, this.evenements.length - MAX_EVENEMENTS);
         this.bulles = this.bulles.filter((b) => b.fin > maintenant);
@@ -274,6 +294,27 @@ export class Magasin {
       const debut = maintenant + i * 1200;
       this.bulles.push({ id, texte: r.texte, debut, fin: debut + 2500 });
     });
+  }
+
+  private ajouterEffet(e: EvenementEtat, maintenant: number): void {
+    const pouvoir = String(e.details.pouvoir ?? "");
+    const fiche = (FICHES_POUVOIR as Readonly<Record<string, { rayon: number }>>)[pouvoir];
+    if (fiche === undefined || e.position === null) return;
+    // Les événements d'une pré-simulation ou d'un rattrapage n'animent pas la carte.
+    if (this.etat !== null && this.etat.tick - e.tick > 24) return;
+    this.effets.push({
+      pouvoir,
+      x: e.position.x,
+      y: e.position.y,
+      rayon: fiche.rayon,
+      debut: maintenant,
+      fin: maintenant + (pouvoir === "foudre" ? 900 : 1400),
+    });
+  }
+
+  /** Personnages ayant une question ouverte à Claude. */
+  get questionnes(): ReadonlySet<string> {
+    return new Set((this.etat?.questions ?? []).map((q) => q.personnageId));
   }
 
   selectionner(id: string | null): void {

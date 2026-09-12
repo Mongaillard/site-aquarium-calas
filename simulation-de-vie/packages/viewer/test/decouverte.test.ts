@@ -61,6 +61,8 @@ function etat(decouvertes: number[]): MessageEtat {
     },
     decouvertes,
     rayonVision: 6,
+    faveur: { valeur: 20, max: 40, recharges: {}, miracles: 0 },
+    questions: [],
   };
 }
 

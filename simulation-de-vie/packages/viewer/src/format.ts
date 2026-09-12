@@ -83,6 +83,9 @@ export const LIBELLES_SAISON: Readonly<Record<string, string>> = {
 };
 
 export const LIBELLES_TYPE: Readonly<Record<string, string>> = {
+  divin: "miracle",
+  conseil: "conseil de Claude",
+  ambition: "ambition",
   arrivee: "arrivée",
   deces: "décès",
   intention: "intention",
@@ -403,6 +406,22 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
           return `${nom} : ${String(d.genre)}`;
       }
     }
+    case "divin":
+      return `✨ ${String(d.nom)} en (${String(d.x)}, ${String(d.y)}) : ${String(d.effet)}${d.reaction !== null && d.reaction !== undefined && qui ? ` — ${qui} : « ${String(d.reaction)} »` : ""}`;
+    case "conseil":
+      if (d.etape === "question")
+        return `💬 ${qui} demande conseil à Claude (${String(d.motifs).replace(/_/g, " ").replace(/,/g, ", ")}).`;
+      return d.applique === true
+        ? `💬 ${qui} a demandé conseil : ${String(d.libelle)} — « ${String(d.pensee)} » (${String(d.jours)} j pour : ${String(d.but)})`
+        : d.raison === "expiree"
+          ? `💬 ${qui} attendait un conseil qui n'est pas venu.`
+          : d.raison === "remplacee"
+            ? `💬 La question de ${qui} attendra : l'observateur en pose une autre.`
+            : `💬 ${qui} a demandé conseil, mais n'en a rien tiré.`;
+    case "ambition":
+      return d.issue === "accomplie"
+        ? `🎯 ${qui} a réussi ce qu'${d.cible === "" ? "il" : "on"} voulait : ${String(d.but)}.`
+        : `${qui} renonce : ${String(d.but)}.`;
     case "claude":
       return d.genre === "pensee"
         ? `🧠 ${qui} pense : « ${String(d.texte)} »`

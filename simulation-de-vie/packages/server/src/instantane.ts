@@ -27,8 +27,19 @@ import {
   partenaireDe,
   rayonVision,
 } from "@sdv/core";
-import type { Evenement, Personnage, Simulation, Intention, Savoir } from "@sdv/core";
 import type {
+  Evenement,
+  Personnage,
+  Simulation,
+  Intention,
+  Invention,
+  Lecon,
+  Savoir,
+  TypeBatiment,
+} from "@sdv/core";
+import type {
+  AmbitionFiche,
+  AmbitionStat,
   BatimentEtat,
   BilanSaison,
   EvenementEtat,
@@ -279,6 +290,78 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
       reussies: sim.journal.parType("chasse").filter((e) => e.details.reussie === true).length,
       ratees: sim.journal.parType("chasse").filter((e) => e.details.reussie !== true).length,
     },
+    ambitions: ambitionsEnCours(sim),
+    miracles: sim.faveur.miracles,
+  };
+}
+
+/** Où ils vont : les ambitions en cours, nées des conseils de Claude. */
+export function ambitionsEnCours(sim: Simulation): AmbitionStat[] {
+  const T = sim.horloge.ticksParJour;
+  const resultat: AmbitionStat[] = [];
+  for (const p of sim.vivants()) {
+    const a = p.ambition;
+    if (a?.issue !== "en_cours") continue;
+    resultat.push({
+      personnageId: p.id,
+      prenom: p.identite.prenom,
+      nomFamille: p.identite.nomFamille,
+      cible: libelleAmbition(a.genre, a.cible),
+      but: a.but,
+      joursRestants: Math.max(0, Math.ceil((a.jusqua - sim.tick) / T)),
+    });
+  }
+  return resultat;
+}
+
+const LIBELLES_PRIORITE: Record<string, string> = {
+  provisions: "les provisions d'abord",
+  chaleur: "la chaleur d'abord",
+  social: "les siens d'abord",
+  soin: "les soins d'abord",
+  explorer: "explorer",
+};
+const LIBELLES_DIRECTION: Record<string, string> = {
+  nord: "vers le nord",
+  est: "vers l'est",
+  sud: "vers le sud",
+  ouest: "vers l'ouest",
+  nord_est: "vers le nord-est",
+  sud_est: "vers le sud-est",
+  sud_ouest: "vers le sud-ouest",
+  nord_ouest: "vers le nord-ouest",
+};
+
+/** Libellé lisible d'une ambition (« bâtir un puits », « chercher : fumoir »…). */
+export function libelleAmbition(genre: string, cible: string): string {
+  switch (genre) {
+    case "invention":
+      return cible in INVENTIONS ? `inventer : ${INVENTIONS[cible as Invention].nom}` : cible;
+    case "batiment":
+      return cible in PLANS_BATIMENT
+        ? `bâtir : ${PLANS_BATIMENT[cible as TypeBatiment].nom}`
+        : cible;
+    case "lecon":
+      return cible in LECONS ? `retenir : ${LECONS[cible as Lecon].titre}` : cible;
+    case "priorite":
+      return LIBELLES_PRIORITE[cible] ?? cible;
+    case "explorer":
+      return `explorer ${LIBELLES_DIRECTION[cible] ?? cible}`;
+    default:
+      return cible;
+  }
+}
+
+export function ambitionFiche(sim: Simulation, p: Personnage): AmbitionFiche | null {
+  const a = p.ambition;
+  if (a === null) return null;
+  return {
+    genre: a.genre,
+    cible: libelleAmbition(a.genre, a.cible),
+    but: a.but,
+    pensee: a.pensee,
+    joursRestants: Math.max(0, Math.ceil((a.jusqua - sim.tick) / sim.horloge.ticksParJour)),
+    issue: a.issue,
   };
 }
 
@@ -341,6 +424,8 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     stats: statistiques(sim, ctx.bilan),
     decouvertes: ctx.suivi.nouvellesDecouvertes(sim),
     rayonVision: rayonVision(sim, sim.horloge.moment()),
+    faveur: sim.etatFaveur(),
+    questions: sim.questionsEnAttente(),
   };
 }
 
@@ -555,6 +640,8 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
     nombreSouvenirs: p.memoire.taille,
     corps: ficheCorps(sim, p),
     metier: sim.titre(p),
+    ambition: ambitionFiche(sim, p),
+    conseilPossible: sim.conseilPossible(p),
     humeur: p.humeur
       .filter((m) => m.jusqua > sim.tick)
       .map((m) => ({ cle: m.cle, valeur: Math.round(m.valeur) })),

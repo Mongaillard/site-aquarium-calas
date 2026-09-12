@@ -67,6 +67,58 @@ describe("instantanés", () => {
     expect((e3.decouvertes.length + e1.decouvertes.length) / 3).toBe(s.grille.nombreDecouvertes);
   });
 
+  it("l'état porte la faveur et les questions ouvertes ; la fiche, l'ambition et le bouton de conseil", () => {
+    const s = sim();
+    const suivi = new SuiviClient();
+    const bilan = new BilanSaisons();
+    const e1 = messageEtat(s, { ticksParSeconde: 4, pause: false, suivi, bilan, indexJournal: 0 });
+    expect(e1.faveur.max).toBe(40);
+    expect(e1.faveur.valeur).toBeGreaterThan(0);
+    expect(e1.questions).toEqual([]);
+    expect(e1.stats.miracles).toBe(0);
+    expect(e1.stats.ambitions).toEqual([]);
+    const p = s.vivants().find((x) => x.corps.stade === "adulte");
+    if (!p) throw new Error("vide");
+    const f1 = messageFiche(s, p.id);
+    expect(f1?.ambition).toBeNull();
+    expect(f1?.conseilPossible).toBe(true);
+    expect(s.demanderConseil(p.id)).toBe(true);
+    const e2 = messageEtat(s, { ticksParSeconde: 4, pause: false, suivi, bilan, indexJournal: 0 });
+    expect(e2.questions).toHaveLength(1);
+    expect(e2.questions[0]?.personnageId).toBe(p.id);
+    expect(e2.questions[0]?.options.length).toBeGreaterThan(0);
+    expect(messageFiche(s, p.id)?.conseilPossible).toBe(false);
+    const q = e2.questions[0];
+    if (!q) throw new Error("vide");
+    const option = q.options.find((o) => o.id.startsWith("priorite:")) ?? q.options[0];
+    if (!option) throw new Error("vide");
+    expect(
+      s.conseiller({
+        questionId: q.id,
+        personnageId: p.id,
+        choix: option.id,
+        pensee: "Je sais ce que je veux.",
+        ambition: { but: "tenir jusqu'au printemps", jours: 5 },
+      }).ok,
+    ).toBe(true);
+    const e3 = messageEtat(s, { ticksParSeconde: 4, pause: false, suivi, bilan, indexJournal: 0 });
+    expect(e3.stats.ambitions).toHaveLength(1);
+    expect(e3.stats.ambitions[0]).toMatchObject({
+      personnageId: p.id,
+      but: "tenir jusqu'au printemps",
+      joursRestants: 5,
+    });
+    expect(messageFiche(s, p.id)?.ambition).toMatchObject({
+      but: "tenir jusqu'au printemps",
+      issue: "en_cours",
+      joursRestants: 5,
+    });
+    s.exercer({ pouvoir: "regard", x: p.corps.position.x, y: p.corps.position.y });
+    const e4 = messageEtat(s, { ticksParSeconde: 4, pause: false, suivi, bilan, indexJournal: 0 });
+    expect(e4.stats.miracles).toBe(1);
+    expect(e4.faveur.valeur).toBe(e3.faveur.valeur - 2);
+  });
+
   it("le différentiel signale les gisements disparus", () => {
     const s = sim();
     const suivi = new SuiviClient();

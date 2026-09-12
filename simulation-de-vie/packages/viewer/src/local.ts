@@ -108,6 +108,17 @@ export class LiaisonLocale implements Liaison {
         if (sim.inspirer(commande)) this.appelsIA += 1;
         this.aDiffuser = true;
         return;
+      case "pouvoir":
+        sim.exercer(commande);
+        break;
+      case "conseil":
+        if (sim.conseiller(commande).ok) this.appelsIA += 1;
+        this.aDiffuser = true;
+        return;
+      case "demander_conseil":
+        sim.demanderConseil(commande.id);
+        this.aDiffuser = true;
+        return;
     }
     if (this.minuteur !== null) this.diffuser();
   }

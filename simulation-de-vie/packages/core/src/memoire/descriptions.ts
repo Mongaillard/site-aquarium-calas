@@ -87,6 +87,17 @@ export function decrireEvenement(
     case "champ":
     case "semis":
       return null;
+    case "divin":
+      // Le témoin le plus proche mémorise déjà le miracle dans `exercer`.
+      return null;
+    case "conseil":
+      return null;
+    case "ambition":
+      return temoin
+        ? d.issue === "accomplie"
+          ? `${qui} a obtenu ce qu'${f ? "elle" : "il"} voulait : ${String(d.but)}.`
+          : null
+        : null;
     case "capture":
       return temoin ? `${qui} a ramené un ${String(d.nom)} vivant.` : null;
     case "abattage":

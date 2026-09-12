@@ -10,7 +10,8 @@ import type { Invention } from "./catalogue.js";
 import { apprendre } from "./lecons.js";
 
 /** Le besoin qui fait naître l'idée, pour chaque invention. */
-function besoinRessenti(monde: Monde, p: Personnage, invention: Invention): boolean {
+/** Le besoin qui fait venir l'idée est-il ressenti en ce moment ? */
+export function besoinRessenti(monde: Monde, p: Personnage, invention: Invention): boolean {
   const lieux = [...p.connaissance.values()];
   const inv = p.corps.inventaire;
   const saison = monde.horloge.moment().saison;

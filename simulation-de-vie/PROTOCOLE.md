@@ -823,7 +823,7 @@ Fonctionnalités minimales, dans cet ordre de priorité :
 
 Pas d'édition du monde par l'observateur en phase 1–5 (lecture seule). **[DÉCISION]** Une
 « intervention divine » (déposer une ressource, déclencher une météo) peut être ajoutée
-en phase 6.
+en phase 6 — réalisée en M13 sous la forme du mode Dieu (section 8 ter).
 
 ---
 
@@ -898,6 +898,32 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   (`claude`), ce qui garde le rejeu possible.
 - Sobriété : un appel à la fois, déclenché par un décès, une invention ou la sélection d'un
   personnage ; jamais en boucle.
+
+## 8 ter. Mode Dieu et conseil de Claude tels que réalisés (M13)
+
+- **[DÉCISION]** L'observateur influence, il ne commande pas. Un pouvoir change le monde
+  (météo, gisements, un corps, un bâtiment, le brouillard) ; jamais une intention, un plan ou
+  une relation. Les personnages interprètent : le témoin éveillé le plus proche mémorise le
+  miracle et en garde une humeur de trois jours.
+- **Faveur** : 20 au départ, plafond 40, +1 par jour simulé, +1 à +4 quand la colonie
+  prospère (bâtiment terminé, leçon, union, naissance, invention). Chaque pouvoir a un coût et
+  une recharge (`FICHES_POUVOIR`, dans le protocole, contrat commun du moteur et de la page).
+  Refus explicites : `faveur_insuffisante`, `recharge`, `cible_invalide`, `hors_monde` (le
+  monde déjà généré seulement), `sans_effet` (rien n'est payé).
+- **Rejeu** : chaque miracle est journalisé (`divin` : pouvoir, cible, effet, témoin,
+  réaction) ; le hasard d'un pouvoir vient d'un flux dérivé du tick et du pouvoir. Même
+  graine, mêmes commandes aux mêmes ticks, même monde.
+- **Demander à Claude** : le moteur mesure les motifs (compteurs de faim, de froid, de moral
+  bas, soirs sans idée, échecs consécutifs, absence de projet), tient la file, ouvre une
+  question à la fois et construit lui-même le contexte et le catalogue d'options (règle 10.2 :
+  jamais le LLM). La page met la question en mots ; Claude répond `{choix, pensee, ambition}`
+  ; la page valide, relance une fois, puis le moteur revalide le choix contre les options de
+  la question ouverte (la liste n'est pas reconstruite d'après la page). Une réponse tardive
+  ou hors catalogue ne change rien. Événements `conseil` et `ambition`.
+- **Ambition** : une seule par personne (but, cible, pensée, échéance) ; le moteur la vérifie
+  chaque aube et la déclare accomplie ou abandonnée. C'est la trace visible de « où il va ».
+- Sobriété inchangée : un appel à la fois, conseils espacés d'au moins vingt secondes réelles,
+  quatre questions par jour simulé au plus, cinq jours de silence par personne.
 
 ## 15 bis. Savoirs : leçons et inventions
 

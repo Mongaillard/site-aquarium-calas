@@ -11,6 +11,7 @@ import type { Intention } from "../actions/types.js";
 import type { Ressource } from "../monde/ressources.js";
 import type { Perception, PerceptionLegere } from "./perception.js";
 import type { Cerveau } from "./types.js";
+import { bonusPriorite } from "./conseil.js";
 
 /** En dessous de ces valeurs, boire / manger deviennent des candidats. */
 export const SEUILS_ENVIE = {
@@ -692,6 +693,12 @@ export class RuleBrain implements Cerveau {
     });
 
     candidats.push({ intention: { type: "attendre", ticks: 3 }, score: 0.05 });
-    return candidats;
+    // Une priorité choisie sur les conseils de Claude pèse sur les candidats concernés.
+    const priorite = perception.moi.priorite;
+    if (priorite === null) return candidats;
+    return candidats.map((c) => ({
+      intention: c.intention,
+      score: c.score + bonusPriorite(priorite, c.intention),
+    }));
   }
 }

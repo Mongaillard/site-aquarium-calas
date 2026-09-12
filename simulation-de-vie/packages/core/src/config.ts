@@ -48,6 +48,8 @@ export interface SimConfig {
     maxConcurrent: number;
     timeoutMs: number;
     enfantsAvecLLM: boolean;
+    /** Questions à Claude (conseils) ouvertes par jour simulé, au plus. */
+    conseilsParJour: number;
     budgetUsdParJourSimule: number;
   };
   memoire: {
@@ -88,6 +90,7 @@ export const CONFIG_PAR_DEFAUT: SimConfig = {
     maxConcurrent: 4,
     timeoutMs: 60_000,
     enfantsAvecLLM: false,
+    conseilsParJour: 4,
     budgetUsdParJourSimule: 5,
   },
   memoire: { maxSouvenirs: 2000, topK: 20, demiVieRecenceJours: 1 },

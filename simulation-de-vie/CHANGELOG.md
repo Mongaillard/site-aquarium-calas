@@ -2,6 +2,78 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M13 – Le mode Dieu et le conseil de Claude (2026-09-12)
+
+Deux façons d'influencer sans jamais commander : l'observateur exerce des pouvoirs sur le
+monde (les personnages interprètent, ils n'obéissent pas), et un personnage à court d'idées
+peut demander conseil à Claude, qui choisit dans un catalogue fermé que le moteur applique.
+
+- **Faveur** : l'observateur dispose d'une faveur (✦, 20 au départ, plafonnée à 40) qui monte
+  d'un point par jour simulé et quand la colonie prospère (naissance +3, union +2, invention
+  +4, leçon +2, bâtiment terminé +1). Chaque pouvoir a un coût et une recharge en jours.
+- **Neuf pouvoirs** (`packages/core/src/monde/divin.ts`, catalogue `FICHES_POUVOIR` dans le
+  protocole) : Ondée (6 ✦, pluie du jour, baies et fibres regarnies à huit tuiles, champs
+  poussés d'un stade), Éclaircie (8 ✦, ciel dégagé), Sève (12 ✦, gisements et souches
+  regarnis à six tuiles), Souffle (4 ✦, sur une personne : moral +15 trois jours, fatigue
+  effacée), Main qui guérit (14 ✦, plaies fermées, maladies guéries avec immunité, santé +30),
+  Braise (5 ✦, sur un feu : rallumé avec vingt bûches ; sur un autre bâtiment : solidité +30),
+  Foudre (15 ✦, épreuve : bâtiment −40 de solidité ou feu embrasé, brûlure de gravité 2 à une
+  tuile, sécurité −30 et peur à huit tuiles, l'orage arrive), Songe (10 ✦, une personne
+  apprend en rêve la leçon qui lui manque le plus), Regard (2 ✦, sans recharge : le brouillard
+  se lève à douze tuiles, sans que la colonie le sache). Un miracle ne touche que le monde
+  déjà généré, refuse une cible vide ou sans effet (rien n'est payé), et le témoin éveillé le
+  plus proche s'en souvient (« Le ciel nous a fait une grâce… » / « Le ciel nous a
+  frappés… ») avec une humeur de trois jours. Événement `divin` (pouvoir, effet, témoin,
+  réaction) ; même graine, mêmes miracles aux mêmes ticks, même monde.
+- **Demander à Claude** (`packages/core/src/cerveau/conseil.ts`) : le soir, après la
+  réflexion, un adulte dont les motifs mesurables pèsent assez entre dans la file (quatre au
+  plus) : besoin ressenti sans idée trois soirs de suite (2), inconfort chronique — trois
+  jours de faim ou de froid, quatre de moral bas — (3), quatre échecs de suite (3), aucun
+  projet ni bâtiment nécessaire (1) ; seuil 2. Une seule question ouverte à la fois, quatre
+  par jour au plus (`brain.conseilsParJour`), cinq jours de silence par personne, expiration
+  au bout d'un jour. La question porte un contexte compact construit par le moteur (identité,
+  besoins, inconfort, village, savoirs, souvenirs) et un catalogue fermé de neuf options au
+  plus : `invention:<id>` (besoin ressenti), `batiment:<type>` (prérequis vérifiés),
+  `lecon:<id>` (les plus utiles), `priorite:<provisions|chaleur|social|soin|explorer>`,
+  `explorer:<direction>` (là où il reste à découvrir).
+- **Application déterministe** : une invention devient une idée (force 0,6, origine
+  « Claude »), une leçon est retenue, un bâtiment passe devant dans les besoins de
+  construction (le site, l'approvisionnement et la fondation restent ceux du moteur), une
+  priorité vaut +0,35 sur les candidats concernés du cerveau à règles, une direction oriente
+  l'exploration (la direction voulue et ses voisines, deux fois plus loin). Chaque conseil
+  pose une **ambition** (but, pensée, échéance de 3 à 20 jours) suivie chaque aube :
+  accomplie (prototype réussi, bâtiment achevé, douze lieux découverts, échéance tenue) ou
+  abandonnée ; événements `conseil` (question, réponse appliquée ou non, raison) et
+  `ambition`, souvenirs et humeur. Un choix hors catalogue ne change rien et ferme la question.
+- **Le bouton de l'observateur** : « Demander conseil » dans la fiche fait poser sa question
+  tout de suite (une par jour et par personne), en passant devant une question ouverte par le
+  moteur.
+- Protocole : `POUVOIRS`, `FICHES_POUVOIR`, `FaveurEtat`, `QuestionConseil` (contexte et
+  options), `MessageEtat.faveur` et `.questions`, `MessageFiche.ambition` et
+  `.conseilPossible`, `Statistiques.ambitions` et `.miracles` ; commandes `pouvoir`,
+  `conseil`, `demander_conseil` validées et bornées. Le paquet `@sdv/core` dépend désormais de
+  `@sdv/protocole` (le catalogue des pouvoirs est le contrat commun).
+- Viewer : bouton « ✨ Dieu » (touche `g`) qui ouvre une barre de pouvoirs flottante en bas de
+  la carte (jauge de faveur, pastilles avec coût, recharge grisée, touches 1 à 9) ; un pouvoir
+  armé se pose d'un clic sur une tuile connue, une personne ou un bâtiment (halo de visée
+  tireté, rouge sur l'inconnu ; clic droit ou Échap désarment) ; sur écran tactile, un toucher
+  pose le réticule et le bouton « ✓ Ici » (ou un appui long) applique ; refus signalé par une
+  secousse. Effets dessinés une seconde (pluie, éclair et flash, anneaux, pousses, braise,
+  lune), coupés sous `prefers-reduced-motion`. Bouton « 💬 Conseils » à côté de « 🧠 Claude »
+  (sur claude.ai) : quand une question s'ouvre, la page la met en mots, Claude répond en JSON
+  strict, une seule relance en cas de choix hors catalogue, puis fermeture propre ; badge du
+  nombre de questions en attente, « ? » au-dessus de la tête du demandeur. Fiche : bloc
+  « Ambition » (but, échéance, issue) et bouton « Demander conseil » ; Statistiques : « Où ils
+  vont » (ambitions en cours, cliquables), miracles et faveur ; Journal : miracles, conseils,
+  ambitions.
+- Sans intervention de l'observateur ni de Claude, les mondes sont ceux de M12 (mêmes
+  trajectoires sur les graines 7 et 42 à 450 jours) : les questions s'ouvrent et expirent sans
+  rien changer.
+- Pas encore (phases suivantes du mode Dieu) : la foi des personnages et l'attribution du
+  miracle au ciel ou au hasard, les prières et l'autel, la réputation du dieu, les épreuves
+  lourdes (gel précoce, sécheresse, fièvre envoyée), le troupeau offert, l'idée soufflée, la
+  migration conseillée.
+
 ## M12 – Le village apprivoise (jalon 5 de la feuille de route) (2026-09-12)
 
 - **Capture et apprivoisement** : après une chasse réussie, avec une corde en poche, un jeune
