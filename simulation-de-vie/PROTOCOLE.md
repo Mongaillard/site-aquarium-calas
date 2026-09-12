@@ -208,6 +208,23 @@ de moins). Les maladies entrent dans `sourcesDegats`, donc dans la cause de déc
 grise. Les tombes sont creusées à l'écart de l'eau (rayon de souillure + 1) quand une tuile
 libre existe à huit tuiles.
 
+**Le village apprivoise (M12).** `monde/village.ts` : `DOCILITE` par espèce, `tenterCapture`
+(après une chasse réussie, corde consommée, chance docilité × 0,8), `Bete` dans
+`Simulation.betail` (`ajouterBete`, `retirerBete`, `prochainIdBete`), `heureBete` (à l'enclos,
+sinon derrière le maître, sinon fuite), `jourBete` (fuite d'une bête peu docile sans enclos,
+fourrage d'hiver : fibres à six tuiles ou stock de l'enclos, famine en dix jours, lait tous les
+deux jours pour mouflon et aurochs adultes dociles, laine du mouflon au printemps, mise bas au
+dixième jour du printemps à deux adultes de même espèce, une fois sur deux, sous la capacité
+de six). Bâtiments `enclos` (stock de douze) et `champ` (matériaux : quatre graines ;
+`Batiment.culture` : semé, stade 0..4, jours, récoltes consécutives, jachère). `jourChamp` :
+un stade tous les douze jours à la belle saison, mûr = gisement de baies sur la tuile
+(`rendement` = 24 × fertilité × (1 + 0,08 × niveau d'agriculture), fertilité −30 % par récolte
+consécutive, plancher 0,25), gel au premier jour d'hiver, ravage par un troupeau à une tuile,
+jachère qui remet la fertilité. `prochainBatimentNecessaire` propose l'enclos (bêtes sans
+enclos) et le champ (quatre graines accessibles à la belle saison, `grainesAccessibles`).
+Intention `abattre` (faim < 35, rien d'autre de connu, lance ou hache). `titre` : compétence
+la plus pratiquée (cueillette à moitié) au niveau 3, exposée dans `PersonnageEtat.metier`.
+
 ### 4.3 Temps, saisons, météo
 
 - Horloge : tick → minute, heure, jour, saison, année. **[DÉCISION]** 30 jours par saison,

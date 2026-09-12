@@ -61,6 +61,8 @@ export interface PersonnageEtat {
   readonly alerte: boolean;
   /** Malade : teint pâle. */
   readonly malade: boolean;
+  /** Titre de métier tiré de la pratique (« pêcheuse »), s'il en a un. */
+  readonly metier: string | null;
 }
 
 export interface BatimentEtat {
@@ -75,6 +77,12 @@ export interface BatimentEtat {
   readonly allume: boolean;
   /** Feux : bûches en réserve (quatre par jour, six sous la neige). */
   readonly reserveBois: number;
+  /** Champs : semé, stade de pousse (0 semé … 4 mûr), récoltes consécutives. */
+  readonly culture: {
+    readonly seme: boolean;
+    readonly stade: number;
+    readonly recoltes: number;
+  } | null;
   readonly stock: Readonly<Record<string, number>> | null;
   /** Chantier : travail restant et total (ticks·personne), matériaux manquants. */
   readonly travailRestant: number;
@@ -140,6 +148,9 @@ export interface Statistiques {
   readonly attaques: number;
   /** Malades en ce moment. */
   readonly malades: number;
+  /** Bêtes apprivoisées et champs. */
+  readonly betail: number;
+  readonly champs: number;
 }
 
 export interface SavoirStat {
@@ -172,6 +183,8 @@ export interface TroupeauEtat {
   readonly predateur: boolean;
   /** Meute désignée comme menace par le directeur de danger (yeux jaunes la nuit). */
   readonly menace: boolean;
+  /** Bête apprivoisée (bétail d'une famille). */
+  readonly domestique: boolean;
 }
 
 export interface FauneStat {
@@ -311,6 +324,7 @@ export interface MessageFiche {
   readonly savoirs: readonly SavoirFiche[];
   readonly corps: CorpsFiche;
   readonly humeur: readonly HumeurFiche[];
+  readonly metier: string | null;
 }
 
 export interface MessageErreur {

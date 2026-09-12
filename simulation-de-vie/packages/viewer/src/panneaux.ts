@@ -217,7 +217,7 @@ export class Panneaux {
       ${
         b.etat === "chantier"
           ? `<h3>Chantier</h3><div class="jauges"><span>travail</span><div class="jauge"><i style="width:${avancement}%;background:#6cc2ff"></i></div><span class="num">${avancement}%</span></div><div>Matériaux manquants : ${manquants || "<span class='discret'>aucun, il ne reste qu'à travailler</span>"}</div>`
-          : `<h3>État</h3><div class="jauges"><span>solidité</span><div class="jauge ${b.solidite < 40 ? "critique" : b.solidite < 60 ? "bas" : ""}"><i style="width:${b.solidite}%"></i></div><span class="num">${b.solidite}</span></div>${b.type === "feu_de_camp" ? `<div>${b.allume ? `🔥 allumé · ${b.reserveBois} bûche${b.reserveBois > 1 ? "s" : ""} en réserve (quatre par jour, six sous la neige)` : "éteint (une bûche suffit à le rallumer)"}</div>` : ""}${b.capaciteDormeurs > 0 ? `<div>${b.capaciteDormeurs} place${b.capaciteDormeurs > 1 ? "s" : ""} pour dormir (les enfants se serrent)</div>` : ""}${b.epitaphe ? `<p class="epitaphe">${e(b.epitaphe)}</p>` : ""}`
+          : `<h3>État</h3><div class="jauges"><span>solidité</span><div class="jauge ${b.solidite < 40 ? "critique" : b.solidite < 60 ? "bas" : ""}"><i style="width:${b.solidite}%"></i></div><span class="num">${b.solidite}</span></div>${b.type === "feu_de_camp" ? `<div>${b.allume ? `🔥 allumé · ${b.reserveBois} bûche${b.reserveBois > 1 ? "s" : ""} en réserve (quatre par jour, six sous la neige)` : "éteint (une bûche suffit à le rallumer)"}</div>` : ""}${b.capaciteDormeurs > 0 ? `<div>${b.capaciteDormeurs} place${b.capaciteDormeurs > 1 ? "s" : ""} pour dormir (les enfants se serrent)</div>` : ""}${b.epitaphe ? `<p class="epitaphe">${e(b.epitaphe)}</p>` : ""}${b.culture ? `<div>${b.culture.seme ? `🌱 semé · stade ${b.culture.stade}/4 ${["(terre nue)", "(levée)", "(pousse)", "(épis)", "(mûr, à récolter)"][b.culture.stade] ?? ""}` : "en jachère, à semer au printemps (quatre graines)"}${b.culture.recoltes > 0 ? ` · ${b.culture.recoltes} récolte${b.culture.recoltes > 1 ? "s" : ""} de suite` : ""}</div>` : ""}${b.type === "enclos" ? `<div>Les bêtes de la famille y restent ; lait et laine vont dans son stock ; l'hiver, elles broutent les fibres alentour.</div>` : ""}`
       }
       ${stock !== null ? `<h3>Stock</h3><div class="puces">${stock}</div>` : ""}
       <h3>Présents</h3>
@@ -365,7 +365,7 @@ export class Panneaux {
     return `
       <div class="entete-fiche">
         <span class="rond" style="background:${couleurFamille(f.nomFamille)}"></span>
-        <span class="nom">${e(f.prenom)} ${e(f.nomFamille)}</span>
+        <span class="nom">${e(f.prenom)} ${e(f.nomFamille)}${f.metier ? ` <span class="discret">${e(f.metier)}</span>` : ""}</span>
         <span class="actions"><button id="btn-suivre" class="${this.magasin.suivre ? "actif" : ""}" title="Caméra qui suit ce personnage (s)">suivre</button><button id="btn-fermer" title="Fermer (échap)">✕</button></span>
       </div>
       <div class="discret">${etat} · réputation ${f.reputation} · ${f.lieuxConnus} lieux connus · ${f.nombreSouvenirs} souvenirs</div>
@@ -501,7 +501,7 @@ export class Panneaux {
         ${tuile(s.vivants, "vivants")}${tuile(s.enfants, "enfants")}${tuile(s.population, "population totale")}${tuile(s.morts, "morts")}
         ${tuile(s.naissances, "naissances")}${tuile(s.unions, "unions")}${tuile(s.generations, "générations")}${tuile(s.dialogues, "dialogues")}
         ${tuile(s.batiments, "bâtiments")}${tuile(s.chantiers, "chantiers")}${tuile(s.evenements, "événements")}${tuile(s.tick, "ticks")}
-        ${tuile(s.malades, "malades")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}
+        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}
       </div>
       <h3>Bâtiments</h3><div class="puces">${batiments}</div>
       <h3>Stocks</h3><div class="puces">${stocks}</div>
@@ -530,7 +530,7 @@ export class Panneaux {
       .sort((a, b) => a.nomFamille.localeCompare(b.nomFamille) || a.prenom.localeCompare(b.prenom));
     const morts = etat.personnages.filter((p) => !p.vivant);
     const ligne = (p: (typeof vivants)[number]): string =>
-      `<li class="personne" data-id="${e(p.id)}"><span class="rond" style="background:${couleurFamille(p.nomFamille)}"></span><span>${e(p.prenom)} ${e(p.nomFamille)}</span><span class="detail">${e(p.stade)}${p.enceinte ? " · enceinte" : ""}${p.endormi ? " · dort" : ""} · ${e(p.intention ?? "—")}</span></li>`;
+      `<li class="personne" data-id="${e(p.id)}"><span class="rond" style="background:${couleurFamille(p.nomFamille)}"></span><span>${e(p.prenom)} ${e(p.nomFamille)}</span><span class="detail">${p.metier ? `${e(p.metier)} · ` : ""}${e(p.stade)}${p.enceinte ? " · enceinte" : ""}${p.endormi ? " · dort" : ""} · ${e(p.intention ?? "—")}</span></li>`;
     $("liste-population").innerHTML =
       vivants.map(ligne).join("") +
       (morts.length > 0

@@ -53,6 +53,7 @@ import {
   tomberMalade,
 } from "../agents/maladies.js";
 import { RESERVE_BOIS_MAX } from "../monde.js";
+import { semer, tenterCapture } from "../monde/village.js";
 import type { Action } from "./types.js";
 import { INVENTIONS, LECONS, estLecon } from "../savoirs/catalogue.js";
 import { apprendre, connait } from "../savoirs/lecons.js";
@@ -149,6 +150,8 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       return action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
     case "reparer":
       return tickReparer(monde, p, action);
+    case "abattre":
+      return tickAbattre(monde, p, action);
     case "defendre": {
       const cible = monde.personnages.find((x) => x.id === action.cible);
       if (!cible?.vivant) return echec("personne à défendre");
@@ -695,6 +698,11 @@ function tickRecolter(
   const pris = ajouter(p.corps.inventaire, gisement.type, rendement);
   gisement.quantite -= pris;
   gagnerExperience(p.experience, "recolte", 2);
+  // Des baies donnent parfois des graines ; un champ récolté forme le paysan.
+  const champ = tuile?.batiment?.type === "champ" ? tuile.batiment : null;
+  if (gisement.type === "baies" && pris > 0 && champ === null && p.rng.chance(0.1))
+    ajouter(p.corps.inventaire, "graines", 1);
+  if (champ !== null) gagnerExperience(p.experience, "agriculture", 4);
   const outilUse =
     outil === null
       ? null
@@ -716,6 +724,11 @@ function tickRecolter(
   if (gisement.quantite < 1) {
     monde.emettre("gisement_epuise", p, { ressource: gisement.type }, 3, action.cible);
     if (gisement.tauxRegen === 0 && tuile) tuile.gisement = null;
+    if (champ?.culture) {
+      champ.culture.seme = false;
+      champ.culture.stade = 0;
+      champ.culture.jours = 0;
+    }
     // Un arbre abattu laisse une souche, qui repousse en cent quatre-vingts jours.
     if (gisement.type === "bois" && gisement.outilRequis === "hache_pierre")
       gisement.epuiseDepuis = monde.horloge.tick;
@@ -782,6 +795,28 @@ function tickChasser(
     const quantite = ajouter(inv, "gibier", profil.viande * betes);
     const cuir = profil.cuir > 0 ? ajouter(inv, "cuir", profil.cuir * betes) : 0;
     gagnerExperience(p.experience, "chasse", 6);
+    // Un jeune isolé, une corde, une espèce docile : on le ramène vivant.
+    if (t.taille > 0) {
+      const bete = tenterCapture(p, t.espece, p.rng, () => monde.prochainIdBete());
+      if (bete !== null) {
+        monde.ajouterBete(bete);
+        t.taille -= 1;
+        monde.emettre(
+          "capture",
+          p,
+          { espece: t.espece, nom: profil.nom, bete: bete.id },
+          7,
+          t.position,
+        );
+        p.memoire.ajouter(
+          monde.horloge.tick,
+          "action",
+          `J'ai ramené un jeune ${profil.nom} vivant, au bout d'une corde.`,
+          8,
+          [],
+        );
+      }
+    }
     monde.emettre(
       "chasse",
       p,
@@ -851,6 +886,41 @@ function tickBoire(
   const pos = p.corps.position;
   if (eauSouillee(monde, pos.x, pos.y) && p.rng.chance(CHANCE_FIEVRE_DES_EAUX))
     tomberMalade(monde, p, "fievre_des_eaux", "après avoir bu une eau souillée");
+  return TERMINEE;
+}
+
+/** Abattre une bête de la famille : sa viande et son cuir, quand la faim l'exige. */
+function tickAbattre(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "abattre" }>,
+): Resultat {
+  const bete = monde.betail.get(action.bete);
+  if (bete === undefined) return echec("plus de bête à abattre");
+  if (bete.famille !== p.identite.nomFamille) return echec("ce n'est pas notre bête");
+  if (Grille.distance(p.corps.position, bete.position) > 2) return echec("la bête est trop loin");
+  if (!outilSatisfait(p.corps.inventaire, "lance") && !possede(p.corps.inventaire, "hache_pierre"))
+    return echec("il faut une lance ou une hache");
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+  const profil = PROFILS[bete.espece];
+  const viande = ajouter(p.corps.inventaire, "gibier", profil.viande);
+  const cuir = profil.cuir > 0 ? ajouter(p.corps.inventaire, "cuir", profil.cuir) : 0;
+  monde.retirerBete(bete.id);
+  monde.emettre(
+    "abattage",
+    p,
+    { espece: bete.espece, nom: profil.nom, viande, cuir },
+    6,
+    bete.position,
+  );
+  p.memoire.ajouter(
+    monde.horloge.tick,
+    "action",
+    `Il a fallu abattre notre ${profil.nom} ; on n'avait plus rien.`,
+    6,
+    [],
+  );
   return TERMINEE;
 }
 
@@ -1052,6 +1122,11 @@ function tickConstruire(
     b.termineAuTick = monde.horloge.tick;
     b.allume = plan.atelier === "feu";
     if (plan.atelier === "feu") b.reserveBois = 6;
+    // Un champ achevé est semé : les graines livrées sont en terre.
+    if (b.type === "champ" && semer(b)) {
+      gagnerExperience(p.experience, "agriculture", 6);
+      monde.emettre("semis", p, { batiment: b.id }, 5, b.position);
+    }
     monde.emettre("batiment_termine", p, { batiment: b.id, type: b.type }, 7, b.position);
     for (const autre of monde.personnages) {
       if (autre.projet?.batimentId === b.id) autre.projet = null;

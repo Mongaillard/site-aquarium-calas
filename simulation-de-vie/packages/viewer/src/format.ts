@@ -34,6 +34,9 @@ export const LETTRES_BATIMENT: Readonly<Record<string, string>> = {
   puits: "P",
   palissade: "#",
   tombe: "+",
+  fumoir: "S",
+  enclos: "O",
+  champ: "=",
 };
 
 export const COULEURS_BATIMENT: Readonly<Record<string, string>> = {
@@ -45,6 +48,9 @@ export const COULEURS_BATIMENT: Readonly<Record<string, string>> = {
   puits: "#5c7f9e",
   palissade: "#7a5a2e",
   tombe: "#555555",
+  fumoir: "#8a6a3a",
+  enclos: "#a0783c",
+  champ: "#8fa63a",
 };
 
 export const NOMS_BATIMENT: Readonly<Record<string, string>> = {
@@ -57,6 +63,8 @@ export const NOMS_BATIMENT: Readonly<Record<string, string>> = {
   palissade: "palissade",
   tombe: "tombe",
   fumoir: "fumoir",
+  enclos: "enclos",
+  champ: "champ",
 };
 
 export const LIBELLES_METEO: Readonly<Record<string, string>> = {
@@ -242,6 +250,42 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       return d.lieu === "sac"
         ? `${qui} jette ${String(d.quantite)} ${res(d)} gâté${Number(d.quantite) > 1 ? "s" : ""}.`
         : `${String(d.quantite)} ${res(d)} se gâte${Number(d.quantite) > 1 ? "nt" : ""} dans ${d.lieu === "entrepot" ? "un entrepôt" : "un stock"}.`;
+    case "capture":
+      return `${qui} ramène un jeune ${String(d.nom)} vivant, au bout d'une corde.`;
+    case "abattage":
+      return `${qui} abat ${d.nom === "aurochs" ? "l'" : "le "}${String(d.nom)} de la famille (${String(d.viande)} de viande).`;
+    case "semis":
+      return `${qui === "quelqu'un" ? "On sème" : `${qui} sème`} le champ.`;
+    case "betail":
+      switch (String(d.genre)) {
+        case "naissance":
+          return `Une bête naît à l'enclos (${String(d.espece)}).`;
+        case "lait":
+          return `${String(d.quantite)} lait à l'enclos.`;
+        case "laine":
+          return `La tonte donne ${String(d.quantite)} fibres.`;
+        case "famine":
+          return `Une bête (${String(d.espece)}) meurt de faim à l'enclos.`;
+        case "fuite":
+          return `Une bête (${String(d.espece)}) s'échappe.`;
+        default:
+          return `bétail : ${String(d.genre)}`;
+      }
+    case "champ":
+      switch (String(d.genre)) {
+        case "levee":
+          return "Le champ lève.";
+        case "mur":
+          return "Le champ est mûr : il n'y a plus qu'à récolter.";
+        case "gel":
+          return "Le gel emporte la culture du champ.";
+        case "ravage":
+          return "Un troupeau piétine le champ.";
+        case "jachere":
+          return "Le champ, laissé en jachère, retrouve sa fertilité.";
+        default:
+          return `champ : ${String(d.genre)}`;
+      }
     case "reparation":
       return `${qui} répare ${String(d.objet).replace(/_/g, " ")} (solidité ${String(d.solidite)}).`;
     case "feu_rallume":

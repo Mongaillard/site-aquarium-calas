@@ -16,10 +16,11 @@ const NOMS_RESSOURCES: Record<string, string> = {
   baies: "des baies",
   poisson: "du poisson",
   gibier: "du gibier",
+  lait: "du lait",
+  graines: "des graines",
   eau: "de l'eau",
   fibres: "des fibres",
   argile: "de l'argile",
-  graines: "des graines",
   cuir: "du cuir",
   corde: "de la corde",
   repas_cuit: "un repas cuit",
@@ -82,7 +83,16 @@ export function decrireEvenement(
     case "faune":
     case "pourriture":
     case "reparation":
+    case "betail":
+    case "champ":
+    case "semis":
       return null;
+    case "capture":
+      return temoin ? `${qui} a ramené un ${String(d.nom)} vivant.` : null;
+    case "abattage":
+      return temoin
+        ? `${qui} a abattu ${d.nom === "aurochs" ? "l'" : "le "}${String(d.nom)} de la famille.`
+        : null;
     case "maladie":
       return temoin ? `${qui} est tombé${e_} malade (${String(d.nom)}).` : null;
     case "guerison_maladie":

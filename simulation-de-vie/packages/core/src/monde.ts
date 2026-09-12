@@ -14,6 +14,8 @@ import type { Position } from "./monde/grille.js";
 import type { Horloge } from "./monde/horloge.js";
 import type { Meteo } from "./monde/meteo.js";
 import type { Troupeau } from "./monde/faune.js";
+import type { Bete } from "./monde/village.js";
+import { betesDe, enclosDe } from "./monde/village.js";
 import type { Rng } from "./rng.js";
 
 export interface Monde {
@@ -25,6 +27,11 @@ export interface Monde {
   readonly batiments: ReadonlyMap<string, Batiment>;
   /** La faune : un objet par troupeau ou meute (jalon « la faune vit »). */
   readonly troupeaux: ReadonlyMap<string, Troupeau>;
+  /** Le bétail : bêtes apprivoisées, par identifiant. */
+  readonly betail: ReadonlyMap<string, Bete>;
+  ajouterBete(bete: Bete): void;
+  retirerBete(id: string): void;
+  prochainIdBete(): string;
   readonly meteo: Meteo;
   emettre(
     type: TypeEvenement,
@@ -200,6 +207,20 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
     acces.some((b) => b.stock !== null && (b.stock.ressources.poisson ?? 0) >= 15)
   )
     return "fumoir";
+  // Des bêtes et pas d'enclos : on en bâtit un.
+  if (
+    betesDe(monde, p.identite.nomFamille).length > 0 &&
+    enclosDe(monde, p.identite.nomFamille) === null
+  )
+    return "enclos";
+  // Des graines en main ou au stock à la belle saison : un champ.
+  const saison = monde.horloge.moment().saison;
+  if (
+    (saison === "printemps" || saison === "ete") &&
+    !acces.some((b) => b.type === "champ") &&
+    grainesAccessibles(monde, p) >= 4
+  )
+    return "champ";
   // Des murs contre les loups : une enceinte de pieux autour de l'abri familial.
   if (
     (p.savoirs.get("murs_contre_les_loups")?.force ?? 0) >= SEUIL_SAVOIR &&
@@ -207,6 +228,14 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
   )
     return "palissade";
   return null;
+}
+
+/** Graines en poche et dans les stocks familiaux. */
+export function grainesAccessibles(monde: Monde, p: Personnage): number {
+  let n = p.corps.inventaire.ressources.graines ?? 0;
+  for (const b of batimentsAccessibles(monde, p))
+    if (b.etat === "termine" && b.stock !== null) n += b.stock.ressources.graines ?? 0;
+  return n;
 }
 
 /** Rayon de l'enceinte de palissade autour de l'abri familial. */

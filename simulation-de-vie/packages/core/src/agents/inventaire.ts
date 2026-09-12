@@ -19,6 +19,7 @@ export const VIE_NOURRITURE: Partial<Record<Ressource, number>> = {
   repas_cuit: 12,
   poisson_fume: 90,
   graines: 300,
+  lait: 2,
 };
 
 export function ageDe(inv: Inventaire, r: Ressource): number {
@@ -195,6 +196,7 @@ export const NOURRITURE: Partial<Record<Ressource, number>> = {
   poisson: 35,
   gibier: 45,
   poisson_fume: 50,
+  lait: 20,
 };
 
 /** Nourriture crue transformable en repas cuit. */

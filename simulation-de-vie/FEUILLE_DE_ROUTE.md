@@ -75,7 +75,7 @@ Ce qui rend l'hiver vraiment difficile, sans tuer par surprise.
 
 Ce qu'on verra : des barres de fraîcheur sur les stocks, la hauteur des flammes qui dit la réserve de bois, des teints pâles et des courbes de malades par saison.
 
-### Jalon 12 — Le village apprivoise
+### Jalon 12 — Le village apprivoise — livré en partie (M12 : capture, enclos, champs, métiers ; sans les chaînes de production, la rouille, la propriété commune et le troc)
 
 L'élevage, les champs et les métiers, en trois générations.
 

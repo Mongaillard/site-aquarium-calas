@@ -59,6 +59,18 @@ export {
   seuilReserveBois,
 } from "./monde.js";
 export { REPARATIONS_MAX, SEUIL_REPARATION } from "./monde/recettes.js";
+export {
+  DOCILITE,
+  CAPACITE_ENCLOS,
+  GRAINES_PAR_SEMIS,
+  JOURS_PAR_STADE,
+  RENDEMENT_CHAMP,
+  betesDe,
+  enclosDe,
+  titre,
+  rendement,
+} from "./monde/village.js";
+export type { Bete, Culture } from "./monde/village.js";
 export type { ResultatCombat, IssueCombat } from "./agents/combat.js";
 export { tuileEnceinteManquante, RAYON_ENCEINTE } from "./monde.js";
 export { rendreAscii, LEGENDE_ASCII } from "./monde/ascii.js";

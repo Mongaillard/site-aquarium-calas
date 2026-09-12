@@ -124,6 +124,16 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       return planifierVeille(monde, p);
     case "reparer":
       return planifierReparationOutil(monde, p, intention.objet);
+    case "abattre": {
+      const bete = monde.betail.get(intention.bete);
+      if (bete === undefined) return echec("plus de bête");
+      const plan: Action[] = [];
+      const aller = allerPresDe(monde, p, bete.position);
+      if (aller) plan.push(aller);
+      plan.push({ type: "abattre", bete: bete.id, ticksRestants: 3 });
+      plan.push({ type: "manger", ressource: "gibier", ticksRestants: null });
+      return ok(plan);
+    }
   }
 }
 

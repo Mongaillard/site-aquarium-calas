@@ -4,9 +4,9 @@
  * perception, de la décision, de la planification et de l'exécution de M1.
  */
 import { appliquerTickBesoins } from "./agents/besoins.js";
-import { possede, transferer, placeLibre } from "./agents/inventaire.js";
+import { possede, retirer, transferer, placeLibre } from "./agents/inventaire.js";
 import type { TypeAction } from "./actions/types.js";
-import { gagnerExperience } from "./agents/competences.js";
+import { gagnerExperience, niveau } from "./agents/competences.js";
 import {
   capacites,
   fatigueEffort,
@@ -70,6 +70,8 @@ import {
   peuplerMorceau,
 } from "./monde/faune.js";
 import type { Troupeau } from "./monde/faune.js";
+import { heureBete, jourBete, jourChamp, semer, titre as titreDe } from "./monde/village.js";
+import type { Bete } from "./monde/village.js";
 import { REPIT_TICKS, etatDangerInitial, heureDanger, proieAuContact } from "./monde/danger.js";
 import type { EtatDanger } from "./monde/danger.js";
 import { combattre } from "./agents/combat.js";
@@ -122,6 +124,9 @@ export class Simulation implements Monde {
   readonly troupeaux = new Map<string, Troupeau>();
   /** Directeur de danger : la menace en cours et le budget d'attaques. */
   readonly danger: EtatDanger;
+  /** Le bétail (jalon « le village apprivoise »). */
+  readonly betail = new Map<string, Bete>();
+  private compteurBetail = 0;
   private readonly morceauxPeuples = new Set<number>();
   private compteurTroupeaux = 0;
   meteo: Meteo = "clair";
@@ -681,6 +686,7 @@ export class Simulation implements Monde {
       for (const t of this.troupeaux.values()) heureTroupeau(this, t);
       this.heureDeDanger();
       heureContagion(this);
+      this.heureDuBetail();
     }
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
@@ -725,6 +731,7 @@ export class Simulation implements Monde {
       }
       this.jourFaune();
       this.jourDuTemps();
+      this.jourDuVillage();
       this.regenererBassins();
     }
     for (const p of this.vivants()) {
@@ -945,6 +952,109 @@ export class Simulation implements Monde {
           7,
           index.corps.position,
         );
+      }
+    }
+  }
+
+  prochainIdBete(): string {
+    return `betail-${String(++this.compteurBetail)}`;
+  }
+
+  ajouterBete(bete: Bete): void {
+    this.betail.set(bete.id, bete);
+  }
+
+  retirerBete(id: string): void {
+    this.betail.delete(id);
+  }
+
+  /** Titre de métier d'un personnage (« la pêcheuse »), s'il en a un. */
+  titre(p: Personnage): string | null {
+    return titreDe(p);
+  }
+
+  /** Une heure du bétail : à l'enclos, ou derrière son maître, ou en fuite. */
+  private heureDuBetail(): void {
+    for (const b of [...this.betail.values()]) {
+      if (heureBete(this, b) === "fuit") {
+        this.betail.delete(b.id);
+        this.emettre(
+          "betail",
+          null,
+          { genre: "fuite", espece: b.espece, bete: b.id, famille: b.famille },
+          4,
+          b.position,
+        );
+      }
+    }
+  }
+
+  /** Aube du village : le bétail vit, les champs poussent, on ressème au printemps. */
+  private jourDuVillage(): void {
+    const moment = this.horloge.moment();
+    for (const b of [...this.betail.values()]) {
+      const { evenements, nouvelle } = jourBete(
+        this,
+        b,
+        this.rng.fork(`betail/${b.id}/${String(moment.jourAbsolu)}`),
+        () => this.prochainIdBete(),
+      );
+      for (const e of evenements) {
+        if (e.genre === "fuite" || e.genre === "famine") this.betail.delete(b.id);
+        this.emettre(
+          "betail",
+          null,
+          {
+            genre: e.genre,
+            espece: e.bete.espece,
+            bete: e.bete.id,
+            famille: e.bete.famille,
+            quantite: e.quantite,
+          },
+          e.genre === "naissance" || e.genre === "famine" || e.genre === "fuite" ? 5 : 2,
+          e.bete.position,
+        );
+      }
+      if (nouvelle !== null) this.betail.set(nouvelle.id, nouvelle);
+    }
+    for (const champ of this.batiments.values()) {
+      if (champ.type !== "champ" || champ.etat !== "termine") continue;
+      const competence = Math.max(
+        0,
+        ...this.vivants()
+          .filter((p) => p.identite.nomFamille === champ.famille)
+          .map((p) => niveau(p.experience.agriculture)),
+      );
+      for (const e of jourChamp(this, champ, competence))
+        this.emettre(
+          "champ",
+          null,
+          { genre: e.genre, batiment: champ.id, famille: champ.famille },
+          e.genre === "mur" || e.genre === "gel" ? 5 : 3,
+          champ.position,
+        );
+      // Au printemps, un champ vide est ressemé avec les graines du stock familial.
+      if (
+        moment.saison === "printemps" &&
+        moment.jourDeSaison <= 20 &&
+        champ.culture !== null &&
+        !champ.culture.seme
+      ) {
+        const stock = [...this.batiments.values()].find(
+          (b) =>
+            b.famille === champ.famille &&
+            b.etat === "termine" &&
+            b.stock !== null &&
+            (b.stock.ressources.graines ?? 0) >= 4,
+        );
+        if (stock?.stock && retirer(stock.stock, "graines", 4) === 4 && semer(champ))
+          this.emettre(
+            "semis",
+            null,
+            { batiment: champ.id, famille: champ.famille },
+            4,
+            champ.position,
+          );
       }
     }
   }

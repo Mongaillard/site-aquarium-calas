@@ -73,6 +73,8 @@ export type Action =
   | { readonly type: "defendre"; readonly cible: string; ticksRestants: number }
   /** Réparer un outil ébréché avec une bûche. */
   | { readonly type: "reparer"; readonly objet: TypeObjet; ticksRestants: number }
+  /** Abattre une bête du troupeau familial. */
+  | { readonly type: "abattre"; readonly bete: string; ticksRestants: number }
   | { readonly type: "se_reposer"; ticksRestants: number };
 
 export type TypeAction = Action["type"];
@@ -101,7 +103,8 @@ export type Intention =
   | { readonly type: "fuir" }
   | { readonly type: "defendre"; readonly cible: string }
   | { readonly type: "veiller" }
-  | { readonly type: "reparer"; readonly objet: TypeObjet };
+  | { readonly type: "reparer"; readonly objet: TypeObjet }
+  | { readonly type: "abattre"; readonly bete: string };
 
 export type TypeIntention = Intention["type"];
 
@@ -129,6 +132,8 @@ export function decrireIntention(i: Intention): string {
       return `defendre:${i.cible}`;
     case "reparer":
       return `reparer:${i.objet}`;
+    case "abattre":
+      return `abattre:${i.bete}`;
     default:
       return i.type;
   }
@@ -188,6 +193,8 @@ export function decrireAction(a: Action): string {
       return `defendre:${a.cible}`;
     case "reparer":
       return `reparer:${a.objet}`;
+    case "abattre":
+      return `abattre:${a.bete}`;
   }
 }
 

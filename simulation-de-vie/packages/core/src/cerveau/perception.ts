@@ -50,6 +50,7 @@ import { meilleureNourritureConnue, stockVolable } from "../actions/planificateu
 import { eligibles, partenaireDe, veutCourtiser } from "../social/couple.js";
 import { avancementGrossesse, peutConcevoir } from "../agents/vie.js";
 import { PROFILS, troupeauxVisiblesDepuis } from "../monde/faune.js";
+import { betesDe } from "../monde/village.js";
 import type { Espece, EtatTroupeau } from "../monde/faune.js";
 
 export interface PersonneVisible {
@@ -181,6 +182,12 @@ export function menacePercue(
   };
 }
 
+function betailFamilial(monde: Monde, p: Personnage): { premiere: string; nombre: number } | null {
+  const betes = betesDe(monde, p.identite.nomFamille);
+  const premiere = betes[0];
+  return premiere === undefined ? null : { premiere: premiere.id, nombre: betes.length };
+}
+
 export interface TroupeauVisible {
   readonly id: string;
   readonly espece: Espece;
@@ -239,6 +246,8 @@ export interface Perception {
     readonly ideesEnCours: readonly Invention[];
     readonly possede: (objet: TypeObjet) => boolean;
     readonly cuir: number;
+    /** Bêtes de la famille (identifiant de la première, et nombre). */
+    readonly betail: { readonly premiere: string; readonly nombre: number } | null;
     readonly poissonCru: number;
     /** Le corps : ce qui saigne, ce qui brûle de fièvre, ce qui est cassé, la fatigue. */
     readonly corps: {
@@ -475,6 +484,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
         .map(([k]) => k as Invention),
       possede: (objet) => possede(inv, objet),
       cuir: quantite(inv, "cuir"),
+      betail: betailFamilial(monde, p),
       poissonCru: quantite(inv, "poisson"),
       corps: {
         blesse: p.corps.etat.blessures.length > 0,

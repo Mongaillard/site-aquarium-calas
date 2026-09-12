@@ -89,6 +89,7 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     epuise: estEpuise(p),
     alerte: p.drapeaux.alerteJusqua > sim.tick,
     malade: p.corps.etat.maladies.length > 0,
+    metier: sim.titre(p),
   };
 }
 
@@ -105,6 +106,9 @@ export function etatBatiments(sim: Simulation): BatimentEtat[] {
     epitaphe: b.epitaphe,
     allume: b.allume,
     reserveBois: b.reserveBois,
+    culture: b.culture
+      ? { seme: b.culture.seme, stade: b.culture.stade, recoltes: b.culture.recoltes }
+      : null,
     stock: b.stock ? { ...b.stock.ressources } : null,
     travailRestant: Math.max(0, Math.round(b.travailRestant)),
     travailTotal: PLANS_BATIMENT[b.type].travail,
@@ -212,6 +216,21 @@ export function etatTroupeaux(sim: Simulation): MessageEtat["troupeaux"] {
       etat: t.etat,
       predateur: PROFILS[t.espece].predateur,
       menace: t.enMenace || t.proieHumaine !== null,
+      domestique: false,
+    });
+  }
+  for (const b of sim.betail.values()) {
+    resultat.push({
+      id: b.id,
+      espece: b.espece,
+      nom: PROFILS[b.espece].nom,
+      x: b.position.x,
+      y: b.position.y,
+      taille: 1,
+      etat: "pature",
+      predateur: false,
+      menace: false,
+      domestique: true,
     });
   }
   return resultat;
@@ -253,6 +272,9 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     faune: recensement(sim),
     attaques: sim.danger.attaques,
     malades: sim.vivants().filter((p) => p.corps.etat.maladies.length > 0).length,
+    betail: sim.betail.size,
+    champs: [...sim.batiments.values()].filter((b) => b.type === "champ" && b.etat === "termine")
+      .length,
     chasses: {
       reussies: sim.journal.parType("chasse").filter((e) => e.details.reussie === true).length,
       ratees: sim.journal.parType("chasse").filter((e) => e.details.reussie !== true).length,
@@ -434,6 +456,8 @@ export function pensee(sim: Simulation, p: Personnage): string {
       return "Je veille au feu cette nuit ; qu'ils viennent.";
     case "reparer":
       return `Cet outil est ébréché, je le répare tant qu'il tient.`;
+    case "abattre":
+      return "On n'a plus rien ; il va falloir abattre une bête.";
   }
 }
 
@@ -530,6 +554,7 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
     })),
     nombreSouvenirs: p.memoire.taille,
     corps: ficheCorps(sim, p),
+    metier: sim.titre(p),
     humeur: p.humeur
       .filter((m) => m.jusqua > sim.tick)
       .map((m) => ({ cle: m.cle, valeur: Math.round(m.valeur) })),

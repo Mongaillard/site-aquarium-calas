@@ -294,6 +294,40 @@ export function palissade(ctx: Ctx, x: number, y: number): void {
   ctx.fillRect(x + 0.05, y + 0.5, 0.9, 0.08);
 }
 
+/** Enclos : quatre pieux et deux lisses, une porte au sud. */
+export function enclos(ctx: Ctx, x: number, y: number): void {
+  ctx.strokeStyle = "#a0783c";
+  ctx.lineWidth = 0.06;
+  ctx.strokeRect(x + 0.1, y + 0.15, 0.8, 0.75);
+  ctx.beginPath();
+  ctx.moveTo(x + 0.1, y + 0.5);
+  ctx.lineTo(x + 0.9, y + 0.5);
+  ctx.stroke();
+  ctx.fillStyle = "#7a5a2e";
+  for (const [px, py] of [
+    [0.1, 0.15],
+    [0.9, 0.15],
+    [0.1, 0.9],
+    [0.9, 0.9],
+  ] as const)
+    ctx.fillRect(x + px - 0.05, y + py - 0.12, 0.1, 0.18);
+}
+
+const COULEURS_STADE = ["#9c7a4a", "#a8c56a", "#7fb04f", "#c9c04a", "#e0b23a"] as const;
+
+/** Champ : des sillons, dont la couleur dit le stade (terre nue, levée, pousse, épis, mûr). */
+export function champ(ctx: Ctx, x: number, y: number, seme: boolean, stade: number): void {
+  ctx.fillStyle = "#6b4a2c";
+  ctx.fillRect(x + 0.05, y + 0.05, 0.9, 0.9);
+  ctx.fillStyle = seme ? (COULEURS_STADE[Math.max(0, Math.min(4, stade))] ?? "#9c7a4a") : "#7d5a38";
+  for (let i = 0; i < 4; i++) ctx.fillRect(x + 0.1, y + 0.12 + i * 0.22, 0.8, 0.1);
+  if (seme && stade >= 3) {
+    ctx.fillStyle = "#f2d16b";
+    for (let i = 0; i < 4; i++)
+      for (let j = 0; j < 3; j++) ctx.fillRect(x + 0.2 + j * 0.28, y + 0.1 + i * 0.22, 0.06, 0.06);
+  }
+}
+
 export function tombe(ctx: Ctx, x: number, y: number): void {
   ctx.fillStyle = "#777777";
   ctx.beginPath();

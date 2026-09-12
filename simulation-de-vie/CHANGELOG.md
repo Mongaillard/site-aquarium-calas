@@ -2,6 +2,47 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M12 – Le village apprivoise (jalon 5 de la feuille de route) (2026-09-12)
+
+- **Capture et apprivoisement** : après une chasse réussie, avec une corde en poche, un jeune
+  d'une espèce docile peut être ramené vivant (mouflon 0,7, aurochs 0,4, lièvre 0,3, sanglier
+  0,2 ; le cerf et le loup jamais ; chance = docilité × 0,8, la corde est consommée). La bête
+  (`Bete` : espèce, famille, maître, docilité, faim d'hiver, née en captivité) suit son maître
+  à deux tuiles tant qu'il n'y a pas d'enclos, et une bête peu docile finit par s'échapper.
+  Événements `capture` et `betail` (naissance, lait, laine, famine, fuite).
+- **Enclos et élevage** : nouveau bâtiment `enclos` (six bois, quatre fibres, stock de douze),
+  bâti dès qu'une famille a une bête ; les bêtes y restent ; un mouflon ou un aurochs adulte
+  donne du lait tous les deux jours (nouvelle nourriture, 20, qui tourne en deux jours), un
+  mouflon donne six fibres de laine au printemps, deux adultes de la même espèce font un petit
+  au dixième jour du printemps une fois sur deux (né docile), et l'hiver les bêtes broutent les
+  fibres à six tuiles de l'enclos, ou son stock, ou dépérissent en dix jours. Quand la faim
+  presse et qu'on ne connaît rien d'autre à manger, on **abat** une bête de la famille
+  (intention `abattre`, sa viande et son cuir).
+- **Semis, champs, sols** : les baies donnent parfois des graines (une fois sur dix) ; à la belle
+  saison, une famille qui en a quatre bâtit un `champ` (les graines sont les matériaux, le
+  champ achevé est semé) ; la culture pousse d'un stade tous les douze jours (semé, levée,
+  pousse, épis, mûr) ; mûr, la tuile devient un gisement de baies cultivées (24, plus 8 % par
+  niveau d'agriculture), récolté comme les autres, ce qui forme le paysan ; le gel du premier
+  jour d'hiver emporte ce qui n'est pas mûr ; un troupeau qui passe piétine un stade ; deux
+  récoltes de suite épuisent la terre (rendement −30 % par récolte) et une année sans semis la
+  rend ; au printemps, un champ vide est ressemé avec les graines du stock familial.
+  Événements `semis` et `champ` (levée, mûr, gel, ravage, jachère).
+- **Métiers** : un titre tiré de la pratique (« pêcheuse », « chasseur », « bâtisseuse »,
+  « guérisseur », « paysanne »…) dès le niveau 3 de la compétence la plus pratiquée, la
+  cueillette comptant moitié ; affiché dans la fiche et la liste de la population.
+- Viewer : enclos et champs dessinés (les sillons changent de couleur avec le stade), bêtes
+  apprivoisées sur la carte, fiche du champ (stade, récoltes de suite) et de l'enclos,
+  compteurs de bêtes et de champs dans Statistiques, événements du bétail et des champs dans le
+  Journal.
+- Pas encore : le fromage, le bœuf qui tire le traîneau, les chaînes de production (cuir
+  tanné, pot cuit, tissu, cuivre), la rouille des compétences et le maître-apprenti, la propriété
+  commune et l'emprunt, le troc.
+- Sur cinq graines et 450 jours : 20 à 24 vivants sur quatre mondes (trois à six champs
+  par monde, six à onze semis, six à huit récoltes mûres, des greniers de graines) ; le monde
+  de la graine 42, le plus pauvre en baies et en poisson, subit une famine au deuxième hiver
+  (six vivants) : c'est le prochain chantier d'équilibrage. Les captures restent rares (la
+  corde manque), deux sur la graine 42.
+
 ## M11 – Le temps compte (jalon 4 de la feuille de route) (2026-09-12)
 
 - **Périssabilité** : chaque pile de nourriture a un âge (moyenne pondérée quand on mélange,

@@ -3,6 +3,8 @@ import type { Inventaire } from "../agents/inventaire.js";
 import { creerInventaire } from "../agents/inventaire.js";
 import type { Position } from "./grille.js";
 import type { Ressource } from "./ressources.js";
+import { cultureInitiale } from "./village.js";
+import type { Culture } from "./village.js";
 
 export const TYPES_BATIMENT = [
   "feu_de_camp",
@@ -14,6 +16,8 @@ export const TYPES_BATIMENT = [
   "palissade",
   "tombe",
   "fumoir",
+  "enclos",
+  "champ",
 ] as const;
 export type TypeBatiment = (typeof TYPES_BATIMENT)[number];
 
@@ -126,6 +130,32 @@ export const PLANS_BATIMENT: Record<TypeBatiment, PlanBatiment> = {
     sourceEau: false,
     ascii: "#",
   },
+  enclos: {
+    nom: "enclos",
+    materiaux: { bois: 6, fibres: 4 },
+    travail: 10,
+    capaciteDormeurs: 0,
+    capaciteStock: 12,
+    chaleur: 0,
+    rayonChaleur: 0,
+    abri: false,
+    atelier: null,
+    sourceEau: false,
+    ascii: "O",
+  },
+  champ: {
+    nom: "champ",
+    materiaux: { graines: 4 },
+    travail: 8,
+    capaciteDormeurs: 0,
+    capaciteStock: 0,
+    chaleur: 0,
+    rayonChaleur: 0,
+    abri: false,
+    atelier: null,
+    sourceEau: false,
+    ascii: "=",
+  },
   fumoir: {
     nom: "fumoir",
     materiaux: { bois: 6, pierre: 3, argile: 2 },
@@ -176,6 +206,8 @@ export interface Batiment {
   termineAuTick: number | null;
   /** Tombes : ce qu'on y grave. */
   epitaphe: string | null;
+  /** Champs : l'état de la culture. */
+  culture: Culture | null;
 }
 
 export function creerChantier(
@@ -204,6 +236,7 @@ export function creerChantier(
     fondeAuTick: tick,
     termineAuTick: null,
     epitaphe: null,
+    culture: type === "champ" ? cultureInitiale() : null,
   };
 }
 

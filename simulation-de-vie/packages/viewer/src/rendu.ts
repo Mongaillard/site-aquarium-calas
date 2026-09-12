@@ -142,9 +142,9 @@ export class Rendu {
           taille: tr.taille,
           predateur: tr.predateur,
           yeux: tr.menace && nuit,
+          echelle: tr.domestique ? 0.85 : 1,
           marche: pos.enMouvement || tr.etat === "fuite",
           phase: (maintenant / 300) % 1,
-          echelle: 1,
         });
       }
 
@@ -273,6 +273,12 @@ export class Rendu {
         break;
       case "tombe":
         sprites.tombe(ctx, b.x, b.y);
+        break;
+      case "enclos":
+        sprites.enclos(ctx, b.x, b.y);
+        break;
+      case "champ":
+        sprites.champ(ctx, b.x, b.y, b.culture?.seme ?? false, b.culture?.stade ?? 0);
         break;
       default:
         ctx.fillStyle = "#888";

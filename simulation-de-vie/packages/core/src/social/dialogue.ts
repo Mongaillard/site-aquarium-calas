@@ -81,6 +81,7 @@ const NOMS_LIEUX: Partial<Record<Ressource, string>> = {
   fibres: "des fibres",
   poisson: "du poisson",
   gibier: "du gibier",
+  lait: "du lait",
   argile: "de l'argile",
 };
 

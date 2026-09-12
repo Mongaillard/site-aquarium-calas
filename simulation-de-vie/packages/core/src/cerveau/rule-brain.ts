@@ -629,6 +629,22 @@ export class RuleBrain implements Cerveau {
       });
     }
 
+    // Abattre une bête de la famille quand la faim presse et qu'on ne connaît rien d'autre à manger.
+    if (
+      adulte &&
+      perception.moi.betail !== null &&
+      besoins.faim < 35 &&
+      !nourritureEnPoche &&
+      !connaitNourriture &&
+      !perception.stockAccessible &&
+      (perception.moi.possede("lance") || perception.moi.possede("hache_pierre"))
+    ) {
+      candidats.push({
+        intention: { type: "abattre", bete: perception.moi.betail.premiere },
+        score: 0.3 + urgence(besoins.faim) * 1.5,
+      });
+    }
+
     // Chasser pour le cuir quand on sait ce qu'il vaut.
     if (
       adulte &&
