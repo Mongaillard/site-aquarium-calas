@@ -17,6 +17,7 @@ import {
   capacites,
   estEpuise,
   PROFILS,
+  PROFILS_MALADIE,
   recensement,
   codeBiome,
   decrireAction,
@@ -87,6 +88,7 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     blesse: p.corps.etat.blessures.length > 0,
     epuise: estEpuise(p),
     alerte: p.drapeaux.alerteJusqua > sim.tick,
+    malade: p.corps.etat.maladies.length > 0,
   };
 }
 
@@ -102,6 +104,7 @@ export function etatBatiments(sim: Simulation): BatimentEtat[] {
     solidite: Math.round(b.solidite),
     epitaphe: b.epitaphe,
     allume: b.allume,
+    reserveBois: b.reserveBois,
     stock: b.stock ? { ...b.stock.ressources } : null,
     travailRestant: Math.max(0, Math.round(b.travailRestant)),
     travailTotal: PLANS_BATIMENT[b.type].travail,
@@ -249,6 +252,7 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     savoirs: savoirsDuVillage(sim),
     faune: recensement(sim),
     attaques: sim.danger.attaques,
+    malades: sim.vivants().filter((p) => p.corps.etat.maladies.length > 0).length,
     chasses: {
       reussies: sim.journal.parType("chasse").filter((e) => e.details.reussie === true).length,
       ratees: sim.journal.parType("chasse").filter((e) => e.details.reussie !== true).length,
@@ -428,6 +432,8 @@ export function pensee(sim: Simulation, p: Personnage): string {
       return `Je ne laisserai pas les loups approcher ${prenom(i.cible)}.`;
     case "veiller":
       return "Je veille au feu cette nuit ; qu'ils viennent.";
+    case "reparer":
+      return `Cet outil est ébréché, je le répare tant qu'il tient.`;
   }
 }
 
@@ -550,6 +556,10 @@ function ficheCorps(sim: Simulation, p: Personnage): MessageFiche["corps"] {
     carence: etat.carence,
     handicaps: etat.handicaps.map((h) => h.type),
     cicatrices: etat.cicatrices,
+    maladies: etat.maladies.map((m) => ({
+      nom: PROFILS_MALADIE[m.type].nom,
+      joursRestants: Math.max(0, Math.ceil((m.jusqua - sim.tick) / T)),
+    })),
     capacites: {
       mobilite: Math.round(c.mobilite * 100) / 100,
       manipulation: Math.round(c.manipulation * 100) / 100,

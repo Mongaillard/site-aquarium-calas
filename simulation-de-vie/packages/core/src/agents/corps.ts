@@ -10,6 +10,8 @@ import { NOURRITURE, possede, retirerObjet } from "./inventaire.js";
 import { phenotype } from "./genetique.js";
 import { gagnerExperience, niveau } from "./competences.js";
 import type { Personnage } from "./personnage.js";
+import { soulager, sourcesMaladies } from "./maladies.js";
+import type { Maladie, MaladieEnCours } from "./maladies.js";
 
 export type TypeBlessure = "coupure" | "fracture" | "morsure";
 export type Gravite = 1 | 2 | 3;
@@ -47,6 +49,9 @@ export interface EtatCorps {
   cicatrices: number;
   /** Catégories des vingt derniers repas, la plus récente en dernier. */
   repas: CategorieAliment[];
+  /** Maladies en cours et immunités acquises (jalon « le temps compte »). */
+  maladies: MaladieEnCours[];
+  immunites: Maladie[];
   /** Vrai une fois l'épuisement signalé (une fois par épisode). */
   epuisementSignale: boolean;
 }
@@ -86,6 +91,8 @@ export function etatCorpsInitial(): EtatCorps {
     handicaps: [],
     cicatrices: 0,
     repas: [],
+    maladies: [],
+    immunites: [],
     epuisementSignale: false,
   };
 }
@@ -173,6 +180,7 @@ export function sourcesDegats(
   }
   if (hemorragie > 0) sources.push({ cause: "hémorragie", perteParJour: hemorragie });
   if (infection > 0) sources.push({ cause: "infection", perteParJour: infection });
+  sources.push(...sourcesMaladies(p));
   if (p.corps.etat.carence === "gencives") sources.push({ cause: "carence", perteParJour: 1 });
   return sources;
 }
@@ -370,6 +378,15 @@ export function soignerAvec(monde: Monde, soignant: Personnage, cible: Personnag
     gagnerExperience(soignant.experience, "soin", 8);
     return "cataplasme";
   }
+  if (
+    cible.corps.etat.maladies.length > 0 &&
+    possede(inv, "cataplasme") &&
+    soulager(monde, cible)
+  ) {
+    retirerObjet(inv, "cataplasme");
+    gagnerExperience(soignant.experience, "soin", 6);
+    return "cataplasme";
+  }
   const fracture = blessures.find((b) => b.type === "fracture" && !b.immobilisee);
   if (fracture !== undefined && possede(inv, "attelle")) {
     retirerObjet(inv, "attelle");
@@ -399,6 +416,9 @@ export function soinNecessaire(
   )
     return "cataplasme";
   if (b.some((x) => x.type === "fracture" && !x.immobilisee)) return "attelle";
+  // Un malade qui en a encore pour plus d'un jour : un cataplasme le soulage.
+  const T = 144;
+  if (cible.corps.etat.maladies.some((m) => m.jusqua > tick + T)) return "cataplasme";
   return null;
 }
 

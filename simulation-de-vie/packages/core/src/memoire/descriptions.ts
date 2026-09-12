@@ -80,7 +80,15 @@ export function decrireEvenement(
         ? `${qui} a raté un ${String(d.nom)}${lieu(e)}.`
         : `Le ${String(d.nom)} m'a échappé${lieu(e)}.`;
     case "faune":
+    case "pourriture":
+    case "reparation":
       return null;
+    case "maladie":
+      return temoin ? `${qui} est tombé${e_} malade (${String(d.nom)}).` : null;
+    case "guerison_maladie":
+      return temoin ? null : `Je suis guéri${e_} : ${String(d.nom)}, c'est fini.`;
+    case "epidemie":
+      return temoin ? `Une toux venue d'ailleurs a pris ${qui}. On se tient loin.` : null;
     case "menace":
       if (d.genre === "traces")
         return temoin

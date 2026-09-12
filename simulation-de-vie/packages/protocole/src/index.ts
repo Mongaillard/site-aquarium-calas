@@ -59,6 +59,8 @@ export interface PersonnageEtat {
   readonly epuise: boolean;
   /** L'alarme a été donnée : un « ! » au-dessus de la tête. */
   readonly alerte: boolean;
+  /** Malade : teint pâle. */
+  readonly malade: boolean;
 }
 
 export interface BatimentEtat {
@@ -71,6 +73,8 @@ export interface BatimentEtat {
   readonly proprietaire: string;
   readonly solidite: number;
   readonly allume: boolean;
+  /** Feux : bûches en réserve (quatre par jour, six sous la neige). */
+  readonly reserveBois: number;
   readonly stock: Readonly<Record<string, number>> | null;
   /** Chantier : travail restant et total (ticks·personne), matériaux manquants. */
   readonly travailRestant: number;
@@ -134,6 +138,8 @@ export interface Statistiques {
   readonly chasses: { readonly reussies: number; readonly ratees: number };
   /** Attaques de meutes résolues par un combat. */
   readonly attaques: number;
+  /** Malades en ce moment. */
+  readonly malades: number;
 }
 
 export interface SavoirStat {
@@ -243,6 +249,7 @@ export interface CorpsFiche {
   readonly carence: string | null;
   readonly handicaps: readonly string[];
   readonly cicatrices: number;
+  readonly maladies: readonly { readonly nom: string; readonly joursRestants: number }[];
   readonly capacites: {
     readonly mobilite: number;
     readonly manipulation: number;

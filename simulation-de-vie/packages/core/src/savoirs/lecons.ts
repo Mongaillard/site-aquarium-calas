@@ -86,6 +86,7 @@ export function tirerLecons(monde: Monde, defunt: Personnage, cause: string): Le
       if (enfant) lecons.push("enfants_dabord");
       break;
     case "soif":
+    case "fièvre des eaux":
       if (!puits) lecons.push("puits_pres_du_village");
       break;
     case "hémorragie":

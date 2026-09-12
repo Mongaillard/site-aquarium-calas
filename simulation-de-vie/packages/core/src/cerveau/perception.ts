@@ -12,6 +12,7 @@ import {
   soinNecessaire,
 } from "../agents/corps.js";
 import type { TypeObjet } from "../monde/recettes.js";
+import { REPARATIONS_MAX, SEUIL_REPARATION } from "../monde/recettes.js";
 import type { Besoins } from "../agents/besoins.js";
 import type { Personnalite } from "../agents/identite.js";
 import {
@@ -29,6 +30,8 @@ import {
   batimentAReparer,
   batimentsAccessibles,
   estEau,
+  feuAAlimenter,
+  feuEteint,
   feuProche,
   prochainBatimentNecessaire,
 } from "../monde.js";
@@ -81,6 +84,8 @@ export interface PersonneVisible {
   readonly chasse: boolean;
   /** Veille la nuit près du feu. */
   readonly veille: boolean;
+  /** Malade (on garde ses distances). */
+  readonly malade: boolean;
 }
 
 export interface ProjetPercu {
@@ -105,6 +110,7 @@ export interface PerceptionLegere {
   };
   readonly abriDisponible: boolean;
   readonly feuConnu: boolean;
+  /** Le feu familial est éteint (ou à court de bois) : on s'en occupe. */
   /** Danger : l'alarme a été donnée, ou une meute lancée sur quelqu'un est en vue. */
   readonly menace?: {
     readonly distance: number;
@@ -201,6 +207,8 @@ export interface Perception {
     readonly ressourceNourriture: Ressource | null;
     readonly nourritureCrue: number;
     readonly possedeHache: boolean;
+    /** Outil ébréché qu'on peut encore réparer, s'il y en a un. */
+    readonly outilAReparer: TypeObjet | null;
     readonly intention: Intention | null;
     readonly dernierEchec: Echec | null;
     readonly projet: ProjetPercu | null;
@@ -243,6 +251,7 @@ export interface Perception {
       readonly epuise: boolean;
       readonly mobilite: number;
       readonly soinNecessaire: "bandage" | "cataplasme" | "attelle" | null;
+      readonly malade: boolean;
     };
     readonly explorerPlusLoin: boolean;
   };
@@ -256,6 +265,9 @@ export interface Perception {
   readonly abriDisponible: boolean;
   readonly feuProche: boolean;
   readonly feuConnu: boolean;
+  readonly feuFamilialAAlimenter: boolean;
+  /** Le feu familial est éteint (pas seulement à court de bois). */
+  readonly feuFamilialEteint: boolean;
   /** Un fumoir terminé existe dans la famille. */
   readonly fumoirConnu: boolean;
   readonly stockAccessible: boolean;
@@ -382,6 +394,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
           autre.actionEnCours?.type === "chasser" ||
           (autre.intention?.type === "recolter" && autre.intention.ressource === "gibier"),
         veille: autre.actionEnCours?.type === "veiller",
+        malade: autre.corps.etat.maladies.length > 0,
       });
     }
   }
@@ -419,6 +432,10 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
       ressourceNourriture: nourritureDisponible(inv),
       nourritureCrue: quantite(inv, "baies") + quantite(inv, "poisson") + quantite(inv, "gibier"),
       possedeHache: possede(inv, "hache_pierre"),
+      outilAReparer:
+        inv.objets.find(
+          (o) => o.solidite < SEUIL_REPARATION && (o.reparations ?? 0) < REPARATIONS_MAX,
+        )?.type ?? null,
       intention: p.intention,
       dernierEchec: p.dernierEchec,
       projet,
@@ -469,6 +486,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
         epuise: estEpuise(p),
         mobilite: capacites(p, monde.config.vie.joursParAnnee, monde.horloge.tick).mobilite,
         soinNecessaire: soinNecessaire(p, monde.horloge.tick),
+        malade: p.corps.etat.maladies.length > 0,
       },
       explorerPlusLoin: p.drapeaux.explorerPlusLoinJusqua > monde.horloge.tick,
     },
@@ -491,6 +509,8 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
     abriDisponible: abriDisponible(monde, p) !== null,
     feuProche: feuProche(monde, p.corps.position) !== null,
     feuConnu: feuAllume,
+    feuFamilialAAlimenter: feuAAlimenter(monde, p) !== null,
+    feuFamilialEteint: feuEteint(monde, p) !== null,
     fumoirConnu: acces.some((b) => b.etat === "termine" && b.type === "fumoir"),
     stockAccessible: acces.some((b) => b.etat === "termine" && b.stock !== null),
     besoinConstruction: prochainBatimentNecessaire(monde, p),

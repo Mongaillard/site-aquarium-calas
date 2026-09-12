@@ -62,7 +62,7 @@ Le premier danger extérieur, et la colonie qui apprend à y répondre.
 
 Ce qu'on verra : des yeux jaunes au bord du halo de vision, un « ! » au-dessus des têtes, une enceinte verte ou rouge selon ses brèches, un chien qui suit sa maîtresse.
 
-### Jalon 11 — Le temps compte
+### Jalon 11 — Le temps compte — livré pour l'essentiel (M11 ; sans le calque de salubrité, les ruines et la logistique)
 
 Ce qui rend l'hiver vraiment difficile, sans tuer par surprise.
 

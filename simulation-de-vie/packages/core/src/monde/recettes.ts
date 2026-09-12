@@ -27,7 +27,14 @@ export interface Objet {
   readonly type: TypeObjet;
   /** Solidité 0..100 ; un outil à 0 est cassé et disparaît. */
   solidite: number;
+  /** Réparations déjà faites (deux au plus). */
+  reparations?: number;
 }
+
+/** Un outil ébréché se répare deux fois, pas plus. */
+export const REPARATIONS_MAX = 2;
+/** Solidité en dessous de laquelle on répare. */
+export const SEUIL_REPARATION = 25;
 
 export type Atelier = "feu" | "four" | "fumoir";
 

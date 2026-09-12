@@ -12,6 +12,8 @@ import {
   transferer,
   userObjet,
   outilSatisfait,
+  estGate,
+  objet,
 } from "../agents/inventaire.js";
 import { cleLieu, relationAvec } from "../agents/personnage.js";
 import type { Personnage } from "../agents/personnage.js";
@@ -20,7 +22,12 @@ import { INFO_BIOME } from "../monde/biomes.js";
 import { Grille } from "../monde/grille.js";
 import type { Position } from "../monde/grille.js";
 import { EFFETS_METEO } from "../monde/meteo.js";
-import { RECETTES, SOLIDITE_INITIALE, inventionDeRecette } from "../monde/recettes.js";
+import {
+  RECETTES,
+  SOLIDITE_INITIALE,
+  inventionDeRecette,
+  REPARATIONS_MAX,
+} from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
 import { atelierAdjacent, autorise, eauAdjacente, feuProche } from "../monde.js";
 import type { Monde } from "../monde.js";
@@ -39,6 +46,13 @@ import {
   tirerAccident,
 } from "../agents/corps.js";
 import { PROFILS, faireFuir } from "../monde/faune.js";
+import {
+  CHANCE_FIEVRE_DES_EAUX,
+  CHANCE_MAL_DES_VENTRES,
+  eauSouillee,
+  tomberMalade,
+} from "../agents/maladies.js";
+import { RESERVE_BOIS_MAX } from "../monde.js";
 import type { Action } from "./types.js";
 import { INVENTIONS, LECONS, estLecon } from "../savoirs/catalogue.js";
 import { apprendre, connait } from "../savoirs/lecons.js";
@@ -133,6 +147,8 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
     case "veiller":
       action.ticksRestants -= 1;
       return action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
+    case "reparer":
+      return tickReparer(monde, p, action);
     case "defendre": {
       const cible = monde.personnages.find((x) => x.id === action.cible);
       if (!cible?.vivant) return echec("personne à défendre");
@@ -831,6 +847,30 @@ function tickBoire(
   action.ticksRestants -= 1;
   if (action.ticksRestants > 0) return ENCOURS;
   p.besoins.soif = 100;
+  // Une tombe près de l'eau la souille : la fièvre des eaux guette qui y boit.
+  const pos = p.corps.position;
+  if (eauSouillee(monde, pos.x, pos.y) && p.rng.chance(CHANCE_FIEVRE_DES_EAUX))
+    tomberMalade(monde, p, "fievre_des_eaux", "après avoir bu une eau souillée");
+  return TERMINEE;
+}
+
+/** Réparer un outil ébréché : une bûche, trois ticks, deux fois au plus par outil. */
+function tickReparer(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "reparer" }>,
+): Resultat {
+  const o = objet(p.corps.inventaire, action.objet);
+  if (o === null) return echec("plus d'outil à réparer");
+  if ((o.reparations ?? 0) >= REPARATIONS_MAX) return echec("cet outil ne se répare plus");
+  if (quantite(p.corps.inventaire, "bois") < 1) return echec("il manque bois");
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+  retirer(p.corps.inventaire, "bois", 1);
+  o.solidite = Math.min(100, o.solidite + 40);
+  o.reparations = (o.reparations ?? 0) + 1;
+  gagnerExperience(p.experience, "artisanat", 2);
+  monde.emettre("reparation", p, { objet: o.type, solidite: o.solidite, fois: o.reparations }, 2);
   return TERMINEE;
 }
 
@@ -847,6 +887,7 @@ function tickManger(
   action.ticksRestants -= 1;
   if (action.ticksRestants > 0) return ENCOURS;
   let mange = 0;
+  const gate = estGate(p.corps.inventaire, action.ressource);
   while (p.besoins.faim < 90 && retirer(p.corps.inventaire, action.ressource, 1) === 1) {
     p.besoins.faim = clamp(p.besoins.faim + valeur);
     mange++;
@@ -855,6 +896,8 @@ function tickManger(
   p.besoins.moral = clamp(p.besoins.moral + (action.ressource === "repas_cuit" ? 6 : 2));
   for (let i = 0; i < mange; i++) enregistrerRepas(p, action.ressource);
   monde.emettre("repas", p, { ressource: action.ressource, quantite: mange }, 2);
+  if (gate && mange > 0 && p.rng.chance(CHANCE_MAL_DES_VENTRES))
+    tomberMalade(monde, p, "mal_des_ventres", "après un repas gâté");
   return TERMINEE;
 }
 
@@ -1008,6 +1051,7 @@ function tickConstruire(
     b.travailRestant = 0;
     b.termineAuTick = monde.horloge.tick;
     b.allume = plan.atelier === "feu";
+    if (plan.atelier === "feu") b.reserveBois = 6;
     monde.emettre("batiment_termine", p, { batiment: b.id, type: b.type }, 7, b.position);
     for (const autre of monde.personnages) {
       if (autre.projet?.batimentId === b.id) autre.projet = null;
@@ -1034,11 +1078,24 @@ function tickConstruire(
     return TERMINEE;
   }
 
-  // Bâtiment terminé : rallumer un feu ou réparer.
-  if (plan.atelier === "feu" && !b.allume) {
-    if (retirer(p.corps.inventaire, "bois", 1) < 1) return echec("il manque bois");
+  // Bâtiment terminé : alimenter ou rallumer un feu, ou réparer.
+  if (plan.atelier === "feu" && (!b.allume || b.reserveBois < RESERVE_BOIS_MAX)) {
+    const buches = Math.min(quantite(p.corps.inventaire, "bois"), RESERVE_BOIS_MAX - b.reserveBois);
+    // Un feu éteint qui a encore des bûches se rallume sans rien apporter.
+    if (buches < 1 && (b.allume || b.reserveBois < 1)) return echec("il manque bois");
+    retirer(p.corps.inventaire, "bois", buches);
+    b.reserveBois += buches;
+    const etaitEteint = !b.allume;
     b.allume = true;
-    monde.emettre("feu_rallume", p, { batiment: b.id }, 2, b.position);
+    if (etaitEteint) monde.emettre("feu_rallume", p, { batiment: b.id, buches }, 2, b.position);
+    else
+      monde.emettre(
+        "livraison",
+        p,
+        { batiment: b.id, ressource: "bois", quantite: buches },
+        1,
+        b.position,
+      );
     return TERMINEE;
   }
   if (b.solidite < 100) {

@@ -7,6 +7,7 @@ import {
   possede,
   quantite,
   outilSatisfait,
+  objet,
 } from "../agents/inventaire.js";
 import type { LieuConnu, Personnage } from "../agents/personnage.js";
 import { PLANS_BATIMENT, materiauxManquants } from "../monde/batiments.js";
@@ -14,8 +15,8 @@ import type { Batiment, TypeBatiment } from "../monde/batiments.js";
 import { INFO_BIOME } from "../monde/biomes.js";
 import { Grille } from "../monde/grille.js";
 import type { Position } from "../monde/grille.js";
-import { RECETTES, inventionDeRecette } from "../monde/recettes.js";
-import type { NomRecette } from "../monde/recettes.js";
+import { RECETTES, REPARATIONS_MAX, inventionDeRecette } from "../monde/recettes.js";
+import type { NomRecette, TypeObjet } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
 import {
   abriDisponible,
@@ -25,9 +26,10 @@ import {
   chantierFamilial,
   eauAdjacente,
   estEau,
-  feuEteint,
+  feuAAlimenter,
   feuProche,
   prochainBatimentNecessaire,
+  RESERVE_BOIS_MAX,
   tuileEnceinteManquante,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
@@ -120,7 +122,19 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       }));
     case "veiller":
       return planifierVeille(monde, p);
+    case "reparer":
+      return planifierReparationOutil(monde, p, intention.objet);
   }
+}
+
+/** Réparer un outil ébréché : il faut une bûche. */
+function planifierReparationOutil(monde: Monde, p: Personnage, type: TypeObjet): ResultatPlan {
+  const o = objet(p.corps.inventaire, type);
+  if (o === null) return echec("plus d'outil à réparer");
+  if ((o.reparations ?? 0) >= REPARATIONS_MAX) return echec("cet outil ne se répare plus");
+  if (quantite(p.corps.inventaire, "bois") < 1)
+    return planifierApprovisionnement(monde, p, { bois: 1 }, "la réparation");
+  return ok([{ type: "reparer", objet: type, ticksRestants: 3 }]);
 }
 
 /** Fuir la meute : à l'abri (jusqu'à 40 tuiles), sinon près d'un feu, sinon vers les autres. */
@@ -645,7 +659,7 @@ function planifierConstruction(monde: Monde, p: Personnage): ResultatPlan {
     const type = prochainBatimentNecessaire(monde, p);
     if (type === null) return planifierReparation(monde, p);
     if (type === "feu_de_camp") {
-      const feu = feuEteint(monde, p);
+      const feu = feuAAlimenter(monde, p);
       if (feu !== null) return planifierRallumage(monde, p, feu);
     }
     chantier = chantierFamilial(monde, p, type);
@@ -665,10 +679,13 @@ function planifierConstruction(monde: Monde, p: Personnage): ResultatPlan {
   return planifierApprovisionnement(monde, p, manquants, `chantier ${chantier.type}`);
 }
 
-/** Rallumer un feu éteint : une bûche suffit. */
+/** Rallumer ou alimenter un feu : on apporte de quoi remplir la réserve (au moins une bûche). */
 function planifierRallumage(monde: Monde, p: Personnage, feu: Batiment): ResultatPlan {
-  if (quantite(p.corps.inventaire, "bois") < 1)
-    return planifierApprovisionnement(monde, p, { bois: 1 }, "le feu");
+  const besoin = Math.max(1, Math.min(12, RESERVE_BOIS_MAX - feu.reserveBois));
+  // Un feu éteint qui a encore des bûches : on court le rallumer, le bois attendra.
+  const rallumageSimple = !feu.allume && feu.reserveBois >= 1;
+  if (!rallumageSimple && quantite(p.corps.inventaire, "bois") < 1)
+    return planifierApprovisionnement(monde, p, { bois: besoin }, "le feu");
   const plan: Action[] = [];
   const aller = allerPresDe(monde, p, feu.position);
   if (aller) plan.push(aller);

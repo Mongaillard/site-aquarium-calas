@@ -199,7 +199,7 @@ export const RAYON_ACTIVITE = 48;
 /** Une souche repousse en autant de jours. */
 export const JOURS_REPOUSSE_SOUCHE = 180;
 /** Croissance logistique des bancs de poissons, par bassin (morceau) et par jour. */
-export const CROISSANCE_POISSON = 0.2;
+export const CROISSANCE_POISSON = 0.25;
 /** Immigration d'un bassin voisin quand un bassin est presque vide (poissons par jour). */
 export const IMMIGRATION_POISSON = 1;
 /** Un bassin de pêche : un carré de ce côté (tuiles). */

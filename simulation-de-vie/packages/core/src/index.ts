@@ -40,6 +40,25 @@ export {
 } from "./monde/danger.js";
 export type { EtatDanger, Menace } from "./monde/danger.js";
 export { combattre, defenseursAutour } from "./agents/combat.js";
+export {
+  MALADIES,
+  PROFILS_MALADIE,
+  estMalade,
+  estImmunise,
+  tomberMalade,
+  eauSouillee,
+} from "./agents/maladies.js";
+export type { Maladie, MaladieEnCours, ProfilMaladie } from "./agents/maladies.js";
+export { VIE_NOURRITURE, ageDe, ajouterAge, pourrir, estGate } from "./agents/inventaire.js";
+export {
+  RESERVE_BOIS_MAX,
+  BUCHES_PAR_JOUR,
+  BUCHES_PAR_JOUR_FROID,
+  BUCHES_PAR_JOUR_NEIGE,
+  feuAAlimenter,
+  seuilReserveBois,
+} from "./monde.js";
+export { REPARATIONS_MAX, SEUIL_REPARATION } from "./monde/recettes.js";
 export type { ResultatCombat, IssueCombat } from "./agents/combat.js";
 export { tuileEnceinteManquante, RAYON_ENCEINTE } from "./monde.js";
 export { rendreAscii, LEGENDE_ASCII } from "./monde/ascii.js";

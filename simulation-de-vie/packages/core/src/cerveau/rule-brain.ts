@@ -148,7 +148,7 @@ export class RuleBrain implements Cerveau {
     }
     // Le repos ne passe pas avant la faim ni la soif.
     if (
-      (corps.blesse || corps.fievre || corps.fatigue > 80) &&
+      (corps.blesse || corps.fievre || corps.malade || corps.fatigue > 80) &&
       perception.abriDisponible &&
       besoins.faim >= 35 &&
       besoins.soif >= 35
@@ -259,6 +259,14 @@ export class RuleBrain implements Cerveau {
       });
     }
 
+    // Un outil ébréché se répare, tant qu'il le peut encore.
+    if (adulte && perception.moi.outilAReparer !== null) {
+      candidats.push({
+        intention: { type: "reparer", objet: perception.moi.outilAReparer },
+        score: 0.45 + personnalite.conscience * 0.3,
+      });
+    }
+
     // Une lance ouvre l'accès au gibier, quand on en a vu.
     if (adulte && connaitGibier && !armeDeChasse && placeLibre > 0) {
       candidats.push({
@@ -298,7 +306,8 @@ export class RuleBrain implements Cerveau {
           (v.famille ? 0.2 : 0) +
           (v.eligible ? 0.35 + v.attirance / 100 : 0) +
           (v.lien === "inconnu" ? personnalite.ouverture * 0.3 : 0) -
-          v.distance * 0.02;
+          v.distance * 0.02 -
+          (v.malade ? 0.6 : 0);
         if (sc > meilleurScore) {
           meilleurScore = sc;
           meilleur = v;
@@ -530,13 +539,23 @@ export class RuleBrain implements Cerveau {
     }
 
     // Construire : poursuivre son projet ou en lancer un pour un besoin réel.
+    // Une construction qui vient d'échouer à se planifier (rien à livrer, site introuvable)
+    // attend six heures avant d'être retentée : on ne tourne pas en rond.
+    const constructionEnPanne =
+      perception.moi.dernierEchec !== null &&
+      perception.moi.dernierEchec.action === "construire" &&
+      perception.moment.tick - perception.moi.dernierEchec.tick < 36;
     if (
       adulte &&
+      !constructionEnPanne &&
       (projet !== null || perception.besoinConstruction !== null || perception.reparationNecessaire)
     ) {
       const type = projet?.type ?? perception.besoinConstruction;
       const besoinAbri = (type === "abri" || type === "maison") && !perception.abriDisponible;
-      const besoinFeu = type === "feu_de_camp" && !perception.feuConnu;
+      // Un feu éteint presse ; un feu qui manque de bûches attend que quelqu'un ait le temps.
+      const feuEteint =
+        type === "feu_de_camp" && (!perception.feuConnu || perception.feuFamilialEteint);
+      const feuABois = type === "feu_de_camp" && !feuEteint && perception.feuFamilialAAlimenter;
       candidats.push({
         intention: { type: "construire" },
         score:
@@ -546,7 +565,8 @@ export class RuleBrain implements Cerveau {
           (perception.reparationNecessaire && projet === null ? 0.5 : 0) +
           (besoinAbri ? 0.5 + urgence(besoins.securite) + froid : 0) +
           (perception.moi.chercheAbri && (type === "abri" || type === "maison") ? 0.4 : 0) +
-          (besoinFeu ? 0.3 + froid : 0) -
+          (feuEteint ? 0.4 + froid : 0) +
+          (feuABois ? 0.1 + (saisonFroide ? 0.1 : 0) : 0) -
           (projet === null && perception.besoinConstruction === null ? 0.15 : 0) -
           (nuit ? 0.3 : 0),
       });
@@ -565,12 +585,12 @@ export class RuleBrain implements Cerveau {
       adulte &&
       sait("fumoir") &&
       perception.fumoirConnu &&
-      perception.moi.poissonCru >= 3 &&
+      (perception.moi.poissonCru >= 3 || (perception.stockAccessible && placeLibre >= 3)) &&
       placeLibre > 0
     ) {
       candidats.push({
         intention: { type: "fabriquer", recette: "poisson_fume" },
-        score: 0.4 + personnalite.conscience * 0.3 + (saisonFroide ? 0.3 : 0),
+        score: 0.55 + personnalite.conscience * 0.3 + (saisonFroide ? 0.4 : 0),
       });
     }
 

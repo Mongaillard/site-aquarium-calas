@@ -188,6 +188,26 @@ sinon « veilleur de nuit ») et à `tuileEnceinteManquante`, qui fait bâtir l'
 palissade à trois tuiles de l'abri familial quand la leçon est sue. Le cerveau propose
 `veiller` la nuit (leçon sue, arme, feu connu, personne d'autre ne veille).
 
+**Le temps compte (M11).** `Inventaire.age` porte l'âge moyen (jours) de chaque pile de
+nourriture ; `ajouterAge` mélange en moyenne pondérée, `transferer` emporte l'âge, `pourrir`
+(à l'aube, `Simulation.jourDuTemps`) vieillit d'un jour et, dès que l'âge moyen dépasse la
+moitié de `VIE_NOURRITURE × conservation` (entrepôt ×2, automne ×2,5, hiver ×4), retire un
+`vie`-ième de la pile par jour en la rajeunissant d'autant. Manger gâté
+(`estGate`) donne le mal des ventres à 30 %. Les feux ont `reserveBois` (max 20) et brûlent
+0 / 1 / 2 bûches par jour (belle saison / saison froide / neige) ; `feuAAlimenter` désigne le
+feu familial éteint ou sous le seuil (4 en saison froide, jamais à la belle saison sauf feu éteint) que `prochainBatimentNecessaire`
+fait alimenter (`construire` sur le feu livre jusqu'à dix bûches ; un feu éteint avec des
+bûches se rallume sans bois). Les outils portent `reparations` (deux au plus, `reparer` :
+une bûche, +40 de solidité). `agents/maladies.ts` : `PROFILS_MALADIE` (durée, perte par jour
+×1,5 pour enfants et anciens, contagion, immunisante, faim), `tomberMalade` (pas deux fois,
+pas si immunisé, durée modulée par l'immunité innée), `jourMaladies` (guérisons, immunités,
+refroidissement après une journée sous 25 de chaleur), `heureContagion` (toux grise à deux
+tuiles), `eauSouillee` (tombe à quatre tuiles, sauf puits), `soulager` (cataplasme : trois jours
+de moins). Les maladies entrent dans `sourcesDegats`, donc dans la cause de décès. Épidémie :
+à partir du deuxième hiver, au plus tous les deux ans, un adulte tiré au sort prend la toux
+grise. Les tombes sont creusées à l'écart de l'eau (rayon de souillure + 1) quand une tuile
+libre existe à huit tuiles.
+
 ### 4.3 Temps, saisons, météo
 
 - Horloge : tick → minute, heure, jour, saison, année. **[DÉCISION]** 30 jours par saison,

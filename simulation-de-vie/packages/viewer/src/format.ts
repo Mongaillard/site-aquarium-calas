@@ -229,7 +229,21 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
     case "batiment_effondre":
       return `${NOMS_BATIMENT[String(d.type)] ?? String(d.type)} s'effondre.`;
     case "feu_eteint":
-      return "L'orage éteint un feu.";
+      return d.raison === "plus de bois"
+        ? "Un feu s'éteint faute de bois."
+        : "L'orage éteint un feu.";
+    case "maladie":
+      return `${qui} tombe malade : ${String(d.nom)}, ${String(d.origine)} (${String(d.jours)} jours).`;
+    case "guerison_maladie":
+      return `${qui} guérit de sa ${String(d.nom)}.`;
+    case "epidemie":
+      return `Une toux grise venue d'ailleurs prend ${qui} : l'épidémie commence.`;
+    case "pourriture":
+      return d.lieu === "sac"
+        ? `${qui} jette ${String(d.quantite)} ${res(d)} gâté${Number(d.quantite) > 1 ? "s" : ""}.`
+        : `${String(d.quantite)} ${res(d)} se gâte${Number(d.quantite) > 1 ? "nt" : ""} dans ${d.lieu === "entrepot" ? "un entrepôt" : "un stock"}.`;
+    case "reparation":
+      return `${qui} répare ${String(d.objet).replace(/_/g, " ")} (solidité ${String(d.solidite)}).`;
     case "feu_rallume":
       return `${qui} rallume le feu.`;
     case "depot":

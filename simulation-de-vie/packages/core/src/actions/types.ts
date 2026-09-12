@@ -1,7 +1,7 @@
 /** Actions atomiques (section 6) et intentions (section 10). */
 import type { TypeBatiment } from "../monde/batiments.js";
 import type { Position } from "../monde/grille.js";
-import type { NomRecette } from "../monde/recettes.js";
+import type { NomRecette, TypeObjet } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
 
 export type Action =
@@ -71,6 +71,8 @@ export type Action =
   /** Veille de nuit près du feu ; garde auprès de quelqu'un que la meute vise. */
   | { readonly type: "veiller"; ticksRestants: number }
   | { readonly type: "defendre"; readonly cible: string; ticksRestants: number }
+  /** Réparer un outil ébréché avec une bûche. */
+  | { readonly type: "reparer"; readonly objet: TypeObjet; ticksRestants: number }
   | { readonly type: "se_reposer"; ticksRestants: number };
 
 export type TypeAction = Action["type"];
@@ -98,7 +100,8 @@ export type Intention =
   /** Danger : se mettre à l'abri ou près du feu, défendre quelqu'un, veiller la nuit. */
   | { readonly type: "fuir" }
   | { readonly type: "defendre"; readonly cible: string }
-  | { readonly type: "veiller" };
+  | { readonly type: "veiller" }
+  | { readonly type: "reparer"; readonly objet: TypeObjet };
 
 export type TypeIntention = Intention["type"];
 
@@ -124,6 +127,8 @@ export function decrireIntention(i: Intention): string {
       return `soigner:${i.cible}`;
     case "defendre":
       return `defendre:${i.cible}`;
+    case "reparer":
+      return `reparer:${i.objet}`;
     default:
       return i.type;
   }
@@ -181,6 +186,8 @@ export function decrireAction(a: Action): string {
       return `veiller:${a.ticksRestants}`;
     case "defendre":
       return `defendre:${a.cible}`;
+    case "reparer":
+      return `reparer:${a.objet}`;
   }
 }
 

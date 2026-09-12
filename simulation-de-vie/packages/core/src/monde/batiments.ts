@@ -169,8 +169,9 @@ export interface Batiment {
   /** Solidité 0..100 ; s'use chaque jour, s'effondre à 0. */
   solidite: number;
   readonly stock: Inventaire | null;
-  /** Feux : allumé ou éteint. */
+  /** Feux : allumé ou éteint, et la réserve de bûches (quatre par jour, six sous la neige). */
   allume: boolean;
+  reserveBois: number;
   readonly fondeAuTick: number;
   termineAuTick: number | null;
   /** Tombes : ce qu'on y grave. */
@@ -199,6 +200,7 @@ export function creerChantier(
     solidite: 100,
     stock: plan.capaciteStock > 0 ? creerInventaire(plan.capaciteStock) : null,
     allume: false,
+    reserveBois: 0,
     fondeAuTick: tick,
     termineAuTick: null,
     epitaphe: null,

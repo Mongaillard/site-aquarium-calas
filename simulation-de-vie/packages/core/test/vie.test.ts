@@ -346,6 +346,7 @@ describe("hiver : chaleur, pêche et provisions", () => {
     const feu = sim.fonderChantier("feu_de_camp", { x: 15, y: 10 }, a);
     feu.etat = "termine";
     feu.allume = true;
+    feu.reserveBois = 12;
     const abri = sim.fonderChantier("abri", { x: 8, y: 10 }, a);
     abri.etat = "termine";
     const r = planifier(sim, a, { type: "se_rechauffer" });

@@ -184,10 +184,12 @@ describe("chantiers et bâtiments", () => {
     const feu = sim.fonderChantier("feu_de_camp", { x: 9, y: 11 }, a);
     feu.etat = "termine";
     feu.allume = true;
+    feu.reserveBois = 12;
     expect(prochainBatimentNecessaire(sim, a)).toBe("entrepot");
     feu.allume = false;
     expect(prochainBatimentNecessaire(sim, a)).toBe("feu_de_camp");
     feu.allume = true;
+    feu.reserveBois = 12;
     const entrepot = sim.fonderChantier("entrepot", { x: 8, y: 11 }, a);
     entrepot.etat = "termine";
     expect(prochainBatimentNecessaire(sim, a)).toBeNull(); // famille de 2 : pas de maison
@@ -317,6 +319,7 @@ describe("fabrication", () => {
     const feu = sim.fonderChantier("feu_de_camp", { x: 10, y: 11 }, a);
     feu.etat = "termine";
     feu.allume = true;
+    feu.reserveBois = 12;
     ajouter(a.corps.inventaire, "baies", 1);
     a.plan = [{ type: "fabriquer", recette: "repas_cuit", ticksRestants: null }];
     expect(executerPlan(sim, a)).toBe("terminee");

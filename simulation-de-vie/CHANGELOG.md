@@ -2,6 +2,51 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M11 – Le temps compte (jalon 4 de la feuille de route) (2026-09-12)
+
+- **Périssabilité** : chaque pile de nourriture a un âge (moyenne pondérée quand on mélange,
+  emporté quand on transfère). À l'air libre : baies six jours, poisson quinze, gibier cinq,
+  repas cuit douze, poisson fumé quatre-vingt-dix, grain trois cents. Une pile a un âge moyen ; passé la moitié de sa
+  durée de vie, le plus vieux se gâte chaque jour (un `vie`-ième de la pile, ce qu'on a rentré
+  il y a `vie` jours ; événement `pourriture`) : une réserve renouvelée se maintient au lieu de
+  disparaître d'un coup. L'entrepôt conserve deux fois plus longtemps,
+  l'automne deux fois et demie, l'hiver quatre fois : les provisions d'automne tiennent l'hiver,
+  celles de l'été non. Voir son poisson se gâter donne l'idée du fumoir. Manger gâté donne le
+  mal des ventres trois fois sur dix.
+- **Bois de chauffe** : un feu a une réserve (vingt bûches au plus) ; à la belle saison il couve
+  sans rien consommer, en saison froide il brûle une bûche par jour, deux sous la neige ; à sec, il s'éteint
+  (`feu_eteint` « plus de bois »). La famille l'alimente dès que la réserve passe sous quatre
+  bûches en saison froide (à la belle saison, seulement s'il est éteint) ; un feu éteint qui a encore des bûches se rallume sans
+  rien apporter, et le feu familial éteint pèse lourd dans le choix de construire. La fiche du
+  feu montre la réserve.
+- **Usure et réparation** : un outil ébréché (solidité sous 25) se répare deux fois, avec une
+  bûche et trois ticks (intention `reparer`, événement `reparation`).
+- **Eau souillée** : une tombe à moins de quatre tuiles d'un point d'eau le souille ; boire
+  une eau souillée donne la fièvre des eaux trois fois sur cent ; un puits n'est jamais
+  souillé ; on enterre désormais à l'écart de l'eau quand on le peut, et mourir de la fièvre
+  des eaux enseigne « un puits près du village ».
+- **Maladies** : quatre au catalogue. Refroidissement (une journée à grelotter : 10 %, quatre
+  jours, 2 de santé par jour), fièvre des eaux (huit jours, 4 par jour, immunisante), mal des
+  ventres (quatre jours, 2 par jour, faim ×1,3), toux grise (douze jours, 3 par jour,
+  contagieuse à deux tuiles à 2 % par heure, immunisante). Un enfant ou un ancien perd une fois
+  et demie plus ; la durée dépend de l'immunité innée ; un cataplasme retire trois jours. Le
+  malade se repose, les autres évitent de lui parler (quarantaine instinctive). Une épidémie de
+  toux grise au plus tous les deux ans, à partir du deuxième hiver (événement `epidemie`). La
+  cause de décès nomme la maladie.
+- Viewer : teint pâle des malades, maladies et jours restants dans la fiche, réserve de bois
+  dans la fiche du feu, compteur de malades dans Statistiques, événements de pourriture, de
+  maladie, de guérison, d'épidémie et de réparation dans le Journal.
+- Pas encore : le calque de salubrité, la fosse et le nettoyage, les ruines, les caches
+  d'expédition et le coût des distances.
+- Équilibrage : la première version tuait la colonie au premier hiver (poisson gâté en trois
+  jours, feux voraces, fièvre des eaux en spirale autour des tombes) ; corrigée par la
+  conservation par le froid, des feux moins gourmands, le rallumage sans bois, les tombes
+  loin de l'eau et la première épidémie repoussée au deuxième hiver.
+  Sur cinq graines et 450 jours : 15 à 24 vivants, un à cinq décès par monde (couches, berceau,
+  infection, une faim) ; 900 à 1 500 bûches livrées aux feux par monde, quelques feux éteints
+  faute de bois, 60 à 90 réparations d'outils, une épidémie de toux grise par monde au
+  deuxième hiver, sans mort.
+
 ## M10 – La nuit menace (jalon 3 de la feuille de route) (2026-09-12)
 
 - Le premier danger extérieur : les meutes de loups s'en prennent au village, et la colonie

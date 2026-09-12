@@ -182,9 +182,10 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
   let capacite = 0;
   for (const b of acces) capacite += PLANS_BATIMENT[b.type].capaciteDormeurs;
   if (capacite < famille) return "abri";
-  // Un feu éteint compte comme un feu à (r)allumer.
+  // Un feu éteint compte comme un feu à (r)allumer ; un feu à court de bois, à alimenter.
   if (!acces.some((b) => b.type === "feu_de_camp" && (b.etat === "chantier" || b.allume)))
     return "feu_de_camp";
+  if (feuAAlimenter(monde, p) !== null) return "feu_de_camp";
   if (!acces.some((b) => PLANS_BATIMENT[b.type].capaciteStock > 0)) return "entrepot";
   if (
     (p.savoirs.get("puits_pres_du_village")?.force ?? 0) >= 0.6 &&
@@ -254,6 +255,29 @@ export function feuEteint(monde: Monde, p: Personnage): Batiment | null {
   return (
     batimentsAccessibles(monde, p, "feu_de_camp").find((b) => b.etat === "termine" && !b.allume) ??
     null
+  );
+}
+
+/** Réserve de bûches d'un feu, au plus ; consommation par jour, et sous la neige. */
+export const RESERVE_BOIS_MAX = 20;
+/** Bûches par jour : à la belle saison le feu couve sans rien consommer, en saison froide il brûle. */
+export const BUCHES_PAR_JOUR = 0;
+export const BUCHES_PAR_JOUR_FROID = 1;
+export const BUCHES_PAR_JOUR_NEIGE = 2;
+
+/** Réserve en dessous de laquelle on va chercher du bois pour le feu (plus tôt en saison froide). */
+export function seuilReserveBois(monde: Monde): number {
+  const saison = monde.horloge.moment().saison;
+  return saison === "automne" || saison === "hiver" ? 4 : 0;
+}
+
+/** Feu familial éteint, ou allumé mais à court de bûches, le plus proche. */
+export function feuAAlimenter(monde: Monde, p: Personnage): Batiment | null {
+  const seuil = seuilReserveBois(monde);
+  return (
+    batimentsAccessibles(monde, p, "feu_de_camp").find(
+      (b) => b.etat === "termine" && (!b.allume || (seuil > 0 && b.reserveBois < seuil)),
+    ) ?? null
   );
 }
 

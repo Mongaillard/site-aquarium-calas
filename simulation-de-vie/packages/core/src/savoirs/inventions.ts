@@ -40,14 +40,15 @@ function besoinRessenti(monde: Monde, p: Personnage, invention: Invention): bool
         (saison === "automne" || p.drapeaux.faimMinDuJour < 50)
       );
     case "fumoir":
+      // Du poisson qui s'entasse, ou du poisson qu'on a vu se gâter : il faut le conserver.
       return (
-        (saison === "automne" || saison === "ete") &&
+        p.drapeaux.nourritureGateeJusqua > monde.horloge.tick ||
         [...monde.batiments.values()].some(
           (b) =>
             b.etat === "termine" &&
             b.stock !== null &&
             b.famille === p.identite.nomFamille &&
-            (b.stock.ressources.poisson ?? 0) >= 20,
+            (b.stock.ressources.poisson ?? 0) >= 12,
         )
       );
     case "couche":

@@ -113,7 +113,7 @@ export class Rendu {
         sprites.personnage(ctx, pos.x, pos.y, {
           couleur: couleurFamille(p.nomFamille),
           contour: couleurMoral(p.besoins.moral),
-          teint: sprites.TEINTS[p.teint] ?? "#f3d3b3",
+          teint: p.malade ? "#cfd3cf" : (sprites.TEINTS[p.teint] ?? "#f3d3b3"),
           cheveux: sprites.CHEVEUX[p.cheveux] ?? "#4a2e1a",
           sexe: p.sexe,
           echelle: p.stade === "enfant" ? 0.6 : p.stade === "adolescent" ? 0.8 : 1,

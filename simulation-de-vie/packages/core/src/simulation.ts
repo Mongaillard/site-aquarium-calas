@@ -44,7 +44,7 @@ import type { SimConfig, SimConfigPartielle } from "./config.js";
 import { fusionnerConfig, validerConfig } from "./config.js";
 import { Journal } from "./evenements/journal.js";
 import type { Evenement, TypeEvenement } from "./evenements/journal.js";
-import { feuProche } from "./monde.js";
+import { estEau, feuProche } from "./monde.js";
 import { decrireEvenement, importancePourTemoin } from "./memoire/descriptions.js";
 import type { Nommeur } from "./memoire/descriptions.js";
 import { reflechir } from "./memoire/reflexion.js";
@@ -73,6 +73,16 @@ import type { Troupeau } from "./monde/faune.js";
 import { REPIT_TICKS, etatDangerInitial, heureDanger, proieAuContact } from "./monde/danger.js";
 import type { EtatDanger } from "./monde/danger.js";
 import { combattre } from "./agents/combat.js";
+import {
+  ANNEES_ENTRE_EPIDEMIES,
+  RAYON_SOUILLURE,
+  heureContagion,
+  jourMaladies,
+  tomberMalade,
+} from "./agents/maladies.js";
+import { facteurFaimMaladies } from "./agents/maladies.js";
+import { pourrir } from "./agents/inventaire.js";
+import { BUCHES_PAR_JOUR, BUCHES_PAR_JOUR_FROID, BUCHES_PAR_JOUR_NEIGE } from "./monde.js";
 import type { Position } from "./monde/grille.js";
 import { Horloge } from "./monde/horloge.js";
 import { EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
@@ -304,7 +314,10 @@ export class Simulation implements Monde {
         : `Ici repose ${defunt.identite.prenom}, mort${f ? "e" : ""} de ${cause}.`;
     // La tombe se creuse sur place, ou sur la tuile libre la plus proche (un mort
     // dans un abri n'y est pas enterré).
-    const place = this.tuileLibreProche(defunt.corps.position, 3);
+    // On enterre à l'écart de l'eau (une tombe près d'un point d'eau le souille), sinon sur place.
+    const place =
+      this.tuileLibreProche(defunt.corps.position, 8, true) ??
+      this.tuileLibreProche(defunt.corps.position, 3);
     if (place !== null) {
       const tombe = this.fonderChantier("tombe", place, defunt);
       tombe.etat = "termine";
@@ -341,7 +354,7 @@ export class Simulation implements Monde {
   }
 
   /** Tuile constructible sans bâtiment la plus proche d'une position, dans un rayon donné. */
-  private tuileLibreProche(centre: Position, rayon: number): Position | null {
+  private tuileLibreProche(centre: Position, rayon: number, loinDeLEau = false): Position | null {
     let meilleure: Position | null = null;
     let meilleureDistance = Infinity;
     for (let dy = -rayon; dy <= rayon; dy++) {
@@ -351,11 +364,20 @@ export class Simulation implements Monde {
         if (d >= meilleureDistance) continue;
         const tuile = this.grille.tuileOuNull(pos.x, pos.y);
         if (tuile?.batiment !== null || !INFO_BIOME[tuile.biome].constructible) continue;
+        if (loinDeLEau && this.eauAMoinsDe(pos, RAYON_SOUILLURE + 1)) continue;
         meilleure = pos;
         meilleureDistance = d;
       }
     }
     return meilleure;
+  }
+
+  /** De l'eau (rivière, mer ou puits) à moins de `rayon` tuiles ? */
+  private eauAMoinsDe(pos: Position, rayon: number): boolean {
+    for (let dy = -rayon; dy <= rayon; dy++)
+      for (let dx = -rayon; dx <= rayon; dx++)
+        if (estEau(this, pos.x + dx, pos.y + dy)) return true;
+    return false;
   }
 
   /** Crée une simulation neuve à partir d'une configuration (partielle ou non). */
@@ -658,6 +680,7 @@ export class Simulation implements Monde {
     if (this.tick % 6 === 0) {
       for (const t of this.troupeaux.values()) heureTroupeau(this, t);
       this.heureDeDanger();
+      heureContagion(this);
     }
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
@@ -701,6 +724,7 @@ export class Simulation implements Monde {
         if (p.vivant) passeQuotidienneCorps(this, p);
       }
       this.jourFaune();
+      this.jourDuTemps();
       this.regenererBassins();
     }
     for (const p of this.vivants()) {
@@ -833,6 +857,95 @@ export class Simulation implements Monde {
     for (const p of this.personnages) {
       if (p.vivant && Grille.distance(p.corps.position, proie.corps.position) <= 12)
         p.drapeaux.alerteJusqua = this.tick + 36;
+    }
+  }
+
+  /** La première épidémie ne peut frapper qu'à partir du deuxième hiver. */
+  private derniereEpidemieAnnee = 0;
+
+  /**
+   * Aube (jalon « le temps compte ») : les feux brûlent leurs bûches, la
+   * nourriture vieillit et se gâte, les maladies suivent leur cours, et une
+   * toux grise arrive de loin au plus tous les deux ans, au premier jour de l'hiver.
+   */
+  private jourDuTemps(): void {
+    const moment = this.horloge.moment();
+    const saisonFroide = moment.saison === "automne" || moment.saison === "hiver";
+    const buches =
+      this.meteo === "neige"
+        ? BUCHES_PAR_JOUR_NEIGE
+        : saisonFroide
+          ? BUCHES_PAR_JOUR_FROID
+          : BUCHES_PAR_JOUR;
+    for (const b of this.batiments.values()) {
+      if (b.etat !== "termine" || !b.allume || PLANS_BATIMENT[b.type].atelier !== "feu") continue;
+      if (b.reserveBois >= buches) {
+        b.reserveBois -= buches;
+      } else {
+        b.reserveBois = 0;
+        b.allume = false;
+        this.emettre("feu_eteint", null, { batiment: b.id, raison: "plus de bois" }, 4, b.position);
+      }
+    }
+    // Le froid conserve : quatre fois plus longtemps l'hiver, deux fois et demie l'automne.
+    const froid = moment.saison === "hiver" ? 4 : moment.saison === "automne" ? 2.5 : 1;
+    for (const b of this.batiments.values()) {
+      if (b.stock === null || b.etat !== "termine") continue;
+      const conservation = froid * (b.type === "entrepot" ? 2 : 1);
+      for (const perte of pourrir(b.stock, conservation)) {
+        if (perte.ressource === "poisson") {
+          for (const p of this.vivants())
+            if (p.identite.nomFamille === b.famille)
+              p.drapeaux.nourritureGateeJusqua = this.tick + 20 * this.horloge.ticksParJour;
+        }
+        this.emettre(
+          "pourriture",
+          null,
+          { ressource: perte.ressource, quantite: perte.quantite, lieu: b.type, batiment: b.id },
+          2,
+          b.position,
+        );
+      }
+    }
+    for (const p of this.vivants()) {
+      for (const perte of pourrir(p.corps.inventaire, froid)) {
+        if (perte.ressource === "poisson")
+          p.drapeaux.nourritureGateeJusqua = this.tick + 20 * this.horloge.ticksParJour;
+        this.emettre(
+          "pourriture",
+          p,
+          { ressource: perte.ressource, quantite: perte.quantite, lieu: "sac", batiment: null },
+          2,
+        );
+      }
+      jourMaladies(this, p);
+    }
+    if (
+      moment.saison === "hiver" &&
+      moment.jourDeSaison === 1 &&
+      moment.annee - this.derniereEpidemieAnnee >= ANNEES_ENTRE_EPIDEMIES &&
+      this.rng.fork(`epidemie/${String(moment.annee)}`).chance(0.5)
+    ) {
+      const adultes = this.vivants().filter((p) => p.corps.stade !== "enfant");
+      const index =
+        adultes[
+          this.rng
+            .fork(`epidemie/${String(moment.annee)}/qui`)
+            .entier(0, Math.max(0, adultes.length - 1))
+        ];
+      if (
+        index !== undefined &&
+        tomberMalade(this, index, "toux_grise", "une toux venue d'ailleurs") !== null
+      ) {
+        this.derniereEpidemieAnnee = moment.annee;
+        this.emettre(
+          "epidemie",
+          index,
+          { maladie: "toux_grise", nom: "toux grise" },
+          7,
+          index.corps.position,
+        );
+      }
     }
   }
 
@@ -975,7 +1088,8 @@ export class Simulation implements Monde {
       facteurSoif: meteo.soif,
       facteurFaim:
         (p.corps.enceinte !== null ? 1.3 : p.corps.stade === "enfant" ? 0.7 : 1) *
-        (p.corps.etat.carence === "ventre_creux" ? 1.15 : 1),
+        (p.corps.etat.carence === "ventre_creux" ? 1.15 : 1) *
+        facteurFaimMaladies(p),
       humeur: humeur(p, this.tick),
     });
     // Sources de dégâts nommées : besoins vitaux, puis le corps (hémorragie, infection, carence).
