@@ -55,6 +55,7 @@ export const NOMS_BATIMENT: Readonly<Record<string, string>> = {
   puits: "puits",
   palissade: "palissade",
   tombe: "tombe",
+  fumoir: "fumoir",
 };
 
 export const LIBELLES_METEO: Readonly<Record<string, string>> = {
@@ -142,6 +143,7 @@ export function formaterTick(tick: number, ticksParJour: number, joursParSaison:
 }
 
 const NOMS_RESSOURCES_EV: Readonly<Record<string, string>> = {
+  poisson_fume: "du poisson fumé",
   bois: "du bois",
   pierre: "de la pierre",
   baies: "des baies",
@@ -248,7 +250,9 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
     case "prototype_rate":
       return `${qui} rate son prototype de ${String(d.nom)}.`;
     case "jeu":
-      return `${qui} joue aux osselets avec ${cible("avec")}.`;
+      return d.jeu === "flute"
+        ? `${qui} joue de la flûte pour ${cible("avec")}.`
+        : `${qui} joue aux osselets avec ${cible("avec")}.`;
     case "claude":
       return d.genre === "pensee"
         ? `🧠 ${qui} pense : « ${String(d.texte)} »`

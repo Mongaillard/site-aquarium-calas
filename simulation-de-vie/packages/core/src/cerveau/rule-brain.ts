@@ -282,14 +282,40 @@ export class RuleBrain implements Cerveau {
           utile: personnalite.ouverture > 0.5 && !perception.moi.possede("pirogue"),
         },
         { invention: "osselets", utile: besoins.moral < 60 && !perception.moi.possede("osselets") },
+        {
+          invention: "arc",
+          utile: connait("gibier") && !perception.moi.possede("arc"),
+        },
+        {
+          invention: "couche",
+          utile:
+            perception.abriDisponible && !perception.moi.possede("couche") && besoins.sommeil < 70,
+        },
+        {
+          invention: "traineau",
+          utile: placeLibre <= 2 && !perception.moi.possede("traineau"),
+        },
+        {
+          invention: "flute",
+          utile: (besoins.social < 60 || besoins.moral < 70) && !perception.moi.possede("flute"),
+        },
+        {
+          invention: "vetement",
+          utile:
+            (saisonFroide || sait("vetements_chauds")) &&
+            !perception.moi.possede("vetement_cuir") &&
+            perception.moi.cuir >= 3,
+        },
       ];
       for (const { invention, utile } of equipement) {
         if (!utile || !sait(invention) || perception.moi.ideesEnCours.includes(invention)) continue;
+        if (invention === "fumoir") continue; // le fumoir est un bâtiment, pas un objet
         candidats.push({
           intention: { type: "fabriquer", recette: INVENTIONS[invention].recette },
           score:
             0.35 +
             personnalite.conscience * 0.3 +
+            (invention === "vetement" && (saisonFroide || sait("vetements_chauds")) ? 0.5 : 0) +
             (invention === "osselets" ? urgence(besoins.moral) : 0),
         });
       }
@@ -419,6 +445,35 @@ export class RuleBrain implements Cerveau {
       candidats.push({
         intention: { type: "fabriquer", recette: "hache_pierre" },
         score: 0.3 + personnalite.conscience * 0.3 + (projet !== null ? 0.15 : 0),
+      });
+    }
+
+    // Fumer le poisson quand on a un fumoir et de quoi le remplir.
+    if (
+      adulte &&
+      sait("fumoir") &&
+      perception.fumoirConnu &&
+      perception.moi.poissonCru >= 3 &&
+      placeLibre > 0
+    ) {
+      candidats.push({
+        intention: { type: "fabriquer", recette: "poisson_fume" },
+        score: 0.4 + personnalite.conscience * 0.3 + (saisonFroide ? 0.3 : 0),
+      });
+    }
+
+    // Chasser pour le cuir quand on sait ce qu'il vaut.
+    if (
+      adulte &&
+      sait("vetements_chauds") &&
+      !perception.moi.possede("vetement_cuir") &&
+      perception.moi.cuir < 3 &&
+      connait("gibier") &&
+      placeLibre > 1
+    ) {
+      candidats.push({
+        intention: { type: "recolter", ressource: "gibier" },
+        score: 0.4 + personnalite.conscience * 0.2 + (saisonFroide ? 0.3 : 0),
       });
     }
 

@@ -38,8 +38,8 @@ l'épitaphe des défunts et le récit des inventions ; le moteur reste maître d
 
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la
-curiosité donnent des idées, puis des inventions (filet, piège, pirogue, osselets) que la
-colonie apprend à faire. L'onglet Statistiques liste les savoirs du village, la fiche d'un
+curiosité donnent des idées, puis des inventions (filet, piège, arc, pirogue, traîneau, fumoir,
+couche de fibres, vêtement de cuir, osselets, flûte) que la colonie apprend à faire. L'onglet Statistiques liste les savoirs du village, la fiche d'un
 personnage ce qu'il a retenu.
 
 Un brouillard d'exploration couvre ce que la colonie n'a jamais vu : au départ, seul un halo

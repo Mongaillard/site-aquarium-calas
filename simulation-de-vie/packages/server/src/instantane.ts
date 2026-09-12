@@ -293,6 +293,8 @@ const NOMS_RESSOURCES: Record<string, string> = {
   argile: "de l'argile",
   corde: "de la corde",
   repas_cuit: "un repas cuit",
+  poisson_fume: "du poisson fumé",
+  cuir: "du cuir",
 };
 
 /**

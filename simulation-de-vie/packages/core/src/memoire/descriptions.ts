@@ -192,7 +192,9 @@ export function decrireEvenement(
     case "jeu":
       return temoin
         ? null
-        : `J'ai joué aux osselets avec ${noms.prenom(String(d.avec ?? ""))} ; ça fait du bien.`;
+        : d.jeu === "flute"
+          ? `J'ai joué de la flûte pour ${noms.prenom(String(d.avec ?? ""))} ; ça nous a fait du bien.`
+          : `J'ai joué aux osselets avec ${noms.prenom(String(d.avec ?? ""))} ; ça fait du bien.`;
     case "lecon":
     case "idee":
     case "prototype_rate":

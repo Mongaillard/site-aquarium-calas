@@ -240,6 +240,9 @@ export class Rendu {
       case "four":
         sprites.four(ctx, b.x, b.y);
         break;
+      case "fumoir":
+        sprites.fumoir(ctx, b.x, b.y, maintenant);
+        break;
       case "puits":
         sprites.puits(ctx, b.x, b.y);
         break;

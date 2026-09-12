@@ -2,7 +2,7 @@
  * Inventions : un besoin répété, une personne curieuse, et une idée le soir ;
  * puis un prototype, qui peut rater, avant que le savoir ne se répande.
  */
-import { possede } from "../agents/inventaire.js";
+import { placeLibre, possede, quantite } from "../agents/inventaire.js";
 import type { Personnage } from "../agents/personnage.js";
 import type { Monde } from "../monde.js";
 import { INVENTIONS, SEUIL_SAVOIR } from "./catalogue.js";
@@ -32,6 +32,39 @@ function besoinRessenti(monde: Monde, p: Personnage, invention: Invention): bool
     case "osselets":
       return (
         (p.besoins.moral < 80 || p.besoins.social < 60) && monde.horloge.moment().jourAbsolu >= 10
+      );
+    case "arc":
+      return (
+        lieux.some((l) => l.type === "gibier" && l.quantiteVue >= 1) &&
+        (possede(inv, "lance") || possede(inv, "piege")) &&
+        (saison === "automne" || p.drapeaux.faimMinDuJour < 50)
+      );
+    case "fumoir":
+      return (
+        (saison === "automne" || saison === "ete") &&
+        [...monde.batiments.values()].some(
+          (b) =>
+            b.etat === "termine" &&
+            b.stock !== null &&
+            b.famille === p.identite.nomFamille &&
+            (b.stock.ressources.poisson ?? 0) >= 20,
+        )
+      );
+    case "couche":
+      return p.besoins.sommeil < 45 && p.drapeaux.chaleurMinDuJour < 60;
+    case "traineau":
+      return placeLibre(inv) === 0 && p.identite.personnalite.conscience > 0.45;
+    case "flute":
+      return (
+        (p.besoins.social < 55 || p.besoins.moral < 65) &&
+        monde.horloge.moment().jourAbsolu >= 15 &&
+        !possede(inv, "osselets")
+      );
+    case "vetement":
+      return (
+        p.drapeaux.chaleurMinDuJour < 40 &&
+        !possede(inv, "vetement_cuir") &&
+        (quantite(inv, "cuir") >= 1 || lieux.some((l) => l.type === "gibier" && l.quantiteVue >= 1))
       );
   }
 }

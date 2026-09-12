@@ -31,7 +31,7 @@ describe("leçons tirées des décès", () => {
     p.besoins.faim = 5;
     p.besoins.chaleur = 0;
     // Au printemps, on retient de rentrer ; en saison froide, aussi les provisions.
-    expect(tirerLecons(sim, p, "froid")).toEqual(["rentrer_quand_on_gele"]);
+    expect(tirerLecons(sim, p, "froid")).toEqual(["rentrer_quand_on_gele", "vetements_chauds"]);
     expect(tirerLecons(sim, p, "soif")).toEqual(["puits_pres_du_village"]);
     expect(tirerLecons(sim, p, "vieillesse")).toEqual([]);
   });
@@ -52,7 +52,7 @@ describe("leçons tirées des décès", () => {
     for (const m of famille) expect(connait(m, "rentrer_quand_on_gele")).toBe(false);
     sim.tuer(p, "froid");
     const lecons = sim.journal.parType("lecon");
-    expect(lecons).toHaveLength(1);
+    expect(lecons).toHaveLength(2); // rentrer quand on gèle, puis des vêtements chauds
     expect(lecons[0]?.details.lecon).toBe("rentrer_quand_on_gele");
     expect(lecons[0]?.details.apprenants).toBeGreaterThan(0);
     for (const m of famille) {

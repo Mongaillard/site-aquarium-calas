@@ -13,6 +13,7 @@ export const TYPES_BATIMENT = [
   "puits",
   "palissade",
   "tombe",
+  "fumoir",
 ] as const;
 export type TypeBatiment = (typeof TYPES_BATIMENT)[number];
 
@@ -28,7 +29,7 @@ export interface PlanBatiment {
   /** Rayon dans lequel le gain de chaleur s'applique (0 = sur la tuile seulement). */
   readonly rayonChaleur: number;
   readonly abri: boolean;
-  readonly atelier: "feu" | "four" | null;
+  readonly atelier: "feu" | "four" | "fumoir" | null;
   readonly sourceEau: boolean;
   readonly ascii: string;
 }
@@ -124,6 +125,19 @@ export const PLANS_BATIMENT: Record<TypeBatiment, PlanBatiment> = {
     atelier: null,
     sourceEau: false,
     ascii: "#",
+  },
+  fumoir: {
+    nom: "fumoir",
+    materiaux: { bois: 6, pierre: 3, argile: 2 },
+    travail: 20,
+    capaciteDormeurs: 0,
+    capaciteStock: 0,
+    chaleur: 1,
+    rayonChaleur: 1,
+    abri: false,
+    atelier: "fumoir",
+    sourceEau: false,
+    ascii: "S",
   },
   tombe: {
     nom: "tombe",

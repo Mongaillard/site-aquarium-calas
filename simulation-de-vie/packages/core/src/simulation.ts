@@ -626,12 +626,15 @@ export class Simulation implements Monde {
       perteChaleur *= 0.7;
     }
     if (possede(p.corps.inventaire, "vetement_cuir")) perteChaleur *= 0.6;
+    const surCouche = p.corps.endormi && abriIci !== null && possede(p.corps.inventaire, "couche");
+    if (surCouche) perteChaleur *= 0.8;
 
     const effet = appliquerTickBesoins(p.besoins, {
       ticksParJour: this.horloge.ticksParJour,
       estNuit: moment.estNuit,
       dort: p.corps.endormi,
       aAbri: abriIci !== null,
+      aCouche: surCouche,
       enCompagnie,
       extraversion: p.identite.personnalite.extraversion,
       perteChaleur,

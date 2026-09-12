@@ -696,7 +696,7 @@ function planifierFabrication(monde: Monde, p: Personnage, nom: NomRecette): Res
 function atelierLePlusProche(
   monde: Monde,
   pos: Position,
-  atelier: "feu" | "four",
+  atelier: "feu" | "four" | "fumoir",
 ): Batiment | null {
   let meilleur: Batiment | null = null;
   let dMin = Infinity;

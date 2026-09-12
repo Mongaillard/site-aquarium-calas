@@ -806,11 +806,12 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue
   fermé (`provisions_hiver`, `rentrer_quand_on_gele`, `enfants_dabord`, `partager_en_hiver`,
-  `puits_pres_du_village`). La famille, le partenaire, les amis et les témoins proches la
+  `puits_pres_du_village`, `vetements_chauds`). La famille, le partenaire, les amis et les témoins proches la
   retiennent ; une tombe porte l'épitaphe. Chaque leçon a un effet précis sur le cerveau
   (seuils, scores, bâtiment nécessaire).
-- **Invention** : catalogue fermé d'inventions que le moteur sait appliquer (`filet`,
-  `piege`, `pirogue`, `osselets`), chacune avec un besoin déclencheur, une recette et un effet.
+- **Invention** : catalogue fermé d'inventions que le moteur sait appliquer (`filet`, `piege`,
+  `arc`, `pirogue`, `traineau`, `fumoir`, `couche`, `vetement`, `osselets`, `flute`), chacune
+  avec un besoin déclencheur, une recette et un effet.
   Le soir, un adulte qui ressent le besoin peut avoir l'idée (curiosité = ouverture) ; il
   fabrique un prototype qui peut rater ; la réussite fait de l'idée un savoir de la famille.
 - **Transmission** : par le dialogue (sujet `savoir`, avec l'origine), aux adolescents par

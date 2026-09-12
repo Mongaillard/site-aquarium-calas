@@ -2,6 +2,30 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M7c – Dix inventions et les hivers suivants (2026-09-12)
+
+- Équilibrage : l'ancienne version s'effondrait au deuxième hiver, quand la colonie avait grandi.
+  Causes trouvées en rejouant 450 jours : les entrepôts s'usaient et disparaissaient avec les
+  provisions ; les enfants héritaient de pierres qui remplissaient leur sac et ne pouvaient plus
+  recevoir à manger ; les naissances dépassaient ce que dix adultes pouvaient nourrir. Désormais
+  l'usure des bâtiments est deux fois plus lente (0,5 par jour, 3 sous l'orage) et la réparation
+  prioritaire, le stock d'un bâtiment effondré passe au stock familial le plus proche, la
+  nourriture offerte à quelqu'un dont le sac est plein se mange sur place, un enfant n'hérite
+  que de quoi manger, les enfants mangent moins (×0,7), une femme n'a pas plus d'un enfant par
+  an (délai de 120 jours, probabilité 0,15). Trois graines sur 450 jours, soit quatre hivers :
+  un décès au total.
+- Six inventions de plus (dix au catalogue) : l'arc (gibier doublé, remplace la lance), le
+  fumoir (bâtiment ; le poisson fumé nourrit 50 au lieu de 35 ; l'idée suffit à lancer le
+  chantier et le bâtiment achevé vaut prototype réussi), la couche de fibres (sommeil
+  réparateur et moins de froid à l'abri), le traîneau (six places de plus dans le sac), la
+  flûte (veillée qui remonte moral et lien social) et le vêtement de cuir (le gibier donne
+  désormais du cuir, la recette passe au niveau 1). Nouvelle leçon « des vêtements chauds »
+  quand on meurt de froid sans cuir sur le dos, qui pousse à chasser pour le cuir.
+- Viewer : fumoir dessiné avec sa fumée, poisson fumé et cuir nommés, veillées à la flûte dans
+  le Journal.
+- Sur deux graines et 450 jours : les dix inventions apparaissent, trois fumoirs bâtis par
+  monde, 125 à 195 parties et veillées.
+
 ## M5 – Cerveau Claude, dans la page (2026-09-12)
 
 - Principe : Claude n'appelle aucune API payante. La page publiée sur claude.ai demande à Claude

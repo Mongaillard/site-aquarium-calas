@@ -57,7 +57,12 @@ export type EffetDialogue =
       readonly savoir: Savoir;
       readonly origine: string | null;
     }
-  | { readonly type: "jeu"; readonly de: string; readonly vers: string };
+  | {
+      readonly type: "jeu";
+      readonly de: string;
+      readonly vers: string;
+      readonly jeu: "osselets" | "flute";
+    };
 
 export type SujetDialogue =
   "salutations" | "nouvelles" | "invitation" | "dispute" | "entraide" | "savoir" | "jeu";
@@ -229,7 +234,17 @@ export function composerDialogue(monde: Monde, a: Personnage, b: Personnage): Di
     const autre = joueur === a ? b : a;
     dire(joueur, tu ? "On fait une partie d'osselets ?" : "Une partie d'osselets, ça vous dit ?");
     dire(autre, tu ? "Volontiers, ça change les idées." : "Volontiers, ça change les idées.");
-    effets.push({ type: "jeu", de: joueur.id, vers: autre.id });
+    effets.push({ type: "jeu", de: joueur.id, vers: autre.id, jeu: "osselets" });
+    sujet = "jeu";
+  } else if (
+    (possede(a.corps.inventaire, "flute") || possede(b.corps.inventaire, "flute")) &&
+    (a.besoins.moral < 85 || b.besoins.moral < 85 || a.besoins.social < 70 || b.besoins.social < 70)
+  ) {
+    const musicien = possede(a.corps.inventaire, "flute") ? a : b;
+    const autre = musicien === a ? b : a;
+    dire(musicien, tu ? "Écoute, j'ai appris un air." : "Écoutez, j'ai appris un air.");
+    dire(autre, tu ? "C'est beau. Rejoue-le." : "C'est beau. Rejouez-le.");
+    effets.push({ type: "jeu", de: musicien.id, vers: autre.id, jeu: "flute" });
     sujet = "jeu";
   }
 

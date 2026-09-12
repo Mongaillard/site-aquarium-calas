@@ -147,6 +147,8 @@ export interface Perception {
     /** Inventions dont j'ai l'idée mais pas encore le prototype réussi. */
     readonly ideesEnCours: readonly Invention[];
     readonly possede: (objet: TypeObjet) => boolean;
+    readonly cuir: number;
+    readonly poissonCru: number;
     readonly explorerPlusLoin: boolean;
   };
   readonly moment: Moment;
@@ -157,6 +159,8 @@ export interface Perception {
   readonly abriDisponible: boolean;
   readonly feuProche: boolean;
   readonly feuConnu: boolean;
+  /** Un fumoir terminé existe dans la famille. */
+  readonly fumoirConnu: boolean;
   readonly stockAccessible: boolean;
   readonly besoinConstruction: TypeBatiment | null;
   readonly reparationNecessaire: boolean;
@@ -334,6 +338,8 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
         .filter(([k, v]) => k in INVENTIONS && v.force >= SEUIL_SAVOIR && v.force < 1)
         .map(([k]) => k as Invention),
       possede: (objet) => possede(inv, objet),
+      cuir: quantite(inv, "cuir"),
+      poissonCru: quantite(inv, "poisson"),
       explorerPlusLoin: p.drapeaux.explorerPlusLoinJusqua > monde.horloge.tick,
     },
     moment,
@@ -344,6 +350,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
     abriDisponible: abriDisponible(monde, p) !== null,
     feuProche: feuProche(monde, p.corps.position) !== null,
     feuConnu: feuAllume,
+    fumoirConnu: acces.some((b) => b.etat === "termine" && b.type === "fumoir"),
     stockAccessible: acces.some((b) => b.etat === "termine" && b.stock !== null),
     besoinConstruction: prochainBatimentNecessaire(monde, p),
     reparationNecessaire: batimentAReparer(monde, p) !== null,

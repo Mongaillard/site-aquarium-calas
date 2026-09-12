@@ -376,7 +376,11 @@ function tickParler(
       case "jeu": {
         de.besoins.moral = clamp(de.besoins.moral + 10);
         vers.besoins.moral = clamp(vers.besoins.moral + 10);
-        monde.emettre("jeu", de, { avec: vers.id, jeu: "osselets" }, 3);
+        if (effet.jeu === "flute") {
+          de.besoins.social = clamp(de.besoins.social + 10);
+          vers.besoins.social = clamp(vers.besoins.social + 10);
+        }
+        monde.emettre("jeu", de, { avec: vers.id, jeu: effet.jeu }, 3);
         break;
       }
       case "don": {
@@ -594,7 +598,9 @@ function tickRecolter(
 
   // Un filet prend deux fois plus de poisson qu'une canne.
   const auFilet = gisement.type === "poisson" && possede(p.corps.inventaire, "filet");
-  const parAction = (1 + Math.floor(niv / 2)) * (outil === "hache_pierre" || auFilet ? 2 : 1);
+  const aLArc = gisement.type === "gibier" && possede(p.corps.inventaire, "arc");
+  const parAction =
+    (1 + Math.floor(niv / 2)) * (outil === "hache_pierre" || auFilet || aLArc ? 2 : 1);
   const rendement = Math.min(
     Math.floor(gisement.quantite),
     parAction,
@@ -602,6 +608,9 @@ function tickRecolter(
   );
   const pris = ajouter(p.corps.inventaire, gisement.type, rendement);
   gisement.quantite -= pris;
+  // Le gibier donne aussi du cuir, pour les vêtements.
+  if (gisement.type === "gibier" && pris > 0)
+    ajouter(p.corps.inventaire, "cuir", Math.ceil(pris / 2));
   gagnerExperience(p.experience, "recolte", 2);
   const outilUse =
     outil === null
@@ -611,7 +620,9 @@ function tickRecolter(
         : outil === "canne_a_peche"
           ? "filet"
           : outil === "lance"
-            ? "piege"
+            ? possede(p.corps.inventaire, "arc")
+              ? "arc"
+              : "piege"
             : outil;
   if (outilUse !== null && userObjet(p.corps.inventaire, outilUse)) {
     monde.emettre("outil_casse", p, { outil }, 3);
@@ -730,6 +741,8 @@ function tickFabriquer(
       return TERMINEE;
     }
     if (!ajouterObjet(p.corps.inventaire, objet)) return echec("inventaire plein");
+    // Un traîneau permet de porter davantage.
+    if (objet.type === "traineau") p.corps.inventaire.capacite += 6;
     if (invention !== undefined && forceIdee < 1) {
       apprendre(p, invention, 1, p.identite.prenom, monde.horloge.tick);
       for (const m of membresFamille(monde, p))
@@ -813,6 +826,25 @@ function tickConstruire(
     monde.emettre("batiment_termine", p, { batiment: b.id, type: b.type }, 7, b.position);
     for (const autre of monde.personnages) {
       if (autre.projet?.batimentId === b.id) autre.projet = null;
+    }
+    // Un fumoir achevé : l'idée devient un savoir éprouvé, pour le bâtisseur et sa famille.
+    if (b.type === "fumoir" && (p.savoirs.get("fumoir")?.force ?? 0) < 1) {
+      apprendre(p, "fumoir", 1, p.identite.prenom, monde.horloge.tick);
+      for (const m of membresFamille(monde, p))
+        apprendre(m, "fumoir", 1, p.identite.prenom, monde.horloge.tick);
+      monde.emettre(
+        "invention",
+        p,
+        { invention: "fumoir", nom: INVENTIONS.fumoir.nom, domaine: INVENTIONS.fumoir.domaine },
+        9,
+      );
+      p.memoire.ajouter(
+        monde.horloge.tick,
+        "reflexion",
+        `Ça marche ! ${INVENTIONS.fumoir.confidence}`,
+        9,
+        [],
+      );
     }
     return TERMINEE;
   }

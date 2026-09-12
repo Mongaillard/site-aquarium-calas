@@ -227,6 +227,35 @@ export function entrepot(ctx: Ctx, x: number, y: number): void {
   ctx.stroke();
 }
 
+/** Fumoir : une petite hutte close d'où monte une fumée qui ondule. */
+export function fumoir(ctx: Ctx, x: number, y: number, maintenant: number): void {
+  ctx.fillStyle = "#6b4a2a";
+  ctx.fillRect(x + 0.2, y + 0.45, 0.6, 0.47);
+  ctx.fillStyle = "#3d2a18";
+  ctx.beginPath();
+  ctx.moveTo(x + 0.12, y + 0.48);
+  ctx.lineTo(x + 0.5, y + 0.18);
+  ctx.lineTo(x + 0.88, y + 0.48);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#2a1a10";
+  ctx.fillRect(x + 0.42, y + 0.66, 0.16, 0.26);
+  const t = maintenant / 900;
+  ctx.fillStyle = "rgba(220,220,220,0.5)";
+  for (let i = 0; i < 3; i++) {
+    const phase = (t + i * 0.33) % 1;
+    ctx.beginPath();
+    ctx.arc(
+      x + 0.5 + Math.sin((phase + i) * 6) * 0.08,
+      y + 0.2 - phase * 0.3,
+      0.05 + phase * 0.05,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+}
+
 export function four(ctx: Ctx, x: number, y: number): void {
   ctx.fillStyle = "#8a6a4a";
   ctx.beginPath();

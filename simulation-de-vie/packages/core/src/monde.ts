@@ -8,6 +8,7 @@ import type { Evenement, TypeEvenement } from "./evenements/journal.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
 import { PLANS_BATIMENT } from "./monde/batiments.js";
 import { Grille } from "./monde/grille.js";
+import { SEUIL_SAVOIR } from "./savoirs/catalogue.js";
 import type { Position } from "./monde/grille.js";
 import type { Horloge } from "./monde/horloge.js";
 import type { Meteo } from "./monde/meteo.js";
@@ -150,7 +151,7 @@ export function feuProche(monde: Monde, pos: Position): Batiment | null {
 export function atelierAdjacent(
   monde: Monde,
   pos: Position,
-  atelier: "feu" | "four",
+  atelier: "feu" | "four" | "fumoir",
 ): Batiment | null {
   for (const b of monde.batiments.values()) {
     if (b.etat !== "termine" || PLANS_BATIMENT[b.type].atelier !== atelier) continue;
@@ -187,6 +188,13 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
   )
     return "puits";
   if (famille >= 3 && !acces.some((b) => b.type === "maison")) return "maison";
+  // Le fumoir, une fois inventé, dès que le poisson s'entasse.
+  if (
+    (p.savoirs.get("fumoir")?.force ?? 0) >= SEUIL_SAVOIR &&
+    !acces.some((b) => b.type === "fumoir") &&
+    acces.some((b) => b.stock !== null && (b.stock.ressources.poisson ?? 0) >= 15)
+  )
+    return "fumoir";
   return null;
 }
 

@@ -31,6 +31,8 @@ export interface ContexteBesoins {
   readonly dort: boolean;
   /** Dans un abri ou une maison (sécurité, sommeil). */
   readonly aAbri: boolean;
+  /** Dort sur une couche de fibres (sommeil réparateur). */
+  readonly aCouche?: boolean;
   readonly enCompagnie: boolean;
   readonly extraversion: number;
   /**
@@ -73,7 +75,7 @@ export function appliquerTickBesoins(b: Besoins, ctx: ContexteBesoins): EffetBes
 
   b.faim = clamp(b.faim - (100 / (2 * T)) * ralenti * ctx.facteurFaim);
   b.soif = clamp(b.soif - (100 / T) * ralenti * ctx.facteurSoif);
-  const recuperation = ctx.aAbri ? 1.3 : 1;
+  const recuperation = (ctx.aAbri ? 1.3 : 1) * (ctx.aCouche === true ? 1.3 : 1);
   b.sommeil = clamp(
     ctx.dort ? b.sommeil + (100 / (T / 3)) * recuperation : b.sommeil - 100 / (1.5 * T),
   );

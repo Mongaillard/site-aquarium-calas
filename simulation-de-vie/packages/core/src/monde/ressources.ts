@@ -14,6 +14,7 @@ export const RESSOURCES = [
   "cuir",
   "corde",
   "repas_cuit",
+  "poisson_fume",
 ] as const;
 export type Ressource = (typeof RESSOURCES)[number];
 
@@ -100,4 +101,5 @@ export const ASCII_RESSOURCE: Record<Ressource, string> = {
   cuir: "c",
   corde: "r",
   repas_cuit: "p",
+  poisson_fume: "s",
 };

@@ -6,7 +6,7 @@ import type { Ressource } from "../monde/ressources.js";
 export interface Inventaire {
   ressources: Partial<Record<Ressource, number>>;
   objets: Objet[];
-  readonly capacite: number;
+  capacite: number;
 }
 
 export function creerInventaire(capacite: number): Inventaire {
@@ -65,7 +65,7 @@ export function outilSatisfait(inv: Inventaire, outil: Outil | null): boolean {
   if (outil === null) return true;
   if (possede(inv, outil)) return true;
   if (outil === "canne_a_peche") return possede(inv, "filet");
-  if (outil === "lance") return possede(inv, "piege");
+  if (outil === "lance") return possede(inv, "piege") || possede(inv, "arc");
   return false;
 }
 
@@ -103,6 +103,7 @@ export const NOURRITURE: Partial<Record<Ressource, number>> = {
   repas_cuit: 25,
   poisson: 35,
   gibier: 45,
+  poisson_fume: 50,
 };
 
 /** Nourriture crue transformable en repas cuit. */

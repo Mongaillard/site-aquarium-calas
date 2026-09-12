@@ -148,8 +148,9 @@ export function heriter(monde: Monde, defunt: Personnage): Personnage | null {
       transmis += transferer(inv, stock.stock, r, n);
   }
   for (const o of inv.objets.splice(0)) {
-    if (!enfant && placeLibre(heritier.corps.inventaire) > 0)
-      heritier.corps.inventaire.objets.push(o);
+    if (enfant || placeLibre(heritier.corps.inventaire) <= 0) continue;
+    heritier.corps.inventaire.objets.push(o);
+    if (o.type === "traineau") heritier.corps.inventaire.capacite += 6;
   }
   let batiments = 0;
   for (const b of monde.batiments.values()) {

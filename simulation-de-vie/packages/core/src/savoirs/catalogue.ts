@@ -33,10 +33,14 @@ export const LECONS = {
     titre: "Un puits au village",
     morale: "Personne ne doit mourir de soif à deux pas de chez soi : creusons un puits.",
   },
+  vetements_chauds: {
+    titre: "Des vêtements chauds",
+    morale: "Le froid passe à travers les fibres : il faut du cuir sur le dos avant l'hiver.",
+  },
 } as const satisfies Record<string, FicheLecon>;
 export type Lecon = keyof typeof LECONS;
 
-export type Domaine = "peche" | "chasse" | "deplacement" | "jeu";
+export type Domaine = "peche" | "chasse" | "deplacement" | "jeu" | "conservation" | "confort";
 
 export interface FicheInvention {
   readonly nom: string;
@@ -76,6 +80,48 @@ export const INVENTIONS = {
     recette: "osselets",
     idee: "Les soirées sont longues. Quelques petites pierres à lancer et rattraper, ça ferait un jeu.",
     confidence: "Avec quelques pierres, on joue aux osselets : ça remonte le moral.",
+  },
+  arc: {
+    nom: "arc",
+    domaine: "chasse",
+    recette: "arc",
+    idee: "Le gibier est trop loin pour la lance. Une branche courbée et une corde tendue lanceraient une flèche.",
+    confidence: "Avec un arc, on rapporte deux fois plus de gibier.",
+  },
+  fumoir: {
+    nom: "fumoir",
+    domaine: "conservation",
+    recette: "poisson_fume",
+    idee: "Le poisson s'entasse et se gâte. Suspendu au-dessus d'un feu couvert, il se garderait tout l'hiver.",
+    confidence: "Fumé dans un fumoir, le poisson nourrit davantage et se garde tout l'hiver.",
+  },
+  couche: {
+    nom: "couche de fibres",
+    domaine: "confort",
+    recette: "couche",
+    idee: "Le sol est dur et froid. Une épaisse couche de fibres tressées ferait une vraie couche.",
+    confidence: "Sur une couche de fibres, on dort mieux et on a moins froid.",
+  },
+  traineau: {
+    nom: "traîneau",
+    domaine: "deplacement",
+    recette: "traineau",
+    idee: "Mes bras ne suffisent plus. Des planches liées qu'on tire porteraient le reste.",
+    confidence: "Avec un traîneau, on rapporte bien plus à chaque voyage.",
+  },
+  flute: {
+    nom: "flûte",
+    domaine: "jeu",
+    recette: "flute",
+    idee: "Le vent siffle dans les roseaux creux. Un bois percé chanterait aussi.",
+    confidence: "Un bois percé fait une flûte : les veillées sont plus douces.",
+  },
+  vetement: {
+    nom: "vêtement de cuir",
+    domaine: "confort",
+    recette: "vetement_cuir",
+    idee: "Les peaux du gibier tiennent chaud aux bêtes. Cousues avec de la corde, elles nous tiendraient chaud aussi.",
+    confidence: "Un vêtement de cuir cousu tient chaud tout l'hiver.",
   },
 } as const satisfies Record<string, FicheInvention>;
 export type Invention = keyof typeof INVENTIONS;

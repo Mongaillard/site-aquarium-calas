@@ -14,6 +14,10 @@ export const TYPES_OBJET = [
   "piege",
   "pirogue",
   "osselets",
+  "arc",
+  "couche",
+  "traineau",
+  "flute",
 ] as const;
 export type TypeObjet = (typeof TYPES_OBJET)[number];
 
@@ -23,7 +27,7 @@ export interface Objet {
   solidite: number;
 }
 
-export type Atelier = "feu" | "four";
+export type Atelier = "feu" | "four" | "fumoir";
 
 export type ProduitRecette =
   { readonly objet: TypeObjet } | { readonly ressource: Ressource; readonly quantite: number };
@@ -38,7 +42,17 @@ export interface Recette {
   /** Durée en ticks au niveau requis. */
   readonly duree: number;
   /** Recette d'invention : il faut en avoir eu l'idée (ou l'avoir apprise) pour la fabriquer. */
-  readonly invention?: "filet" | "piege" | "pirogue" | "osselets";
+  readonly invention?:
+    | "filet"
+    | "piege"
+    | "pirogue"
+    | "osselets"
+    | "arc"
+    | "fumoir"
+    | "couche"
+    | "traineau"
+    | "flute"
+    | "vetement";
 }
 
 /** L'invention qu'exige une recette, s'il y en a une. */
@@ -138,9 +152,60 @@ export const RECETTES = {
     produit: { objet: "vetement_cuir" },
     ingredients: { cuir: 3, corde: 1 },
     competence: "artisanat",
-    niveauRequis: 3,
+    niveauRequis: 1,
     atelier: null,
     duree: 8,
+    invention: "vetement",
+  },
+  arc: {
+    nom: "arc",
+    produit: { objet: "arc" },
+    ingredients: { bois: 3, fibres: 3 },
+    competence: "artisanat",
+    niveauRequis: 1,
+    atelier: null,
+    duree: 6,
+    invention: "arc",
+  },
+  couche: {
+    nom: "couche de fibres",
+    produit: { objet: "couche" },
+    ingredients: { fibres: 8, bois: 2 },
+    competence: "artisanat",
+    niveauRequis: 0,
+    atelier: null,
+    duree: 6,
+    invention: "couche",
+  },
+  traineau: {
+    nom: "traîneau",
+    produit: { objet: "traineau" },
+    ingredients: { bois: 6, fibres: 4 },
+    competence: "artisanat",
+    niveauRequis: 1,
+    atelier: null,
+    duree: 8,
+    invention: "traineau",
+  },
+  flute: {
+    nom: "flûte",
+    produit: { objet: "flute" },
+    ingredients: { bois: 1 },
+    competence: "artisanat",
+    niveauRequis: 0,
+    atelier: null,
+    duree: 3,
+    invention: "flute",
+  },
+  poisson_fume: {
+    nom: "poisson fumé",
+    produit: { ressource: "poisson_fume", quantite: 3 },
+    ingredients: { poisson: 3 },
+    competence: "cuisine",
+    niveauRequis: 0,
+    atelier: "fumoir",
+    duree: 4,
+    invention: "fumoir",
   },
   pot_argile: {
     nom: "pot d'argile",
@@ -191,4 +256,8 @@ export const SOLIDITE_INITIALE: Record<TypeObjet, number> = {
   piege: 25,
   pirogue: 200,
   osselets: 100,
+  arc: 30,
+  couche: 100,
+  traineau: 100,
+  flute: 100,
 };

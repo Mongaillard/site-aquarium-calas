@@ -76,6 +76,7 @@ export function tirerLecons(monde: Monde, defunt: Personnage, cause: string): Le
     case "froid":
       if (chaleurAPortee) lecons.push("rentrer_quand_on_gele");
       if (b.faim < 15 && saisonFroide) lecons.push("provisions_hiver");
+      if (!aChaudSurLui(defunt)) lecons.push("vetements_chauds");
       if (enfant) lecons.push("enfants_dabord");
       break;
     case "faim":
@@ -106,7 +107,7 @@ export function apprenants(monde: Monde, defunt: Personnage, rayon = 10): Person
   return [...resultat].sort((a, b) => a.id.localeCompare(b.id));
 }
 
-/** Le vêtement de cuir n'existe pas encore vraiment ; on garde l'aide pour plus tard. */
+/** Porte un vêtement de cuir. */
 export function aChaudSurLui(p: Personnage): boolean {
   return possede(p.corps.inventaire, "vetement_cuir");
 }
