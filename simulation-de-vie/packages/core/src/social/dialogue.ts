@@ -74,7 +74,8 @@ export function directionVers(de: Position, vers: Position): string {
   if (dx === 0 && dy === 0) return "ici même";
   const ns = Math.abs(dy) >= Math.abs(dx) / 2 ? (dy < 0 ? "nord" : "sud") : "";
   const eo = Math.abs(dx) >= Math.abs(dy) / 2 ? (dx < 0 ? "ouest" : "est") : "";
-  return `au ${ns}${ns && eo ? "-" : ""}${eo}`;
+  if (ns === "") return `à l'${eo}`;
+  return `au ${ns}${eo ? `-${eo}` : ""}`;
 }
 
 /** Lieux utiles que `de` connaît et que `vers` ignore, les plus proches de `vers` d'abord. */

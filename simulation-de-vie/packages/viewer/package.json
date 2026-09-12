@@ -1,0 +1,19 @@
+{
+  "name": "@sdv/viewer",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Interface d'observation de la simulation (carte, inspecteur, journal, statistiques)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@sdv/protocole": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}

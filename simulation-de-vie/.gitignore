@@ -5,3 +5,4 @@ saves/
 journal/
 .env
 coverage/
+dist-types/

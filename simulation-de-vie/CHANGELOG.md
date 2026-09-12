@@ -2,6 +2,35 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M6 – Viewer (2026-09-12)
+
+- Nouveau paquet `@sdv/protocole` : types des messages serveur ↔ viewer (`init`, `etat`,
+  `fiche`, commandes) et petites fonctions pures (teinte de famille, voile nocturne, découpage
+  des transcriptions).
+- Nouveau paquet `@sdv/server` (`sim-serve`) : boucle temps réel à vitesse réglable
+  (×1, ×4, ×16, ×64, pause, tick, saut à l'aube), diffusion de l'état par WebSocket (≤ 10 fois
+  par seconde, gisements en différentiel, événements depuis le dernier envoi), fiche détaillée
+  d'un personnage à la demande, pensée intérieure en mode règles, bilan des naissances et
+  décès par saison, service statique du viewer construit.
+- Nouveau paquet `@sdv/viewer` (Vite, TypeScript, canvas 2D, sans framework) : carte des
+  biomes, gisements, bâtiments (lettres, chantiers en pointillé, halo des feux), personnages
+  (cercle coloré par famille, contour selon le moral, taille selon l'âge, sommeil, grossesse),
+  prénoms au zoom, voile jour / nuit, bulles de dialogue, zoom à la molette, déplacement à la
+  souris, survol, clic pour inspecter, mode « suivre ce personnage ».
+- Panneaux : Personnage (pensée, intention, action, plan, besoins en jauges, famille cliquable,
+  relations, inventaire, compétences, identité et personnalité, souvenirs marquants et
+  récents), Journal filtrable par type, par personnage et par importance, Conversations avec
+  transcriptions complètes, Statistiques (population, naissances, unions, générations,
+  bâtiments, stocks, par saison, appels et coût IA), Population.
+- Raccourcis clavier : espace (pause), → (tick), a (aube), + / − (vitesse), s (suivre),
+  échap (fermer), f (recadrer).
+- Scripts : `pnpm serve -- --seed 42 --jours 30` (construit le viewer puis lance le
+  serveur sur http://localhost:8080), `pnpm viewer:dev` (Vite avec rechargement à chaud,
+  proxy WebSocket vers le serveur).
+- Dialogues : « à l'est » et « à l'ouest » plutôt que « au est ».
+- Tests : 163 au total (+19) : protocole, instantanés, serveur WebSocket de bout en bout,
+  caméra et formats du viewer.
+
 ## M4 – Vie et reproduction (2026-09-12)
 
 - Couples : éligibilité (adultes de sexes opposés, non apparentés, libres sauf trait

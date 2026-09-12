@@ -17,7 +17,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
-    "sim": "pnpm --filter @sdv/cli run sim"
+    "sim": "pnpm --filter @sdv/cli run sim",
+    "viewer:build": "pnpm --filter @sdv/viewer build",
+    "viewer:dev": "pnpm --filter @sdv/viewer dev",
+    "serve": "pnpm --filter @sdv/viewer build && pnpm --filter @sdv/server start"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.0",
@@ -28,5 +31,10 @@
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.35.0",
     "vitest": "^3.2.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

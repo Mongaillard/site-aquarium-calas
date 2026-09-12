@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simulation de vie</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="barre">
+        <div class="titre">Simulation de vie <span id="graine" class="discret"></span></div>
+        <div id="horloge" class="horloge">—</div>
+        <div id="meteo" class="meteo"></div>
+        <div class="controles">
+          <button id="btn-pause" title="Pause / reprendre (espace)">⏸</button>
+          <button id="btn-tick" title="Avancer d'un tick (→)">+1</button>
+          <button id="btn-aube" title="Sauter à l'aube suivante (a)">aube</button>
+          <span class="vitesses" id="vitesses"></span>
+        </div>
+        <div id="resume" class="resume"></div>
+        <div id="connexion" class="connexion">connexion…</div>
+      </header>
+      <main id="principal">
+        <div id="zone-carte">
+          <canvas id="carte"></canvas>
+          <div id="legende" class="legende"></div>
+          <div id="survol" class="survol" hidden></div>
+        </div>
+        <aside id="panneau">
+          <nav id="onglets">
+            <button data-onglet="inspecteur" class="actif">Personnage</button>
+            <button data-onglet="journal">Journal</button>
+            <button data-onglet="conversations">Conversations</button>
+            <button data-onglet="stats">Statistiques</button>
+            <button data-onglet="population">Population</button>
+          </nav>
+          <section id="inspecteur" class="onglet actif">
+            <p class="discret">
+              Cliquez sur un personnage de la carte, ou choisissez-le dans l'onglet Population.
+            </p>
+          </section>
+          <section id="journal" class="onglet">
+            <div class="filtres">
+              <select id="filtre-type">
+                <option value="">Tous les types</option>
+              </select>
+              <select id="filtre-personnage">
+                <option value="">Tout le monde</option>
+              </select>
+              <label
+                ><input type="checkbox" id="filtre-important" checked /> importants seulement</label
+              >
+            </div>
+            <ol id="liste-journal" class="liste"></ol>
+          </section>
+          <section id="conversations" class="onglet">
+            <ol id="liste-conversations" class="liste"></ol>
+          </section>
+          <section id="stats" class="onglet"></section>
+          <section id="population" class="onglet">
+            <ol id="liste-population" class="liste"></ol>
+          </section>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

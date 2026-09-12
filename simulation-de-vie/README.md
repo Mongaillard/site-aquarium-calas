@@ -16,6 +16,22 @@ pnpm sim run --seed 42 --days 30 --sans-carte --inspect p-0001 --journal journal
 `pnpm sim run` génère un monde, l'affiche en ASCII avec sa distribution de biomes et son
 empreinte, puis fait avancer l'horloge du nombre de jours demandé.
 
+## Interface d'observation
+
+```bash
+pnpm serve -- --seed 42 --jours 30 --vitesse 4   # http://localhost:8080
+```
+
+Le serveur fait tourner la simulation en temps réel (vitesse réglable depuis l'interface) et la
+diffuse par WebSocket. La page montre la carte animée (biomes, gisements, bâtiments,
+personnages colorés par famille, bulles de dialogue, jour / nuit) et cinq panneaux :
+Personnage (pensée, besoins, famille, relations, souvenirs), Journal, Conversations,
+Statistiques, Population. Cliquez sur un personnage pour l'inspecter, appuyez sur `s` pour
+que la caméra le suive.
+
+Pour développer le viewer avec rechargement à chaud : lancez le serveur (`pnpm --filter
+@sdv/server start -- --seed 42`) puis `pnpm viewer:dev` (http://localhost:5173).
+
 ## Structure
 
 ```
@@ -29,7 +45,10 @@ packages/core/src
   genealogie.ts arbre des filiations et des unions
   evenements/   journal d'événements
   simulation.ts boucle principale
-packages/cli    commande `sim`
+packages/cli        commande `sim`
+packages/protocole  messages serveur ↔ viewer
+packages/server     serveur temps réel (WebSocket + fichiers statiques), commande `sim-serve`
+packages/viewer     interface web (Vite, canvas 2D)
 ```
 
 Le moteur ne dépend d'aucun service réseau ; le cerveau Claude (phase M5) sera un paquet

@@ -217,7 +217,7 @@ describe("dialogue", () => {
   });
 
   it("directionVers", () => {
-    expect(directionVers({ x: 0, y: 0 }, { x: 5, y: 0 })).toBe("au est");
+    expect(directionVers({ x: 0, y: 0 }, { x: 5, y: 0 })).toBe("à l'est");
     expect(directionVers({ x: 0, y: 0 }, { x: 5, y: -5 })).toBe("au nord-est");
     expect(directionVers({ x: 0, y: 0 }, { x: 0, y: 3 })).toBe("au sud");
   });

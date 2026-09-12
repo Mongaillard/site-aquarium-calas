@@ -3,7 +3,7 @@ import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**", "saves/**", "journal/**"] },
+  { ignores: ["**/dist/**", "**/dist-types/**", "**/node_modules/**", "saves/**", "journal/**"] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
@@ -21,7 +21,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["**/*.js", "vitest.config.ts"],
+    files: ["**/*.js", "vitest.config.ts", "**/vite.config.ts"],
     extends: [tseslint.configs.disableTypeChecked],
   },
   prettier,

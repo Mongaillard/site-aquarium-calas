@@ -1,0 +1,23 @@
+{
+  "name": "@sdv/server",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Serveur de simulation : fait tourner le monde et le diffuse au viewer par WebSocket",
+  "type": "module",
+  "bin": {
+    "sim-serve": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "start": "tsc -b && node dist/main.js"
+  },
+  "dependencies": {
+    "@sdv/core": "workspace:*",
+    "@sdv/protocole": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.12"
+  }
+}
