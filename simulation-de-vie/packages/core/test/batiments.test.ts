@@ -37,7 +37,10 @@ function scenario(): { sim: Simulation; a: Personnage; b: Personnage; etranger: 
   a.corps.position = { x: 10, y: 10 };
   b.corps.position = { x: 11, y: 10 };
   etranger.corps.position = { x: 20, y: 20 };
-  for (const p of sim.personnages) p.connaissance.clear();
+  for (const p of sim.personnages) {
+    p.connaissance.clear();
+    p.relations.clear();
+  }
   return { sim, a, b, etranger };
 }
 
@@ -74,9 +77,9 @@ describe("chantiers et bâtiments", () => {
     expect(chantier.proprietaire).toBe(a.id);
     expect(a.projet?.batimentId).toBe(chantier.id);
     expect(sim.grille.tuile(10, 11).batiment?.id).toBe(chantier.id);
-    expect(autorise(chantier, a)).toBe(true);
-    expect(autorise(chantier, b)).toBe(true);
-    expect(autorise(chantier, etranger)).toBe(false);
+    expect(autorise(sim, chantier, a)).toBe(true);
+    expect(autorise(sim, chantier, b)).toBe(true);
+    expect(autorise(sim, chantier, etranger)).toBe(false);
     expect(sim.journal.compte("chantier_fonde")).toBe(1);
   });
 

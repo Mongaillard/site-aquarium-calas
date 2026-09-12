@@ -180,3 +180,38 @@ export {
 export { relationAvec } from "./agents/personnage.js";
 export type { Drapeaux } from "./agents/personnage.js";
 export { stockVolable } from "./actions/planificateur.js";
+export {
+  heriter as heriterGenome,
+  esperanceDeVie,
+  probabiliteMortNaturelle,
+  phenotypeTeint,
+  TAUX_MUTATION,
+} from "./agents/genetique.js";
+export {
+  AGE_MATERNITE,
+  ticksGestation,
+  avancementGrossesse,
+  tickVieQuotidien,
+  personnaliteAdolescente,
+  heriter,
+  deuil,
+  adopter,
+  apprendreParObservation,
+  competenceObservee,
+} from "./agents/vie.js";
+export { mettreAJourStade } from "./agents/personnage.js";
+export type { Grossesse } from "./agents/personnage.js";
+export {
+  SEUILS_COUPLE,
+  partenaireDe,
+  estVolage,
+  eligibles,
+  gainAttirance,
+  veutCourtiser,
+  accepteCour,
+  unir,
+  rompre,
+} from "./social/couple.js";
+export { apparentes } from "./monde.js";
+export { construireGenealogie, descendantsVivants } from "./genealogie.js";
+export type { Genealogie, NoeudGenealogie } from "./genealogie.js";

@@ -148,6 +148,18 @@ describe("survie (intégration M1)", () => {
     expect(echecsEau.length).toBeLessThan(10);
   });
 
+  it("M4 : au moins une naissance en 60 jours, et l'enfant survit à ses premiers jours", () => {
+    const sim = Simulation.creer({ seed: 42 });
+    for (let j = 0; j < 60; j++) sim.avancerJusquaAube();
+    expect(sim.journal.compte("union")).toBeGreaterThanOrEqual(1);
+    expect(sim.journal.compte("naissance")).toBeGreaterThanOrEqual(1);
+    const enfants = sim.personnages.filter((p) => p.identite.parents !== null);
+    expect(enfants.length).toBeGreaterThanOrEqual(1);
+    expect(enfants.some((p) => p.vivant)).toBe(true);
+    expect(sim.genealogie().generations).toBe(2);
+    expect(sim.statistiques().vivants).toBeGreaterThanOrEqual(11);
+  }, 120_000);
+
   it("les gisements renouvelables se régénèrent", () => {
     const sim = Simulation.creer({ seed: 42, population: { initiale: 0 } });
     const gisement = [...sim.grille.toutes()].find((t) => t.gisement?.type === "fibres")?.gisement;

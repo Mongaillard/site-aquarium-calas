@@ -40,7 +40,7 @@ export const PLANS_BATIMENT: Record<TypeBatiment, PlanBatiment> = {
     travail: 3,
     capaciteDormeurs: 0,
     capaciteStock: 0,
-    chaleur: 2,
+    chaleur: 2.5,
     rayonChaleur: 2,
     abri: false,
     atelier: "feu",
@@ -53,7 +53,7 @@ export const PLANS_BATIMENT: Record<TypeBatiment, PlanBatiment> = {
     travail: 24,
     capaciteDormeurs: 2,
     capaciteStock: 0,
-    chaleur: 1.5,
+    chaleur: 2,
     rayonChaleur: 0,
     abri: true,
     atelier: null,
@@ -66,7 +66,7 @@ export const PLANS_BATIMENT: Record<TypeBatiment, PlanBatiment> = {
     travail: 96,
     capaciteDormeurs: 5,
     capaciteStock: 50,
-    chaleur: 2.5,
+    chaleur: 3,
     rayonChaleur: 0,
     abri: true,
     atelier: null,
@@ -144,7 +144,7 @@ export interface Batiment {
   readonly id: string;
   readonly type: TypeBatiment;
   readonly position: Position;
-  readonly proprietaire: string;
+  proprietaire: string;
   /** Nom de famille du fondateur : la famille est autorisée d'office. */
   readonly famille: string;
   readonly autorises: string[];

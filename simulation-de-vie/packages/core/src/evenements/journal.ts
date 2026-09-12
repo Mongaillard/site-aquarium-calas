@@ -32,6 +32,14 @@ export const TYPES_EVENEMENT = [
   "vol",
   "invitation",
   "reflexion",
+  "cour",
+  "union",
+  "grossesse",
+  "fausse_couche",
+  "naissance",
+  "stade",
+  "heritage",
+  "adoption",
 ] as const;
 export type TypeEvenement = (typeof TYPES_EVENEMENT)[number];
 

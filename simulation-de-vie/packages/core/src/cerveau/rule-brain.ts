@@ -7,7 +7,7 @@ import { urgence } from "../agents/besoins.js";
 import type { Personnage } from "../agents/personnage.js";
 import type { Intention } from "../actions/types.js";
 import type { Ressource } from "../monde/ressources.js";
-import type { Perception } from "./perception.js";
+import type { Perception, PerceptionLegere } from "./perception.js";
 import type { Cerveau } from "./types.js";
 
 /** En dessous de ces valeurs, boire / manger deviennent des candidats. */
@@ -31,12 +31,12 @@ interface Candidat {
 export class RuleBrain implements Cerveau {
   constructor(private readonly personnage: Personnage) {}
 
-  urgence(perception: Perception): Intention | null {
+  urgence(perception: PerceptionLegere): Intention | null {
     const b = perception.moi.besoins;
     if (b.soif < SEUILS_URGENCE.soif) return { type: "boire" };
     if (b.faim < SEUILS_URGENCE.faim) return { type: "manger" };
     if (b.chaleur < SEUILS_URGENCE.chaleur && (perception.abriDisponible || perception.feuConnu)) {
-      return { type: "dormir" };
+      return { type: "se_rechauffer" };
     }
     return null;
   }
@@ -92,22 +92,66 @@ export class RuleBrain implements Cerveau {
       });
     }
 
-    // Constituer une réserve de nourriture (conscience) quand on sait où en trouver.
-    if (adulte && connait("baies") && placeLibre > 0 && !nourritureEnPoche) {
+    const saisonFroide = perception.saison === "automne" || perception.saison === "hiver";
+
+    // Se réchauffer au feu ou à l'abri quand on a froid.
+    if (besoins.chaleur < 60 && (perception.feuConnu || perception.abriDisponible)) {
       candidats.push({
-        intention: { type: "recolter", ressource: "baies" },
+        intention: { type: "se_rechauffer" },
+        score: urgence(besoins.chaleur) * 4 + (saisonFroide ? 0.3 : 0) + (nuit ? 0.3 : 0),
+      });
+    }
+
+    // Constituer une réserve de nourriture (conscience) quand on sait où en trouver.
+    const nourriture = perception.nourritureAccessible;
+    if (adulte && nourriture !== null && placeLibre > 0 && !nourritureEnPoche) {
+      candidats.push({
+        intention: { type: "recolter", ressource: nourriture },
         score:
           0.25 +
           personnalite.conscience * 0.45 +
           urgence(besoins.faim) * 0.5 +
-          (perception.moi.prudenceNourriture ? 0.3 : 0),
+          (perception.moi.prudenceNourriture ? 0.3 : 0) +
+          (perception.moi.enfantsACharge > 0 ? 0.35 : 0),
+      });
+    }
+
+    // Provisions : en automne, on remplit les stocks pour l'hiver.
+    if (
+      adulte &&
+      nourriture !== null &&
+      perception.stockAccessible &&
+      placeLibre > 3 &&
+      saisonFroide
+    ) {
+      candidats.push({
+        intention: { type: "recolter", ressource: nourriture },
+        score: 0.35 + personnalite.conscience * 0.5 + (perception.saison === "automne" ? 0.2 : 0),
+      });
+    }
+    if (adulte && perception.stockAccessible && perception.nourritureEnPocheQuantite >= 6) {
+      candidats.push({
+        intention: { type: "stocker" },
+        score: 0.5 + personnalite.conscience * 0.3,
+      });
+    }
+
+    // Une canne à pêche ouvre l'accès au poisson.
+    if (adulte && perception.connaitPoisson && !perception.possedeCanne && placeLibre > 0) {
+      candidats.push({
+        intention: { type: "fabriquer", recette: "canne_a_peche" },
+        score:
+          0.35 +
+          personnalite.conscience * 0.3 +
+          urgence(besoins.faim) * 0.5 +
+          (saisonFroide ? 0.3 : 0),
       });
     }
 
     // Parler : besoin social, extraversion, affinité ; pas deux fois de suite avec la même personne.
     const tick = perception.moment.tick;
     const interlocuteurs = perception.personnesVisibles.filter(
-      (v) => !v.endormi && v.derniereInteraction < tick - 36,
+      (v) => !v.endormi && v.derniereInteraction < tick - (v.eligible ? 24 : 36),
     );
     if (interlocuteurs.length > 0 && besoins.social < 90) {
       let meilleur = interlocuteurs[0];
@@ -115,7 +159,8 @@ export class RuleBrain implements Cerveau {
       for (const v of interlocuteurs) {
         const sc =
           v.affinite / 100 +
-          (v.famille ? 0.3 : 0) +
+          (v.famille ? 0.2 : 0) +
+          (v.eligible ? 0.35 + v.attirance / 100 : 0) +
           (v.lien === "inconnu" ? personnalite.ouverture * 0.3 : 0) -
           v.distance * 0.02;
         if (sc > meilleurScore) {
@@ -164,6 +209,99 @@ export class RuleBrain implements Cerveau {
             (connaitNourriture ? -0.3 : 0.2),
         });
       }
+    }
+
+    // Nourrir ses enfants passe avant tout le reste.
+    const enfantAffame = perception.personnesVisibles.find((v) => v.estMonEnfant && v.aUnPeuFaim);
+    if (adulte && enfantAffame !== undefined && perception.moi.ressourceNourriture !== null) {
+      candidats.push({
+        intention: {
+          type: "offrir",
+          cible: enfantAffame.id,
+          ressource: perception.moi.ressourceNourriture,
+        },
+        score: 1.2 + personnalite.agreabilite * 0.3,
+      });
+    }
+
+    // Un parent sans vivres va en chercher pour son enfant.
+    if (adulte && enfantAffame !== undefined && perception.moi.ressourceNourriture === null) {
+      if (connait("baies")) {
+        candidats.push({
+          intention: { type: "recolter", ressource: "baies" },
+          score: 1.0 + personnalite.agreabilite * 0.3,
+        });
+      } else if (perception.stockAccessible) {
+        candidats.push({ intention: { type: "manger" }, score: 0.6 }); // passe par le stock familial
+      }
+    }
+
+    // Enfants : rester près d'un parent, demander à manger.
+    if (!adulte) {
+      const parentProche = perception.moi.parents[0];
+      if (parentProche !== undefined && parentProche.distance > 3) {
+        candidats.push({
+          intention: { type: "suivre", cible: parentProche.id },
+          score:
+            0.6 +
+            urgence(besoins.securite) +
+            urgence(besoins.faim) +
+            Math.min(0.5, parentProche.distance / 20),
+        });
+      }
+      const parent = perception.personnesVisibles.find((v) => v.estMonParent && !v.endormi);
+      if (
+        parent !== undefined &&
+        besoins.faim < 45 &&
+        !nourritureEnPoche &&
+        parent.derniereInteraction < tick - 24
+      ) {
+        candidats.push({
+          intention: { type: "demander", cible: parent.id, ressource: "baies" },
+          score: 0.5 + urgence(besoins.faim) * 2,
+        });
+      }
+    }
+
+    // Cour : attirance et affinité suffisantes envers une personne libre.
+    const courtisable = perception.personnesVisibles.find((v) => v.courtisable && !v.endormi);
+    if (adulte && courtisable !== undefined && !nuit) {
+      candidats.push({
+        intention: { type: "courtiser", cible: courtisable.id },
+        score:
+          0.45 +
+          courtisable.attirance / 120 +
+          personnalite.extraversion * 0.3 +
+          (perception.moi.valeurs.includes("famille") ? 0.2 : 0),
+      });
+    }
+
+    // Reproduction : partenaire proche, abri disponible, personne enceinte.
+    const partenaire = perception.moi.partenaire;
+    const partenaireVisible = partenaire
+      ? perception.personnesVisibles.find((v) => v.id === partenaire.id)
+      : undefined;
+    if (
+      adulte &&
+      partenaireVisible !== undefined &&
+      !partenaireVisible.endormi &&
+      !partenaireVisible.enceinte &&
+      perception.moi.coupleFecond &&
+      perception.abriDisponible &&
+      !perception.moi.enceinte &&
+      besoins.faim > 45 &&
+      besoins.soif > 45 &&
+      besoins.sommeil > 45
+    ) {
+      candidats.push({
+        intention: { type: "se_reproduire" },
+        score:
+          0.35 +
+          partenaireVisible.attirance / 150 +
+          (nuit ? 0.35 : 0) +
+          (perception.moi.valeurs.includes("famille") ? 0.3 : 0) +
+          (perception.moi.valeurs.includes("plaisir") ? 0.2 : 0),
+      });
     }
 
     // Voler : dernier recours des affamés peu scrupuleux.
@@ -226,11 +364,12 @@ export class RuleBrain implements Cerveau {
     candidats.push({
       intention: { type: "explorer" },
       score:
-        0.15 +
+        (adulte ? 0.15 : -0.2) +
         personnalite.ouverture * 0.35 +
         manque * 0.8 -
         familiarite * 0.2 -
-        (nuit ? 0.2 : 0) +
+        (nuit ? 0.2 : 0) -
+        (perception.saison === "hiver" ? 0.3 : 0) +
         (perception.moi.explorerPlusLoin ? 0.3 : 0),
     });
 

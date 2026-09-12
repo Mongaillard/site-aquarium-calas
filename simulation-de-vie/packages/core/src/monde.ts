@@ -32,6 +32,21 @@ export interface Monde {
   fonderChantier(type: TypeBatiment, position: Position, fondateur: Personnage): Batiment;
   /** Retire un bâtiment du monde (effondrement). */
   detruireBatiment(id: string): void;
+  /** Fait naître l'enfant d'un couple ; renvoie le nouveau personnage. */
+  naitre(mere: Personnage, pere: Personnage): Personnage;
+  /** Fait mourir un personnage (cause libre). */
+  tuer(p: Personnage, cause: string): void;
+}
+
+/**
+ * Deux personnes sont apparentées si elles portent le même nom ou si un lien
+ * familial (partenaire, parent, enfant, fratrie) les unit.
+ */
+export function apparentes(a: Personnage, b: Personnage): boolean {
+  if (a.id === b.id) return true;
+  if (a.identite.nomFamille === b.identite.nomFamille) return true;
+  const lien = a.relations.get(b.id)?.lien;
+  return lien === "partenaire" || lien === "parent" || lien === "enfant" || lien === "fratrie";
 }
 
 /** Vrai si la tuile est de l'eau (source de boisson). */
@@ -60,11 +75,12 @@ export function personnagesVivants(monde: Monde): Personnage[] {
   return monde.personnages.filter((p) => p.vivant);
 }
 
-/** Le personnage a-t-il le droit d'utiliser ce bâtiment ? */
-export function autorise(b: Batiment, p: Personnage): boolean {
-  return (
-    b.proprietaire === p.id || b.autorises.includes(p.id) || b.famille === p.identite.nomFamille
-  );
+/** Le personnage a-t-il le droit d'utiliser ce bâtiment ? (propriétaire, invité, famille, apparenté au propriétaire) */
+export function autorise(monde: Monde, b: Batiment, p: Personnage): boolean {
+  if (b.proprietaire === p.id || b.autorises.includes(p.id) || b.famille === p.identite.nomFamille)
+    return true;
+  const proprietaire = monde.personnages.find((x) => x.id === b.proprietaire);
+  return proprietaire !== undefined && apparentes(p, proprietaire);
 }
 
 export function batimentEn(monde: Monde, pos: Position): Batiment | null {
@@ -75,7 +91,7 @@ export function batimentEn(monde: Monde, pos: Position): Batiment | null {
 export function batimentsAccessibles(monde: Monde, p: Personnage, type?: TypeBatiment): Batiment[] {
   const pos = p.corps.position;
   return [...monde.batiments.values()]
-    .filter((b) => (type === undefined || b.type === type) && autorise(b, p))
+    .filter((b) => (type === undefined || b.type === type) && autorise(monde, b, p))
     .sort(
       (a, b) =>
         Grille.distance(pos, a.position) - Grille.distance(pos, b.position) ||
@@ -83,13 +99,14 @@ export function batimentsAccessibles(monde: Monde, p: Personnage, type?: TypeBat
     );
 }
 
-/** Nombre de personnages endormis sur la tuile d'un bâtiment. */
+/** Nombre d'adultes endormis sur la tuile d'un bâtiment (les enfants se serrent, ils ne comptent pas). */
 export function dormeurs(monde: Monde, b: Batiment): number {
   let n = 0;
   for (const p of monde.personnages) {
     if (
       p.vivant &&
       p.corps.endormi &&
+      p.corps.stade !== "enfant" &&
       p.corps.position.x === b.position.x &&
       p.corps.position.y === b.position.y
     )
@@ -102,6 +119,7 @@ export function dormeurs(monde: Monde, b: Batiment): number {
 export function abriDisponible(monde: Monde, p: Personnage): Batiment | null {
   for (const b of batimentsAccessibles(monde, p)) {
     if (b.etat !== "termine" || !PLANS_BATIMENT[b.type].abri) continue;
+    if (p.corps.stade === "enfant") return b;
     const surPlace =
       p.corps.position.x === b.position.x && p.corps.position.y === b.position.y && p.corps.endormi
         ? 1
@@ -142,11 +160,9 @@ export function atelierAdjacent(
   return null;
 }
 
-/** Membres vivants de la famille (même nom) d'un personnage, lui compris. */
+/** Membres vivants de la famille (même nom ou lien familial) d'un personnage, lui compris. */
 export function membresFamille(monde: Monde, p: Personnage): Personnage[] {
-  return monde.personnages.filter(
-    (a) => a.vivant && a.identite.nomFamille === p.identite.nomFamille,
-  );
+  return monde.personnages.filter((a) => a.vivant && apparentes(p, a));
 }
 
 /**

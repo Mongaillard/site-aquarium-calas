@@ -152,6 +152,41 @@ export function decrireEvenement(
     }
     case "reflexion":
       return temoin ? null : String(d.texte ?? "");
+    case "cour": {
+      const cible = noms.prenom(String(d.cible ?? ""));
+      const accepte = d.accepte === true;
+      if (temoin) return `J'ai vu ${qui} faire la cour à ${cible}.`;
+      return accepte
+        ? `J'ai fait la cour à ${cible}, et ${noms.feminin(String(d.cible ?? "")) ? "elle" : "il"} a souri.`
+        : `J'ai fait la cour à ${cible}, sans succès.`;
+    }
+    case "union": {
+      const cible = noms.prenom(String(d.cible ?? ""));
+      return temoin
+        ? `${qui} et ${cible} sont désormais ensemble.`
+        : `${cible} et moi sommes désormais ensemble. Quel jour !`;
+    }
+    case "grossesse":
+      return temoin ? null : `J'attends un enfant de ${noms.prenom(String(d.pere ?? ""))}.`;
+    case "fausse_couche":
+      return temoin ? null : "J'ai perdu l'enfant que j'attendais.";
+    case "naissance": {
+      const prenom = String(d.prenom ?? "");
+      const fille = d.sexe === "F";
+      return temoin
+        ? `${qui} a mis au monde ${fille ? "une fille" : "un fils"}, ${prenom}.`
+        : `${prenom}, ${fille ? "ma fille" : "mon fils"}, est né${fille ? "e" : ""}.`;
+    }
+    case "stade":
+      return temoin ? null : `Me voilà ${String(d.nouveau)} : ${String(d.ageAnnees)} ans déjà.`;
+    case "heritage":
+      return temoin ? null : `J'ai hérité des biens de ${noms.prenom(String(d.defunt ?? ""))}.`;
+    case "adoption": {
+      const enfant = String(d.prenom ?? "");
+      return temoin
+        ? `${qui} a recueilli ${enfant}.`
+        : `J'ai recueilli ${enfant}, qui n'a plus personne.`;
+    }
     case "meteo":
     case "arrivee":
     case "intention":

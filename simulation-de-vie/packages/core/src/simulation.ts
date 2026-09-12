@@ -7,11 +7,22 @@ import { appliquerTickBesoins } from "./agents/besoins.js";
 import { possede } from "./agents/inventaire.js";
 import type { Personnage } from "./agents/personnage.js";
 import { genererPopulation } from "./agents/population.js";
+import { creerPersonnage } from "./agents/personnage.js";
+import { heriter as heriterGenome } from "./agents/genetique.js";
+import {
+  adopter,
+  apprendreParObservation,
+  deuil,
+  heriter,
+  tickVieQuotidien,
+} from "./agents/vie.js";
+import { construireGenealogie } from "./genealogie.js";
+import type { Genealogie } from "./genealogie.js";
 import { executerTick } from "./actions/executeur.js";
 import { planifier } from "./actions/planificateur.js";
 import { decrireAction, decrireIntention, memeIntention } from "./actions/types.js";
 import type { Intention } from "./actions/types.js";
-import { percevoir, rayonVision } from "./cerveau/perception.js";
+import { observer, percevoir, percevoirLeger, rayonVision } from "./cerveau/perception.js";
 import { RuleBrain } from "./cerveau/rule-brain.js";
 import type { Cerveau } from "./cerveau/types.js";
 import type { SimConfig, SimConfigPartielle } from "./config.js";
@@ -50,6 +61,7 @@ export class Simulation implements Monde {
   readonly personnages: Personnage[];
   readonly batiments = new Map<string, Batiment>();
   meteo: Meteo = "clair";
+  private compteurPersonnages = 0;
   private readonly cerveaux = new Map<string, Cerveau>();
   private readonly gisements: { tuile: Tuile; gisement: Gisement }[] = [];
   private compteurBatiments = 0;
@@ -63,6 +75,7 @@ export class Simulation implements Monde {
     for (const t of grille.toutes())
       if (t.gisement) this.gisements.push({ tuile: t, gisement: t.gisement });
     this.personnages = genererPopulation(rng, config, grille);
+    this.compteurPersonnages = this.personnages.length;
     this.journal.ecouter((e) => {
       this.memoriser(e);
     });
@@ -141,6 +154,7 @@ export class Simulation implements Monde {
         e.acteur ? [e.acteur] : [],
         e.position,
       );
+      apprendreParObservation(t, e.type);
     }
   }
 
@@ -240,6 +254,92 @@ export class Simulation implements Monde {
     return b;
   }
 
+  /** Prénoms déjà portés (vivants et morts), pour éviter les doublons. */
+  prenomsUtilises(): Set<string> {
+    return new Set(this.personnages.map((p) => p.identite.prenom));
+  }
+
+  naitre(mere: Personnage, pere: Personnage): Personnage {
+    this.compteurPersonnages += 1;
+    const id = `p-${String(this.compteurPersonnages).padStart(4, "0")}`;
+    const coutume = this.config.social.nomFamille;
+    const nomFamille =
+      coutume === "pere"
+        ? pere.identite.nomFamille
+        : coutume === "mere"
+          ? mere.identite.nomFamille
+          : `${pere.identite.nomFamille}-${mere.identite.nomFamille}`;
+    const enfant = creerPersonnage(this.rng, {
+      id,
+      naissance: this.tick,
+      nomFamille,
+      parents: [mere.id, pere.id],
+      genome: heriterGenome(
+        mere.identite.genome,
+        pere.identite.genome,
+        this.rng.fork(`genome/${id}`),
+      ),
+      prenomsInterdits: this.prenomsUtilises(),
+      position: { ...mere.corps.position },
+      ageJours: 0,
+      joursParAnnee: this.config.vie.joursParAnnee,
+      ageAdulte: this.config.vie.ageAdulte,
+      ageAncien: this.config.vie.ageAncien,
+      ticksParJour: this.horloge.ticksParJour,
+      memoire: {
+        maxSouvenirs: this.config.memoire.maxSouvenirs,
+        demiVieRecenceJours: this.config.memoire.demiVieRecenceJours,
+      },
+    });
+    enfant.besoins.faim = 80;
+    enfant.besoins.soif = 80;
+    this.personnages.push(enfant);
+    this.cerveaux.set(id, new RuleBrain(enfant));
+    for (const parent of [mere, pere]) {
+      parent.relations.set(id, relationFamiliale(id, "enfant"));
+      enfant.relations.set(parent.id, relationFamiliale(parent.id, "parent"));
+    }
+    for (const autre of this.personnages) {
+      if (autre.id === id || autre.identite.parents === null) continue;
+      if (autre.identite.parents.some((x) => x === mere.id || x === pere.id)) {
+        autre.relations.set(id, relationFamiliale(id, "fratrie"));
+        enfant.relations.set(autre.id, relationFamiliale(autre.id, "fratrie"));
+      }
+    }
+    this.emettre(
+      "naissance",
+      mere,
+      {
+        enfant: id,
+        prenom: enfant.identite.prenom,
+        sexe: enfant.identite.sexe,
+        pere: pere.id,
+        nomFamille,
+      },
+      10,
+    );
+    const fille = enfant.identite.sexe === "F";
+    pere.memoire.ajouter(
+      this.tick,
+      "action",
+      `${enfant.identite.prenom}, ${fille ? "ma fille" : "mon fils"}, est né${fille ? "e" : ""}. ${mere.identite.prenom} va bien.`,
+      10,
+      [id, mere.id],
+      mere.corps.position,
+    );
+    mere.besoins.moral = Math.min(100, mere.besoins.moral + 20);
+    pere.besoins.moral = Math.min(100, pere.besoins.moral + 20);
+    return enfant;
+  }
+
+  tuer(p: Personnage, cause: string): void {
+    this.mourir(p, cause);
+  }
+
+  genealogie(): Genealogie {
+    return construireGenealogie(this.personnages);
+  }
+
   detruireBatiment(id: string): void {
     const b = this.batiments.get(id);
     if (b === undefined) return;
@@ -316,7 +416,12 @@ export class Simulation implements Monde {
       }
       if (b.solidite <= 0) this.detruireBatiment(b.id);
     }
-    if (this.tick > 0) for (const p of this.vivants()) p.corps.ageJours += 1;
+    if (this.tick > 0) {
+      for (const p of this.vivants()) {
+        p.corps.ageJours += 1;
+        tickVieQuotidien(this, p);
+      }
+    }
     for (const p of this.vivants()) {
       p.drapeaux.faimMinDuJour = p.besoins.faim;
       p.drapeaux.chaleurMinDuJour = p.besoins.chaleur;
@@ -368,7 +473,10 @@ export class Simulation implements Monde {
       gainChaleur += PLANS_BATIMENT[abriIci.type].chaleur;
     }
     const feu = feuProche(this, pos);
-    if (feu !== null) gainChaleur += PLANS_BATIMENT[feu.type].chaleur;
+    if (feu !== null) {
+      gainChaleur += PLANS_BATIMENT[feu.type].chaleur;
+      perteChaleur *= 0.7;
+    }
     if (possede(p.corps.inventaire, "vetement_cuir")) perteChaleur *= 0.6;
 
     const effet = appliquerTickBesoins(p.besoins, {
@@ -381,6 +489,7 @@ export class Simulation implements Monde {
       perteChaleur,
       gainChaleur,
       facteurSoif: meteo.soif,
+      facteurFaim: p.corps.enceinte !== null ? 1.3 : 1,
     });
     p.corps.sante = Math.min(100, p.corps.sante + effet.deltaSante);
     p.drapeaux.faimMinDuJour = Math.min(p.drapeaux.faimMinDuJour, p.besoins.faim);
@@ -396,12 +505,14 @@ export class Simulation implements Monde {
       if (b === undefined || b.etat === "termine") p.projet = null;
     }
 
-    const perception = percevoir(this, p);
+    // Observation à chaque tick (connaissance des lieux) ; perception complète seulement pour décider.
+    observer(this, p, rayonVision(this, moment));
+    const legere = percevoirLeger(this, p);
     const cerveau = this.cerveaux.get(p.id);
     if (cerveau === undefined) return;
 
     if (!p.corps.endormi) {
-      const urgence = this.tick >= p.urgenceIgnoreeJusqua ? cerveau.urgence(perception) : null;
+      const urgence = this.tick >= p.urgenceIgnoreeJusqua ? cerveau.urgence(legere) : null;
       if (urgence !== null) {
         if (!memeIntention(urgence, p.intention)) {
           this.definirIntention(p, urgence);
@@ -417,6 +528,7 @@ export class Simulation implements Monde {
     }
 
     if (p.actionEnCours === null && p.plan.length === 0) {
+      const perception = percevoir(this, p, false);
       if (p.intention === null) this.definirIntention(p, cerveau.decider(perception));
       const intention = p.intention;
       if (intention === null) return;
@@ -429,11 +541,19 @@ export class Simulation implements Monde {
         p.intention = null;
         // Une urgence impossible à planifier (aucune eau connue…) est mise en sommeil
         // deux heures, sinon elle annulerait le repli à chaque tick sans jamais bouger.
-        if (memeIntention(intention, cerveau.urgence(perception))) {
+        if (memeIntention(intention, cerveau.urgence(legere))) {
           p.urgenceIgnoreeJusqua = this.tick + 12;
         }
-        // Repli : bouger pour découvrir autre chose.
-        const repli = planifier(this, p, { type: "explorer" });
+        // Repli : un enfant rejoint un parent, un adulte bouge pour découvrir autre chose.
+        const parent =
+          p.corps.stade === "enfant"
+            ? p.identite.parents?.find((id) => this.personnage(id)?.vivant)
+            : undefined;
+        const repli = planifier(
+          this,
+          p,
+          parent !== undefined ? { type: "suivre", cible: parent } : { type: "explorer" },
+        );
         if (repli.ok) p.plan = repli.plan;
         return;
       }
@@ -485,5 +605,11 @@ export class Simulation implements Monde {
     p.intention = null;
     p.projet = null;
     this.emettre("deces", p, { cause, prenom: p.identite.prenom, ageJours: p.corps.ageJours }, 10);
+    heriter(this, p); // avant le deuil, qui rompt l'union
+    deuil(this, p, cause);
+    for (const enfant of this.personnages) {
+      if (enfant.vivant && (enfant.identite.parents?.includes(p.id) ?? false))
+        adopter(this, enfant);
+    }
   }
 }

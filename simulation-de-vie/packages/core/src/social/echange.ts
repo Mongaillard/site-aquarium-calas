@@ -18,9 +18,9 @@ export function probabiliteAccord(
 ): number {
   const possede = quantite(cible.corps.inventaire, ressource);
   const estNourriture = NOURRITURE[ressource] !== undefined;
-  const reserve = estNourriture ? 1 : 0;
-  if (possede - reserve < n) return 0;
   const rel = relationAvec(cible, demandeur.id);
+  const reserve = estNourriture && rel.lien !== "enfant" ? 1 : 0;
+  if (possede - reserve < n) return 0;
   const famille = cible.identite.nomFamille === demandeur.identite.nomFamille;
   let p =
     0.25 +
@@ -31,6 +31,7 @@ export function probabiliteAccord(
     demandeur.reputation / 400;
   if (estNourriture && cible.besoins.faim < 40) p -= 0.4;
   if (rel.dette < 0) p += 0.2; // la cible me doit quelque chose
+  if (rel.lien === "enfant") p += 0.6; // un parent ne laisse pas son enfant avoir faim
   return borner(p, 0, 0.95);
 }
 

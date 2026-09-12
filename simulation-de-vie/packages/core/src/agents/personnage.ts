@@ -18,6 +18,11 @@ import type { Inventaire } from "./inventaire.js";
 
 export type Stade = "enfant" | "adolescent" | "adulte" | "ancien";
 
+export interface Grossesse {
+  readonly depuisTick: number;
+  readonly pere: string;
+}
+
 export interface Corps {
   sante: number;
   ageJours: number;
@@ -26,6 +31,9 @@ export interface Corps {
   inventaire: Inventaire;
   /** Vrai pendant l'action `dormir`. */
   endormi: boolean;
+  enceinte: Grossesse | null;
+  /** Tick du dernier accouchement (délai avant une nouvelle grossesse). */
+  dernierAccouchement: number | null;
 }
 
 /** Lieu mémorisé : gisement ou point d'eau vu par le personnage (préfigure la mémoire de M3). */
@@ -141,6 +149,8 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
       position: { ...options.position },
       inventaire: creerInventaire(capaciteInventaire(identite, stade)),
       endormi: false,
+      enceinte: null,
+      dernierAccouchement: null,
     },
     besoins: besoinsInitiaux(rng),
     experience: experienceInitiale(),
@@ -190,4 +200,23 @@ export function relationAvec(p: Personnage, id: string): Relation {
     p.relations.set(id, r);
   }
   return r;
+}
+
+/**
+ * Met à jour le stade de vie selon l'âge ; renvoie l'ancien stade si un
+ * changement a eu lieu (sinon `null`). La capacité d'inventaire suit.
+ */
+export function mettreAJourStade(
+  p: Personnage,
+  joursParAnnee: number,
+  ageAdulte: number,
+  ageAncien: number,
+): Stade | null {
+  const nouveau = stadeDepuisAge(p.corps.ageJours, joursParAnnee, ageAdulte, ageAncien);
+  if (nouveau === p.corps.stade) return null;
+  const ancien = p.corps.stade;
+  p.corps.stade = nouveau;
+  const inv = p.corps.inventaire;
+  (inv as { capacite: number }).capacite = capaciteInventaire(p.identite, nouveau);
+  return ancien;
 }

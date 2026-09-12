@@ -27,6 +27,8 @@ export interface Relation {
   /** > 0 : la cible me doit ; < 0 : je lui dois. */
   dette: number;
   interactions: number;
+  /** Cours réussies (section 8.1). */
+  cours: number;
 }
 
 export function relationVierge(cible: string): Relation {
@@ -39,6 +41,7 @@ export function relationVierge(cible: string): Relation {
     derniereInteraction: -Infinity,
     dette: 0,
     interactions: 0,
+    cours: 0,
   };
 }
 

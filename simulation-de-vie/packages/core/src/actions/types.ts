@@ -32,7 +32,12 @@ export type Action =
       readonly quantite: number;
     }
   | { readonly type: "jeter"; readonly ressource: Ressource; readonly quantite: number }
-  | { readonly type: "parler"; readonly cible: string; ticksRestants: number | null }
+  | {
+      readonly type: "parler";
+      readonly cible: string;
+      ticksRestants: number | null;
+      poursuite?: number;
+    }
   | {
       readonly type: "offrir";
       readonly cible: string;
@@ -50,7 +55,16 @@ export type Action =
       readonly batimentId: string;
       readonly ressource: Ressource;
       readonly quantite: number;
-    };
+    }
+  | {
+      readonly type: "courtiser";
+      readonly cible: string;
+      ticksRestants: number | null;
+      poursuite?: number;
+    }
+  | { readonly type: "se_reproduire"; readonly partenaire: string; ticksRestants: number | null }
+  | { readonly type: "suivre"; readonly cible: string; ticksRestants: number }
+  | { readonly type: "se_rechauffer"; ticksRestants: number };
 
 export type TypeAction = Action["type"];
 
@@ -67,7 +81,11 @@ export type Intention =
   | { readonly type: "parler"; readonly cible: string }
   | { readonly type: "offrir"; readonly cible: string; readonly ressource: Ressource }
   | { readonly type: "demander"; readonly cible: string; readonly ressource: Ressource }
-  | { readonly type: "voler" };
+  | { readonly type: "voler" }
+  | { readonly type: "courtiser"; readonly cible: string }
+  | { readonly type: "se_reproduire" }
+  | { readonly type: "suivre"; readonly cible: string }
+  | { readonly type: "se_rechauffer" };
 
 export type TypeIntention = Intention["type"];
 
@@ -85,6 +103,10 @@ export function decrireIntention(i: Intention): string {
       return `offrir:${i.ressource}→${i.cible}`;
     case "demander":
       return `demander:${i.ressource}←${i.cible}`;
+    case "courtiser":
+      return `courtiser:${i.cible}`;
+    case "suivre":
+      return `suivre:${i.cible}`;
     default:
       return i.type;
   }
@@ -124,6 +146,14 @@ export function decrireAction(a: Action): string {
       return `demander:${a.ressource}×${a.quantite}←${a.cible}`;
     case "voler":
       return `voler:${a.ressource}×${a.quantite}←${a.batimentId}`;
+    case "courtiser":
+      return `courtiser:${a.cible}`;
+    case "se_reproduire":
+      return `se_reproduire:${a.partenaire}`;
+    case "suivre":
+      return `suivre:${a.cible}`;
+    case "se_rechauffer":
+      return `se_rechauffer:${a.ticksRestants}`;
   }
 }
 

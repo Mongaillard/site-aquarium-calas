@@ -2,6 +2,52 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M4 – Vie et reproduction (2026-09-12)
+
+- Couples : éligibilité (adultes de sexes opposés, non apparentés, libres sauf trait
+  « volage », écart d'âge ≤ 15 ans), attirance qui croît au fil des conversations cordiales
+  entre personnes éligibles, action `Courtiser` (acceptation selon attirance, affinité,
+  compatibilité), union après trois cours réussies ; un partenaire est apparenté et accède
+  aux bâtiments de l'autre.
+- Reproduction : action `SeReproduire` (couple, abri, forme, femme féconde), probabilité de
+  grossesse configurable réduite par la faim et la santé, le planificateur amène les deux
+  partenaires à l'abri ; grossesse de 30 jours (faim ×1,3, vitesse réduite au dernier tiers,
+  fausse couche possible si santé basse), délai post-partum de 20 jours.
+- Naissance : enfant avec génome hérité (un allèle de chaque parent, mutation 5 %), prénom
+  inédit, nom selon la coutume (père par défaut), liens parent / enfant / fratrie, souvenir
+  d'importance 10 pour les deux parents.
+- Enfance : les enfants ne récoltent ni ne construisent, suivent un parent, demandent à
+  manger (un parent refuse rarement) ou se servent au stock familial ; les parents nourrissent
+  leurs enfants en priorité et vont chercher des baies pour eux ; apprentissage par
+  observation (récolte, artisanat, construction) ; à l'adolescence la personnalité se fixe
+  (génétique × 0,6 + entourage × 0,4).
+- Vieillesse : stades mis à jour chaque jour (événement `stade`), espérance de vie génétique
+  (55 à 85 ans), probabilité journalière de mort naturelle croissante après 55 ans.
+- Décès : héritage des biens et bâtiments (partenaire, puis aîné, puis famille), deuil des
+  proches (moral, souvenir d'importance 10 même à distance), rupture de l'union, adoption des
+  orphelins par l'adulte qui les aime le plus.
+- Généalogie : arbre exportable (`sim run --genealogie <fichier>`), générations et
+  descendants.
+- Poursuite : parler ou courtiser suit un interlocuteur qui s'éloigne (jusqu'à 8 tuiles) au
+  lieu d'échouer.
+- CLI : compteurs de vie (cours, unions, grossesses, naissances, décès, adoptions), stade et
+  grossesse dans le tableau d'état, naissances dans le résumé quotidien.
+- Équilibrage de l'hiver (découvert en faisant tourner 120 jours : toute la colonie mourait de
+  froid) : intention et action « se réchauffer » (abri d'abord, surtout avec un feu à côté,
+  sinon le feu), feu plus chaud qui coupe le vent, abris et maisons plus chauds, les enfants
+  ne comptent pas dans la capacité des abris ; fabrication d'une canne à pêche dès qu'un banc
+  de poissons est connu et pêche comme nourriture principale ; provisions d'automne
+  déposées au stock familial et consommées l'hiver ; exploration réduite en hiver.
+  Résultat : sur quatre graines, 19 à 22 personnes vivantes au jour 150 (été de l'an 2),
+  7 à 10 naissances, au plus deux décès.
+- Performance : la perception complète n'est construite qu'au moment de décider (les
+  réflexes d'urgence utilisent une perception légère), recherche de nourriture en une passe ;
+  150 jours passent de 40 s à 13 s.
+- Tests : 144 au total (+21) dont « ≥ 1 naissance en 60 jours » et « la colonie passe
+  l'hiver (120 jours) ».
+- Non couvert (M7) : maladies, tombes choisies par le cerveau à règles, vêtements de cuir
+  (lance, chasse, cuir), agriculture, monnaie.
+
 ## M3 – Mémoire et relations (2026-09-12)
 
 - Flux de mémoire par personnage : souvenirs horodatés (observation, action, dialogue,

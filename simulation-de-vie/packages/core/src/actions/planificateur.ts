@@ -29,6 +29,8 @@ import {
   prochainBatimentNecessaire,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
+import { partenaireDe } from "../social/couple.js";
+import { relationAvec } from "../agents/personnage.js";
 import { trouverChemin } from "./chemin.js";
 import type { Action, Intention } from "./types.js";
 
@@ -77,11 +79,101 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
         type: "demander",
         cible: cible.id,
         ressource: intention.ressource,
-        quantite: 2,
+        quantite: p.corps.stade === "enfant" ? 1 : 2,
       }));
     case "voler":
       return planifierVol(monde, p);
+    case "courtiser":
+      return planifierRencontre(monde, p, intention.cible, (cible) => ({
+        type: "courtiser",
+        cible: cible.id,
+        ticksRestants: null,
+      }));
+    case "se_reproduire":
+      return planifierReproduction(monde, p);
+    case "suivre":
+      return planifierSuivi(monde, intention.cible);
+    case "se_rechauffer":
+      return planifierRechauffement(monde, p);
   }
+}
+
+/**
+ * Se réchauffer là où le bilan thermique est le meilleur : un abri (surtout
+ * avec un feu à côté) protège mieux qu'un feu en plein vent.
+ */
+function planifierRechauffement(monde: Monde, p: Personnage): ResultatPlan {
+  const pos = p.corps.position;
+  const attente: Action = { type: "se_rechauffer", ticksRestants: 36 };
+  const abri = abriDisponible(monde, p);
+  if (abri !== null && Grille.distance(pos, abri.position) <= 30) {
+    if (pos.x === abri.position.x && pos.y === abri.position.y) return ok([attente]);
+    const aller = allerSur(monde, p, abri.position);
+    if (aller) return ok([aller, attente]);
+  }
+  if (feuProche(monde, pos) !== null) return ok([attente]);
+  const feu = feuLePlusProche(monde, pos, 25);
+  if (feu !== null) {
+    const aller = allerPresDe(monde, p, feu.position);
+    if (aller) return ok([aller, attente]);
+  }
+  return echec("aucune source de chaleur connue");
+}
+
+/**
+ * Meilleure nourriture que le personnage sait aller chercher : poisson (canne),
+ * gibier (lance) ou baies, la plus nourrissante d'abord.
+ */
+export function meilleureNourritureConnue(p: Personnage): Ressource | null {
+  const inv = p.corps.inventaire;
+  let gibier = false;
+  let poisson = false;
+  let baies = false;
+  for (const l of p.connaissance.values()) {
+    if (l.quantiteVue < 1 || (l.outilRequis !== null && !possede(inv, l.outilRequis))) continue;
+    if (l.type === "gibier") gibier = true;
+    else if (l.type === "poisson") poisson = true;
+    else if (l.type === "baies") baies = true;
+  }
+  return gibier ? "gibier" : poisson ? "poisson" : baies ? "baies" : null;
+}
+
+/**
+ * Reproduction (section 8.1) : les deux partenaires rejoignent l'abri. Le
+ * partenaire, s'il est proche, disponible et consentant (attirance suffisante),
+ * reçoit le plan de s'y rendre et d'y attendre.
+ */
+function planifierReproduction(monde: Monde, p: Personnage): ResultatPlan {
+  const partenaire = partenaireDe(monde, p);
+  if (partenaire === null) return echec("pas de partenaire");
+  if (partenaire.corps.endormi) return echec(`${partenaire.identite.prenom} dort`);
+  if (Grille.distance(p.corps.position, partenaire.corps.position) > 6)
+    return echec(`${partenaire.identite.prenom} est loin`);
+  const abri = abriDisponible(monde, p) ?? abriDisponible(monde, partenaire);
+  if (abri === null) return echec("aucun abri disponible");
+  if (relationAvec(partenaire, p.id).attirance < 40)
+    return echec(`${partenaire.identite.prenom} n'en a pas envie`);
+  for (const x of [p, partenaire]) {
+    if (x.besoins.faim < 40 || x.besoins.soif < 40 || x.besoins.sommeil < 40)
+      return echec("pas en état");
+  }
+  const allerPartenaire = allerSur(monde, partenaire, abri.position);
+  partenaire.plan = allerPartenaire
+    ? [allerPartenaire, { type: "attendre", ticksRestants: 8 }]
+    : [{ type: "attendre", ticksRestants: 8 }];
+  partenaire.actionEnCours = null;
+  partenaire.intention = { type: "suivre", cible: p.id };
+  const aller = allerSur(monde, p, abri.position);
+  const plan: Action[] = aller ? [aller] : [];
+  plan.push({ type: "attendre", ticksRestants: 1 });
+  plan.push({ type: "se_reproduire", partenaire: partenaire.id, ticksRestants: null });
+  return ok(plan);
+}
+
+function planifierSuivi(monde: Monde, cibleId: string): ResultatPlan {
+  const cible = monde.personnages.find((x) => x.id === cibleId);
+  if (!cible?.vivant) return echec("personne à suivre");
+  return ok([{ type: "suivre", cible: cible.id, ticksRestants: 12 }]);
 }
 
 /** Rejoindre une personne (≤ 2 tuiles) puis agir avec elle. */
@@ -111,7 +203,7 @@ export function stockVolable(
 ): { batiment: Batiment; ressource: Ressource } | null {
   let meilleur: { batiment: Batiment; ressource: Ressource; distance: number } | null = null;
   for (const b of monde.batiments.values()) {
-    if (b.etat !== "termine" || b.stock === null || autorise(b, p)) continue;
+    if (b.etat !== "termine" || b.stock === null || autorise(monde, b, p)) continue;
     const ressource = nourritureDisponible(b.stock);
     if (ressource === null) continue;
     const distance = Grille.distance(p.corps.position, b.position);
@@ -175,6 +267,43 @@ function planifierBoire(monde: Monde, p: Personnage): ResultatPlan {
 function planifierManger(monde: Monde, p: Personnage): ResultatPlan {
   const ressource = nourritureDisponible(p.corps.inventaire);
   if (ressource !== null) return ok([{ type: "manger", ressource, ticksRestants: null }]);
+  if (p.corps.stade === "enfant") {
+    const stock = batimentsAccessibles(monde, p).find(
+      (b) => b.etat === "termine" && b.stock !== null && nourritureDisponible(b.stock) !== null,
+    );
+    if (stock?.stock) {
+      const dansStock = nourritureDisponible(stock.stock);
+      if (dansStock !== null) {
+        const plan: Action[] = [];
+        const aller = allerPresDe(monde, p, stock.position);
+        if (aller) plan.push(aller);
+        plan.push({ type: "prendre", batimentId: stock.id, ressource: dansStock, quantite: 2 });
+        plan.push({ type: "manger", ressource: dansStock, ticksRestants: null });
+        return ok(plan);
+      }
+    }
+    const parents = (p.identite.parents ?? [])
+      .map((id) => monde.personnages.find((x) => x.id === id))
+      .filter((x): x is Personnage => x?.vivant === true && !x.corps.endormi)
+      .sort(
+        (x, y) =>
+          Grille.distance(p.corps.position, x.corps.position) -
+          Grille.distance(p.corps.position, y.corps.position),
+      );
+    const parent =
+      parents.find((x) => nourritureDisponible(x.corps.inventaire) !== null) ?? parents[0];
+    if (parent !== undefined && Grille.distance(p.corps.position, parent.corps.position) <= 30) {
+      const ressource = nourritureDisponible(parent.corps.inventaire);
+      if (ressource === null) return echec(`${parent.identite.prenom} n'a rien à donner`);
+      return planifierRencontre(monde, p, parent.id, (cible) => ({
+        type: "demander",
+        cible: cible.id,
+        ressource,
+        quantite: 1,
+      }));
+    }
+    return echec("trop jeune pour récolter : il faut demander");
+  }
 
   // Nourriture dans un stock familial proche ?
   for (const b of batimentsAccessibles(monde, p)) {
@@ -189,7 +318,8 @@ function planifierManger(monde: Monde, p: Personnage): ResultatPlan {
     plan.push({ type: "manger", ressource: dansStock, ticksRestants: null });
     return ok(plan);
   }
-  return planifierRecolte(monde, p, "baies", 1, true);
+  const nourriture = meilleureNourritureConnue(p) ?? "baies";
+  return planifierRecolte(monde, p, nourriture, 1, true);
 }
 
 /**

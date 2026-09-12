@@ -21,11 +21,12 @@ empreinte, puis fait avancer l'horloge du nombre de jours demandé.
 ```
 packages/core/src
   monde/        grille, génération, biomes, ressources, horloge, météo, recettes, bâtiments, rendu ASCII
-  agents/       identité, génome, besoins, inventaire, compétences, population
+  agents/       identité, génome et héritage, besoins, inventaire, compétences, population, cycle de vie
   actions/      types d'actions et d'intentions, A*, planificateur, exécuteur
   cerveau/      interface Cerveau, perception, RuleBrain (règles)
   memoire/      flux de souvenirs, mise en mots des événements, réflexion du soir
-  social/       relations, dialogues à gabarits, échanges et vol
+  social/       relations, dialogues à gabarits, échanges et vol, couples
+  genealogie.ts arbre des filiations et des unions
   evenements/   journal d'événements
   simulation.ts boucle principale
 packages/cli    commande `sim`

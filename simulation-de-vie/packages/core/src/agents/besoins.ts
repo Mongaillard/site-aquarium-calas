@@ -42,6 +42,8 @@ export interface ContexteBesoins {
   readonly gainChaleur: number;
   /** Multiplicateur de la soif (canicule). */
   readonly facteurSoif: number;
+  /** Multiplicateur de la faim (grossesse). */
+  readonly facteurFaim: number;
 }
 
 export const CONTEXTE_BESOINS_DEFAUT: ContexteBesoins = {
@@ -54,6 +56,7 @@ export const CONTEXTE_BESOINS_DEFAUT: ContexteBesoins = {
   perteChaleur: 0,
   gainChaleur: 0,
   facteurSoif: 1,
+  facteurFaim: 1,
 };
 
 export interface EffetBesoins {
@@ -68,7 +71,7 @@ export function appliquerTickBesoins(b: Besoins, ctx: ContexteBesoins): EffetBes
   const T = ctx.ticksParJour;
   const ralenti = ctx.dort ? 0.6 : 1;
 
-  b.faim = clamp(b.faim - (100 / (2 * T)) * ralenti);
+  b.faim = clamp(b.faim - (100 / (2 * T)) * ralenti * ctx.facteurFaim);
   b.soif = clamp(b.soif - (100 / T) * ralenti * ctx.facteurSoif);
   const recuperation = ctx.aAbri ? 1.3 : 1;
   b.sommeil = clamp(

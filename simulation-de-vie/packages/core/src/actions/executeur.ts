@@ -21,12 +21,14 @@ import type { Position } from "../monde/grille.js";
 import { EFFETS_METEO } from "../monde/meteo.js";
 import { RECETTES, SOLIDITE_INITIALE } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
-import { atelierAdjacent, autorise, eauAdjacente } from "../monde.js";
+import { atelierAdjacent, autorise, eauAdjacente, feuProche } from "../monde.js";
 import type { Monde } from "../monde.js";
 import { composerDialogue, transcrire } from "../social/dialogue.js";
 import { accepteDemande, effetsDon, effetsRefus, effetsVol } from "../social/echange.js";
 import { ajusterRelation } from "../social/relations.js";
+import { SEUILS_COUPLE, accepteCour, eligibles, gainAttirance, unir } from "../social/couple.js";
 import { rayonVision } from "../cerveau/perception.js";
+import { avancementGrossesse, peutConcevoir } from "../agents/vie.js";
 import { trouverChemin } from "./chemin.js";
 import type { Action } from "./types.js";
 
@@ -48,7 +50,10 @@ export function vitesse(p: Personnage, monde?: Monde): number {
   if (p.besoins.faim < 20 || p.besoins.soif < 20) v *= 0.7;
   if (p.corps.stade === "enfant") v *= 0.8;
   if (p.corps.stade === "ancien") v *= 0.85;
-  if (monde) v *= EFFETS_METEO[monde.meteo].vitesse;
+  if (monde) {
+    v *= EFFETS_METEO[monde.meteo].vitesse;
+    if (p.corps.enceinte !== null && avancementGrossesse(monde, p) > 2 / 3) v *= 0.8;
+  }
   return v;
 }
 
@@ -91,7 +96,201 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       return tickDemander(monde, p, action);
     case "voler":
       return tickVoler(monde, p, action);
+    case "courtiser":
+      return tickCourtiser(monde, p, action);
+    case "se_reproduire":
+      return tickSeReproduire(monde, p, action);
+    case "suivre":
+      return tickSuivre(monde, p, action);
+    case "se_rechauffer": {
+      const pos = p.corps.position;
+      const ici = monde.grille.tuile(pos.x, pos.y).batiment;
+      const abri = ici !== null && ici.etat === "termine" && PLANS_BATIMENT[ici.type].abri;
+      if (!abri && feuProche(monde, pos) === null) return echec("pas de chaleur ici");
+      action.ticksRestants -= 1;
+      return p.besoins.chaleur >= 85 || action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
+    }
   }
+}
+
+function tickCourtiser(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "courtiser" }>,
+): Resultat {
+  const poursuite = poursuivre(monde, p, action.cible, action);
+  if (poursuite !== null) return poursuite;
+  const cible = interlocuteur(monde, p, action.cible);
+  if (typeof cible === "string") return echec(cible);
+  if (!eligibles(monde, p, cible)) return echec(`${cible.identite.prenom} n'est pas libre`);
+  action.ticksRestants ??= 3;
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+  const tick = monde.horloge.tick;
+  const accepte = accepteCour(p, cible);
+  const ra = relationAvec(p, cible.id);
+  const rb = relationAvec(cible, p.id);
+  if (accepte) {
+    ra.cours += 1;
+    ajusterRelation(
+      ra,
+      p.identite.personnalite,
+      cible.identite.personnalite,
+      { affinite: 3, attirance: 10 },
+      tick,
+    );
+    ajusterRelation(
+      rb,
+      cible.identite.personnalite,
+      p.identite.personnalite,
+      { affinite: 3, attirance: 10 },
+      tick,
+    );
+    p.besoins.moral = clamp(p.besoins.moral + 5);
+    cible.besoins.moral = clamp(cible.besoins.moral + 5);
+  } else {
+    ajusterRelation(
+      ra,
+      p.identite.personnalite,
+      cible.identite.personnalite,
+      { attirance: -5 },
+      tick,
+    );
+    p.besoins.moral = clamp(p.besoins.moral - 4);
+  }
+  p.besoins.social = clamp(p.besoins.social + 15);
+  cible.besoins.social = clamp(cible.besoins.social + 15);
+  monde.emettre("cour", p, { cible: cible.id, accepte, cours: ra.cours }, accepte ? 4 : 3);
+  if (
+    accepte &&
+    ra.cours >= SEUILS_COUPLE.coursPourUnion &&
+    rb.attirance > SEUILS_COUPLE.attirance
+  ) {
+    unir(p, cible, tick);
+    monde.emettre(
+      "union",
+      p,
+      { cible: cible.id, prenoms: `${p.identite.prenom} & ${cible.identite.prenom}` },
+      8,
+    );
+  }
+  return accepte ? TERMINEE : echec(`${cible.identite.prenom} a décliné`);
+}
+
+function tickSeReproduire(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "se_reproduire" }>,
+): Resultat {
+  const partenaire = monde.personnages.find((x) => x.id === action.partenaire);
+  if (!partenaire?.vivant) return echec("partenaire absent");
+  if (relationAvec(p, partenaire.id).lien !== "partenaire") return echec("pas de lien de couple");
+  if (partenaire.corps.endormi) return echec(`${partenaire.identite.prenom} dort`);
+  if (Grille.distance(p.corps.position, partenaire.corps.position) > 1)
+    return echec(`${partenaire.identite.prenom} n'est pas là`);
+  const b = monde.grille.tuile(p.corps.position.x, p.corps.position.y).batiment;
+  if (b?.etat !== "termine" || !PLANS_BATIMENT[b.type].abri) return echec("pas à l'abri");
+  if (!autorise(monde, b, p) && !autorise(monde, b, partenaire))
+    return echec("cet abri n'est pas le nôtre");
+  const mere = p.identite.sexe === "F" ? p : partenaire;
+  const pere = mere === p ? partenaire : p;
+  if (mere.corps.stade !== "adulte" || pere.corps.stade !== "adulte") return echec("pas en âge");
+  if (mere.corps.enceinte !== null) return echec(`${mere.identite.prenom} attend déjà un enfant`);
+  if (!peutConcevoir(monde, mere)) return echec("pas le moment d'avoir un enfant");
+  for (const x of [p, partenaire]) {
+    if (x.besoins.faim < 40 || x.besoins.soif < 40 || x.besoins.sommeil < 40)
+      return echec("pas en état");
+  }
+  action.ticksRestants ??= 2;
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+  partenaire.corps.position = { ...p.corps.position };
+  const tick = monde.horloge.tick;
+  ajusterRelation(
+    relationAvec(p, partenaire.id),
+    p.identite.personnalite,
+    partenaire.identite.personnalite,
+    { affinite: 3, attirance: 5 },
+    tick,
+  );
+  ajusterRelation(
+    relationAvec(partenaire, p.id),
+    partenaire.identite.personnalite,
+    p.identite.personnalite,
+    { affinite: 3, attirance: 5 },
+    tick,
+  );
+  p.besoins.moral = clamp(p.besoins.moral + 6);
+  partenaire.besoins.moral = clamp(partenaire.besoins.moral + 6);
+  let chance = monde.config.vie.probabiliteGrossesse;
+  if (mere.besoins.faim < 50) chance *= 0.5;
+  if (mere.corps.sante < 50) chance *= 0.5;
+  if (mere.rng.chance(chance)) {
+    mere.corps.enceinte = { depuisTick: tick, pere: pere.id };
+    monde.emettre("grossesse", mere, { pere: pere.id }, 7, null);
+  }
+  return TERMINEE;
+}
+
+/** Suivre quelqu'un : un pas vers lui à chaque tick tant qu'il est à plus de 2 tuiles. */
+function tickSuivre(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "suivre" }>,
+): Resultat {
+  const cible = monde.personnages.find((x) => x.id === action.cible);
+  if (!cible?.vivant) return echec("personne à suivre");
+  action.ticksRestants -= 1;
+  const pos = p.corps.position;
+  if (Grille.distance(pos, cible.corps.position) > 2) {
+    const dx = Math.sign(cible.corps.position.x - pos.x);
+    const dy = Math.sign(cible.corps.position.y - pos.y);
+    const essais: Position[] = [
+      { x: pos.x + dx, y: pos.y + dy },
+      { x: pos.x + dx, y: pos.y },
+      { x: pos.x, y: pos.y + dy },
+    ];
+    for (const e of essais) {
+      if ((e.x !== pos.x || e.y !== pos.y) && monde.grille.estPraticable(e.x, e.y)) {
+        p.corps.position = e;
+        break;
+      }
+    }
+  }
+  return action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
+}
+
+/**
+ * Si l'interlocuteur s'est éloigné (3 à 8 tuiles), fait un pas vers lui et
+ * renvoie « en cours » ; au-delà de 10 pas de poursuite, abandonne.
+ */
+function poursuivre(
+  monde: Monde,
+  p: Personnage,
+  cibleId: string,
+  action: { poursuite?: number },
+): Resultat | null {
+  const cible = monde.personnages.find((x) => x.id === cibleId);
+  if (!cible?.vivant) return null;
+  const d = Grille.distance(p.corps.position, cible.corps.position);
+  if (d <= 2) return null;
+  if (d > 8) return echec(`${cible.identite.prenom} est trop loin`);
+  action.poursuite = (action.poursuite ?? 0) + 1;
+  if (action.poursuite > 10) return echec(`${cible.identite.prenom} s'est éloigné`);
+  const pos = p.corps.position;
+  const dx = Math.sign(cible.corps.position.x - pos.x);
+  const dy = Math.sign(cible.corps.position.y - pos.y);
+  for (const e of [
+    { x: pos.x + dx, y: pos.y + dy },
+    { x: pos.x + dx, y: pos.y },
+    { x: pos.x, y: pos.y + dy },
+  ]) {
+    if ((e.x !== pos.x || e.y !== pos.y) && monde.grille.estPraticable(e.x, e.y)) {
+      p.corps.position = e;
+      break;
+    }
+  }
+  return ENCOURS;
 }
 
 /** Interlocuteur vivant, éveillé, à ≤ 2 tuiles. */
@@ -109,6 +308,8 @@ function tickParler(
   p: Personnage,
   action: Extract<Action, { type: "parler" }>,
 ): Resultat {
+  const poursuite = poursuivre(monde, p, action.cible, action);
+  if (poursuite !== null) return poursuite;
   const cible = interlocuteur(monde, p, action.cible);
   if (typeof cible === "string") return echec(cible);
   action.ticksRestants ??= 2 + Math.min(2, Math.round(p.identite.personnalite.extraversion * 2));
@@ -174,6 +375,16 @@ function tickParler(
   }
   p.besoins.social = clamp(p.besoins.social + 25);
   cible.besoins.social = clamp(cible.besoins.social + 25);
+  if (dialogue.sujet !== "dispute" && eligibles(monde, p, cible)) {
+    for (const [x, y] of [
+      [p, cible],
+      [cible, p],
+    ] as const) {
+      const r = relationAvec(x, y.id);
+      r.attirance = Math.min(100, r.attirance + gainAttirance(x, y));
+      r.affinite = Math.min(100, r.affinite + 3);
+    }
+  }
   if (dialogue.sujet === "dispute") {
     p.besoins.moral = clamp(p.besoins.moral - 4);
     cible.besoins.moral = clamp(cible.besoins.moral - 4);
@@ -259,7 +470,7 @@ function tickVoler(
 ): Resultat {
   const b = monde.batiments.get(action.batimentId);
   if (b?.etat !== "termine" || b.stock === null) return echec("pas de stock ici");
-  if (autorise(b, p)) return echec("ce stock est le mien");
+  if (autorise(monde, b, p)) return echec("ce stock est le mien");
   if (Grille.distance(p.corps.position, b.position) > 1) return echec("stock trop loin");
   const n = transferer(b.stock, p.corps.inventaire, action.ressource, action.quantite);
   if (n <= 0) return echec("rien à voler");
@@ -534,7 +745,7 @@ function stockAccessible(monde: Monde, p: Personnage, batimentId: string) {
   const b = monde.batiments.get(batimentId);
   if (b === undefined) return { erreur: "bâtiment disparu" } as const;
   if (b.etat !== "termine" || b.stock === null) return { erreur: "pas de stock ici" } as const;
-  if (!autorise(b, p)) return { erreur: "accès refusé" } as const;
+  if (!autorise(monde, b, p)) return { erreur: "accès refusé" } as const;
   if (Grille.distance(p.corps.position, b.position) > 1)
     return { erreur: "stock trop loin" } as const;
   return { b, stock: b.stock } as const;

@@ -33,6 +33,7 @@ Options de run :
   --verbose            Affiche les événements marquants (décès, bâtiments, vols…)
   --inspect <id>       Affiche l'identité, les relations et les souvenirs d'un personnage (ex. p-0001)
   --journal <fichier>  Écrit le journal complet au format NDJSON à la fin
+  --genealogie <fichier>  Écrit l'arbre généalogique en JSON à la fin
 `;
 
 function entier(valeur: string | undefined, defaut: number, nom: string): number {
@@ -72,12 +73,10 @@ function ligneStatut(sim: Simulation, p: Personnage): string {
     ...p.corps.inventaire.objets.map((o) => `[${o.type}]`),
   ].join(" ");
   const etat = p.vivant
-    ? p.corps.endormi
-      ? "dort  "
-      : "éveillé"
+    ? `${p.corps.endormi ? "dort" : "éveillé"} ${p.corps.stade}${p.corps.enceinte ? " enceinte" : ""}`
     : `mort (${p.causeDeces ?? "?"})`;
   return (
-    `  ${nomComplet(p.identite).padEnd(20)} ${etat.padEnd(14)} ` +
+    `  ${nomComplet(p.identite).padEnd(20)} ${etat.padEnd(24)} ` +
     `santé ${jauge(p.corps.sante)} faim ${jauge(b.faim)} soif ${jauge(b.soif)} ` +
     `sommeil ${jauge(b.sommeil)} chaleur ${jauge(b.chaleur)} moral ${jauge(b.moral)} ` +
     `pos (${p.corps.position.x},${p.corps.position.y}) ${inv}`.trimEnd() +
@@ -99,6 +98,7 @@ function commandeRun(argv: string[]): number {
       verbose: { type: "boolean", default: false },
       inspect: { type: "string" },
       journal: { type: "string" },
+      genealogie: { type: "string" },
     },
     strict: true,
   });
@@ -144,7 +144,12 @@ function commandeRun(argv: string[]): number {
         e.type === "feu_eteint" ||
         e.type === "outil_casse" ||
         e.type === "vol" ||
-        e.type === "invitation"
+        e.type === "invitation" ||
+        e.type === "union" ||
+        e.type === "grossesse" ||
+        e.type === "naissance" ||
+        e.type === "adoption" ||
+        e.type === "stade"
       ) {
         console.log(`  [${sim.horloge.formater(e.tick)}] ${e.type} ${JSON.stringify(e.details)}`);
       }
@@ -155,13 +160,16 @@ function commandeRun(argv: string[]): number {
   const t0 = performance.now();
   for (let j = 0; j < jours; j++) {
     const avant = sim.statistiques();
+    const naissancesAvant = sim.journal.compte("naissance");
     sim.avancerJusquaAube();
     const apres = sim.statistiques();
+    const naissances = sim.journal.compte("naissance") - naissancesAvant;
     const recoltes = sim.journal.compte("recolte");
     const repas = sim.journal.compte("repas");
     console.log(
       `Jour ${String(j + 1).padStart(3)} (${apres.meteo.padEnd(8)}) : vivants ${apres.vivants}/${sim.personnages.length}` +
         (apres.morts > avant.morts ? `  (+${apres.morts - avant.morts} décès)` : "") +
+        (naissances > 0 ? `  (+${naissances} naissance${naissances > 1 ? "s" : ""})` : "") +
         `  bâtiments ${apres.batiments} (+${apres.chantiers} chantiers)` +
         `  récoltes ${recoltes}  repas ${repas}  événements ${apres.evenements}`,
     );
@@ -204,10 +212,20 @@ function commandeRun(argv: string[]): number {
       `${sim.journal.compte("demande")} demandes, ${sim.journal.compte("vol")} vols, ` +
       `${sim.journal.compte("invitation")} invitations, ${sim.journal.compte("reflexion")} réflexions`,
   );
+  console.log(
+    `Vie : ${sim.journal.compte("cour")} cours, ${sim.journal.compte("union")} unions, ` +
+      `${sim.journal.compte("grossesse")} grossesses, ${sim.journal.compte("naissance")} naissances, ` +
+      `${sim.journal.compte("deces")} décès, ${sim.journal.compte("adoption")} adoptions` +
+      `  (population ${sim.personnages.length}, générations ${sim.genealogie().generations})`,
+  );
 
   if (values.inspect !== undefined) {
     console.log();
     inspecter(sim, values.inspect);
+  }
+  if (values.genealogie !== undefined) {
+    writeFileSync(values.genealogie, JSON.stringify(sim.genealogie(), null, 2), "utf8");
+    console.log(`Généalogie écrite : ${values.genealogie}`);
   }
   if (values.journal !== undefined) {
     writeFileSync(values.journal, `${sim.journal.ndjson()}\n`, "utf8");
