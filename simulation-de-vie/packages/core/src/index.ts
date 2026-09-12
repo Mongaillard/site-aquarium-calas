@@ -97,7 +97,7 @@ export { inventer } from "./savoirs/inventions.js";
 export type { Evenement, TypeEvenement, Auditeur } from "./evenements/journal.js";
 export { estEau, eauAdjacente, personnagesVivants } from "./monde.js";
 export type { Monde } from "./monde.js";
-export type { Statistiques } from "./simulation.js";
+export type { Statistiques, Inspiration } from "./simulation.js";
 export { METEOS, EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
 export type { Meteo, EffetsMeteo, EffetsSaison } from "./monde/meteo.js";
 export {

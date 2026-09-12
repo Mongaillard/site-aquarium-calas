@@ -87,6 +87,8 @@ export interface Personnage {
   readonly connaissance: Map<string, LieuConnu>;
   /** Leçons et inventions retenues, avec leur force et leur origine. */
   readonly savoirs: Map<Savoir, SavoirAcquis>;
+  /** Pensée intérieure soufflée par Claude (M5), valable une journée. */
+  penseeClaude: { texte: string; tick: number } | null;
   readonly relations: Map<string, Relation>;
   readonly memoire: FluxMemoire;
   /** Réputation -100..100, modifiée par les témoins de ses actes. */
@@ -166,6 +168,7 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
     actionEnCours: null,
     connaissance: new Map(),
     savoirs: new Map(),
+    penseeClaude: null,
     relations: new Map(),
     memoire: new FluxMemoire({
       ticksParJour: options.ticksParJour,

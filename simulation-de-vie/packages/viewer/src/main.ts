@@ -6,6 +6,7 @@ import type { Camera } from "./camera.js";
 import { cadrer, centrerSur, deplacer, zoomer } from "./camera.js";
 import { Magasin } from "./etat.js";
 import { LiaisonLocale } from "./local.js";
+import { CerveauClaude, sampleDeLaPage } from "./claude.js";
 import { Panneaux } from "./panneaux.js";
 import { Rendu } from "./rendu.js";
 import type { Liaison } from "./reseau.js";
@@ -280,6 +281,33 @@ element("btn-legende", HTMLButtonElement).addEventListener("click", () => {
   legende.classList.toggle("ouverte");
 });
 
+// Cerveau Claude (M5) : seulement dans la page publiée sur claude.ai, sur demande.
+const btnClaude = element("btn-claude", HTMLButtonElement);
+const cerveauClaude = new CerveauClaude(
+  magasin,
+  (inspiration) => {
+    liaison.envoyer(inspiration);
+  },
+  sampleDeLaPage,
+  (texte) => {
+    const el = document.getElementById("connexion");
+    if (el) el.textContent = texte;
+  },
+);
+if (modeLocal && window.claude !== undefined) {
+  btnClaude.hidden = false;
+  btnClaude.addEventListener("click", () => {
+    if (cerveauClaude.estActif) {
+      cerveauClaude.desactiver();
+      const el = document.getElementById("connexion");
+      if (el) el.textContent = "en direct";
+    } else {
+      cerveauClaude.activer();
+    }
+    btnClaude.classList.toggle("actif", cerveauClaude.estActif);
+  });
+}
+
 // Brouillard d'exploration : case dans la légende, touche b.
 function basculerBrouillard(valeur = !magasin.brouillard): void {
   magasin.brouillard = valeur;
@@ -373,6 +401,11 @@ function boucle(maintenant: number): void {
   if (maintenant - dernierPanneau > 250) {
     panneaux.rafraichir();
     dernierPanneau = maintenant;
+    if (cerveauClaude.estActif) {
+      void cerveauClaude.tick(maintenant).then(() => {
+        btnClaude.classList.toggle("actif", cerveauClaude.estActif);
+      });
+    }
   }
   requestAnimationFrame(boucle);
 }

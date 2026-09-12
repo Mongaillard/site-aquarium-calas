@@ -299,8 +299,13 @@ const NOMS_RESSOURCES: Record<string, string> = {
  * Pensée intérieure en mode règles : une phrase déduite de l'intention et des
  * besoins. Le cerveau Claude (M5) fournira la sienne.
  */
+export function penseeDeClaude(sim: Simulation, p: Personnage): boolean {
+  return p.penseeClaude !== null && sim.tick - p.penseeClaude.tick < sim.horloge.ticksParJour;
+}
+
 export function pensee(sim: Simulation, p: Personnage): string {
   if (!p.vivant) return "…";
+  if (p.penseeClaude !== null && penseeDeClaude(sim, p)) return p.penseeClaude.texte;
   if (p.corps.endormi) return "Zzz…";
   const b = p.besoins;
   const prenom = (id: string): string => sim.personnage(id)?.identite.prenom ?? id;
@@ -441,6 +446,7 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
     plan: p.plan.map(decrireAction),
     projet: p.projet ? (sim.batiments.get(p.projet.batimentId)?.type ?? null) : null,
     pensee: pensee(sim, p),
+    penseeDeClaude: penseeDeClaude(sim, p),
     souvenirsRecents: p.memoire.tous().slice(-20).reverse().map(souvenir),
     souvenirsMarquants: p.memoire
       .recuperer({ tick: sim.tick }, 8)

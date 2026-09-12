@@ -224,6 +224,8 @@ export interface MessageFiche {
   readonly projet: string | null;
   /** Pensée intérieure : phrase du cerveau (règles ou LLM). */
   readonly pensee: string;
+  /** Vrai quand la pensée vient de Claude (M5) et non des règles. */
+  readonly penseeDeClaude: boolean;
   readonly souvenirsRecents: readonly SouvenirFiche[];
   readonly souvenirsMarquants: readonly SouvenirFiche[];
   readonly famille: {
@@ -253,7 +255,15 @@ export type Commande =
   | { readonly type: "tick" }
   | { readonly type: "aube" }
   | { readonly type: "inspecter"; readonly id: string }
-  | { readonly type: "fermer_fiche" };
+  | { readonly type: "fermer_fiche" }
+  /** Cerveau Claude (M5) : un texte soufflé au moteur, qui reste maître de l'appliquer. */
+  | {
+      readonly type: "inspiration";
+      readonly genre: "pensee" | "recit" | "epitaphe";
+      readonly personnageId: string;
+      readonly texte: string;
+      readonly savoir?: string;
+    };
 
 /** Vitesses proposées par l'interface (ticks de jeu par seconde réelle). */
 export const VITESSES: readonly number[] = [1, 4, 16, 64];
@@ -267,7 +277,15 @@ export function analyserCommande(texte: string): Commande | null {
     return null;
   }
   if (typeof brut !== "object" || brut === null || !("type" in brut)) return null;
-  const c = brut as { type: unknown; ticksParSeconde?: unknown; id?: unknown };
+  const c = brut as {
+    type: unknown;
+    ticksParSeconde?: unknown;
+    id?: unknown;
+    genre?: unknown;
+    personnageId?: unknown;
+    texte?: unknown;
+    savoir?: unknown;
+  };
   switch (c.type) {
     case "pause":
     case "reprendre":
@@ -285,6 +303,19 @@ export function analyserCommande(texte: string): Commande | null {
       return typeof c.id === "string" && c.id.length > 0 && c.id.length < 64
         ? { type: "inspecter", id: c.id }
         : null;
+    case "inspiration": {
+      const genre = c.genre;
+      if (genre !== "pensee" && genre !== "recit" && genre !== "epitaphe") return null;
+      if (typeof c.personnageId !== "string" || c.personnageId.length === 0) return null;
+      if (typeof c.texte !== "string" || c.texte.length === 0 || c.texte.length > 2000) return null;
+      return {
+        type: "inspiration",
+        genre,
+        personnageId: c.personnageId,
+        texte: c.texte,
+        ...(typeof c.savoir === "string" ? { savoir: c.savoir } : {}),
+      };
+    }
     default:
       return null;
   }

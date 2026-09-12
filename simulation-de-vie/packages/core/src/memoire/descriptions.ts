@@ -196,6 +196,7 @@ export function decrireEvenement(
     case "lecon":
     case "idee":
     case "prototype_rate":
+    case "claude":
       return null; // souvenirs ajoutés explicitement par le moteur
     case "meteo":
     case "arrivee":

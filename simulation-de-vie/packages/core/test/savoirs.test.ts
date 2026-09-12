@@ -117,6 +117,58 @@ describe("leçons tirées des décès", () => {
   });
 });
 
+describe("inspirations de Claude (M5)", () => {
+  it("une pensée soufflée remplace la pensée des règles pendant un jour, un récit devient souvenir", () => {
+    const sim = colonie();
+    const p = sim.personnages[0];
+    if (!p) throw new Error("vide");
+    expect(sim.inspirer({ genre: "pensee", personnageId: "inconnu", texte: "x" })).toBe(false);
+    expect(sim.inspirer({ genre: "pensee", personnageId: p.id, texte: "   " })).toBe(false);
+    expect(sim.inspirer({ genre: "pensee", personnageId: p.id, texte: "Le vent tourne." })).toBe(
+      true,
+    );
+    expect(p.penseeClaude?.texte).toBe("Le vent tourne.");
+    expect(sim.inspirer({ genre: "recit", personnageId: p.id, texte: "Une belle histoire." })).toBe(
+      true,
+    );
+    expect(p.memoire.tous().some((s) => s.texte === "Une belle histoire.")).toBe(true);
+    expect(sim.journal.compte("claude")).toBe(2);
+  });
+
+  it("une épitaphe soufflée s'inscrit sur la tombe et peut porter une leçon du catalogue", () => {
+    const sim = colonie();
+    const p = sim.personnages[0];
+    if (!p) throw new Error("vide");
+    sim.tuer(p, "vieillesse");
+    const tombe = [...sim.batiments.values()].find(
+      (b) => b.type === "tombe" && b.proprietaire === p.id,
+    );
+    expect(tombe).toBeDefined();
+    const famille = membresFamille(sim, p).filter((m) => m.id !== p.id);
+    expect(
+      sim.inspirer({
+        genre: "epitaphe",
+        personnageId: p.id,
+        texte: "Ici repose une aînée qui nous a tout appris.",
+        savoir: "provisions_hiver",
+      }),
+    ).toBe(true);
+    expect(tombe?.epitaphe).toBe("Ici repose une aînée qui nous a tout appris.");
+    for (const m of famille) expect(connait(m, "provisions_hiver")).toBe(true);
+    expect(sim.journal.compte("lecon")).toBe(1);
+    // Une leçon inconnue est ignorée sans erreur.
+    expect(
+      sim.inspirer({
+        genre: "epitaphe",
+        personnageId: p.id,
+        texte: "Adieu.",
+        savoir: "n_importe_quoi",
+      }),
+    ).toBe(true);
+    expect(sim.journal.compte("lecon")).toBe(1);
+  });
+});
+
 describe("inventions", () => {
   it("un besoin et de la curiosité donnent une idée, puis un prototype, puis un savoir partagé", () => {
     const sim = colonie();

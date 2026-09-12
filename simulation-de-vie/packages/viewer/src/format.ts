@@ -249,6 +249,12 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       return `${qui} rate son prototype de ${String(d.nom)}.`;
     case "jeu":
       return `${qui} joue aux osselets avec ${cible("avec")}.`;
+    case "claude":
+      return d.genre === "pensee"
+        ? `🧠 ${qui} pense : « ${String(d.texte)} »`
+        : d.genre === "recit"
+          ? `🧠 On raconte, à propos de ${qui} : « ${String(d.texte)} »`
+          : `🧠 Sur la tombe de ${qui}, on grave : « ${String(d.texte)} »`;
     default:
       return `${qui} ${e.type}`;
   }

@@ -32,6 +32,10 @@ Personnage (pensée, besoins, famille, relations, souvenirs), Journal, Conversat
 Statistiques, Population. Cliquez sur un personnage ou un bâtiment pour l'inspecter, appuyez
 sur `s` pour que la caméra suive le personnage sélectionné.
 
+Sur la page publiée sur claude.ai, le bouton « 🧠 Claude » laisse Claude écrire, sur le compte de
+la personne qui regarde (aucune clé ni facture à part), la pensée du personnage sélectionné,
+l'épitaphe des défunts et le récit des inventions ; le moteur reste maître de ce qu'il applique.
+
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la
 curiosité donnent des idées, puis des inventions (filet, piège, pirogue, osselets) que la

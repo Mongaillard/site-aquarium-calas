@@ -2,6 +2,29 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M5 – Cerveau Claude, dans la page (2026-09-12)
+
+- Principe : Claude n'appelle aucune API payante. La page publiée sur claude.ai demande à Claude
+  sur le compte de la personne qui la regarde (capacité `sample` de la page : consentement au
+  premier appel, usage compté sur l'abonnement, aucune clé ni facture à part). Hors de
+  claude.ai, le bouton n'apparaît pas et le mode règles continue seul.
+- Ce que Claude écrit, et seulement cela : la pensée intérieure du personnage sélectionné (dans
+  sa voix, à partir de sa fiche : besoins, intention, famille, savoirs, derniers souvenirs),
+  l'épitaphe d'un défunt avec la leçon du catalogue qu'il juge la plus juste, le récit d'une
+  invention réussie. Le moteur reste déterministe : il reçoit une commande `inspiration` (texte,
+  et pour une épitaphe un identifiant de leçon), l'applique (`Simulation.inspirer`) et la
+  journalise sous le type `claude` pour le rejeu.
+- Sobriété : un appel à la fois, jamais en boucle ni au fil du temps ; un décès ou une invention
+  déclenche un appel, la pensée du personnage sélectionné est rafraîchie au plus toutes les
+  minutes et seulement si son intention a changé (sinon toutes les trois minutes). Refus ou
+  indisponibilité désactivent le bouton, une saturation attend cinq minutes.
+- Viewer : bouton « 🧠 Claude » dans la barre (page publiée seulement), pensée marquée 🧠 dans
+  la fiche, événements « 🧠 … » dans le Journal, compteur « appels IA » dans les Statistiques.
+  Le serveur accepte aussi la commande `inspiration`.
+- Tests : 183 au total (+6) : inspirations côté moteur (pensée, récit, épitaphe avec leçon,
+  leçon inconnue ignorée), cerveau côté page avec un faux Claude (épitaphe et leçon à un décès,
+  pensée du personnage sélectionné sans enchaîner les appels, désactivation hors claude.ai).
+
 ## M7b – Savoirs : leçons et inventions (2026-09-12)
 
 - Leçons tirées des décès : à chaque mort, le moteur fait l'autopsie de la situation (cause,

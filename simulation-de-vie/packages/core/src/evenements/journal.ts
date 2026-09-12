@@ -45,6 +45,7 @@ export const TYPES_EVENEMENT = [
   "invention",
   "prototype_rate",
   "jeu",
+  "claude",
 ] as const;
 export type TypeEvenement = (typeof TYPES_EVENEMENT)[number];
 

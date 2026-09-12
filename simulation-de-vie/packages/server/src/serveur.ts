@@ -175,6 +175,9 @@ export class Serveur {
       case "fermer_fiche":
         client.ficheId = null;
         break;
+      case "inspiration":
+        this.sim.inspirer(commande);
+        break;
     }
     this.diffuser();
   }

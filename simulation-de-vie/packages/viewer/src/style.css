@@ -466,6 +466,13 @@ table.saisons td:first-child {
     grid-template-columns: 60px 1fr 30px;
   }
 }
+.btn-claude.actif {
+  background: var(--accent);
+  color: #10141a;
+}
+.pensee.claude {
+  border-left-color: var(--accent);
+}
 .epitaphe {
   font-style: italic;
   color: var(--discret);

@@ -5,7 +5,7 @@
  */
 import { Simulation } from "@sdv/core";
 import type { SimConfigPartielle } from "@sdv/core";
-import type { Commande, MessageServeur } from "@sdv/protocole";
+import type { Commande, MessageEtat, MessageServeur } from "@sdv/protocole";
 import {
   BilanSaisons,
   SuiviClient,
@@ -36,6 +36,8 @@ export class LiaisonLocale implements Liaison {
   private derniereDiffusion = 0;
   private aDiffuser = false;
   private minuteur: ReturnType<typeof setInterval> | null = null;
+  /** Inspirations de Claude appliquées (affiché comme « appels IA »). */
+  private appelsIA = 0;
   private preparation: ReturnType<typeof setTimeout> | null = null;
   private ferme = false;
 
@@ -102,6 +104,10 @@ export class LiaisonLocale implements Liaison {
       case "fermer_fiche":
         this.ficheId = null;
         return;
+      case "inspiration":
+        if (sim.inspirer(commande)) this.appelsIA += 1;
+        this.aDiffuser = true;
+        return;
     }
     if (this.minuteur !== null) this.diffuser();
   }
@@ -147,13 +153,14 @@ export class LiaisonLocale implements Liaison {
   private diffuser(): void {
     const sim = this.sim;
     if (sim === null) return;
-    const etat = messageEtat(sim, {
+    const brut = messageEtat(sim, {
       ticksParSeconde: this.ticksParSeconde,
       pause: this.pause,
       suivi: this.suivi,
       bilan: this.bilan,
       indexJournal: this.indexJournal,
     });
+    const etat: MessageEtat = { ...brut, stats: { ...brut.stats, appelsLLM: this.appelsIA } };
     this.indexJournal = sim.journal.taille;
     this.onMessage(etat);
     if (this.ficheId !== null) {

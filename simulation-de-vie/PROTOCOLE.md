@@ -791,6 +791,17 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
 
 ---
 
+## 8 bis. Cerveau Claude tel que réalisé (M5)
+
+- **[DÉCISION]** Pas d'API payante : Claude est sollicité depuis la page publiée sur claude.ai,
+  sur le compte de la personne qui regarde (capacité `sample`), avec consentement au premier
+  appel. Hors de claude.ai, le mode règles continue seul.
+- Claude ne décide pas à la place du moteur : il envoie une `inspiration` (pensée intérieure,
+  récit d'invention, épitaphe avec une leçon du catalogue) que le moteur applique et journalise
+  (`claude`), ce qui garde le rejeu possible.
+- Sobriété : un appel à la fois, déclenché par un décès, une invention ou la sélection d'un
+  personnage ; jamais en boucle.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

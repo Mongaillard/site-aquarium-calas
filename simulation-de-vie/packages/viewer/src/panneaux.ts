@@ -325,7 +325,7 @@ export class Panneaux {
         <span class="actions"><button id="btn-suivre" class="${this.magasin.suivre ? "actif" : ""}" title="Caméra qui suit ce personnage (s)">suivre</button><button id="btn-fermer" title="Fermer (échap)">✕</button></span>
       </div>
       <div class="discret">${etat} · réputation ${f.reputation} · ${f.lieuxConnus} lieux connus · ${f.nombreSouvenirs} souvenirs</div>
-      <div class="pensee">« ${e(f.pensee)} »</div>
+      <div class="pensee${f.penseeDeClaude ? " claude" : ""}">${f.penseeDeClaude ? "🧠 " : ""}« ${e(f.pensee)} »</div>
       <h3>Maintenant</h3>
       <div>Intention : <b>${e(f.intention ?? "—")}</b>${f.projet ? ` · projet : ${e(NOMS_BATIMENT[f.projet] ?? f.projet)}` : ""}</div>
       <div class="discret">Action : ${e(f.action ?? "—")}${f.plan.length > 0 ? ` · puis ${e(f.plan.join(", "))}` : ""}</div>

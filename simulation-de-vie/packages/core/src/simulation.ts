@@ -38,6 +38,7 @@ import type { Monde } from "./monde.js";
 import { PLANS_BATIMENT, creerChantier } from "./monde/batiments.js";
 import { INFO_BIOME } from "./monde/biomes.js";
 import { INVENTIONS, LECONS } from "./savoirs/catalogue.js";
+import type { Lecon } from "./savoirs/catalogue.js";
 import { apprenants, apprendre, tirerLecons } from "./savoirs/lecons.js";
 import { inventer } from "./savoirs/inventions.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
@@ -57,6 +58,18 @@ export interface Statistiques {
   readonly batiments: number;
   readonly chantiers: number;
   readonly meteo: Meteo;
+}
+
+/**
+ * Inspiration venue du cerveau Claude (M5) : un texte, jamais une décision
+ * brute. Le moteur reste maître de ce qu'il applique.
+ */
+export interface Inspiration {
+  readonly genre: "pensee" | "recit" | "epitaphe";
+  readonly personnageId: string;
+  readonly texte: string;
+  /** Épitaphe : leçon retenue par Claude parmi le catalogue (facultatif). */
+  readonly savoir?: string;
 }
 
 /** Rayon, en tuiles, de ce que la colonie connaît de son berceau au premier jour. */
@@ -178,6 +191,66 @@ export class Simulation implements Monde {
     if (idee !== null) {
       this.emettre("idee", p, { invention: idee, nom: INVENTIONS[idee].nom }, 6);
       p.memoire.ajouter(this.tick, "reflexion", `J'ai une idée. ${INVENTIONS[idee].idee}`, 7, []);
+    }
+  }
+
+  /**
+   * Applique une inspiration de Claude : pensée intérieure, récit d'invention
+   * ou épitaphe (avec, éventuellement, une leçon du catalogue). Journalisée
+   * sous le type `claude`, pour que le mode rejeu la retrouve.
+   */
+  inspirer(inspiration: Inspiration): boolean {
+    const p = this.personnage(inspiration.personnageId);
+    if (p === undefined) return false;
+    const texte = inspiration.texte.trim().slice(0, 400);
+    if (texte.length === 0) return false;
+    switch (inspiration.genre) {
+      case "pensee":
+        p.penseeClaude = { texte, tick: this.tick };
+        this.emettre("claude", p, { genre: "pensee", texte }, 1);
+        return true;
+      case "recit":
+        p.memoire.ajouter(this.tick, "reflexion", texte, 8, []);
+        this.emettre("claude", p, { genre: "recit", texte }, 7);
+        return true;
+      case "epitaphe": {
+        const tombe = [...this.batiments.values()].find(
+          (b) => b.type === "tombe" && b.proprietaire === p.id,
+        );
+        if (tombe !== undefined) tombe.epitaphe = texte;
+        const savoir = inspiration.savoir;
+        if (savoir !== undefined && savoir in LECONS) {
+          const lecon = savoir as Lecon;
+          const eleves = apprenants(this, p).filter((e) =>
+            apprendre(e, lecon, 1, p.identite.prenom, this.tick),
+          );
+          for (const e of eleves) {
+            e.memoire.ajouter(
+              this.tick,
+              "reflexion",
+              `La mort de ${p.identite.prenom} m'a appris ceci : ${LECONS[lecon].morale}`,
+              8,
+              [p.id],
+            );
+          }
+          if (eleves.length > 0) {
+            this.emettre(
+              "lecon",
+              p,
+              {
+                cause: p.causeDeces ?? "inconnue",
+                lecon,
+                titre: LECONS[lecon].titre,
+                morale: LECONS[lecon].morale,
+                apprenants: eleves.length,
+              },
+              8,
+            );
+          }
+        }
+        this.emettre("claude", p, { genre: "epitaphe", texte }, 7);
+        return true;
+      }
     }
   }
 
