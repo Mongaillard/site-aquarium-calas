@@ -26,6 +26,27 @@ export interface Conversation {
 export const MAX_EVENEMENTS = 4000;
 export const MAX_CONVERSATIONS = 150;
 
+/** Un morceau du monde tel que le viewer le connaît : biome par tuile, −1 = jamais vu. */
+export interface MorceauVue {
+  readonly cx: number;
+  readonly cy: number;
+  readonly biomes: Int8Array;
+  /** Incrémentée à chaque tuile nouvelle, pour redessiner le fond du morceau. */
+  version: number;
+  connues: number;
+}
+
+export interface Zone {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+export function cleMorceau(cx: number, cy: number): number {
+  return (cx + 32_768) * 65_536 + (cy + 32_768);
+}
+
 export class Magasin {
   init: MessageInit | null = null;
   etat: MessageEtat | null = null;
@@ -49,8 +70,10 @@ export class Magasin {
   selection: string | null = null;
   suivre = false;
   connecte = false;
-  /** Tuiles découvertes par la colonie (1 = vue), indexées y × largeur + x. */
-  decouvertes: Uint8Array | null = null;
+  /** Morceaux du monde dont au moins une tuile a été vue. */
+  readonly morceaux = new Map<number, MorceauVue>();
+  /** Rectangle englobant des tuiles connues (bornes incluses). */
+  private zone: Zone | null = null;
   /** Incrémenté à chaque nouvelle découverte, pour reconstruire le brouillard. */
   versionDecouvertes = 0;
   /** Brouillard d'exploration : l'inconnu reste noir, le déjà-vu est voilé. */
@@ -77,37 +100,66 @@ export class Magasin {
     this.selection = null;
     this.selectionBatiment = null;
     this.suivre = false;
-    this.decouvertes = null;
+    this.morceaux.clear();
+    this.zone = null;
     this.versionDecouvertes += 1;
     this.version += 1;
   }
 
+  get tailleMorceau(): number {
+    return this.init?.tailleMorceau ?? 32;
+  }
+
   /** Rectangle des tuiles découvertes (inclusif), ou null si rien n'est connu. */
-  zoneDecouverte(): { x0: number; y0: number; x1: number; y1: number } | null {
-    const d = this.decouvertes;
-    const init = this.init;
-    if (d === null || init === null) return null;
-    let x0 = Infinity;
-    let y0 = Infinity;
-    let x1 = -1;
-    let y1 = -1;
-    for (let i = 0; i < d.length; i++) {
-      if (d[i] !== 1) continue;
-      const x = i % init.largeur;
-      const y = (i - x) / init.largeur;
-      if (x < x0) x0 = x;
-      if (x > x1) x1 = x;
-      if (y < y0) y0 = y;
-      if (y > y1) y1 = y;
+  zoneDecouverte(): Zone | null {
+    return this.zone === null ? null : { ...this.zone };
+  }
+
+  /** Code de biome d'une tuile connue, ou −1. */
+  biomeEn(x: number, y: number): number {
+    const T = this.tailleMorceau;
+    const m = this.morceaux.get(cleMorceau(Math.floor(x / T), Math.floor(y / T)));
+    if (m === undefined) return -1;
+    return m.biomes[(y - m.cy * T) * T + (x - m.cx * T)] ?? -1;
+  }
+
+  /** Nombre de tuiles connues. */
+  get tuilesConnues(): number {
+    let n = 0;
+    for (const m of this.morceaux.values()) n += m.connues;
+    return n;
+  }
+
+  private decouvrir(x: number, y: number, biome: number): void {
+    const T = this.tailleMorceau;
+    const cx = Math.floor(x / T);
+    const cy = Math.floor(y / T);
+    const cle = cleMorceau(cx, cy);
+    let m = this.morceaux.get(cle);
+    if (m === undefined) {
+      m = { cx, cy, biomes: new Int8Array(T * T).fill(-1), version: 0, connues: 0 };
+      this.morceaux.set(cle, m);
     }
-    return x1 < 0 ? null : { x0, y0, x1, y1 };
+    const i = (y - cy * T) * T + (x - cx * T);
+    if (m.biomes[i] === biome) return;
+    if (m.biomes[i] === -1) m.connues += 1;
+    m.biomes[i] = biome;
+    m.version += 1;
+    if (this.zone === null) this.zone = { x0: x, y0: y, x1: x, y1: y };
+    else {
+      if (x < this.zone.x0) this.zone.x0 = x;
+      if (x > this.zone.x1) this.zone.x1 = x;
+      if (y < this.zone.y0) this.zone.y0 = y;
+      if (y > this.zone.y1) this.zone.y1 = y;
+    }
   }
 
   recevoir(message: MessageServeur, maintenant: number): void {
     switch (message.type) {
       case "init":
         this.init = message;
-        this.decouvertes = new Uint8Array(message.largeur * message.hauteur);
+        this.morceaux.clear();
+        this.zone = null;
         this.versionDecouvertes += 1;
         this.gisements.clear();
         this.evenements.length = 0;
@@ -146,8 +198,10 @@ export class Magasin {
           }
         }
         if (precedent === null) this.dernierEtatA = maintenant;
-        if (message.decouvertes.length > 0 && this.decouvertes !== null) {
-          for (const i of message.decouvertes) this.decouvertes[i] = 1;
+        if (message.decouvertes.length > 0) {
+          const d = message.decouvertes;
+          for (let i = 0; i + 2 < d.length; i += 3)
+            this.decouvrir(d[i] ?? 0, d[i + 1] ?? 0, d[i + 2] ?? 0);
           this.versionDecouvertes += 1;
         }
         for (const [x, y, type, quantite, outil] of message.gisements) {

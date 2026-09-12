@@ -10,9 +10,13 @@ export type CoutumeNomFamille = "pere" | "mere" | "compose";
 export interface SimConfig {
   seed: number | string;
   monde: {
-    largeur: number;
-    hauteur: number;
     joursParSaison: number;
+    /** Échelle du relief (collines, vallées), en tuiles. */
+    echelleRelief: number;
+    /** Échelle des continents et des mers, en tuiles. */
+    echelleContinents: number;
+    /** Rayon du berceau : terre garantie autour de l'origine, en tuiles. */
+    berceau: number;
   };
   population: {
     initiale: number;
@@ -64,7 +68,7 @@ export interface SimConfig {
 
 export const CONFIG_PAR_DEFAUT: SimConfig = {
   seed: 42,
-  monde: { largeur: 96, hauteur: 64, joursParSaison: 30 },
+  monde: { joursParSaison: 30, echelleRelief: 40, echelleContinents: 220, berceau: 28 },
   population: { initiale: 12, familles: 3 },
   temps: { minutesParTick: 10, snapshotTousLesTicks: 144 },
   vie: {
@@ -118,9 +122,10 @@ export function fusionnerConfig(partielle: SimConfigPartielle = {}): SimConfig {
 /** Vérifie les invariants simples ; lève une erreur explicite sinon. */
 export function validerConfig(config: SimConfig): void {
   const erreurs: string[] = [];
-  if (config.monde.largeur < 8 || config.monde.hauteur < 8) {
-    erreurs.push("monde.largeur et monde.hauteur doivent être ≥ 8");
+  if (config.monde.echelleRelief < 4 || config.monde.echelleContinents < 4) {
+    erreurs.push("monde.echelleRelief et monde.echelleContinents doivent être ≥ 4");
   }
+  if (config.monde.berceau < 4) erreurs.push("monde.berceau doit être ≥ 4");
   if (config.temps.minutesParTick <= 0 || 1440 % config.temps.minutesParTick !== 0) {
     erreurs.push("temps.minutesParTick doit diviser 1440");
   }

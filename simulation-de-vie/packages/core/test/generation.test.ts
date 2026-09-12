@@ -37,34 +37,58 @@ describe("choisirBiome", () => {
 });
 
 describe("genererGrille", () => {
-  const options = { largeur: 96, hauteur: 64 };
+  /** Génère un carré de morceaux autour de l'origine. */
+  function generer(seed: number | string, rayonMorceaux = 2): ReturnType<typeof genererGrille> {
+    const g = genererGrille(Rng.depuisGraine(seed));
+    for (let cy = -rayonMorceaux; cy < rayonMorceaux; cy++)
+      for (let cx = -rayonMorceaux; cx < rayonMorceaux; cx++) g.morceau(cx, cy);
+    return g;
+  }
 
   it("est reproductible : même graine → même empreinte", () => {
-    const g1 = genererGrille(Rng.depuisGraine(42), options);
-    const g2 = genererGrille(Rng.depuisGraine(42), options);
+    const g1 = generer(42);
+    const g2 = generer(42);
     expect(hacherGrille(g1)).toBe(hacherGrille(g2));
     expect(rendreAscii(g1)).toBe(rendreAscii(g2));
   });
 
   it("change avec la graine", () => {
-    const g1 = genererGrille(Rng.depuisGraine(42), options);
-    const g2 = genererGrille(Rng.depuisGraine(43), options);
-    expect(hacherGrille(g1)).not.toBe(hacherGrille(g2));
+    expect(hacherGrille(generer(42))).not.toBe(hacherGrille(generer(43)));
   });
 
-  it("ne dépend pas de l'état de consommation du Rng parent", () => {
+  it("ne dépend ni de l'état du Rng parent ni de l'ordre de génération des morceaux", () => {
     const rng = Rng.depuisGraine(42);
     rng.suivant();
     rng.suivant();
-    expect(hacherGrille(genererGrille(rng, options))).toBe(
-      hacherGrille(genererGrille(Rng.depuisGraine(42), options)),
-    );
+    const g1 = genererGrille(rng);
+    g1.morceau(1, 1);
+    g1.morceau(-1, 0);
+    g1.morceau(0, 0);
+    const g2 = genererGrille(Rng.depuisGraine(42));
+    g2.morceau(0, 0);
+    g2.morceau(-1, 0);
+    g2.morceau(1, 1);
+    expect(hacherGrille(g1)).toBe(hacherGrille(g2));
+    expect(g1.tuile(40, 33).biome).toBe(g2.tuile(40, 33).biome);
+    expect(g1.tuile(40, 33).gisement).toEqual(g2.tuile(40, 33).gisement);
+  });
+
+  it("n'a pas de limite : les morceaux lointains et négatifs existent et sont continus", () => {
+    const g = genererGrille(Rng.depuisGraine(42));
+    expect(g.tuileOuNull(-500, 800)).not.toBeNull();
+    expect(g.tuile(-500, 800).x).toBe(-500);
+    expect(g.nombreMorceaux).toBe(1);
+    // Les tuiles de part et d'autre d'une frontière de morceau viennent du même bruit.
+    const a = g.tuile(31, 5);
+    const b = g.tuile(32, 5);
+    expect(Math.abs(a.altitude - b.altitude)).toBeLessThan(0.2);
   });
 
   it("produit un monde plausible : terre majoritaire, eau présente, montagnes rares", () => {
-    const g = genererGrille(Rng.depuisGraine(42), options);
+    const g = generer(42, 4); // 256 × 256 tuiles
     const d = g.distributionBiomes();
-    const total = options.largeur * options.hauteur;
+    const total = g.nombreTuiles;
+    expect(total).toBe(256 * 256);
     const eau = (d.eau_profonde ?? 0) + (d.eau_peu_profonde ?? 0);
     const terre = total - eau;
     expect(eau / total).toBeGreaterThan(0.1);
@@ -74,8 +98,18 @@ describe("genererGrille", () => {
     for (const biome of BIOMES) expect(INFO_BIOME[biome]).toBeDefined();
   });
 
+  it("le berceau est de la terre ferme, pour toutes les graines", () => {
+    for (const seed of [1, 2, 3, 42, 99, "mer"]) {
+      const g = genererGrille(Rng.depuisGraine(seed));
+      let terre = 0;
+      for (let y = -6; y <= 6; y++)
+        for (let x = -6; x <= 6; x++) if (INFO_BIOME[g.tuile(x, y).biome].constructible) terre++;
+      expect(terre).toBeGreaterThan(100);
+    }
+  });
+
   it("place les gisements uniquement sur les biomes autorisés, pleins à la génération", () => {
-    const g = genererGrille(Rng.depuisGraine(42), options);
+    const g = generer(42);
     let nb = 0;
     for (const t of g.toutes()) {
       if (!t.gisement) continue;
@@ -92,11 +126,12 @@ describe("genererGrille", () => {
     expect(nb).toBeGreaterThan(100);
   });
 
-  it("rend une carte ASCII aux bonnes dimensions", () => {
-    const g = genererGrille(Rng.depuisGraine(1), { largeur: 20, hauteur: 10 });
-    const lignes = rendreAscii(g).split("\n");
+  it("rend une carte ASCII de la zone demandée", () => {
+    const g = genererGrille(Rng.depuisGraine(1));
+    const lignes = rendreAscii(g, { zone: { x0: -10, y0: -5, x1: 9, y1: 4 } }).split("\n");
     expect(lignes).toHaveLength(10);
     for (const l of lignes) expect(l).toHaveLength(20);
+    expect(g.nombreMorceaux).toBe(4);
   });
 });
 
@@ -105,12 +140,13 @@ describe("Simulation (M0)", () => {
     const s1 = Simulation.creer({ seed: 42 });
     const s2 = Simulation.creer({ seed: 42 });
     expect(hacherGrille(s1.grille)).toBe(hacherGrille(s2.grille));
-    expect(s1.grille.largeur).toBe(96);
-    expect(s1.grille.hauteur).toBe(64);
+    expect(s1.grille.nombreMorceaux).toBeGreaterThan(0);
+    for (const p of s1.personnages)
+      expect(Math.hypot(p.corps.position.x, p.corps.position.y)).toBeLessThan(40);
   });
 
   it("avance l'horloge jusqu'à l'aube suivante", () => {
-    const sim = Simulation.creer({ seed: 42, monde: { largeur: 16, hauteur: 16 } });
+    const sim = Simulation.creer({ seed: 42 });
     sim.avancer(10);
     sim.avancerJusquaAube();
     expect(sim.tick).toBe(144);
@@ -119,6 +155,6 @@ describe("Simulation (M0)", () => {
 
   it("rejette une configuration incohérente", () => {
     expect(() => Simulation.creer({ temps: { minutesParTick: 7 } })).toThrow(/minutesParTick/);
-    expect(() => Simulation.creer({ monde: { largeur: 4 } })).toThrow(/largeur/);
+    expect(() => Simulation.creer({ monde: { berceau: 1 } })).toThrow(/berceau/);
   });
 });

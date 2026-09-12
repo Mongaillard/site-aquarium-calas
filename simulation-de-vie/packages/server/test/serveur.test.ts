@@ -34,7 +34,7 @@ function attendre<T extends MessageServeur["type"]>(
 
 describe("Serveur", () => {
   it("envoie init puis etat à la connexion, et répond aux commandes", async () => {
-    const sim = Simulation.creer({ seed: 42, monde: { largeur: 48, hauteur: 32 } });
+    const sim = Simulation.creer({ seed: 42 });
     serveur = new Serveur(sim, {
       port: 0,
       ticksParSeconde: 4,
@@ -51,7 +51,7 @@ describe("Serveur", () => {
         r();
       });
     });
-    expect((await init).largeur).toBe(48);
+    expect((await init).tailleMorceau).toBe(32);
     expect((await etat).pause).toBe(true);
 
     const apresTick = attendre(ws, "etat");
@@ -85,7 +85,6 @@ describe("Serveur", () => {
   it("sert un texte explicite sans viewer construit", async () => {
     const sim = Simulation.creer({
       seed: 1,
-      monde: { largeur: 32, hauteur: 32 },
       population: { initiale: 0 },
     });
     serveur = new Serveur(sim, { port: 0, ticksParSeconde: 1, pause: true, racineStatique: null });

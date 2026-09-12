@@ -24,13 +24,13 @@ export function grilleUniforme(
       tuiles.push({ x, y, biome, altitude: 0.2, humidite: 0, gisement: null, batiment: null });
     }
   }
-  const grille = new Grille(largeur, hauteur, tuiles);
   for (const s of surcharges) {
-    const t = grille.tuile(s.x, s.y);
+    const t = tuiles[s.y * largeur + s.x];
+    if (t === undefined) throw new RangeError("surcharge hors grille");
     const nouvelle: Tuile = { ...t, biome: s.biome ?? t.biome, gisement: s.gisement ?? null };
     tuiles[s.y * largeur + s.x] = nouvelle;
   }
-  return new Grille(largeur, hauteur, tuiles);
+  return Grille.depuisTuiles(largeur, hauteur, tuiles);
 }
 
 export function gisementBaies(quantite = 5): Gisement {

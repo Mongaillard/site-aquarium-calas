@@ -1,32 +1,48 @@
-/** Fond de carte pré-rendu (biomes texturés, arbres, rochers, herbes, vagues). */
-import type { MessageInit } from "@sdv/protocole";
+/**
+ * Fond de carte pré-rendu, morceau par morceau (biomes texturés, arbres,
+ * rochers, herbes, vagues). Seules les tuiles connues sont dessinées : le
+ * monde apparaît au fil des découvertes.
+ */
 import { COULEURS_BIOME } from "./format.js";
+import type { MorceauVue } from "./etat.js";
 import { arbre, bruit, herbe, rocher, vague } from "./sprites.js";
 
 /** Pixels par tuile du fond pré-rendu. */
 export const RESOLUTION_FOND = 16;
 
-export function construireFond(init: MessageInit): HTMLCanvasElement {
+export function construireFondMorceau(
+  m: MorceauVue,
+  taille: number,
+  nomsBiomes: readonly string[],
+): HTMLCanvasElement {
   const c = document.createElement("canvas");
-  c.width = init.largeur * RESOLUTION_FOND;
-  c.height = init.hauteur * RESOLUTION_FOND;
+  c.width = taille * RESOLUTION_FOND;
+  c.height = taille * RESOLUTION_FOND;
   const ctx = c.getContext("2d");
   if (ctx === null) return c;
   ctx.scale(RESOLUTION_FOND, RESOLUTION_FOND);
-  const biomeEn = (x: number, y: number): string =>
-    init.nomsBiomes[init.biomes[y * init.largeur + x] ?? 0] ?? "prairie";
+  // Le repère du canevas est celui du monde, décalé à l'origine du morceau.
+  ctx.translate(-m.cx * taille, -m.cy * taille);
+  const x0 = m.cx * taille;
+  const y0 = m.cy * taille;
+  const biomeEn = (x: number, y: number): string | null => {
+    const code = m.biomes[(y - y0) * taille + (x - x0)] ?? -1;
+    return code < 0 ? null : (nomsBiomes[code] ?? "prairie");
+  };
 
-  for (let y = 0; y < init.hauteur; y++) {
-    for (let x = 0; x < init.largeur; x++) {
+  for (let y = y0; y < y0 + taille; y++) {
+    for (let x = x0; x < x0 + taille; x++) {
       const nom = biomeEn(x, y);
+      if (nom === null) continue;
       const base = COULEURS_BIOME[nom] ?? "#7db85a";
       ctx.fillStyle = nuancer(base, (bruit(x, y) - 0.5) * 0.12);
       ctx.fillRect(x, y, 1.02, 1.02);
     }
   }
-  for (let y = 0; y < init.hauteur; y++) {
-    for (let x = 0; x < init.largeur; x++) {
+  for (let y = y0; y < y0 + taille; y++) {
+    for (let x = x0; x < x0 + taille; x++) {
       const nom = biomeEn(x, y);
+      if (nom === null) continue;
       const b = bruit(x, y, 1);
       switch (nom) {
         case "foret":

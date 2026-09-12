@@ -8,10 +8,10 @@ import { creerPersonnage } from "./personnage.js";
 import type { Personnage } from "./personnage.js";
 
 /** Tuile constructible la plus proche du centre (spirale carrée). */
-export function trouverPointDeDepart(grille: Grille): Position {
-  const cx = Math.floor(grille.largeur / 2);
-  const cy = Math.floor(grille.hauteur / 2);
-  const rayonMax = Math.max(grille.largeur, grille.hauteur);
+export function trouverPointDeDepart(grille: Grille, origine: Position = { x: 0, y: 0 }): Position {
+  const cx = origine.x;
+  const cy = origine.y;
+  const rayonMax = 96;
   for (let r = 0; r < rayonMax; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {

@@ -25,8 +25,7 @@ Commandes :
 Options de run :
   --seed <n|texte>     Graine du monde (défaut : 42)
   --days <n>           Nombre de jours à simuler (défaut : 1)
-  --largeur <n>        Largeur de la grille (défaut : 96)
-  --hauteur <n>        Hauteur de la grille (défaut : 64)
+  --rayon <n>          Rayon de la carte affichée autour du berceau (défaut : 48)
   --population <n>     Nombre de personnages initiaux (défaut : 12)
   --ressources         Affiche les gisements sur la carte
   --sans-carte         N'affiche pas la carte ASCII
@@ -43,22 +42,26 @@ function entier(valeur: string | undefined, defaut: number, nom: string): number
   return n;
 }
 
-/** Carte avec les bâtiments et les personnages vivants superposés (`@`). */
-function carteAvecPersonnages(sim: Simulation, ressources: boolean): string {
-  const lignes = rendreAscii(sim.grille, { ressources }).split("\n");
+interface Zone {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
+/** Carte de la zone avec les bâtiments et les personnages vivants superposés (`@`). */
+function carteAvecPersonnages(sim: Simulation, zone: Zone, ressources: boolean): string {
+  const lignes = rendreAscii(sim.grille, { zone, ressources }).split("\n");
+  const poser = (x: number, y: number, c: string): void => {
+    const ligne = lignes[y - zone.y0];
+    if (ligne === undefined || x < zone.x0 || x > zone.x1) return;
+    const i = x - zone.x0;
+    lignes[y - zone.y0] = `${ligne.slice(0, i)}${c}${ligne.slice(i + 1)}`;
+  };
   for (const b of sim.batiments.values()) {
-    const { x, y } = b.position;
-    const ligne = lignes[y];
-    if (ligne === undefined) continue;
-    const c = b.etat === "chantier" ? "?" : PLANS_BATIMENT[b.type].ascii;
-    lignes[y] = `${ligne.slice(0, x)}${c}${ligne.slice(x + 1)}`;
+    poser(b.position.x, b.position.y, b.etat === "chantier" ? "?" : PLANS_BATIMENT[b.type].ascii);
   }
-  for (const p of sim.vivants()) {
-    const { x, y } = p.corps.position;
-    const ligne = lignes[y];
-    if (ligne === undefined) continue;
-    lignes[y] = `${ligne.slice(0, x)}@${ligne.slice(x + 1)}`;
-  }
+  for (const p of sim.vivants()) poser(p.corps.position.x, p.corps.position.y, "@");
   return lignes.join("\n");
 }
 
@@ -90,8 +93,7 @@ function commandeRun(argv: string[]): number {
     options: {
       seed: { type: "string" },
       days: { type: "string" },
-      largeur: { type: "string" },
-      hauteur: { type: "string" },
+      rayon: { type: "string" },
       population: { type: "string" },
       ressources: { type: "boolean", default: false },
       "sans-carte": { type: "boolean", default: false },
@@ -106,20 +108,22 @@ function commandeRun(argv: string[]): number {
   const seedBrute = values.seed ?? "42";
   const seed = /^-?\d+$/.test(seedBrute) ? Number.parseInt(seedBrute, 10) : seedBrute;
   const jours = entier(values.days, 1, "days");
-  const largeur = entier(values.largeur, 96, "largeur");
-  const hauteur = entier(values.hauteur, 64, "hauteur");
+  const rayon = entier(values.rayon, 48, "rayon");
   const population = entier(values.population, 12, "population");
 
   const sim = Simulation.creer({
     seed,
-    monde: { largeur, hauteur },
     population: { initiale: population },
   });
+  // Le monde n'a pas de limite : on génère et on affiche un carré autour du berceau.
+  const zone = { x0: -rayon, y0: -rayon, x1: rayon - 1, y1: rayon - 1 };
+  for (let y = zone.y0; y <= zone.y1; y += 32)
+    for (let x = zone.x0; x <= zone.x1; x += 32) sim.grille.tuileOuNull(x, y);
 
   const distribution = sim.grille.distributionBiomes();
-  const total = largeur * hauteur;
+  const total = sim.grille.nombreTuiles;
   console.log(
-    `Monde ${largeur}×${hauteur}, graine ${String(seed)}, empreinte ${hacherGrille(sim.grille)}`,
+    `Monde sans limite (${String(sim.grille.nombreMorceaux)} morceaux générés autour du berceau), graine ${String(seed)}, empreinte ${hacherGrille(sim.grille)}`,
   );
   for (const biome of BIOMES) {
     const n = distribution[biome] ?? 0;
@@ -180,7 +184,7 @@ function commandeRun(argv: string[]): number {
   console.log();
 
   if (!values["sans-carte"]) {
-    console.log(carteAvecPersonnages(sim, values.ressources));
+    console.log(carteAvecPersonnages(sim, zone, values.ressources));
     console.log();
     console.log(
       `${LEGENDE_ASCII}\n@ personnage   ? chantier   f feu   A abri   M maison   E entrepôt`,

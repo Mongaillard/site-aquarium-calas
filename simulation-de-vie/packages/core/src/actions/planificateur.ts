@@ -106,7 +106,7 @@ function planifierRechauffement(monde: Monde, p: Personnage): ResultatPlan {
   const pos = p.corps.position;
   const attente: Action = { type: "se_rechauffer", ticksRestants: 36 };
   const abri = abriDisponible(monde, p);
-  if (abri !== null && Grille.distance(pos, abri.position) <= 30) {
+  if (abri !== null && Grille.distance(pos, abri.position) <= 80) {
     if (pos.x === abri.position.x && pos.y === abri.position.y) return ok([attente]);
     const aller = allerSur(monde, p, abri.position);
     if (aller) return ok([aller, attente]);
@@ -264,6 +264,20 @@ function planifierBoire(monde: Monde, p: Personnage): ResultatPlan {
   return echec("point d'eau inaccessible");
 }
 
+/**
+ * Un inventaire plein empêche de prendre quoi que ce soit dans un stock : on
+ * y dépose d'abord ce qui encombre le plus (jamais de la nourriture).
+ */
+function faireDePlace(p: Personnage, b: Batiment): Action | null {
+  const inv = p.corps.inventaire;
+  if (placeLibre(inv) > 0 || b.stock === null || placeLibre(b.stock) <= 0) return null;
+  const encombrant = (Object.entries(inv.ressources) as [Ressource, number][])
+    .filter(([r, n]) => NOURRITURE[r] === undefined && n > 0)
+    .sort((a, c) => c[1] - a[1])[0];
+  if (encombrant === undefined) return null;
+  return { type: "deposer", batimentId: b.id, ressource: encombrant[0], quantite: encombrant[1] };
+}
+
 function planifierManger(monde: Monde, p: Personnage): ResultatPlan {
   const ressource = nourritureDisponible(p.corps.inventaire);
   if (ressource !== null) return ok([{ type: "manger", ressource, ticksRestants: null }]);
@@ -277,6 +291,8 @@ function planifierManger(monde: Monde, p: Personnage): ResultatPlan {
         const plan: Action[] = [];
         const aller = allerPresDe(monde, p, stock.position);
         if (aller) plan.push(aller);
+        const place = faireDePlace(p, stock);
+        if (place) plan.push(place);
         plan.push({ type: "prendre", batimentId: stock.id, ressource: dansStock, quantite: 2 });
         plan.push({ type: "manger", ressource: dansStock, ticksRestants: null });
         return ok(plan);
@@ -314,6 +330,8 @@ function planifierManger(monde: Monde, p: Personnage): ResultatPlan {
     const plan: Action[] = [];
     const aller = allerPresDe(monde, p, b.position);
     if (aller) plan.push(aller);
+    const place = faireDePlace(p, b);
+    if (place) plan.push(place);
     plan.push({ type: "prendre", batimentId: b.id, ressource: dansStock, quantite: 3 });
     plan.push({ type: "manger", ressource: dansStock, ticksRestants: null });
     return ok(plan);
@@ -396,7 +414,10 @@ function feuLePlusProche(monde: Monde, pos: Position, rayonMax: number): Batimen
   return meilleur;
 }
 
-/** Cible d'exploration : direction dont le voisinage est le moins connu, à 8–14 tuiles. */
+/** Au-delà de cette distance au foyer, l'exploration devient de moins en moins tentante. */
+const RAYON_EXPLORATION = 36;
+
+/** Cible d'exploration : direction dont le voisinage est le moins connu, à 8–14 tuiles, près du foyer. */
 function planifierExploration(monde: Monde, p: Personnage): ResultatPlan {
   const pos = p.corps.position;
   const directions: (readonly [number, number])[] = [
@@ -409,6 +430,8 @@ function planifierExploration(monde: Monde, p: Personnage): ResultatPlan {
     [-1, 0],
     [-1, -1],
   ];
+  // Le monde n'a pas de limite : on explore autour du foyer, pas à perte de vue.
+  const foyer = batimentsAccessibles(monde, p)[0]?.position ?? { x: 0, y: 0 };
   const candidats: { cible: Position; score: number }[] = [];
   for (const [dx, dy] of directions) {
     const distance = p.rng.entier(8, 14);
@@ -416,9 +439,15 @@ function planifierExploration(monde: Monde, p: Personnage): ResultatPlan {
     const tuile = monde.grille.tuileOuNull(cible.x, cible.y);
     if (tuile === null || !INFO_BIOME[tuile.biome].praticable || estEau(monde, cible.x, cible.y))
       continue;
+    // Jamais au-delà du rayon d'exploration ; et de là-bas, on ne s'éloigne plus du foyer.
+    const dCible = Grille.distance(cible, foyer);
+    const dIci = Grille.distance(pos, foyer);
+    if (dCible > RAYON_EXPLORATION * 1.5) continue;
+    if (dIci > RAYON_EXPLORATION && dCible >= dIci) continue;
     let connus = 0;
     for (const l of p.connaissance.values()) if (Grille.distance(l, cible) <= 6) connus++;
-    candidats.push({ cible, score: -connus + p.rng.suivant() * 0.5 });
+    const eloignement = Math.max(0, dCible - RAYON_EXPLORATION) / 2;
+    candidats.push({ cible, score: -Math.min(connus, 10) - eloignement + p.rng.suivant() * 0.5 });
   }
   candidats.sort((a, b) => b.score - a.score);
   for (const c of candidats.slice(0, ESSAIS_MAX)) {

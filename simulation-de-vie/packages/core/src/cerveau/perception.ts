@@ -71,7 +71,7 @@ export interface ProjetPercu {
 
 /** Perception minimale évaluée à chaque tick pour les réflexes d'urgence. */
 export interface PerceptionLegere {
-  readonly moi: { readonly besoins: Readonly<Besoins> };
+  readonly moi: { readonly besoins: Readonly<Besoins>; readonly nourritureEnPoche: boolean };
   readonly abriDisponible: boolean;
   readonly feuConnu: boolean;
 }
@@ -86,7 +86,7 @@ export function feuConnu(monde: Monde): boolean {
 
 export function percevoirLeger(monde: Monde, p: Personnage): PerceptionLegere {
   return {
-    moi: { besoins: p.besoins },
+    moi: { besoins: p.besoins, nourritureEnPoche: quantiteNourriture(p.corps.inventaire) > 0 },
     abriDisponible: abriDisponible(monde, p) !== null,
     feuConnu: feuConnu(monde),
   };

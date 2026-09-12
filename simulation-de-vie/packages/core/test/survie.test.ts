@@ -18,8 +18,8 @@ describe("survie (intégration M1)", () => {
   }, 30_000);
 
   it("deux exécutions identiques produisent le même journal (P1)", () => {
-    const a = Simulation.creer({ seed: 7, monde: { largeur: 48, hauteur: 32 } });
-    const b = Simulation.creer({ seed: 7, monde: { largeur: 48, hauteur: 32 } });
+    const a = Simulation.creer({ seed: 7 });
+    const b = Simulation.creer({ seed: 7 });
     a.avancer(3 * 144);
     b.avancer(3 * 144);
     expect(a.journal.empreinte()).toBe(b.journal.empreinte());
@@ -31,7 +31,6 @@ describe("survie (intégration M1)", () => {
   it("un personnage privé d'eau meurt de soif, et l'événement est journalisé", () => {
     const sim = Simulation.creer({
       seed: 3,
-      monde: { largeur: 32, hauteur: 32 },
       population: { initiale: 1, familles: 1 },
     });
     const p = sim.personnages[0];
@@ -70,7 +69,6 @@ describe("survie (intégration M1)", () => {
   it("épuisé et assoiffé, un personnage va boire au lieu de s'endormir sur place", () => {
     const sim = Simulation.creer({
       seed: 5,
-      monde: { largeur: 48, hauteur: 32 },
       population: { initiale: 1, familles: 1 },
     });
     const p = sim.personnages[0];
@@ -91,7 +89,6 @@ describe("survie (intégration M1)", () => {
   it("affamé avec un inventaire plein, un personnage libère de la place puis mange", () => {
     const sim = Simulation.creer({
       seed: 5,
-      monde: { largeur: 48, hauteur: 32 },
       population: { initiale: 1, familles: 1 },
     });
     const p = sim.personnages[0];
@@ -148,9 +145,9 @@ describe("survie (intégration M1)", () => {
     expect(echecsEau.length).toBeLessThan(10);
   });
 
-  it("M4 : au moins une naissance en 60 jours, et l'enfant survit à ses premiers jours", () => {
+  it("M4 : au moins une naissance en 80 jours, et l'enfant survit à ses premiers jours", () => {
     const sim = Simulation.creer({ seed: 42 });
-    for (let j = 0; j < 60; j++) sim.avancerJusquaAube();
+    for (let j = 0; j < 80; j++) sim.avancerJusquaAube();
     expect(sim.journal.compte("union")).toBeGreaterThanOrEqual(1);
     expect(sim.journal.compte("naissance")).toBeGreaterThanOrEqual(1);
     const enfants = sim.personnages.filter((p) => p.identite.parents !== null);

@@ -1,7 +1,7 @@
 # Simulation de vie
 
-Monde 2D persistant peuplé de personnages autonomes, chacun doté d'une identité et d'une IA
-propres. La spécification complète est dans [`PROTOCOLE.md`](./PROTOCOLE.md) ; l'avancement
+Monde 2D sans limite, généré au fil des explorations, peuplé de personnages autonomes, chacun
+doté d'une identité et d'une IA propres. La spécification complète est dans [`PROTOCOLE.md`](./PROTOCOLE.md) ; l'avancement
 par phase est dans [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## Démarrage
@@ -13,8 +13,10 @@ pnpm sim run --seed 42 --days 30 --ressources
 pnpm sim run --seed 42 --days 30 --sans-carte --inspect p-0001 --journal journal/evenements.ndjson
 ```
 
-`pnpm sim run` génère un monde, l'affiche en ASCII avec sa distribution de biomes et son
-empreinte, puis fait avancer l'horloge du nombre de jours demandé.
+`pnpm sim run` génère un monde, affiche en ASCII la zone autour du berceau (`--rayon`, 48 par
+défaut) avec sa distribution de biomes et son empreinte, puis fait avancer l'horloge du nombre
+de jours demandé. Le monde n'a pas de bords : il est découpé en morceaux de 32 × 32 tuiles créés
+à la demande, toujours identiques pour une même graine, et il grandit avec les explorations.
 
 ## Interface d'observation
 

@@ -6,6 +6,8 @@ import {
   BIOMES,
   COMPETENCES,
   PLANS_BATIMENT,
+  TAILLE_MORCEAU,
+  cleMorceau,
   avancementGrossesse,
   codeBiome,
   decrireAction,
@@ -30,14 +32,10 @@ import type {
 } from "@sdv/protocole";
 
 export function messageInit(sim: Simulation): MessageInit {
-  const biomes: number[] = [];
-  for (const t of sim.grille.toutes()) biomes.push(codeBiome(t.biome));
   return {
     type: "init",
     seed: String(sim.config.seed),
-    largeur: sim.grille.largeur,
-    hauteur: sim.grille.hauteur,
-    biomes,
+    tailleMorceau: TAILLE_MORCEAU,
     nomsBiomes: [...BIOMES],
     ticksParJour: sim.horloge.ticksParJour,
     joursParSaison: sim.config.monde.joursParSaison,
@@ -101,20 +99,26 @@ export function etatBatiments(sim: Simulation): BatimentEtat[] {
 /** Suivi de ce qu'un client a déjà reçu (gisements, découvertes), pour n'émettre que les changements. */
 export class SuiviClient {
   private readonly derniers = new Map<string, number>();
-  private decouvertesEnvoyees: Uint8Array | null = null;
+  /** Par morceau, les tuiles déjà annoncées à ce client. */
+  private readonly decouvertesEnvoyees = new Map<number, Uint8Array>();
 
-  /** Tuiles découvertes depuis le dernier appel (toutes au premier appel). */
+  /** Tuiles découvertes depuis le dernier appel, en triplets x, y, biome (toutes au premier appel). */
   nouvellesDecouvertes(sim: Simulation): number[] {
-    const source = sim.grille.tuilesDecouvertes();
-    if (this.decouvertesEnvoyees?.length !== source.length) {
-      this.decouvertesEnvoyees = new Uint8Array(source.length);
-    }
-    const envoyees = this.decouvertesEnvoyees;
     const resultat: number[] = [];
-    for (let i = 0; i < source.length; i++) {
-      if (source[i] === 1 && envoyees[i] !== 1) {
+    for (const m of sim.grille.morceauxGeneres()) {
+      if (m.nbDecouvertes === 0) continue;
+      const cle = cleMorceau(m.cx, m.cy);
+      let envoyees = this.decouvertesEnvoyees.get(cle);
+      if (envoyees === undefined) {
+        envoyees = new Uint8Array(m.decouvertes.length);
+        this.decouvertesEnvoyees.set(cle, envoyees);
+      }
+      for (let i = 0; i < m.decouvertes.length; i++) {
+        if (m.decouvertes[i] !== 1 || envoyees[i] === 1) continue;
+        const t = m.tuiles[i];
+        if (t === null || t === undefined) continue;
         envoyees[i] = 1;
-        resultat.push(i);
+        resultat.push(t.x, t.y, codeBiome(t.biome));
       }
     }
     return resultat;
@@ -124,8 +128,10 @@ export class SuiviClient {
   differentiel(sim: Simulation): GisementEtat[] {
     const resultat: GisementEtat[] = [];
     const vus = new Set<string>();
-    for (const t of sim.grille.toutes()) {
-      if (t.gisement === null) continue;
+    // Seuls les gisements des tuiles découvertes sont annoncés : le viewer ne
+    // doit rien savoir de ce que la colonie n'a pas vu.
+    for (const t of sim.grille.tuilesAvecGisement()) {
+      if (t.gisement === null || !sim.grille.estDecouverte(t.x, t.y)) continue;
       const cle = `${t.x},${t.y}`;
       vus.add(cle);
       const q = Math.floor(t.gisement.quantite);
@@ -203,7 +209,8 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     coutLLM: 0,
     evenements: s.evenements,
     tuilesDecouvertes: sim.grille.nombreDecouvertes,
-    tuiles: sim.grille.largeur * sim.grille.hauteur,
+    tuiles: sim.grille.nombreTuiles,
+    morceaux: sim.grille.nombreMorceaux,
   };
 }
 

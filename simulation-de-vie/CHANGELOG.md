@@ -2,6 +2,35 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M7a – Monde sans limite (2026-09-12)
+
+- Moteur : la grille n'a plus de bords. Le monde est découpé en morceaux de 32 × 32 tuiles
+  générés à la demande, dès qu'un personnage ou un calcul de chemin s'en approche, et chaque
+  morceau ne dépend que de la graine et de ses coordonnées (l'ordre d'exploration ne change
+  rien, coordonnées négatives comprises). Un bruit lent dessine continents et mers, un bruit
+  plus fin le relief, et un « berceau » garantit à l'origine de la terre ferme avec un rivage
+  à quelques tuiles (eau, poisson, argile). Empreinte de carte calculée sur les morceaux dans
+  un ordre fixe ; rendu ASCII d'une zone au choix ; A* sur des clés de position sans limite.
+- Configuration : `monde.largeur` et `monde.hauteur` disparaissent au profit de
+  `monde.echelleRelief`, `monde.echelleContinents` et `monde.berceau` ; la CLI prend `--rayon`
+  pour la carte affichée autour du berceau.
+- Comportement : la colonie connaît d'emblée les environs du berceau (rayon 14) ; l'exploration
+  se fait autour du foyer (36 tuiles, jamais au-delà de 54) au lieu de dériver à l'infini ;
+  on va se réchauffer à un abri jusqu'à 80 tuiles ; quand on gèle et qu'une chaleur est à
+  portée, on rentre avant de chercher à manger (sauf nourriture en poche) ; un enfant qui a
+  froid ou que la nuit surprend va se mettre au chaud ; un inventaire plein n'empêche plus de
+  prendre à manger dans un stock (on y dépose d'abord ce qui encombre) ; la canne à pêche se
+  fabrique sans niveau d'artisanat. Sur cinq graines et 160 jours : aucun décès, 63 naissances.
+- Protocole et serveur : `init` ne porte plus la carte ; l'état transmet les tuiles
+  nouvellement découvertes avec leur biome (triplets x, y, biome), et les statistiques comptent
+  tuiles découvertes, tuiles générées et morceaux.
+- Viewer : la carte se construit au fil des découvertes, fond pré-rendu par morceau, brouillard
+  et caméra sur la zone connue, berceau au centre au premier instant. Statistiques : tuiles
+  découvertes et morceaux du monde.
+- Tests : 170 au total (+2) : reproductibilité par morceau et indépendance de l'ordre de
+  génération, absence de limite, berceau sur la terre ferme pour plusieurs graines, magasin
+  par morceaux côté viewer. Le test de naissance passe à un horizon de 80 jours.
+
 ## M6 ter – Brouillard d'exploration (2026-09-12)
 
 - Moteur : la grille retient les tuiles déjà vues par au moins un personnage (`decouvrir`,

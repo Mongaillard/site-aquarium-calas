@@ -24,7 +24,7 @@ describe("LiaisonLocale", () => {
         seed: 42,
         joursAvance: 2,
         ticksParSeconde: 64,
-        config: { monde: { largeur: 48, hauteur: 32 } },
+        config: {},
       },
       (m) => messages.push(m),
       (c) => connexions.push(c),

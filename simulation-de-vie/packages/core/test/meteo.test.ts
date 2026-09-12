@@ -35,7 +35,6 @@ describe("météo", () => {
   it("la simulation tire une météo par jour et la journalise", () => {
     const sim = Simulation.creer({
       seed: 42,
-      monde: { largeur: 32, hauteur: 32 },
       population: { initiale: 0 },
     });
     expect(METEOS).toContain(sim.meteo);

@@ -3,7 +3,7 @@ import "./style.css";
 import type { Commande, MessageServeur } from "@sdv/protocole";
 import { VITESSES } from "@sdv/protocole";
 import type { Camera } from "./camera.js";
-import { ajuster, cadrer, centrerSur, deplacer, zoomer } from "./camera.js";
+import { cadrer, centrerSur, deplacer, zoomer } from "./camera.js";
 import { Magasin } from "./etat.js";
 import { LiaisonLocale } from "./local.js";
 import { Panneaux } from "./panneaux.js";
@@ -341,11 +341,13 @@ let dernierPanneau = 0;
 function boucle(maintenant: number): void {
   const init = magasin.init;
   if (init !== null && !camAjustee) {
-    cam = ajuster(init.largeur, init.hauteur, canvas.width, canvas.height);
     const etat = magasin.etat;
-    // Avec le brouillard, on cadre ce que la colonie connaît plutôt que tout le monde.
-    const zone = magasin.brouillard ? magasin.zoneDecouverte() : null;
-    if (zone !== null) cam = cadrer(zone, canvas.width, canvas.height, 20);
+    // Le monde n'a pas de limite : on cadre ce que la colonie connaît, sinon le berceau.
+    const zone = magasin.zoneDecouverte();
+    cam =
+      zone !== null
+        ? cadrer(zone, canvas.width, canvas.height, 20)
+        : centrerSur({ echelle: 12, dx: 0, dy: 0 }, 0, 0, canvas.width, canvas.height);
     // Sur un écran étroit, le monde entier serait illisible : on cadre le village.
     if (etat !== null && canvas.width < 900 * (window.devicePixelRatio || 1)) {
       const vivants = etat.personnages.filter((p) => p.vivant);

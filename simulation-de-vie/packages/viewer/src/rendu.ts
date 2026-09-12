@@ -3,15 +3,15 @@ import { LEVER_COUCHER, opaciteNuit } from "@sdv/protocole";
 import type { BatimentEtat, PersonnageEtat } from "@sdv/protocole";
 import type { Camera } from "./camera.js";
 import { versEcran, versMonde } from "./camera.js";
-import { Brouillard } from "./brouillard.js";
-import type { Magasin } from "./etat.js";
-import { RESOLUTION_FOND, construireFond } from "./fond.js";
+import { Brouillard, COULEUR_INCONNU } from "./brouillard.js";
+import type { Magasin, MorceauVue } from "./etat.js";
+import { RESOLUTION_FOND, construireFondMorceau } from "./fond.js";
 import { couleurFamille, couleurMoral } from "./format.js";
 import * as sprites from "./sprites.js";
 
 export class Rendu {
-  private fond: HTMLCanvasElement | null = null;
-  private fondPour: unknown = null;
+  /** Fond pré-rendu de chaque morceau connu, avec la version dessinée. */
+  private readonly fonds = new Map<MorceauVue, { canvas: HTMLCanvasElement; version: number }>();
   private readonly brouillard = new Brouillard();
   private readonly ctx: CanvasRenderingContext2D;
 
@@ -24,13 +24,16 @@ export class Rendu {
     this.ctx = ctx;
   }
 
-  private fondCarte(): HTMLCanvasElement | null {
-    const init = this.magasin.init;
-    if (init === null) return null;
-    if (this.fond !== null && this.fondPour === init) return this.fond;
-    this.fond = construireFond(init);
-    this.fondPour = init;
-    return this.fond;
+  private fondMorceau(
+    m: MorceauVue,
+    taille: number,
+    nomsBiomes: readonly string[],
+  ): HTMLCanvasElement {
+    const existant = this.fonds.get(m);
+    if (existant?.version === m.version) return existant.canvas;
+    const canvas = construireFondMorceau(m, taille, nomsBiomes);
+    this.fonds.set(m, { canvas, version: m.version });
+    return canvas;
   }
 
   dessiner(
@@ -42,11 +45,10 @@ export class Rendu {
     const { canvas, ctx, magasin } = this;
     const init = magasin.init;
     const etat = magasin.etat;
-    ctx.fillStyle = "#0f1216";
+    ctx.fillStyle = COULEUR_INCONNU;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (init === null) return;
-    const fond = this.fondCarte();
-    if (fond === null) return;
+    if (!this.fonds.size && magasin.morceaux.size === 0 && etat === null) return;
 
     // Fenêtre visible en tuiles, pour ne dessiner que le nécessaire.
     const hg = versMonde(cam, 0, 0);
@@ -58,17 +60,27 @@ export class Rendu {
     ctx.imageSmoothingEnabled = cam.echelle < RESOLUTION_FOND;
     ctx.translate(cam.dx, cam.dy);
     ctx.scale(cam.echelle, cam.echelle);
-    ctx.drawImage(fond, 0, 0, init.largeur, init.hauteur);
+    // Fond : les morceaux connus qui tombent dans la fenêtre.
+    const T = magasin.tailleMorceau;
+    for (const m of magasin.morceaux.values()) {
+      const x = m.cx * T;
+      const y = m.cy * T;
+      if (x + T < hg.x - 1 || x > bd.x + 1 || y + T < hg.y - 1 || y > bd.y + 1) continue;
+      ctx.drawImage(this.fondMorceau(m, T, init.nomsBiomes), x, y, T, T);
+    }
+    // Les morceaux oubliés (nouveau monde) libèrent leur fond.
+    for (const m of [...this.fonds.keys()])
+      if (!magasin.morceaux.has(cleDe(m))) this.fonds.delete(m);
 
     // Gisements.
     if (cam.echelle >= 5) {
       for (const g of magasin.gisements.values()) {
-        if (g.quantite <= 0 || !visible(g.x, g.y)) continue;
+        if (g.quantite <= 0 || !visible(g.x, g.y) || magasin.biomeEn(g.x, g.y) < 0) continue;
         sprites.gisement(ctx, g.x, g.y, g.type, g.outil, g.quantite / 8);
       }
     } else {
       for (const g of magasin.gisements.values()) {
-        if (g.quantite <= 0 || !visible(g.x, g.y)) continue;
+        if (g.quantite <= 0 || !visible(g.x, g.y) || magasin.biomeEn(g.x, g.y) < 0) continue;
         ctx.fillStyle = "rgba(255,255,255,0.35)";
         ctx.fillRect(g.x + 0.3, g.y + 0.3, 0.4, 0.4);
       }
@@ -115,12 +127,10 @@ export class Rendu {
       }
 
       // Brouillard d'exploration : dessiné après le monde, avant les textes.
-      if (magasin.brouillard && magasin.decouvertes !== null) {
+      if (magasin.brouillard) {
         this.brouillard.dessiner(
           ctx,
-          init,
-          magasin.decouvertes,
-          magasin.versionDecouvertes,
+          magasin,
           positions.map(({ pos }) => pos),
           etat.rayonVision,
         );
@@ -287,6 +297,10 @@ export class Rendu {
     const y = Math.floor(m.y);
     return etat.batiments.find((b) => b.x === x && b.y === y) ?? null;
   }
+}
+
+function cleDe(m: MorceauVue): number {
+  return (m.cx + 32_768) * 65_536 + (m.cy + 32_768);
 }
 
 function arrondi(

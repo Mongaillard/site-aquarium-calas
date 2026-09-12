@@ -69,7 +69,7 @@ export const RECETTES = {
     produit: { objet: "canne_a_peche" },
     ingredients: { bois: 2, fibres: 2 },
     competence: "artisanat",
-    niveauRequis: 1,
+    niveauRequis: 0,
     atelier: null,
     duree: 4,
   },

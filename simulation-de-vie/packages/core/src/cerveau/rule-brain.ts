@@ -34,10 +34,13 @@ export class RuleBrain implements Cerveau {
   urgence(perception: PerceptionLegere): Intention | null {
     const b = perception.moi.besoins;
     if (b.soif < SEUILS_URGENCE.soif) return { type: "boire" };
-    if (b.faim < SEUILS_URGENCE.faim) return { type: "manger" };
-    if (b.chaleur < SEUILS_URGENCE.chaleur && (perception.abriDisponible || perception.feuConnu)) {
-      return { type: "se_rechauffer" };
-    }
+    // Le froid tue plus vite que la faim : quand on gèle et qu'une chaleur est
+    // à portée, on rentre d'abord, sauf si l'on a de quoi manger sur soi.
+    const gele =
+      b.chaleur < SEUILS_URGENCE.chaleur && (perception.abriDisponible || perception.feuConnu);
+    const affame = b.faim < SEUILS_URGENCE.faim;
+    if (gele && !(affame && perception.moi.nourritureEnPoche)) return { type: "se_rechauffer" };
+    if (affame) return { type: "manger" };
     return null;
   }
 
@@ -238,6 +241,14 @@ export class RuleBrain implements Cerveau {
 
     // Enfants : rester près d'un parent, demander à manger.
     if (!adulte) {
+      // Un enfant qui a froid, ou que la nuit surprend, va se mettre au chaud
+      // plutôt que d'attendre dehors qu'on s'occupe de lui.
+      if ((besoins.chaleur < 70 || nuit) && (perception.abriDisponible || perception.feuConnu)) {
+        candidats.push({
+          intention: { type: "se_rechauffer" },
+          score: 0.7 + urgence(besoins.chaleur) * 3 + (nuit ? 0.3 : 0),
+        });
+      }
       const parentProche = perception.moi.parents[0];
       if (parentProche !== undefined && parentProche.distance > 3) {
         candidats.push({

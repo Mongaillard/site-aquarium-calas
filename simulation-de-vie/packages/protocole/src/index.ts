@@ -16,10 +16,8 @@ export interface MomentEtat {
 export interface MessageInit {
   readonly type: "init";
   readonly seed: string;
-  readonly largeur: number;
-  readonly hauteur: number;
-  /** Code de biome par tuile (index dans `nomsBiomes`), ligne par ligne. */
-  readonly biomes: readonly number[];
+  /** Le monde n'a pas de limite : il est découpé en morceaux carrés de ce côté. */
+  readonly tailleMorceau: number;
   readonly nomsBiomes: readonly string[];
   readonly ticksParJour: number;
   readonly joursParSaison: number;
@@ -118,9 +116,10 @@ export interface Statistiques {
   readonly appelsLLM: number;
   readonly coutLLM: number;
   readonly evenements: number;
-  /** Tuiles déjà vues par la colonie, et taille du monde. */
+  /** Tuiles déjà vues par la colonie, tuiles générées et morceaux du monde existants. */
   readonly tuilesDecouvertes: number;
   readonly tuiles: number;
+  readonly morceaux: number;
 }
 
 export interface MessageEtat {
@@ -136,7 +135,11 @@ export interface MessageEtat {
   readonly gisements: readonly GisementEtat[];
   readonly evenements: readonly EvenementEtat[];
   readonly stats: Statistiques;
-  /** Tuiles nouvellement découvertes (indices y × largeur + x) ; toutes au premier envoi. */
+  /**
+   * Tuiles nouvellement découvertes, par triplets `x, y, code de biome` (index
+   * dans `nomsBiomes`) ; toutes au premier envoi. La carte se construit ainsi
+   * au fil des découvertes : le viewer ne connaît que ce que la colonie a vu.
+   */
   readonly decouvertes: readonly number[];
   /** Rayon de vision courant des personnages, en tuiles (jour / nuit, météo). */
   readonly rayonVision: number;

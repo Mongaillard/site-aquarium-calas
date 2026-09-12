@@ -39,11 +39,10 @@ import { PLANS_BATIMENT, creerChantier } from "./monde/batiments.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
 import { genererGrille } from "./monde/generation.js";
 import { Grille } from "./monde/grille.js";
-import type { Position, Tuile } from "./monde/grille.js";
+import type { Position } from "./monde/grille.js";
 import { Horloge } from "./monde/horloge.js";
 import { EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
 import type { Meteo } from "./monde/meteo.js";
-import type { Gisement } from "./monde/ressources.js";
 import { Rng } from "./rng.js";
 
 export interface Statistiques {
@@ -56,6 +55,9 @@ export interface Statistiques {
   readonly meteo: Meteo;
 }
 
+/** Rayon, en tuiles, de ce que la colonie connaît de son berceau au premier jour. */
+const RAYON_CONNAISSANCE_INITIALE = 14;
+
 export class Simulation implements Monde {
   readonly journal = new Journal();
   readonly personnages: Personnage[];
@@ -63,7 +65,6 @@ export class Simulation implements Monde {
   meteo: Meteo = "clair";
   private compteurPersonnages = 0;
   private readonly cerveaux = new Map<string, Cerveau>();
-  private readonly gisements: { tuile: Tuile; gisement: Gisement }[] = [];
   private compteurBatiments = 0;
 
   private constructor(
@@ -72,17 +73,11 @@ export class Simulation implements Monde {
     readonly horloge: Horloge,
     readonly grille: Grille,
   ) {
-    for (const t of grille.toutes())
-      if (t.gisement) this.gisements.push({ tuile: t, gisement: t.gisement });
     this.personnages = genererPopulation(rng, config, grille);
     this.compteurPersonnages = this.personnages.length;
-    // Le voisinage de départ est connu de la colonie dès le premier instant.
-    const rayonDepart = rayonVision(this, horloge.moment());
-    for (const p of this.personnages) {
-      const { x, y } = p.corps.position;
-      for (let dy = -rayonDepart; dy <= rayonDepart; dy++)
-        for (let dx = -rayonDepart; dx <= rayonDepart; dx++) grille.decouvrir(x + dx, y + dy);
-    }
+    // La colonie s'installe en terrain reconnu : chacun connaît déjà les environs
+    // du berceau (points d'eau, gisements), et ces tuiles comptent comme découvertes.
+    for (const p of this.personnages) observer(this, p, RAYON_CONNAISSANCE_INITIALE);
     this.journal.ecouter((e) => {
       this.memoriser(e);
     });
@@ -183,18 +178,16 @@ export class Simulation implements Monde {
     validerConfig(config);
     const rng = Rng.depuisGraine(config.seed);
     const grille = genererGrille(rng.fork("monde"), {
-      largeur: config.monde.largeur,
-      hauteur: config.monde.hauteur,
+      echelleRelief: config.monde.echelleRelief,
+      echelleContinents: config.monde.echelleContinents,
+      berceau: config.monde.berceau,
     });
     return Simulation.creerAvecGrille(config, grille);
   }
 
   /** Crée une simulation sur une grille fournie (tests, scénarios). */
   static creerAvecGrille(partielle: SimConfigPartielle, grille: Grille): Simulation {
-    const config = fusionnerConfig({
-      ...partielle,
-      monde: { ...partielle.monde, largeur: grille.largeur, hauteur: grille.hauteur },
-    });
+    const config = fusionnerConfig(partielle);
     validerConfig(config);
     const rng = Rng.depuisGraine(config.seed);
     const horloge = new Horloge({
@@ -445,8 +438,10 @@ export class Simulation implements Monde {
     const facteurBaies =
       EFFETS_SAISON[moment.saison].regenBaies * EFFETS_METEO[this.meteo].regenBaies;
     const parTick = 1 / this.horloge.ticksParJour;
-    for (const { gisement } of this.gisements) {
-      if (gisement.tauxRegen <= 0 || gisement.quantite >= gisement.max) continue;
+    for (const tuile of this.grille.tuilesAvecGisement()) {
+      const gisement = tuile.gisement;
+      if (gisement === null || gisement.tauxRegen <= 0 || gisement.quantite >= gisement.max)
+        continue;
       const facteur = gisement.type === "baies" ? facteurBaies : 1;
       if (facteur <= 0) continue;
       gisement.quantite = Math.min(

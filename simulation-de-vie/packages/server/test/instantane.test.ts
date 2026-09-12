@@ -10,7 +10,7 @@ import {
 } from "../src/instantane.js";
 
 function sim(): Simulation {
-  const s = Simulation.creer({ seed: 42, monde: { largeur: 48, hauteur: 32 } });
+  const s = Simulation.creer({ seed: 42 });
   s.avancer(300);
   return s;
 }
@@ -19,9 +19,7 @@ describe("instantanés", () => {
   it("init décrit la grille et l'horloge", () => {
     const s = sim();
     const m = messageInit(s);
-    expect(m.largeur).toBe(48);
-    expect(m.hauteur).toBe(32);
-    expect(m.biomes).toHaveLength(48 * 32);
+    expect(m.tailleMorceau).toBe(32);
     expect(m.nomsBiomes).toContain("prairie");
     expect(m.ticksParJour).toBe(144);
     expect(m.modeCerveau).toBe("rules");
@@ -39,10 +37,11 @@ describe("instantanés", () => {
     expect(e1.gisements.length).toBeGreaterThan(50); // complet au premier envoi
     expect(e1.stats.vivants).toBe(12);
     expect(e1.rayonVision).toBeGreaterThan(0);
-    expect(e1.decouvertes.length).toBe(s.grille.nombreDecouvertes); // complet au premier envoi
-    expect(e1.decouvertes.length).toBeGreaterThan(50);
+    expect(e1.decouvertes.length).toBe(3 * s.grille.nombreDecouvertes); // complet au premier envoi
+    expect(e1.decouvertes.length).toBeGreaterThan(150);
     expect(e1.stats.tuilesDecouvertes).toBe(s.grille.nombreDecouvertes);
-    expect(e1.stats.tuiles).toBe(48 * 32);
+    expect(e1.stats.tuiles).toBe(s.grille.nombreTuiles);
+    expect(e1.stats.morceaux).toBe(s.grille.nombreMorceaux);
     const e2 = messageEtat(s, {
       ticksParSeconde: 4,
       pause: false,
@@ -63,14 +62,16 @@ describe("instantanés", () => {
     });
     expect(e3.evenements).toHaveLength(5);
     expect(e3.gisements.length).toBeGreaterThan(0); // récoltes et repousse
-    expect(e3.decouvertes.length + e1.decouvertes.length).toBe(s.grille.nombreDecouvertes);
+    expect((e3.decouvertes.length + e1.decouvertes.length) / 3).toBe(s.grille.nombreDecouvertes);
   });
 
   it("le différentiel signale les gisements disparus", () => {
     const s = sim();
     const suivi = new SuiviClient();
     suivi.differentiel(s);
-    const tuile = [...s.grille.toutes()].find((t) => t.gisement !== null);
+    const tuile = [...s.grille.toutes()].find(
+      (t) => t.gisement !== null && s.grille.estDecouverte(t.x, t.y),
+    );
     if (!tuile) throw new Error("pas de gisement");
     tuile.gisement = null;
     const diff = suivi.differentiel(s);

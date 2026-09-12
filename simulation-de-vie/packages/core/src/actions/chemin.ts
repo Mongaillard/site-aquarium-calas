@@ -97,8 +97,7 @@ export function trouverChemin(
   if (!grille.estPraticable(arrivee.x, arrivee.y)) return null;
   if (depart.x === arrivee.x && depart.y === arrivee.y) return [];
   const maxNoeuds = options.maxNoeuds ?? 20_000;
-  const L = grille.largeur;
-  const idx = (x: number, y: number): number => y * L + x;
+  const idx = cle;
   const heuristique = (x: number, y: number): number =>
     Math.max(Math.abs(x - arrivee.x), Math.abs(y - arrivee.y));
 
@@ -116,12 +115,11 @@ export function trouverChemin(
     const courant = file.pop();
     if (courant === undefined) break;
     if (ferme.has(courant.index)) continue;
-    if (courant.index === iArrivee) return reconstruire(parent, iDepart, iArrivee, L);
+    if (courant.index === iArrivee) return reconstruire(parent, iDepart, iArrivee);
     ferme.add(courant.index);
     if (++developpes > maxNoeuds) return null;
 
-    const cx = courant.index % L;
-    const cy = Math.floor(courant.index / L);
+    const { x: cx, y: cy } = decle(courant.index);
     const gCourant = g.get(courant.index) ?? Infinity;
     for (const [dx, dy] of DIRECTIONS) {
       const nx = cx + dx;
@@ -144,16 +142,22 @@ export function trouverChemin(
   return null;
 }
 
-function reconstruire(
-  parent: Map<number, number>,
-  depart: number,
-  arrivee: number,
-  L: number,
-): Position[] {
+/** Clé numérique d'une position (coordonnées négatives comprises). */
+const DECALAGE = 1 << 20;
+const PAS = 1 << 21;
+function cle(x: number, y: number): number {
+  return (x + DECALAGE) * PAS + (y + DECALAGE);
+}
+function decle(k: number): Position {
+  const y = (k % PAS) - DECALAGE;
+  return { x: (k - (y + DECALAGE)) / PAS - DECALAGE, y };
+}
+
+function reconstruire(parent: Map<number, number>, depart: number, arrivee: number): Position[] {
   const chemin: Position[] = [];
   let i = arrivee;
   while (i !== depart) {
-    chemin.push({ x: i % L, y: Math.floor(i / L) });
+    chemin.push(decle(i));
     const p = parent.get(i);
     if (p === undefined) return [];
     i = p;

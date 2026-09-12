@@ -127,7 +127,7 @@ describe("relations", () => {
   });
 
   it("la population initiale relie les familles en fratrie", () => {
-    const sim = Simulation.creer({ seed: 42, monde: { largeur: 32, hauteur: 32 } });
+    const sim = Simulation.creer({ seed: 42 });
     const p = sim.personnages[0];
     if (!p) throw new Error("vide");
     const freres = [...p.relations.values()].filter((r) => r.lien === "fratrie");

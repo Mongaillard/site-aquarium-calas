@@ -116,8 +116,14 @@ reproductible (P1).
 
 ### 4.1 Grille et biomes
 
-- Grille rectangulaire de tuiles. **[DÉCISION]** 96 × 64 tuiles par défaut, configurable.
-- Génération procédurale par bruit (simplex/perlin) seedé : altitude, humidité → biome.
+- Grille de tuiles **sans limite** : le monde est découpé en morceaux de 32 × 32 tuiles,
+  générés à la demande dès qu'un personnage (ou un calcul de chemin) s'en approche, et il
+  grandit avec les explorations. Coordonnées négatives comprises ; l'origine (0, 0) est le
+  berceau de la colonie. **[DÉCISION]** Chaque morceau ne dépend que de la graine et de ses
+  coordonnées : l'ordre d'exploration ne change jamais le monde.
+- Génération procédurale par bruit (simplex) seedé : un bruit lent pour les continents et les
+  mers, un plus fin pour le relief, un troisième pour l'humidité → altitude, humidité → biome.
+  Un « berceau » garantit à l'origine de la terre ferme avec un rivage à quelques tuiles.
 - Biomes : `eau_profonde`, `eau_peu_profonde`, `plage`, `prairie`, `foret`, `colline`,
   `montagne`, `marais`. Chaque biome a un coût de déplacement et une liste de ressources
   possibles.
@@ -790,7 +796,7 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
 ```jsonc
 {
   "seed": 42,
-  "monde": { "largeur": 96, "hauteur": 64, "joursParSaison": 30 },
+  "monde": { "joursParSaison": 30, "echelleRelief": 40, "echelleContinents": 220, "berceau": 28 },
   "population": { "initiale": 12, "familles": 3 },
   "temps": { "minutesParTick": 10, "snapshotTousLesTicks": 144 },
   "vie": {
