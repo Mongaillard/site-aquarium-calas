@@ -49,7 +49,7 @@ Le gibier immobile est remplacé par un monde animal.
 
 Ce qu'on verra : des cerfs qui traversent la prairie, des chasseurs qui les rabattent vers l'eau, des bulles « viens, il y a des cerfs près du gué », des clairières autour du village.
 
-### Jalon 10 — La nuit menace
+### Jalon 10 — La nuit menace — livré pour l'essentiel (M10 ; sans l'ours, les portes, la tour, le bouclier, l'armure et le chien)
 
 Le premier danger extérieur, et la colonie qui apprend à y répondre.
 

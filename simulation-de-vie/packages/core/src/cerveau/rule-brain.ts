@@ -35,6 +35,17 @@ export class RuleBrain implements Cerveau {
 
   urgence(perception: PerceptionLegere): Intention | null {
     const b = perception.moi.besoins;
+    // Des loups : les armés secourent, les autres se mettent à l'abri.
+    const menace = perception.menace ?? null;
+    if (menace !== null) {
+      if (
+        perception.moi.arme === true &&
+        menace.cible !== null &&
+        menace.cible !== this.personnage.id
+      )
+        return { type: "defendre", cible: menace.cible };
+      return { type: "fuir" };
+    }
     if (b.soif < SEUILS_URGENCE.soif) return { type: "boire" };
     // Le froid tue plus vite que la faim : quand on gèle et qu'une chaleur est
     // à portée, on rentre d'abord, sauf si l'on a de quoi manger sur soi.
@@ -560,6 +571,22 @@ export class RuleBrain implements Cerveau {
       candidats.push({
         intention: { type: "fabriquer", recette: "poisson_fume" },
         score: 0.4 + personnalite.conscience * 0.3 + (saisonFroide ? 0.3 : 0),
+      });
+    }
+
+    // Veiller la nuit au feu, quand on a retenu la leçon et que personne ne veille.
+    if (
+      adulte &&
+      nuit &&
+      sait("veilleur_de_nuit") &&
+      armeDeChasse &&
+      besoins.sommeil > 35 &&
+      perception.feuConnu &&
+      !perception.personnesVisibles.some((v) => v.veille)
+    ) {
+      candidats.push({
+        intention: { type: "veiller" },
+        score: 0.7 + personnalite.conscience * 0.3 - urgence(besoins.sommeil) * 0.5,
       });
     }
 

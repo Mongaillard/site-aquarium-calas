@@ -122,6 +122,7 @@ export class Rendu {
           phase: (maintenant / 400) % 1,
           enceinte: p.enceinte,
           blesse: p.blesse,
+          alerte: p.alerte,
           selection: p.id === magasin.selection,
           survol: p.id === survol,
         });
@@ -140,6 +141,7 @@ export class Rendu {
           espece: tr.espece,
           taille: tr.taille,
           predateur: tr.predateur,
+          yeux: tr.menace && nuit,
           marche: pos.enMouvement || tr.etat === "fuite",
           phase: (maintenant / 300) % 1,
           echelle: 1,

@@ -2,6 +2,53 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M10 – La nuit menace (jalon 3 de la feuille de route) (2026-09-12)
+
+- Le premier danger extérieur : les meutes de loups s'en prennent au village, et la colonie
+  apprend à répondre. Un **directeur de danger** tient un budget d'une menace par saison,
+  une à la fois, et laisse trente jours de grâce à la colonie qui s'installe. Une meute
+  affamée à moins de quarante tuiles du village devient une menace : un humain éveillé qui
+  passe à quinze tuiles relève des **traces** (événement `menace`), la meute rôde à une douzaine
+  de tuiles le jour, puis, au crépuscule suivant (au moins une demi-journée de préavis), elle
+  choisit sa **proie** : l'enfant, l'isolé, le dormeur à la belle étoile ; jamais un groupe de
+  trois, jamais à moins de quatre tuiles d'un feu allumé, jamais quelqu'un à l'abri ou derrière
+  une enceinte ; à l'aube, elle renonce et un répit de deux jours s'ouvre. Quand le gibier a
+  disparu à trente tuiles à la ronde et qu'aucune meute ne rôde, la chasse en attire une la
+  nuit (événement `faune` « arrivée »).
+- **Alarme, fuite, entraide** : quiconque est éveillé et voit la meute (à la portée de vue de
+  la nuit, un veilleur au feu un peu plus loin) crie l'alarme, qui porte à douze tuiles
+  (événement `alarme`, un « ! » au-dessus des têtes). Les enfants et les adultes sans arme
+  courent à l'abri, sinon près d'un feu, sinon vers l'adulte le plus proche (intention `fuir`) ;
+  les adultes armés (lance, arc, hache) vont se placer auprès de la personne visée
+  (intention `defendre`, action de garde de douze ticks).
+- **Combat déterministe** (`combattre`) : six rounds au plus ; deux loups engagés sur une
+  personne seule, trois face à un groupe, chacun mordant à 30 % (moins face à plusieurs
+  défenseurs) ; morsure légère six fois sur dix, moyenne sinon, grave trois fois sur cent, un
+  cran de moins sous un vêtement de cuir ; les défenseurs (la cible et les adultes éveillés à
+  deux tuiles) frappent à 25 % + 20 % avec une lance, 12 % à l'arc, 10 % à la hache, + 3 % par
+  niveau de chasse, et un coup tue le loup quatre fois sur dix ; la meute renonce dès deux
+  loups tués ou trois blessés ; la proie se dérobe sous 40 de santé ou, mordue, au sixième
+  round. Un seul événement `combat` résume tout (issue repoussés / fuite / mort). Après le
+  combat, la meute fuit, se méfie et, si elle a tué, mange cinq jours.
+- **Défenses passives** : la palissade bloque enfin les bêtes (aucun animal ne passe une tuile
+  bâtie) ; une position est **enclose** si l'on ne peut s'en éloigner de six tuiles sans
+  franchir un bâtiment terminé, de l'eau ou une montagne ; deux **leçons** nouvelles, tirées
+  d'une mort par les loups ou des suites d'une morsure (« des murs contre les loups »,
+  « un veilleur de nuit », plus « les enfants d'abord ») ; qui a retenu la première bâtit une
+  **enceinte** de pieux à trois tuiles autour de l'abri familial (palissade : deux bois, quatre
+  de travail ; l'eau et la montagne ferment d'elles-mêmes). Qui a retenu la seconde **veille**
+  la nuit près du feu, lance en main, quand personne d'autre ne veille (intention `veiller`).
+- Les blessures gardent leur contexte (« sous les crocs des loups ») ; l'infection d'une
+  morsure passe de 25 à 15 % par jour, sinon les morsures emportaient trop de monde.
+- Viewer : « ! » au-dessus des personnes en alerte, yeux jaunes sur la meute qui rôde la nuit,
+  événements `menace`, `alarme`, `combat` et arrivée d'une meute dans le Journal, compteur
+  d'attaques dans Statistiques, souvenirs des traces, de l'alarme et des combats.
+- Pas encore : l'ours, les portes et la tour de guet, le bouclier et l'armure, le chien.
+  Sur cinq graines et 450 jours : 22 à 28 vivants ; de zéro à quatorze menaces par monde selon
+  la proximité des meutes, un à cinq combats, aucune mort sous les crocs, deux morts des suites
+  d'une morsure (infection) ; les enceintes de pieux apparaissent d'elles-mêmes après la
+  première leçon (16 à 86 pans de palissade par monde).
+
 ## M9 – La faune vit (jalon 2 de la feuille de route) (2026-09-12)
 
 - Le gibier immobile disparaît des gisements : le monde est peuplé de troupeaux mobiles

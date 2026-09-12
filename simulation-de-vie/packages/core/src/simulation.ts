@@ -70,6 +70,9 @@ import {
   peuplerMorceau,
 } from "./monde/faune.js";
 import type { Troupeau } from "./monde/faune.js";
+import { REPIT_TICKS, etatDangerInitial, heureDanger, proieAuContact } from "./monde/danger.js";
+import type { EtatDanger } from "./monde/danger.js";
+import { combattre } from "./agents/combat.js";
 import type { Position } from "./monde/grille.js";
 import { Horloge } from "./monde/horloge.js";
 import { EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
@@ -107,6 +110,8 @@ export class Simulation implements Monde {
   readonly batiments = new Map<string, Batiment>();
   /** La faune : troupeaux et meutes, peuplés morceau par morceau. */
   readonly troupeaux = new Map<string, Troupeau>();
+  /** Directeur de danger : la menace en cours et le budget d'attaques. */
+  readonly danger: EtatDanger;
   private readonly morceauxPeuples = new Set<number>();
   private compteurTroupeaux = 0;
   meteo: Meteo = "clair";
@@ -122,6 +127,7 @@ export class Simulation implements Monde {
   ) {
     this.personnages = genererPopulation(rng, config, grille);
     this.compteurPersonnages = this.personnages.length;
+    this.danger = etatDangerInitial(horloge.ticksParJour);
     this.peuplerFaune();
     // La colonie s'installe en terrain reconnu : chacun connaît déjà les environs
     // du berceau (points d'eau, gisements), et ces tuiles comptent comme découvertes.
@@ -425,7 +431,13 @@ export class Simulation implements Monde {
       action === "fonder";
     if (p.corps.endormi) {
       fatigueRepos(p, "sommeil");
-    } else if (action === "se_reposer" || action === "se_rechauffer" || action === "attendre") {
+    } else if (
+      action === "se_reposer" ||
+      action === "se_rechauffer" ||
+      action === "attendre" ||
+      action === "veiller" ||
+      action === "defendre"
+    ) {
       fatigueRepos(p, "repos");
     } else if (effort) {
       const inv = p.corps.inventaire;
@@ -643,7 +655,10 @@ export class Simulation implements Monde {
     if (this.horloge.estAube() && this.tick > 0) this.nouveauJour();
     this.regenererGisements();
     this.peuplerFaune();
-    if (this.tick % 6 === 0) for (const t of this.troupeaux.values()) heureTroupeau(this, t);
+    if (this.tick % 6 === 0) {
+      for (const t of this.troupeaux.values()) heureTroupeau(this, t);
+      this.heureDeDanger();
+    }
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
     const ordre = this.rng.fork(`tick/${this.tick}`).melanger(this.vivants());
@@ -712,6 +727,112 @@ export class Simulation implements Monde {
       const rng = this.rng.fork(`faune/${m.cx}:${m.cy}`);
       for (const t of peuplerMorceau(m, rng, () => `faune-${++this.compteurTroupeaux}`))
         this.troupeaux.set(t.id, t);
+    }
+  }
+
+  /**
+   * Une heure du directeur de danger : menaces, traces, alarme, et le combat
+   * quand une meute atteint sa proie.
+   */
+  private heureDeDanger(): void {
+    const effets = heureDanger(
+      this,
+      this.danger,
+      this.rng.fork(`danger/${String(this.tick)}`),
+      (pos) => {
+        const id = `faune-${String(++this.compteurTroupeaux)}`;
+        const meute: Troupeau = {
+          id,
+          espece: "loup",
+          position: { ...pos },
+          gite: { ...pos },
+          giteEte: { ...pos },
+          taille: 3,
+          mefiance: 0,
+          etat: "pature",
+          cible: null,
+          faim: 0,
+          derniereMiseBas: 0,
+          proieHumaine: null,
+          enMenace: false,
+          rng: this.rng.fork(id),
+        };
+        this.troupeaux.set(id, meute);
+        return meute;
+      },
+    );
+    for (const e of effets) {
+      if (e.genre === "arrivee") {
+        this.emettre(
+          "faune",
+          null,
+          {
+            genre: "arrivee",
+            espece: "loup",
+            nom: "loups",
+            nombre: e.meute.taille,
+            taille: e.meute.taille,
+            troupeau: e.meute.id,
+            proie: null,
+          },
+          4,
+          e.meute.position,
+        );
+        continue;
+      }
+      if (e.genre === "alarme") {
+        this.emettre(
+          "alarme",
+          e.personnage,
+          { meute: e.meute.id, loups: e.meute.taille },
+          8,
+          e.personnage?.corps.position ?? e.meute.position,
+        );
+        continue;
+      }
+      this.emettre(
+        "menace",
+        e.personnage,
+        { genre: e.genre, meute: e.meute.id, loups: e.meute.taille },
+        e.genre === "traces" ? 6 : 2,
+        e.genre === "traces"
+          ? (e.personnage?.corps.position ?? e.meute.position)
+          : e.meute.position,
+      );
+    }
+    const menace = this.danger.menace;
+    if (menace === null) return;
+    const meute = this.troupeaux.get(menace.meute);
+    if (meute === undefined) return;
+    const proie = proieAuContact(this, meute);
+    if (proie === null) return;
+    const tailleAvant = meute.taille;
+    const resultat = combattre(this, meute, proie);
+    this.danger.attaques += 1;
+    this.danger.menace = null;
+    this.danger.repitJusqua = this.tick + REPIT_TICKS;
+    this.emettre(
+      "combat",
+      proie,
+      {
+        contre: "loups",
+        meute: meute.id,
+        loups: tailleAvant,
+        issue: resultat.issue,
+        rounds: resultat.rounds,
+        defenseurs: resultat.defenseurs,
+        loupsTues: resultat.loupsTues,
+        blesses: resultat.blesses,
+        victime: resultat.victime?.identite.prenom ?? null,
+      },
+      9,
+      proie.corps.position,
+    );
+    if (meute.taille <= 0) this.troupeaux.delete(meute.id);
+    // Après le combat, tout le voisinage est en alerte : on se replie, on secourt.
+    for (const p of this.personnages) {
+      if (p.vivant && Grille.distance(p.corps.position, proie.corps.position) <= 12)
+        p.drapeaux.alerteJusqua = this.tick + 36;
     }
   }
 

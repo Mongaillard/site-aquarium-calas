@@ -81,6 +81,28 @@ export function decrireEvenement(
         : `Le ${String(d.nom)} m'a échappé${lieu(e)}.`;
     case "faune":
       return null;
+    case "menace":
+      if (d.genre === "traces")
+        return temoin
+          ? `${qui} a vu des traces de loups${lieu(e)}.`
+          : `J'ai vu des traces de loups${lieu(e)} : une meute rôde près du village.`;
+      return null;
+    case "alarme":
+      return temoin
+        ? `${qui} a crié : des loups ! Tout le monde s'est mis à l'abri.`
+        : `J'ai vu la meute la première et j'ai donné l'alarme.`;
+    case "combat":
+      if (d.issue === "mort")
+        return temoin
+          ? `Les loups ont pris ${qui}${lieu(e)}. Je n'oublierai pas cette nuit.`
+          : `Les loups m'ont eu${e_}${lieu(e)}.`;
+      if (d.issue === "fuite")
+        return temoin
+          ? `${qui} a échappé de justesse aux loups${lieu(e)}.`
+          : `Les loups m'ont mordu${e_}, j'ai couru vers le feu.`;
+      return temoin
+        ? `${qui} a repoussé les loups${lieu(e)}${Number(d.loupsTues) > 0 ? ` et en a tué ${String(d.loupsTues)}` : ""}.`
+        : `J'ai tenu tête aux loups${lieu(e)}${Number(d.defenseurs) > 1 ? ", à plusieurs" : ", seul" + e_}${Number(d.loupsTues) > 0 ? ` ; ${String(d.loupsTues)} y ${Number(d.loupsTues) > 1 ? "sont restés" : "est resté"}` : ""}.`;
     case "gisement_epuise":
       return temoin
         ? `${qui} a épuisé un gisement${lieu(e)}, il n'y a plus ${ressource(d)} là-bas.`
@@ -263,6 +285,7 @@ export function decrireEvenement(
 /** Importance mémorielle d'un événement pour un témoin (plus faible que pour l'acteur). */
 export function importancePourTemoin(e: Evenement): number {
   if (e.type === "deces") return 8;
+  if (e.type === "combat" || e.type === "alarme") return 7;
   if (e.type === "vol") return 7;
   return Math.max(1, Math.round(e.importance * 0.6));
 }

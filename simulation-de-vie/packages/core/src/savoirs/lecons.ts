@@ -8,6 +8,7 @@ import { possede } from "../agents/inventaire.js";
 import { PLANS_BATIMENT } from "../monde/batiments.js";
 import { Grille } from "../monde/grille.js";
 import { abriDisponible, autorise, feuProche, membresFamille } from "../monde.js";
+import { enclos } from "../monde/danger.js";
 import type { Monde } from "../monde.js";
 import { SEUIL_SAVOIR } from "./catalogue.js";
 import type { Lecon, Savoir, SavoirAcquis } from "./catalogue.js";
@@ -88,12 +89,32 @@ export function tirerLecons(monde: Monde, defunt: Personnage, cause: string): Le
       if (!puits) lecons.push("puits_pres_du_village");
       break;
     case "hémorragie":
-    case "infection":
+    case "infection": {
       lecons.push("soigner_les_blesses");
+      // Une plaie faite par les loups : on retient aussi les murs ou le veilleur.
+      if (defunt.corps.etat.blessures.some((x) => x.contexte.includes("loups"))) {
+        if (!enclos(monde, pos)) lecons.push("murs_contre_les_loups");
+        else lecons.push("veilleur_de_nuit");
+      }
       break;
+    }
     case "accouchement":
       lecons.push("accoucheuse");
       break;
+    case "loups": {
+      if (!enclos(monde, pos)) lecons.push("murs_contre_les_loups");
+      const veilleur = monde.personnages.some(
+        (x) =>
+          x.vivant &&
+          x.id !== defunt.id &&
+          !x.corps.endormi &&
+          x.corps.stade !== "enfant" &&
+          Grille.distance(x.corps.position, pos) <= 6,
+      );
+      if (!veilleur) lecons.push("veilleur_de_nuit");
+      if (enfant) lecons.push("enfants_dabord");
+      break;
+    }
     default:
       break;
   }

@@ -68,6 +68,9 @@ export type Action =
   | { readonly type: "soigner"; readonly cible: string; ticksRestants: number }
   /** Chasse d'un troupeau à portée (lance, arc ou piège). */
   | { readonly type: "chasser"; readonly troupeau: string; ticksRestants: number }
+  /** Veille de nuit près du feu ; garde auprès de quelqu'un que la meute vise. */
+  | { readonly type: "veiller"; ticksRestants: number }
+  | { readonly type: "defendre"; readonly cible: string; ticksRestants: number }
   | { readonly type: "se_reposer"; ticksRestants: number };
 
 export type TypeAction = Action["type"];
@@ -91,7 +94,11 @@ export type Intention =
   | { readonly type: "suivre"; readonly cible: string }
   | { readonly type: "se_rechauffer" }
   | { readonly type: "soigner"; readonly cible: string }
-  | { readonly type: "se_reposer" };
+  | { readonly type: "se_reposer" }
+  /** Danger : se mettre à l'abri ou près du feu, défendre quelqu'un, veiller la nuit. */
+  | { readonly type: "fuir" }
+  | { readonly type: "defendre"; readonly cible: string }
+  | { readonly type: "veiller" };
 
 export type TypeIntention = Intention["type"];
 
@@ -115,6 +122,8 @@ export function decrireIntention(i: Intention): string {
       return `suivre:${i.cible}`;
     case "soigner":
       return `soigner:${i.cible}`;
+    case "defendre":
+      return `defendre:${i.cible}`;
     default:
       return i.type;
   }
@@ -168,6 +177,10 @@ export function decrireAction(a: Action): string {
       return `se_reposer:${a.ticksRestants}`;
     case "chasser":
       return `chasser:${a.troupeau}`;
+    case "veiller":
+      return `veiller:${a.ticksRestants}`;
+    case "defendre":
+      return `defendre:${a.cible}`;
   }
 }
 

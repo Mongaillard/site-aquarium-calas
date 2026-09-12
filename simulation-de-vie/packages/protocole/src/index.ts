@@ -57,6 +57,8 @@ export interface PersonnageEtat {
   /** Le corps (jalon « le corps ») : blessé (bande rouge), épuisé. */
   readonly blesse: boolean;
   readonly epuise: boolean;
+  /** L'alarme a été donnée : un « ! » au-dessus de la tête. */
+  readonly alerte: boolean;
 }
 
 export interface BatimentEtat {
@@ -130,6 +132,8 @@ export interface Statistiques {
   /** La faune : troupeaux et bêtes par espèce, et le bilan des chasses. */
   readonly faune: readonly FauneStat[];
   readonly chasses: { readonly reussies: number; readonly ratees: number };
+  /** Attaques de meutes résolues par un combat. */
+  readonly attaques: number;
 }
 
 export interface SavoirStat {
@@ -160,6 +164,8 @@ export interface TroupeauEtat {
   readonly taille: number;
   readonly etat: "pature" | "fuite" | "gite";
   readonly predateur: boolean;
+  /** Meute désignée comme menace par le directeur de danger (yeux jaunes la nuit). */
+  readonly menace: boolean;
 }
 
 export interface FauneStat {

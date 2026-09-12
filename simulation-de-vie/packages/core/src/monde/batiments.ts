@@ -115,8 +115,8 @@ export const PLANS_BATIMENT: Record<TypeBatiment, PlanBatiment> = {
   },
   palissade: {
     nom: "palissade",
-    materiaux: { bois: 4 },
-    travail: 6,
+    materiaux: { bois: 2 },
+    travail: 4,
     capaciteDormeurs: 0,
     capaciteStock: 0,
     chaleur: 0,

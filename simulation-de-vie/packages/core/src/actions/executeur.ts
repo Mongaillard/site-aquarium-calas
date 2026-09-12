@@ -130,6 +130,17 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       return tickSoigner(monde, p, action);
     case "chasser":
       return tickChasser(monde, p, action);
+    case "veiller":
+      action.ticksRestants -= 1;
+      return action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
+    case "defendre": {
+      const cible = monde.personnages.find((x) => x.id === action.cible);
+      if (!cible?.vivant) return echec("personne à défendre");
+      if (Grille.distance(p.corps.position, cible.corps.position) > 3)
+        return echec("la personne à défendre s'est éloignée");
+      action.ticksRestants -= 1;
+      return action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
+    }
   }
 }
 

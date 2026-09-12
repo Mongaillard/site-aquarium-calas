@@ -46,6 +46,15 @@ export const LECONS = {
     titre: "Une accoucheuse",
     morale: "Une femme n'accouche pas seule : qu'une autre, qui sait, soit près d'elle.",
   },
+  murs_contre_les_loups: {
+    titre: "Des murs contre les loups",
+    morale: "Les loups ne passent pas une palissade : entourons les abris de pieux.",
+  },
+  veilleur_de_nuit: {
+    titre: "Un veilleur de nuit",
+    morale:
+      "La meute vient quand tout le monde dort : qu'un de nous veille au feu, à tour de rôle.",
+  },
 } as const satisfies Record<string, FicheLecon>;
 export type Lecon = keyof typeof LECONS;
 

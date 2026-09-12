@@ -306,6 +306,20 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
         return `${qui} rapporte ${String(d.betes)} ${nom}${Number(d.betes) > 1 ? "s" : ""}${Number(d.rabatteurs) > 0 ? ` (battue à ${String(Number(d.rabatteurs) + 1)})` : ""}${d.arc === true ? ", à l'arc" : ""}.`;
       return `${qui} rate un ${nom}${Number(d.rabatteurs) > 0 ? " malgré les rabatteurs" : ""}.`;
     }
+    case "menace":
+      return d.genre === "traces"
+        ? `${qui} relève des traces de loups : une meute rôde (${String(d.loups)} bêtes).`
+        : d.genre === "menace"
+          ? `Une meute affamée (${String(d.loups)} loups) s'approche du village.`
+          : `La meute s'éloigne avec le jour.`;
+    case "alarme":
+      return `${qui} crie : des loups ! (${String(d.loups)} bêtes)`;
+    case "combat":
+      return d.issue === "mort"
+        ? `Les loups emportent ${qui} (${String(d.loups)} bêtes, ${String(d.defenseurs)} défenseur${Number(d.defenseurs) > 1 ? "s" : ""}).`
+        : d.issue === "fuite"
+          ? `${qui} échappe aux loups en ${String(d.rounds)} rounds, mordu${Number(d.blesses) > 1 ? "s à " + String(d.blesses) : ""}${Number(d.loupsTues) > 0 ? `, ${String(d.loupsTues)} loup${Number(d.loupsTues) > 1 ? "s" : ""} tué${Number(d.loupsTues) > 1 ? "s" : ""}` : ""}.`
+          : `${qui} repousse ${String(d.loups)} loups${Number(d.defenseurs) > 1 ? ` à ${String(d.defenseurs)}` : ", seul"} en ${String(d.rounds)} round${Number(d.rounds) > 1 ? "s" : ""}${Number(d.loupsTues) > 0 ? ` (${String(d.loupsTues)} tué${Number(d.loupsTues) > 1 ? "s" : ""})` : ""}.`;
     case "faune": {
       const nom = String(d.nom);
       switch (String(d.genre)) {
@@ -325,6 +339,8 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
           return `Il n'y a plus de ${nom} par ici.`;
         case "meute":
           return `Une meute de loups prend un ${String(d.proie)}.`;
+        case "arrivee":
+          return `Une meute de loups arrive dans la région : la chasse a vidé les environs.`;
         default:
           return `${nom} : ${String(d.genre)}`;
       }

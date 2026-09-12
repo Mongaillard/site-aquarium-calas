@@ -380,6 +380,8 @@ export interface AspectPersonnage {
   readonly survol: boolean;
   /** Blessé : un bandeau rouge sur le corps. */
   readonly blesse?: boolean;
+  /** Alarme : un « ! » au-dessus de la tête. */
+  readonly alerte?: boolean;
 }
 
 export const TEINTS: Readonly<Record<string, string>> = {
@@ -451,6 +453,13 @@ export function personnage(ctx: Ctx, x: number, y: number, a: AspectPersonnage):
     ctx.fillStyle = "#d63b3b";
     ctx.fillRect(cx - 0.19 * s, sol - 0.5 * s, 0.38 * s, 0.07 * s);
   }
+  if (a.alerte === true) {
+    ctx.fillStyle = "#ffd23a";
+    ctx.font = `bold ${0.5 * s}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("!", cx, sol - 1.05 * s);
+  }
   ctx.strokeStyle = a.contour;
   ctx.lineWidth = 0.035;
   ctx.stroke();
@@ -502,6 +511,8 @@ export interface AspectTroupeau {
   readonly marche: boolean;
   readonly phase: number;
   readonly echelle: number;
+  /** Meute menaçante, la nuit : deux yeux jaunes. */
+  readonly yeux?: boolean;
 }
 
 const ROBES: Readonly<Record<string, { corps: string; ventre: string; taille: number }>> = {
@@ -582,6 +593,16 @@ export function troupeau(ctx: Ctx, x: number, y: number, a: AspectTroupeau): voi
       s * 0.8,
       pas * (i % 2 === 0 ? 1 : -1),
     );
+  }
+  if (a.yeux === true) {
+    ctx.fillStyle = "#ffd23a";
+    for (let i = 0; i < n; i++) {
+      const dx = decalages[i] ?? 0;
+      const ex = x + 0.5 + dx * s + 0.26 * s * 0.8 * 0.9;
+      const ey = sol - (i % 2) * 0.12 * s - 0.42 * s * 0.8 * 0.9;
+      ctx.fillRect(ex - 0.05 * s, ey - 0.02 * s, 0.04 * s, 0.04 * s);
+      ctx.fillRect(ex + 0.02 * s, ey - 0.02 * s, 0.04 * s, 0.04 * s);
+    }
   }
   if (a.taille > 3) {
     ctx.fillStyle = a.predateur ? "#ffb3b3" : "#f4efe6";

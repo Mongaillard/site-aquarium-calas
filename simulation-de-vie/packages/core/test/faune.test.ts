@@ -40,6 +40,8 @@ function troupeau(sim: Simulation, espece: Espece, position: Position, taille: n
     cible: null,
     faim: 0,
     derniereMiseBas: 0,
+    proieHumaine: null,
+    enMenace: false,
     rng: sim.rng.fork(id),
   };
   sim.troupeaux.set(id, t);

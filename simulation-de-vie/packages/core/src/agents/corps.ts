@@ -30,6 +30,8 @@ export interface Blessure {
   immobilisee: boolean;
   /** Ticks passés au repos depuis la blessure (convalescence). */
   ticksRepos: number;
+  /** Comment c'est arrivé (« en fendant du bois », « sous les crocs des loups »…). */
+  readonly contexte: string;
 }
 
 export type Handicap = "boiterie" | "main_raide" | "sans_dents";
@@ -302,6 +304,7 @@ export function blesser(
     type,
     gravite,
     lieu,
+    contexte,
     depuis: tick,
     saigne: type !== "fracture",
     bandee: false,
@@ -417,7 +420,7 @@ export function passeQuotidienneCorps(monde: Monde, p: Personnage): void {
       b.saigne = false;
     // Infection : chaque jour sans bandage, une chance ; la morsure est plus sale.
     if (!b.infectee && b.type !== "fracture" && jours < 10) {
-      const base = b.type === "morsure" ? 0.25 : 0.1;
+      const base = b.type === "morsure" ? 0.15 : 0.1;
       const probabilite = b.bandee ? base / 3 : base;
       if (p.rng.chance(probabilite)) {
         b.infectee = true;

@@ -10,6 +10,7 @@ import type { Monde } from "../monde.js";
 import type { Rng } from "../rng.js";
 import type { Biome } from "./biomes.js";
 import { INFO_BIOME } from "./biomes.js";
+import { PLANS_BATIMENT } from "./batiments.js";
 import { Grille, TAILLE_MORCEAU } from "./grille.js";
 import type { Morceau, Position } from "./grille.js";
 
@@ -174,7 +175,23 @@ export interface Troupeau {
   faim: number;
   /** Année de la dernière mise bas (0 = jamais). */
   derniereMiseBas: number;
+  /** Meute lancée sur une personne (directeur de danger) : son identifiant. */
+  proieHumaine: string | null;
+  /** Meute désignée comme menace : elle rôde vers le village au lieu de pâturer. */
+  enMenace: boolean;
   readonly rng: Rng;
+}
+
+/** Une meute n'approche jamais à moins de quatre tuiles d'un feu allumé. */
+export const RAYON_FEU_SUR = 4;
+
+/** Vrai si un feu allumé se trouve à moins de quatre tuiles. */
+export function presDunFeu(monde: Monde, pos: Position): boolean {
+  for (const b of monde.batiments.values()) {
+    if (b.etat !== "termine" || !b.allume || PLANS_BATIMENT[b.type].atelier !== "feu") continue;
+    if (Grille.distance(b.position, pos) <= RAYON_FEU_SUR) return true;
+  }
+  return false;
 }
 
 /** Au-delà de cette distance (tuiles) de tout humain vivant, un troupeau ne bouge plus. */
@@ -249,6 +266,8 @@ export function peuplerMorceau(morceau: Morceau, rng: Rng, prochainId: () => str
         cible: null,
         faim: 0,
         derniereMiseBas: 0,
+        proieHumaine: null,
+        enMenace: false,
         rng: rng.fork(id),
       });
     }
@@ -306,7 +325,12 @@ export function faireFuir(t: Troupeau, depuis: Position, mefiance: number): void
 }
 
 /** Un pas d'une tuile vers la cible, en contournant l'obstacle si besoin. */
-function avancerDUnPas(monde: Monde, t: Troupeau, cible: Position): boolean {
+function avancerDUnPas(
+  monde: Monde,
+  t: Troupeau,
+  cible: Position,
+  interdit?: (pos: Position) => boolean,
+): boolean {
   const sx = pasVersCible(t.position.x, cible.x);
   const sy = pasVersCible(t.position.y, cible.y);
   const essais: Position[] = [
@@ -318,7 +342,7 @@ function avancerDUnPas(monde: Monde, t: Troupeau, cible: Position): boolean {
   ];
   for (const pos of essais) {
     if (pos.x === t.position.x && pos.y === t.position.y) continue;
-    if (praticable(monde, pos)) {
+    if (praticable(monde, pos) && !(interdit?.(pos) ?? false)) {
       t.position = pos;
       return true;
     }
@@ -337,9 +361,24 @@ export function heureTroupeau(monde: Monde, t: Troupeau): void {
   if (humain === null || humain.distance > RAYON_ACTIVITE) return;
   const moment = monde.horloge.moment();
 
+  // Une meute lancée sur une proie humaine la suit, sans fuir, en évitant les feux ;
+  // une meute qui rôde (menace sans proie désignée) garde le cap que le directeur lui donne.
+  const traque = profil.predateur && (t.proieHumaine !== null || t.enMenace);
+  if (profil.predateur && t.proieHumaine !== null) {
+    const proie = monde.personnages.find((p) => p.id === t.proieHumaine && p.vivant);
+    if (proie === undefined) {
+      t.proieHumaine = null;
+      t.cible = null;
+    } else {
+      t.cible = { ...proie.corps.position };
+      t.etat = "pature";
+    }
+  }
   // Un troupeau jamais chassé se laisse approcher de près ; un troupeau méfiant fuit de loin.
   const distanceFuite = Math.max(1, Math.round(profil.fuite * (0.5 + t.mefiance)));
-  if (humain.distance <= distanceFuite && !(profil.predateur && t.faim > 5)) {
+  if (traque) {
+    // Rien à faire : la proie est déjà la cible.
+  } else if (humain.distance <= distanceFuite && !(profil.predateur && t.faim > 5)) {
     faireFuir(t, humain.position, 0.05);
   } else if (!profil.predateur && t.etat !== "fuite") {
     // Une proie qui sent la meute s'enfuit.
@@ -351,7 +390,7 @@ export function heureTroupeau(monde: Monde, t: Troupeau): void {
     t.cible = null;
   }
 
-  if (t.etat !== "fuite") {
+  if (t.etat !== "fuite" && !traque) {
     if (profil.predateur && t.faim >= FAIM_MEUTE) {
       // Une meute affamée traque la proie la plus proche dans son rayon.
       const proie = proieLaPlusProche(monde, t, RAYON_TRAQUE);
@@ -373,11 +412,12 @@ export function heureTroupeau(monde: Monde, t: Troupeau): void {
   }
 
   if (t.cible !== null) {
-    const pas = t.etat === "fuite" ? profil.vitesse * 2 : profil.vitesse;
+    const pas = t.etat === "fuite" || traque ? profil.vitesse * 2 : profil.vitesse;
+    const interdit = traque ? (pos: Position): boolean => presDunFeu(monde, pos) : undefined;
     for (let i = 0; i < pas; i++) {
-      if (Grille.distance(t.position, t.cible) === 0) break;
-      if (!avancerDUnPas(monde, t, t.cible)) {
-        t.cible = null;
+      if (Grille.distance(t.position, t.cible) <= (traque ? 1 : 0)) break;
+      if (!avancerDUnPas(monde, t, t.cible, interdit)) {
+        if (!traque) t.cible = null;
         break;
       }
     }
@@ -533,6 +573,8 @@ export function jourTroupeau(
       cible: nouveauGite,
       faim: 0,
       derniereMiseBas: t.derniereMiseBas,
+      proieHumaine: null,
+      enMenace: false,
       rng: t.rng.fork(id),
     };
     evenements.push({ genre: "scission", troupeau: t, nombre: part });

@@ -67,6 +67,8 @@ export interface Drapeaux {
   prudenceNourritureJusqua: number;
   chercheAbriJusqua: number;
   explorerPlusLoinJusqua: number;
+  /** Alarme entendue : on se met à l'abri ou on défend jusqu'à ce tick. */
+  alerteJusqua: number;
   /** Minimums du jour, pour la réflexion du soir. */
   faimMinDuJour: number;
   chaleurMinDuJour: number;
@@ -188,6 +190,7 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
       prudenceNourritureJusqua: -1,
       chercheAbriJusqua: -1,
       explorerPlusLoinJusqua: -1,
+      alerteJusqua: -1,
       faimMinDuJour: 100,
       chaleurMinDuJour: 100,
       reflexionsFaites: new Set(),

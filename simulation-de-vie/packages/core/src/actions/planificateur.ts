@@ -28,6 +28,7 @@ import {
   feuEteint,
   feuProche,
   prochainBatimentNecessaire,
+  tuileEnceinteManquante,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
 import { partenaireDe } from "../social/couple.js";
@@ -109,7 +110,63 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       }));
     case "se_reposer":
       return planifierRepos(monde, p);
+    case "fuir":
+      return planifierFuite(monde, p);
+    case "defendre":
+      return planifierRencontre(monde, p, intention.cible, (cible) => ({
+        type: "defendre",
+        cible: cible.id,
+        ticksRestants: 12,
+      }));
+    case "veiller":
+      return planifierVeille(monde, p);
   }
+}
+
+/** Fuir la meute : à l'abri (jusqu'à 40 tuiles), sinon près d'un feu, sinon vers les autres. */
+function planifierFuite(monde: Monde, p: Personnage): ResultatPlan {
+  const pos = p.corps.position;
+  const attente: Action = { type: "attendre", ticksRestants: 24 };
+  const abri = abriDisponible(monde, p);
+  if (abri !== null && Grille.distance(pos, abri.position) <= 40) {
+    if (pos.x === abri.position.x && pos.y === abri.position.y) return ok([attente]);
+    const aller = allerSur(monde, p, abri.position);
+    if (aller) return ok([aller, attente]);
+  }
+  if (feuProche(monde, pos) !== null) return ok([attente]);
+  const feu = feuLePlusProche(monde, pos, 40);
+  if (feu !== null) {
+    const aller = allerPresDe(monde, p, feu.position);
+    if (aller) return ok([aller, attente]);
+  }
+  // Ni abri ni feu : rejoindre l'adulte le plus proche.
+  let proche: Personnage | null = null;
+  let distance = Infinity;
+  for (const a of monde.personnages) {
+    if (!a.vivant || a.id === p.id || a.corps.stade === "enfant") continue;
+    const d = Grille.distance(a.corps.position, pos);
+    if (d < distance) {
+      distance = d;
+      proche = a;
+    }
+  }
+  if (proche !== null) return ok([{ type: "suivre", cible: proche.id, ticksRestants: 24 }]);
+  return echec("nulle part où fuir");
+}
+
+/** Veiller la nuit près du feu familial (ou du feu le plus proche). */
+function planifierVeille(monde: Monde, p: Personnage): ResultatPlan {
+  const pos = p.corps.position;
+  const veille: Action = { type: "veiller", ticksRestants: 36 };
+  const feuFamilial = batimentsAccessibles(monde, p, "feu_de_camp").find(
+    (b) => b.etat === "termine" && b.allume,
+  );
+  const feu = feuFamilial ?? feuLePlusProche(monde, pos, 25);
+  if (feu === null) return echec("aucun feu où veiller");
+  if (Grille.distance(pos, feu.position) <= 1) return ok([veille]);
+  const aller = allerPresDe(monde, p, feu.position);
+  if (aller === null) return echec("feu inaccessible");
+  return ok([aller, veille]);
 }
 
 /** Se reposer à l'abri (jusqu'à 80 tuiles), sinon près d'un feu, sinon sur place. */
@@ -728,6 +785,7 @@ function planifierFondation(monde: Monde, p: Personnage, type: TypeBatiment): Re
  * famille (ou de soi), à moins de 8 tuiles d'un point d'eau connu si possible.
  */
 export function choisirSite(monde: Monde, p: Personnage, type: TypeBatiment): Position | null {
+  if (type === "palissade") return tuileEnceinteManquante(monde, p);
   const acces = batimentsAccessibles(monde, p);
   const centre = acces[0]?.position ?? p.corps.position;
   const eaux = lieuxConnusTries(p, "eau");

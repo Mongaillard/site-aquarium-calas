@@ -30,6 +30,18 @@ export {
   troupeauxVisiblesDepuis,
 } from "./monde/faune.js";
 export type { Espece, EtatTroupeau, ProfilEspece, Troupeau } from "./monde/faune.js";
+export {
+  ATTAQUES_PAR_SAISON,
+  PREAVIS_TICKS,
+  RAYON_ALARME,
+  centreVillage,
+  enclos,
+  vulnerabilite,
+} from "./monde/danger.js";
+export type { EtatDanger, Menace } from "./monde/danger.js";
+export { combattre, defenseursAutour } from "./agents/combat.js";
+export type { ResultatCombat, IssueCombat } from "./agents/combat.js";
+export { tuileEnceinteManquante, RAYON_ENCEINTE } from "./monde.js";
 export { rendreAscii, LEGENDE_ASCII } from "./monde/ascii.js";
 export type { OptionsAscii } from "./monde/ascii.js";
 export { Simulation } from "./simulation.js";

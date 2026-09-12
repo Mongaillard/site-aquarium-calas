@@ -167,6 +167,27 @@ chasseur qui le rate. Forêt : un arbre abattu (`epuiseDepuis`) ne repousse qu'a
 Pêche : les bancs croissent par bassin de 8 × 8 tuiles (logistique, 0,2 par jour à mi-charge,
 immigration d'un poisson par jour sous 10 % de la capacité).
 
+**La nuit menace (M10).** `Simulation.danger` (`EtatDanger` : menace en cours, budget de la
+saison, répit, jours de grâce, nombre d'attaques) est piloté chaque heure par `heureDanger`
+(`monde/danger.ts`) : au plus une menace par saison, rien avant trente jours.
+Une meute (`Troupeau` de loups, `faim ≥ 2`, deux bêtes au moins) à moins de 40 tuiles du
+centre du village (barycentre des abris) devient la menace ; sans gibier à 30 tuiles ni
+meute, une meute arrive la nuit (1 % par heure). Traces quand un humain éveillé passe à
+15 tuiles ; préavis jusqu'au crépuscule suivant (au moins 72 ticks) pendant lequel la meute
+rôde à 12 tuiles (`enMenace`) ; la nuit, `vulnerabilite` note chaque personne (0 si à l'abri,
+à moins de 4 tuiles d'un feu allumé, à deux autres personnes près, ou enclose ; sinon 1 + 3
+pour un enfant + 2 pour l'isolé + 1 endormi + 1 blessé + proximité) et la meute suit la mieux
+notée (`proieHumaine`) en évitant les feux ; quiconque est éveillé et la voit donne l'alarme
+(`drapeaux.alerteJusqua` à 12 tuiles). `menacePercue` alimente la perception légère : l'urgence
+du cerveau devient `defendre` (adulte armé, cible à 12 tuiles) ou `fuir` (abri, feu, adulte le
+plus proche). Au contact (`proieAuContact`), `combattre` (`agents/combat.ts`) résout six rounds
+au plus et un seul événement `combat` est émis ; l'aube ou le combat referme la menace et ouvre
+un répit de deux jours. `enclos` (fouille à six tuiles sans franchir un bâtiment terminé) sert
+à la vulnérabilité, aux leçons (« murs contre les loups » si le défunt n'était pas enclos,
+sinon « veilleur de nuit ») et à `tuileEnceinteManquante`, qui fait bâtir l'anneau de
+palissade à trois tuiles de l'abri familial quand la leçon est sue. Le cerveau propose
+`veiller` la nuit (leçon sue, arme, feu connu, personne d'autre ne veille).
+
 ### 4.3 Temps, saisons, météo
 
 - Horloge : tick → minute, heure, jour, saison, année. **[DÉCISION]** 30 jours par saison,

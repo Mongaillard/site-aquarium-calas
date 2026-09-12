@@ -86,6 +86,7 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     cheveux: p.identite.apparence.cheveux,
     blesse: p.corps.etat.blessures.length > 0,
     epuise: estEpuise(p),
+    alerte: p.drapeaux.alerteJusqua > sim.tick,
   };
 }
 
@@ -207,6 +208,7 @@ export function etatTroupeaux(sim: Simulation): MessageEtat["troupeaux"] {
       taille: t.taille,
       etat: t.etat,
       predateur: PROFILS[t.espece].predateur,
+      menace: t.enMenace || t.proieHumaine !== null,
     });
   }
   return resultat;
@@ -246,6 +248,7 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     morceaux: sim.grille.nombreMorceaux,
     savoirs: savoirsDuVillage(sim),
     faune: recensement(sim),
+    attaques: sim.danger.attaques,
     chasses: {
       reussies: sim.journal.parType("chasse").filter((e) => e.details.reussie === true).length,
       ratees: sim.journal.parType("chasse").filter((e) => e.details.reussie !== true).length,
@@ -419,6 +422,12 @@ export function pensee(sim: Simulation, p: Personnage): string {
       return p.corps.etat.blessures.length > 0
         ? "Je dois me ménager, le temps que ça guérisse."
         : "Je n'en peux plus, un peu de repos.";
+    case "fuir":
+      return "Des loups ! Vite, à l'abri.";
+    case "defendre":
+      return `Je ne laisserai pas les loups approcher ${prenom(i.cible)}.`;
+    case "veiller":
+      return "Je veille au feu cette nuit ; qu'ils viennent.";
   }
 }
 

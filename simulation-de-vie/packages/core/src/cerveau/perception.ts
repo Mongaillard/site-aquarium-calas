@@ -79,6 +79,8 @@ export interface PersonneVisible {
   readonly estMonPartenaire: boolean;
   /** Est en train de chasser (pour se joindre à la battue). */
   readonly chasse: boolean;
+  /** Veille la nuit près du feu. */
+  readonly veille: boolean;
 }
 
 export interface ProjetPercu {
@@ -97,9 +99,19 @@ export interface PerceptionLegere {
     readonly savoirs: ReadonlySet<Savoir>;
     /** Je saigne et j'ai un bandage sur moi : on s'en occupe tout de suite. */
     readonly saigneAvecBandage?: boolean;
+    /** Adulte armé (lance, arc, hache) : peut défendre. */
+    readonly arme?: boolean;
+    readonly enfant?: boolean;
   };
   readonly abriDisponible: boolean;
   readonly feuConnu: boolean;
+  /** Danger : l'alarme a été donnée, ou une meute lancée sur quelqu'un est en vue. */
+  readonly menace?: {
+    readonly distance: number;
+    /** La personne que la meute vise, si elle est à moins de douze tuiles. */
+    readonly cible: string | null;
+    readonly cibleEstMonEnfant: boolean;
+  } | null;
 }
 
 /** Y a-t-il un feu de camp allumé quelque part dans le monde ? */
@@ -111,15 +123,55 @@ export function feuConnu(monde: Monde): boolean {
 }
 
 export function percevoirLeger(monde: Monde, p: Personnage): PerceptionLegere {
+  const inv = p.corps.inventaire;
   return {
     moi: {
       besoins: p.besoins,
-      nourritureEnPoche: quantiteNourriture(p.corps.inventaire) > 0,
+      nourritureEnPoche: quantiteNourriture(inv) > 0,
       savoirs: savoirsConnus(p),
-      saigneAvecBandage: saigne(p) && possede(p.corps.inventaire, "bandage"),
+      saigneAvecBandage: saigne(p) && possede(inv, "bandage"),
+      arme:
+        p.corps.stade !== "enfant" &&
+        (possede(inv, "lance") || possede(inv, "arc") || possede(inv, "hache_pierre")),
+      enfant: p.corps.stade === "enfant",
     },
     abriDisponible: abriDisponible(monde, p) !== null,
     feuConnu: feuConnu(monde),
+    menace: menacePercue(monde, p),
+  };
+}
+
+/** Une meute lancée sur quelqu'un, en vue ou signalée par l'alarme. */
+export function menacePercue(
+  monde: Monde,
+  p: Personnage,
+): NonNullable<PerceptionLegere["menace"]> | null {
+  const tick = monde.horloge.tick;
+  const alerte = p.drapeaux.alerteJusqua > tick;
+  const rayon = rayonVision(monde, monde.horloge.moment());
+  let meilleure: { distance: number; proie: string | null } | null = null;
+  for (const t of monde.troupeaux.values()) {
+    if (!PROFILS[t.espece].predateur || t.taille <= 0 || t.proieHumaine === null) continue;
+    const d = Grille.distance(t.position, p.corps.position);
+    if (d > (alerte ? 24 : rayon)) continue;
+    if (meilleure === null || d < meilleure.distance)
+      meilleure = { distance: d, proie: t.proieHumaine };
+  }
+  if (meilleure === null)
+    return alerte ? { distance: 24, cible: null, cibleEstMonEnfant: false } : null;
+  const idProie = meilleure.proie;
+  const proie = idProie === null ? undefined : monde.personnages.find((x) => x.id === idProie);
+  const cibleProche =
+    proie !== undefined &&
+    proie.vivant &&
+    Grille.distance(proie.corps.position, p.corps.position) <= 12
+      ? proie
+      : null;
+  return {
+    distance: meilleure.distance,
+    cible: cibleProche?.id ?? null,
+    cibleEstMonEnfant:
+      cibleProche !== null && (cibleProche.identite.parents?.includes(p.id) ?? false),
   };
 }
 
@@ -329,6 +381,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
         chasse:
           autre.actionEnCours?.type === "chasser" ||
           (autre.intention?.type === "recolter" && autre.intention.ressource === "gibier"),
+        veille: autre.actionEnCours?.type === "veiller",
       });
     }
   }

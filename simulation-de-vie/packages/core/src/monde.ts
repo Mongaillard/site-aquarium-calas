@@ -7,6 +7,7 @@ import type { SimConfig } from "./config.js";
 import type { Evenement, TypeEvenement } from "./evenements/journal.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
 import { PLANS_BATIMENT } from "./monde/batiments.js";
+import { INFO_BIOME } from "./monde/biomes.js";
 import { Grille } from "./monde/grille.js";
 import { SEUIL_SAVOIR } from "./savoirs/catalogue.js";
 import type { Position } from "./monde/grille.js";
@@ -198,7 +199,49 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
     acces.some((b) => b.stock !== null && (b.stock.ressources.poisson ?? 0) >= 15)
   )
     return "fumoir";
+  // Des murs contre les loups : une enceinte de pieux autour de l'abri familial.
+  if (
+    (p.savoirs.get("murs_contre_les_loups")?.force ?? 0) >= SEUIL_SAVOIR &&
+    tuileEnceinteManquante(monde, p) !== null
+  )
+    return "palissade";
   return null;
+}
+
+/** Rayon de l'enceinte de palissade autour de l'abri familial. */
+export const RAYON_ENCEINTE = 3;
+
+/**
+ * Prochaine tuile de l'enceinte familiale qui manque encore : le carré de rayon
+ * 3 autour du premier abri de la famille, sauf les tuiles déjà bâties et celles
+ * que l'eau ou la montagne ferment d'elles-mêmes.
+ */
+export function tuileEnceinteManquante(monde: Monde, p: Personnage): Position | null {
+  // Le plus ancien abri de la famille (une seule enceinte par famille, quel que soit qui bâtit).
+  const abri = batimentsAccessibles(monde, p)
+    .filter((b) => b.etat === "termine" && PLANS_BATIMENT[b.type].abri)
+    .sort((a, b) => a.id.localeCompare(b.id))[0];
+  if (abri === undefined) return null;
+  const c = abri.position;
+  let meilleure: Position | null = null;
+  let distance = Infinity;
+  for (let dy = -RAYON_ENCEINTE; dy <= RAYON_ENCEINTE; dy++) {
+    for (let dx = -RAYON_ENCEINTE; dx <= RAYON_ENCEINTE; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== RAYON_ENCEINTE) continue;
+      const x = c.x + dx;
+      const y = c.y + dy;
+      const t = monde.grille.tuileOuNull(x, y);
+      if (t === null || !INFO_BIOME[t.biome].praticable) continue; // l'eau et la montagne ferment
+      if (t.batiment !== null) continue; // déjà bâti (palissade ou autre)
+      if (!INFO_BIOME[t.biome].constructible) continue;
+      const d = Grille.distance(p.corps.position, { x, y });
+      if (d < distance) {
+        distance = d;
+        meilleure = { x, y };
+      }
+    }
+  }
+  return meilleure;
 }
 
 /** Chantier de ce type appartenant à la famille, s'il en existe un. */
