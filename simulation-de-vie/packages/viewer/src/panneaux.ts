@@ -114,7 +114,7 @@ export class Panneaux {
       .map(([n, c]) => `<span class="pastille" style="background:${c}"></span>${e(n)}`)
       .join(" ");
     $("legende").innerHTML =
-      `${biomes}<br>${ressources}<br>personnages : vêtement = famille, contour = moral · huttes, maisons, entrepôts, feux · pointillé = chantier · clic : inspecter`;
+      `${biomes}<br>${ressources}<br>personnages : vêtement = famille, contour = moral · huttes, maisons, entrepôts, feux · pointillé = chantier · clic : inspecter · <label><input type="checkbox" id="brouillard-case" checked /> brouillard d'exploration (b)</label>`;
   }
 
   /** Met à jour les panneaux visibles ; `force` ignore le cache de version. */
@@ -443,7 +443,7 @@ export class Panneaux {
         ${tuile(s.vivants, "vivants")}${tuile(s.enfants, "enfants")}${tuile(s.population, "population totale")}${tuile(s.morts, "morts")}
         ${tuile(s.naissances, "naissances")}${tuile(s.unions, "unions")}${tuile(s.generations, "générations")}${tuile(s.dialogues, "dialogues")}
         ${tuile(s.batiments, "bâtiments")}${tuile(s.chantiers, "chantiers")}${tuile(s.evenements, "événements")}${tuile(s.tick, "ticks")}
-        ${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}
+        ${tuile(`${String(Math.round((100 * s.tuilesDecouvertes) / Math.max(1, s.tuiles)))} %`, "monde découvert")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}
       </div>
       <h3>Bâtiments</h3><div class="puces">${batiments}</div>
       <h3>Stocks</h3><div class="puces">${stocks}</div>

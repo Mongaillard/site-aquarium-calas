@@ -118,6 +118,9 @@ export interface Statistiques {
   readonly appelsLLM: number;
   readonly coutLLM: number;
   readonly evenements: number;
+  /** Tuiles déjà vues par la colonie, et taille du monde. */
+  readonly tuilesDecouvertes: number;
+  readonly tuiles: number;
 }
 
 export interface MessageEtat {
@@ -133,6 +136,10 @@ export interface MessageEtat {
   readonly gisements: readonly GisementEtat[];
   readonly evenements: readonly EvenementEtat[];
   readonly stats: Statistiques;
+  /** Tuiles nouvellement découvertes (indices y × largeur + x) ; toutes au premier envoi. */
+  readonly decouvertes: readonly number[];
+  /** Rayon de vision courant des personnages, en tuiles (jour / nuit, météo). */
+  readonly rayonVision: number;
 }
 
 export interface RelationFiche {

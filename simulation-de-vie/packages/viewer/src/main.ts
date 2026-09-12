@@ -3,7 +3,7 @@ import "./style.css";
 import type { Commande, MessageServeur } from "@sdv/protocole";
 import { VITESSES } from "@sdv/protocole";
 import type { Camera } from "./camera.js";
-import { ajuster, centrerSur, deplacer, zoomer } from "./camera.js";
+import { ajuster, cadrer, centrerSur, deplacer, zoomer } from "./camera.js";
 import { Magasin } from "./etat.js";
 import { LiaisonLocale } from "./local.js";
 import { Panneaux } from "./panneaux.js";
@@ -32,7 +32,8 @@ let survolBatiment: string | null = null;
 const parametres = new URLSearchParams(window.location.search);
 const modeLocal = import.meta.env.VITE_MODE_LOCAL === "1" || parametres.has("local");
 const graineInitiale = parametres.get("seed") ?? "42";
-const joursAvance = Number.parseInt(parametres.get("jours") ?? "20", 10);
+// Quelques jours d'avance seulement : on assiste ainsi à l'exploration du monde.
+const joursAvance = Number.parseInt(parametres.get("jours") ?? "5", 10);
 
 let derniereDemandeFiche = 0;
 const recevoir = (m: MessageServeur): void => {
@@ -279,6 +280,18 @@ element("btn-legende", HTMLButtonElement).addEventListener("click", () => {
   legende.classList.toggle("ouverte");
 });
 
+// Brouillard d'exploration : case dans la légende, touche b.
+function basculerBrouillard(valeur = !magasin.brouillard): void {
+  magasin.brouillard = valeur;
+  const caseBrouillard = legende.querySelector<HTMLInputElement>("#brouillard-case");
+  if (caseBrouillard) caseBrouillard.checked = valeur;
+}
+legende.addEventListener("change", (ev) => {
+  const cible = ev.target;
+  if (cible instanceof HTMLInputElement && cible.id === "brouillard-case")
+    basculerBrouillard(cible.checked);
+});
+
 window.addEventListener("keydown", (ev) => {
   const cible = ev.target as HTMLElement | null;
   if (cible?.tagName === "INPUT" || cible?.tagName === "SELECT") return;
@@ -318,6 +331,9 @@ window.addEventListener("keydown", (ev) => {
     case "f":
       camAjustee = false;
       break;
+    case "b":
+      basculerBrouillard();
+      break;
   }
 });
 
@@ -326,8 +342,11 @@ function boucle(maintenant: number): void {
   const init = magasin.init;
   if (init !== null && !camAjustee) {
     cam = ajuster(init.largeur, init.hauteur, canvas.width, canvas.height);
-    // Sur un écran étroit, le monde entier serait illisible : on cadre le village.
     const etat = magasin.etat;
+    // Avec le brouillard, on cadre ce que la colonie connaît plutôt que tout le monde.
+    const zone = magasin.brouillard ? magasin.zoneDecouverte() : null;
+    if (zone !== null) cam = cadrer(zone, canvas.width, canvas.height, 20);
+    // Sur un écran étroit, le monde entier serait illisible : on cadre le village.
     if (etat !== null && canvas.width < 900 * (window.devicePixelRatio || 1)) {
       const vivants = etat.personnages.filter((p) => p.vivant);
       if (vivants.length > 0) {

@@ -13,6 +13,7 @@ import {
   materiauxManquants,
   niveau,
   partenaireDe,
+  rayonVision,
 } from "@sdv/core";
 import type { Evenement, Personnage, Simulation, Intention } from "@sdv/core";
 import type {
@@ -97,9 +98,27 @@ export function etatBatiments(sim: Simulation): BatimentEtat[] {
   }));
 }
 
-/** Suivi des gisements envoyés à un client, pour n'émettre que les changements. */
-export class SuiviGisements {
+/** Suivi de ce qu'un client a déjà reçu (gisements, découvertes), pour n'émettre que les changements. */
+export class SuiviClient {
   private readonly derniers = new Map<string, number>();
+  private decouvertesEnvoyees: Uint8Array | null = null;
+
+  /** Tuiles découvertes depuis le dernier appel (toutes au premier appel). */
+  nouvellesDecouvertes(sim: Simulation): number[] {
+    const source = sim.grille.tuilesDecouvertes();
+    if (this.decouvertesEnvoyees?.length !== source.length) {
+      this.decouvertesEnvoyees = new Uint8Array(source.length);
+    }
+    const envoyees = this.decouvertesEnvoyees;
+    const resultat: number[] = [];
+    for (let i = 0; i < source.length; i++) {
+      if (source[i] === 1 && envoyees[i] !== 1) {
+        envoyees[i] = 1;
+        resultat.push(i);
+      }
+    }
+    return resultat;
+  }
 
   /** Gisements changés depuis le dernier appel (tous au premier appel). */
   differentiel(sim: Simulation): GisementEtat[] {
@@ -183,6 +202,8 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     appelsLLM: 0,
     coutLLM: 0,
     evenements: s.evenements,
+    tuilesDecouvertes: sim.grille.nombreDecouvertes,
+    tuiles: sim.grille.largeur * sim.grille.hauteur,
   };
 }
 
@@ -200,7 +221,7 @@ export function evenementEtat(e: Evenement): EvenementEtat {
 export interface ContexteEtat {
   readonly ticksParSeconde: number;
   readonly pause: boolean;
-  readonly suivi: SuiviGisements;
+  readonly suivi: SuiviClient;
   readonly bilan: BilanSaisons;
   readonly indexJournal: number;
 }
@@ -218,6 +239,8 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     gisements: ctx.suivi.differentiel(sim),
     evenements: sim.journal.tous().slice(ctx.indexJournal).map(evenementEtat),
     stats: statistiques(sim, ctx.bilan),
+    decouvertes: ctx.suivi.nouvellesDecouvertes(sim),
+    rayonVision: rayonVision(sim, sim.horloge.moment()),
   };
 }
 

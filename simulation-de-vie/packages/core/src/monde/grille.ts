@@ -34,6 +34,9 @@ const VOISINAGE_8: readonly (readonly [number, number])[] = [
 
 export class Grille {
   private readonly tuiles: Tuile[];
+  /** Tuiles déjà vues par au moins un personnage (1 = découverte), indexées y × largeur + x. */
+  private readonly decouvertes: Uint8Array;
+  private nbDecouvertes = 0;
 
   constructor(
     readonly largeur: number,
@@ -44,6 +47,30 @@ export class Grille {
       throw new RangeError("Grille : nombre de tuiles incohérent avec les dimensions");
     }
     this.tuiles = tuiles;
+    this.decouvertes = new Uint8Array(largeur * hauteur);
+  }
+
+  /** Marque la tuile comme découverte par la colonie ; vrai si elle ne l'était pas encore. */
+  decouvrir(x: number, y: number): boolean {
+    if (!this.contient(x, y)) return false;
+    const i = y * this.largeur + x;
+    if (this.decouvertes[i] === 1) return false;
+    this.decouvertes[i] = 1;
+    this.nbDecouvertes += 1;
+    return true;
+  }
+
+  estDecouverte(x: number, y: number): boolean {
+    return this.contient(x, y) && this.decouvertes[y * this.largeur + x] === 1;
+  }
+
+  get nombreDecouvertes(): number {
+    return this.nbDecouvertes;
+  }
+
+  /** Carte des découvertes (lecture seule), indexée y × largeur + x. */
+  tuilesDecouvertes(): Readonly<Uint8Array> {
+    return this.decouvertes;
   }
 
   contient(x: number, y: number): boolean {

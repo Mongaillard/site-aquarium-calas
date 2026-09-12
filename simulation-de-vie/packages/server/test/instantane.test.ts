@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "@sdv/core";
 import {
   BilanSaisons,
-  SuiviGisements,
+  SuiviClient,
   messageEtat,
   messageFiche,
   messageInit,
@@ -29,7 +29,7 @@ describe("instantanés", () => {
 
   it("l'état porte les personnages, les bâtiments, les stats et les événements depuis l'index", () => {
     const s = sim();
-    const suivi = new SuiviGisements();
+    const suivi = new SuiviClient();
     const bilan = new BilanSaisons();
     const e1 = messageEtat(s, { ticksParSeconde: 4, pause: false, suivi, bilan, indexJournal: 0 });
     expect(e1.tick).toBe(300);
@@ -38,6 +38,11 @@ describe("instantanés", () => {
     expect(e1.evenements.length).toBe(s.journal.taille);
     expect(e1.gisements.length).toBeGreaterThan(50); // complet au premier envoi
     expect(e1.stats.vivants).toBe(12);
+    expect(e1.rayonVision).toBeGreaterThan(0);
+    expect(e1.decouvertes.length).toBe(s.grille.nombreDecouvertes); // complet au premier envoi
+    expect(e1.decouvertes.length).toBeGreaterThan(50);
+    expect(e1.stats.tuilesDecouvertes).toBe(s.grille.nombreDecouvertes);
+    expect(e1.stats.tuiles).toBe(48 * 32);
     const e2 = messageEtat(s, {
       ticksParSeconde: 4,
       pause: false,
@@ -47,6 +52,7 @@ describe("instantanés", () => {
     });
     expect(e2.evenements).toHaveLength(0);
     expect(e2.gisements).toHaveLength(0); // rien n'a changé
+    expect(e2.decouvertes).toHaveLength(0);
     s.avancer(144);
     const e3 = messageEtat(s, {
       ticksParSeconde: 4,
@@ -57,11 +63,12 @@ describe("instantanés", () => {
     });
     expect(e3.evenements).toHaveLength(5);
     expect(e3.gisements.length).toBeGreaterThan(0); // récoltes et repousse
+    expect(e3.decouvertes.length + e1.decouvertes.length).toBe(s.grille.nombreDecouvertes);
   });
 
   it("le différentiel signale les gisements disparus", () => {
     const s = sim();
-    const suivi = new SuiviGisements();
+    const suivi = new SuiviClient();
     suivi.differentiel(s);
     const tuile = [...s.grille.toutes()].find((t) => t.gisement !== null);
     if (!tuile) throw new Error("pas de gisement");

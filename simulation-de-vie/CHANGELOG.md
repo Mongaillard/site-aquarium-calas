@@ -2,6 +2,23 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M6 ter – Brouillard d'exploration (2026-09-12)
+
+- Moteur : la grille retient les tuiles déjà vues par au moins un personnage (`decouvrir`,
+  `estDecouverte`, `nombreDecouvertes`) ; `observer` les marque à chaque tick et le voisinage
+  de départ est connu dès la création du monde.
+- Protocole : l'état porte les tuiles nouvellement découvertes (différentiel par client, complet
+  au premier envoi) et le rayon de vision courant ; les statistiques comptent la part du monde
+  découverte.
+- Viewer : brouillard d'exploration dessiné sur la carte. L'inconnu reste noir, ce qui a déjà
+  été vu mais n'est plus sous les yeux est voilé, un halo de vision entoure chaque personnage
+  (plus étroit la nuit et par mauvais temps). Bords adoucis, calque reconstruit seulement quand
+  une tuile nouvelle apparaît. Touche `b` ou case dans la légende pour l'ôter ; tuile « monde
+  découvert » dans les Statistiques ; la caméra cadre d'abord la zone connue. Le mode local
+  démarre désormais avec 5 jours d'avance (au lieu de 20) pour assister à l'exploration.
+- Tests : 168 au total (+4) : découverte côté moteur, différentiel côté serveur, magasin et
+  cadrage côté viewer.
+
 ## M6 bis – Mode local et mobile (2026-09-12)
 
 - Mode local : la simulation tourne dans la page elle-même (`LiaisonLocale`, mêmes messages

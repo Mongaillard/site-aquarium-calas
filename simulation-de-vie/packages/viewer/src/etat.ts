@@ -49,6 +49,12 @@ export class Magasin {
   selection: string | null = null;
   suivre = false;
   connecte = false;
+  /** Tuiles découvertes par la colonie (1 = vue), indexées y × largeur + x. */
+  decouvertes: Uint8Array | null = null;
+  /** Incrémenté à chaque nouvelle découverte, pour reconstruire le brouillard. */
+  versionDecouvertes = 0;
+  /** Brouillard d'exploration : l'inconnu reste noir, le déjà-vu est voilé. */
+  brouillard = true;
   /** Compteur de messages `etat` reçus (pour rafraîchir les panneaux à cadence réduite). */
   version = 0;
 
@@ -71,13 +77,38 @@ export class Magasin {
     this.selection = null;
     this.selectionBatiment = null;
     this.suivre = false;
+    this.decouvertes = null;
+    this.versionDecouvertes += 1;
     this.version += 1;
+  }
+
+  /** Rectangle des tuiles découvertes (inclusif), ou null si rien n'est connu. */
+  zoneDecouverte(): { x0: number; y0: number; x1: number; y1: number } | null {
+    const d = this.decouvertes;
+    const init = this.init;
+    if (d === null || init === null) return null;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -1;
+    let y1 = -1;
+    for (let i = 0; i < d.length; i++) {
+      if (d[i] !== 1) continue;
+      const x = i % init.largeur;
+      const y = (i - x) / init.largeur;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+    return x1 < 0 ? null : { x0, y0, x1, y1 };
   }
 
   recevoir(message: MessageServeur, maintenant: number): void {
     switch (message.type) {
       case "init":
         this.init = message;
+        this.decouvertes = new Uint8Array(message.largeur * message.hauteur);
+        this.versionDecouvertes += 1;
         this.gisements.clear();
         this.evenements.length = 0;
         this.conversations.length = 0;
@@ -115,6 +146,10 @@ export class Magasin {
           }
         }
         if (precedent === null) this.dernierEtatA = maintenant;
+        if (message.decouvertes.length > 0 && this.decouvertes !== null) {
+          for (const i of message.decouvertes) this.decouvertes[i] = 1;
+          this.versionDecouvertes += 1;
+        }
         for (const [x, y, type, quantite, outil] of message.gisements) {
           const cle = `${x},${y}`;
           if (quantite < 0) this.gisements.delete(cle);

@@ -16,19 +16,35 @@ export function ajuster(
   largeurEcran: number,
   hauteurEcran: number,
 ): Camera {
+  return cadrer(
+    { x0: 0, y0: 0, x1: largeurMonde - 1, y1: hauteurMonde - 1 },
+    largeurEcran,
+    hauteurEcran,
+  );
+}
+
+/** Cadre un rectangle de tuiles (bornes incluses) dans l'écran, sans zoomer au-delà de `echelleMax`. */
+export function cadrer(
+  zone: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number },
+  largeurEcran: number,
+  hauteurEcran: number,
+  echelleMax = ECHELLE_MAX,
+): Camera {
   const marge = 16;
+  const largeur = zone.x1 - zone.x0 + 1;
+  const hauteur = zone.y1 - zone.y0 + 1;
   const echelle = Math.max(
     ECHELLE_MIN,
     Math.min(
-      ECHELLE_MAX,
-      (largeurEcran - 2 * marge) / largeurMonde,
-      (hauteurEcran - 2 * marge) / hauteurMonde,
+      echelleMax,
+      (largeurEcran - 2 * marge) / largeur,
+      (hauteurEcran - 2 * marge) / hauteur,
     ),
   );
   return {
     echelle,
-    dx: (largeurEcran - largeurMonde * echelle) / 2,
-    dy: (hauteurEcran - hauteurMonde * echelle) / 2,
+    dx: (largeurEcran - largeur * echelle) / 2 - zone.x0 * echelle,
+    dy: (hauteurEcran - hauteur * echelle) / 2 - zone.y0 * echelle,
   };
 }
 

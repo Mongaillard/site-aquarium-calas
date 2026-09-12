@@ -174,6 +174,7 @@ export function observer(monde: Monde, p: Personnage, rayon: number): void {
     for (let dx = -rayon; dx <= rayon; dx++) {
       const t = monde.grille.tuileOuNull(x + dx, y + dy);
       if (t === null) continue;
+      monde.grille.decouvrir(t.x, t.y);
       const cle = cleLieu(t.x, t.y);
       if (t.gisement) {
         const connu = p.connaissance.get(cle);

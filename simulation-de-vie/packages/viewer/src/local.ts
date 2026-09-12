@@ -8,7 +8,7 @@ import type { SimConfigPartielle } from "@sdv/core";
 import type { Commande, MessageServeur } from "@sdv/protocole";
 import {
   BilanSaisons,
-  SuiviGisements,
+  SuiviClient,
   messageEtat,
   messageFiche,
   messageInit,
@@ -25,7 +25,7 @@ export interface OptionsLocales {
 
 export class LiaisonLocale implements Liaison {
   private sim: Simulation | null = null;
-  private readonly suivi = new SuiviGisements();
+  private readonly suivi = new SuiviClient();
   private readonly bilan = new BilanSaisons();
   private indexJournal = 0;
   private ficheId: string | null = null;

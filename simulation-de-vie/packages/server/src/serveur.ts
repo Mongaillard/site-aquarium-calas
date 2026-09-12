@@ -11,13 +11,7 @@ import type { RawData, WebSocket } from "ws";
 import type { Simulation } from "@sdv/core";
 import { analyserCommande } from "@sdv/protocole";
 import type { Commande, MessageServeur } from "@sdv/protocole";
-import {
-  BilanSaisons,
-  SuiviGisements,
-  messageEtat,
-  messageFiche,
-  messageInit,
-} from "./instantane.js";
+import { BilanSaisons, SuiviClient, messageEtat, messageFiche, messageInit } from "./instantane.js";
 
 export interface OptionsServeur {
   readonly port: number;
@@ -31,7 +25,7 @@ export interface OptionsServeur {
 
 interface Client {
   readonly ws: WebSocket;
-  readonly suivi: SuiviGisements;
+  readonly suivi: SuiviClient;
   indexJournal: number;
   ficheId: string | null;
 }
@@ -140,7 +134,7 @@ export class Serveur {
   }
 
   private accueillir(ws: WebSocket): void {
-    const client: Client = { ws, suivi: new SuiviGisements(), indexJournal: 0, ficheId: null };
+    const client: Client = { ws, suivi: new SuiviClient(), indexJournal: 0, ficheId: null };
     this.clients.add(client);
     ws.on("message", (donnees) => {
       const commande = analyserCommande(texteDe(donnees));

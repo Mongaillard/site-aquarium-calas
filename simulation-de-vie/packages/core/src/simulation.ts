@@ -76,6 +76,13 @@ export class Simulation implements Monde {
       if (t.gisement) this.gisements.push({ tuile: t, gisement: t.gisement });
     this.personnages = genererPopulation(rng, config, grille);
     this.compteurPersonnages = this.personnages.length;
+    // Le voisinage de départ est connu de la colonie dès le premier instant.
+    const rayonDepart = rayonVision(this, horloge.moment());
+    for (const p of this.personnages) {
+      const { x, y } = p.corps.position;
+      for (let dy = -rayonDepart; dy <= rayonDepart; dy++)
+        for (let dx = -rayonDepart; dx <= rayonDepart; dx++) grille.decouvrir(x + dx, y + dy);
+    }
     this.journal.ecouter((e) => {
       this.memoriser(e);
     });

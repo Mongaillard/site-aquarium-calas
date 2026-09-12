@@ -3,6 +3,7 @@ import { LEVER_COUCHER, opaciteNuit } from "@sdv/protocole";
 import type { BatimentEtat, PersonnageEtat } from "@sdv/protocole";
 import type { Camera } from "./camera.js";
 import { versEcran, versMonde } from "./camera.js";
+import { Brouillard } from "./brouillard.js";
 import type { Magasin } from "./etat.js";
 import { RESOLUTION_FOND, construireFond } from "./fond.js";
 import { couleurFamille, couleurMoral } from "./format.js";
@@ -11,6 +12,7 @@ import * as sprites from "./sprites.js";
 export class Rendu {
   private fond: HTMLCanvasElement | null = null;
   private fondPour: unknown = null;
+  private readonly brouillard = new Brouillard();
   private readonly ctx: CanvasRenderingContext2D;
 
   constructor(
@@ -110,6 +112,18 @@ export class Rendu {
           selection: p.id === magasin.selection,
           survol: p.id === survol,
         });
+      }
+
+      // Brouillard d'exploration : dessiné après le monde, avant les textes.
+      if (magasin.brouillard && magasin.decouvertes !== null) {
+        this.brouillard.dessiner(
+          ctx,
+          init,
+          magasin.decouvertes,
+          magasin.versionDecouvertes,
+          positions.map(({ pos }) => pos),
+          etat.rayonVision,
+        );
       }
     }
     ctx.restore();

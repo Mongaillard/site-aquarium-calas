@@ -30,6 +30,11 @@ Personnage (pensée, besoins, famille, relations, souvenirs), Journal, Conversat
 Statistiques, Population. Cliquez sur un personnage ou un bâtiment pour l'inspecter, appuyez
 sur `s` pour que la caméra suive le personnage sélectionné.
 
+Un brouillard d'exploration couvre ce que la colonie n'a jamais vu : au départ, seul un halo
+autour de chaque personnage est visible, et la carte se dévoile au fil des explorations. La
+touche `b` (ou la case de la légende) l'enlève ; l'onglet Statistiques indique la part du monde
+découverte.
+
 Pour développer le viewer avec rechargement à chaud : lancez le serveur (`pnpm --filter
 @sdv/server start -- --seed 42`) puis `pnpm viewer:dev` (http://localhost:5173).
 
