@@ -399,6 +399,8 @@ export interface FaveurEtat {
   readonly prieres: number;
   readonly offrandes: number;
   readonly exaucees: number;
+  /** Providence : le ciel répond de lui-même aux prières, avec la faveur disponible. */
+  readonly providence: boolean;
 }
 
 /** Contexte d'une demande de conseil, construit par le moteur (jamais par la page). */
@@ -674,7 +676,9 @@ export type Commande =
       readonly ambition?: { readonly but: string; readonly jours: number };
     }
   /** L'observateur demande qu'un personnage pose sa question à Claude. */
-  | { readonly type: "demander_conseil"; readonly id: string };
+  | { readonly type: "demander_conseil"; readonly id: string }
+  /** Providence : répondre automatiquement aux prières (ou cesser). */
+  | { readonly type: "providence"; readonly actif: boolean };
 
 /** Vitesses proposées par l'interface (ticks de jeu par seconde réelle). */
 export const VITESSES: readonly number[] = [1, 4, 16, 64, 128, 256];
@@ -704,6 +708,7 @@ export function analyserCommande(texte: string): Commande | null {
     choix?: unknown;
     pensee?: unknown;
     ambition?: unknown;
+    actif?: unknown;
   };
   switch (c.type) {
     case "pause":
@@ -779,6 +784,8 @@ export function analyserCommande(texte: string): Commande | null {
       return typeof c.id === "string" && c.id.length > 0 && c.id.length < 64
         ? { type: "demander_conseil", id: c.id }
         : null;
+    case "providence":
+      return typeof c.actif === "boolean" ? { type: "providence", actif: c.actif } : null;
     default:
       return null;
   }

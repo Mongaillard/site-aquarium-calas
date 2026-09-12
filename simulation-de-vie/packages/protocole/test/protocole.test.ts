@@ -79,6 +79,11 @@ describe("protocole", () => {
       id: "p-0001",
     });
     expect(analyserCommande('{"type":"demander_conseil"}')).toBeNull();
+    expect(analyserCommande('{"type":"providence","actif":true}')).toEqual({
+      type: "providence",
+      actif: true,
+    });
+    expect(analyserCommande('{"type":"providence","actif":"oui"}')).toBeNull();
   });
 
   it("la teinte de famille est stable et dans [0, 360)", () => {

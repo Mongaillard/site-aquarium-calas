@@ -70,6 +70,7 @@ function etat(decouvertes: number[]): MessageEtat {
       prieres: 0,
       offrandes: 0,
       exaucees: 0,
+      providence: false,
     },
     questions: [],
     prieres: [],

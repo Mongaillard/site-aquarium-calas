@@ -74,6 +74,8 @@ export interface EtatFaveur {
   prieres: number;
   offrandes: number;
   exaucees: number;
+  /** Providence : le ciel répond de lui-même aux prières. */
+  providence: boolean;
 }
 
 export function etatFaveurInitial(): EtatFaveur {
@@ -86,7 +88,42 @@ export function etatFaveurInitial(): EtatFaveur {
     prieres: 0,
     offrandes: 0,
     exaucees: 0,
+    providence: false,
   };
+}
+
+/**
+ * Providence : pour chaque prière en attente, le premier pouvoir qui l'exauce,
+ * payable et rechargé, est exercé sur la personne (ou sa tuile). Une réponse
+ * par prière ; les épreuves ne sont jamais des réponses.
+ */
+export function providence(monde: MondeDivin, etat: EtatFaveur): CommandePouvoir[] {
+  if (!etat.providence) return [];
+  const T = monde.horloge.ticksParJour;
+  const tick = monde.horloge.tick;
+  const exercees: CommandePouvoir[] = [];
+  for (const p of monde.personnages) {
+    const priere = p.priere;
+    if (!p.vivant || priere === null || priere.exaucee) continue;
+    if (tick - priere.tick > JOURS_PRIERE * T) continue;
+    for (const pouvoir of POUVOIRS_EXAUCANT[priere.sujet]) {
+      const fiche = FICHES_POUVOIR[pouvoir];
+      if (!fiche.bienfait || etat.valeur < fiche.cout) continue;
+      if ((etat.recharges.get(pouvoir) ?? 0) > tick) continue;
+      const commande: CommandePouvoir = {
+        pouvoir,
+        x: p.corps.position.x,
+        y: p.corps.position.y,
+        ...(fiche.cible === "personnage" ? { cibleId: p.id } : {}),
+        auto: true,
+      };
+      if (exercer(monde, etat, commande).ok) {
+        exercees.push(commande);
+        break;
+      }
+    }
+  }
+  return exercees;
 }
 
 /** Le témoin voit-il la main du ciel, ou une chance / un malheur ? */
@@ -126,6 +163,7 @@ export function faveurEtat(etat: EtatFaveur): FaveurEtat {
     prieres: etat.prieres,
     offrandes: etat.offrandes,
     exaucees: etat.exaucees,
+    providence: etat.providence,
   };
 }
 
@@ -134,6 +172,8 @@ export interface CommandePouvoir {
   readonly x: number;
   readonly y: number;
   readonly cibleId?: string | undefined;
+  /** Exercé par la providence, pas par l'observateur. */
+  readonly auto?: boolean | undefined;
 }
 
 export type RaisonRefus =
@@ -234,31 +274,9 @@ export function exercer(
   etat.valeur -= fiche.cout;
   etat.miracles += 1;
   if (fiche.rechargeJours > 0) etat.recharges.set(commande.pouvoir, tick + fiche.rechargeJours * T);
-  const temoin = resultat.temoin;
-  let reaction: string | null = null;
-  let attribue = false;
-  if (temoin !== null) {
-    // Le témoin y voit la main du ciel selon sa foi et la réputation du dieu ; sa foi grandit.
-    attribue = attribueAuCiel(temoin.foi, fiche.bienfait, etat.reputation);
-    reaction = fiche.bienfait
-      ? attribue
-        ? `Le ciel nous a fait une grâce : ${resultat.effet}`
-        : `Une chance inespérée : ${resultat.effet}`
-      : attribue
-        ? `Le ciel nous a frappés : ${resultat.effet}`
-        : `Un malheur : ${resultat.effet}`;
-    temoin.memoire.ajouter(tick, "observation", reaction, fiche.bienfait ? 7 : 8, [], pos);
-    ajouterHumeur(temoin, "miracle", fiche.bienfait ? 8 : -12, 3 * T, tick);
-    temoin.foi = Math.min(10, temoin.foi + (fiche.bienfait ? 1 : 2));
-    temoin.dernierMiracleVu = tick;
-  }
-  if (commande.pouvoir !== "regard")
-    etat.reputation = Math.max(
-      -REPUTATION_MAX,
-      Math.min(REPUTATION_MAX, etat.reputation + (fiche.bienfait ? 1 : -2)),
-    );
   // Les prières que ce bienfait exauce (sujet correspondant, à dix tuiles ou sur la cible).
   const exauces: string[] = [];
+  const exaucesIds = new Set<string>();
   if (fiche.bienfait) {
     for (const p of monde.personnages) {
       const priere = p.priere;
@@ -280,8 +298,34 @@ export function exercer(
       );
       ajouterHumeur(p, "exaucee", 10, 5 * T, tick);
       exauces.push(p.identite.prenom);
+      exaucesIds.add(p.id);
     }
   }
+  const temoin = resultat.temoin;
+  let reaction: string | null = null;
+  let attribue = false;
+  if (temoin !== null) {
+    // Le témoin y voit la main du ciel selon sa foi et la réputation du dieu (toujours, si
+    // c'est sa propre prière qui vient d'être exaucée) ; sa foi grandit.
+    attribue =
+      exaucesIds.has(temoin.id) || attribueAuCiel(temoin.foi, fiche.bienfait, etat.reputation);
+    reaction = fiche.bienfait
+      ? attribue
+        ? `Le ciel nous a fait une grâce : ${resultat.effet}`
+        : `Une chance inespérée : ${resultat.effet}`
+      : attribue
+        ? `Le ciel nous a frappés : ${resultat.effet}`
+        : `Un malheur : ${resultat.effet}`;
+    temoin.memoire.ajouter(tick, "observation", reaction, fiche.bienfait ? 7 : 8, [], pos);
+    ajouterHumeur(temoin, "miracle", fiche.bienfait ? 8 : -12, 3 * T, tick);
+    temoin.foi = Math.min(10, temoin.foi + (fiche.bienfait ? 1 : 2));
+    temoin.dernierMiracleVu = tick;
+  }
+  if (commande.pouvoir !== "regard")
+    etat.reputation = Math.max(
+      -REPUTATION_MAX,
+      Math.min(REPUTATION_MAX, etat.reputation + (fiche.bienfait ? 1 : -2)),
+    );
   monde.emettre(
     "divin",
     temoin,
@@ -296,6 +340,7 @@ export function exercer(
       attribue,
       exauces: exauces.join(", "),
       cout: fiche.cout,
+      auto: commande.auto === true,
     },
     commande.pouvoir === "regard" ? 1 : fiche.bienfait ? 6 : 8,
     pos,
@@ -425,6 +470,7 @@ function eclaircie(monde: MondeDivin, pos: Position): ResultatPouvoir {
 
 function seve(monde: Monde, pos: Position): ResultatPouvoir {
   const n = gisementsAutour(monde, pos, FICHES_POUVOIR.seve.rayon);
+  if (n === 0) return { ok: false, raison: "sans_effet" };
   return {
     ok: true,
     effet: `${String(n)} gisement${n > 1 ? "s" : ""} regorge${n > 1 ? "nt" : ""} de nouveau`,

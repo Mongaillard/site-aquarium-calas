@@ -187,6 +187,9 @@ export class Serveur {
       case "demander_conseil":
         this.sim.demanderConseil(commande.id);
         break;
+      case "providence":
+        this.sim.definirProvidence(commande.actif);
+        break;
     }
     this.diffuser();
   }

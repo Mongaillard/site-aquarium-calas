@@ -214,6 +214,10 @@ function sauvegardeAutomatique(maintenant: number, force = false): void {
   });
 }
 
+const btnMenu = element("btn-menu", HTMLButtonElement);
+btnMenu.addEventListener("click", () => {
+  formulaireLocal.classList.toggle("ouvert");
+});
 if (modeLocal) {
   formulaireLocal.hidden = false;
   graineEntree.value = graineInitiale;
@@ -271,6 +275,8 @@ function redimensionner(): void {
   camAjustee = false;
 }
 window.addEventListener("resize", redimensionner);
+// La zone de carte change de taille sans que la fenêtre bouge (panneau replié, clavier mobile).
+if ("ResizeObserver" in window) new ResizeObserver(redimensionner).observe(zone);
 redimensionner();
 
 const dpr = (): number => window.devicePixelRatio || 1;
@@ -477,6 +483,11 @@ canvas.addEventListener("touchend", (ev) => {
 
 // Mode Dieu : barre de pouvoirs, armement, application sur la carte.
 const btnDieu = element("btn-dieu", HTMLButtonElement);
+const btnProvidence = element("btn-providence", HTMLButtonElement);
+btnProvidence.addEventListener("click", () => {
+  const actif = magasin.etat?.faveur.providence ?? false;
+  envoyer({ type: "providence", actif: !actif });
+});
 const barrePouvoirs = element("pouvoirs", HTMLDivElement);
 const palette = element("palette", HTMLDivElement);
 const aidePouvoir = element("pouvoir-aide", HTMLDivElement);
@@ -600,6 +611,7 @@ function rafraichirPouvoirs(): void {
   }
   if (magasin.pouvoirArme !== null && boutonsPouvoir.get(magasin.pouvoirArme)?.disabled === true)
     desarmer();
+  btnProvidence.setAttribute("aria-pressed", f.providence ? "true" : "false");
   reputationEl.textContent = `Réputation du ciel : ${libelleReputation(f.reputation)} · ${String(f.prieres)} prière${f.prieres > 1 ? "s" : ""}, ${String(f.exaucees)} exaucée${f.exaucees > 1 ? "s" : ""}`;
   // Les prières en attente : ce que la colonie demande au ciel, et ce qui l'exaucerait.
   const prieres = etat.prieres.slice(0, 4);

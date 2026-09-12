@@ -66,6 +66,7 @@ export class Panneaux {
       this.inter.envoyer({ type: "aube" });
     });
     const vitesses = $("vitesses");
+    const select = $("vitesse-select") as HTMLSelectElement;
     for (const v of VITESSES) {
       const b = document.createElement("button");
       b.textContent = `×${v}`;
@@ -75,11 +76,38 @@ export class Panneaux {
         this.inter.envoyer({ type: "reprendre" });
       });
       vitesses.append(b);
+      const o = document.createElement("option");
+      o.value = String(v);
+      o.textContent = `×${v}`;
+      select.append(o);
+    }
+    select.addEventListener("change", () => {
+      this.inter.envoyer({ type: "vitesse", ticksParSeconde: Number(select.value) });
+      this.inter.envoyer({ type: "reprendre" });
+    });
+    // Panneau repliable (écran étroit) : replié (onglets seuls, carte plein écran) ou déplié.
+    const panneau = $("panneau");
+    $("btn-poignee").addEventListener("click", () => {
+      panneau.classList.toggle("replie");
+      this.rafraichirPoignee();
+    });
+  }
+
+  private rafraichirPoignee(): void {
+    $("btn-poignee").textContent = $("panneau").classList.contains("replie") ? "▴" : "▾";
+  }
+
+  /** Déplie le panneau s'il était replié (une sélection sur la carte, par exemple). */
+  deplier(): void {
+    const panneau = $("panneau");
+    if (panneau.classList.contains("replie")) {
+      panneau.classList.remove("replie");
+      this.rafraichirPoignee();
     }
   }
 
   private installerOnglets(): void {
-    for (const b of $("onglets").querySelectorAll<HTMLButtonElement>("button")) {
+    for (const b of $("onglets").querySelectorAll<HTMLButtonElement>("button[data-onglet]")) {
       b.addEventListener("click", () => {
         this.afficherOnglet(b.dataset.onglet ?? "inspecteur");
       });
@@ -88,7 +116,8 @@ export class Panneaux {
 
   afficherOnglet(nom: string): void {
     this.ongletActif = nom;
-    for (const b of $("onglets").querySelectorAll<HTMLButtonElement>("button"))
+    this.deplier();
+    for (const b of $("onglets").querySelectorAll<HTMLButtonElement>("button[data-onglet]"))
       b.classList.toggle("actif", b.dataset.onglet === nom);
     for (const s of document.querySelectorAll<HTMLElement>(".onglet"))
       s.classList.toggle("actif", s.id === nom);
@@ -183,6 +212,8 @@ export class Panneaux {
         !etat.pause && Number(b.dataset.vitesse) === etat.ticksParSeconde,
       );
     }
+    const select = $("vitesse-select") as HTMLSelectElement;
+    if (select.value !== String(etat.ticksParSeconde)) select.value = String(etat.ticksParSeconde);
     const s = etat.stats;
     $("resume").textContent =
       `${s.vivants} vivants (${s.enfants} enfants) · ${s.batiments} bâtiments · ${s.naissances} naissances · ${s.deces} décès · ${s.dialogues} dialogues`;

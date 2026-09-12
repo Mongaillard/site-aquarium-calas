@@ -16,8 +16,17 @@
           <button id="btn-tick" title="Avancer d'un tick (→)">+1</button>
           <button id="btn-aube" title="Sauter à l'aube suivante (a)">aube</button>
           <span class="vitesses" id="vitesses"></span>
+          <select id="vitesse-select" class="vitesse-select" title="Vitesse"></select>
         </div>
         <div id="resume" class="resume"></div>
+        <button
+          id="btn-menu"
+          class="btn-menu"
+          type="button"
+          title="Graine, nouveau monde, sauvegardes"
+        >
+          ⋯
+        </button>
         <form id="local" class="local" hidden>
           <label for="graine-entree" class="discret">graine</label>
           <input id="graine-entree" type="text" inputmode="numeric" size="6" value="42" />
@@ -67,6 +76,15 @@
               <i id="faveur-jauge"></i><span id="faveur-num">✦ 0</span>
             </div>
             <div id="palette" class="palette"></div>
+            <button
+              id="btn-providence"
+              class="pouvoir providence"
+              type="button"
+              aria-pressed="false"
+              title="Providence : le ciel répond de lui-même aux prières, tant que la faveur le permet"
+            >
+              🙏<span class="cout">auto</span>
+            </button>
             <div class="colonne">
               <div id="pouvoir-aide" class="aide discret">
                 Faveur ✦ : +1 par jour, plus quand la colonie prospère ou prie. Choisissez un
@@ -80,6 +98,14 @@
         </div>
         <aside id="panneau">
           <nav id="onglets">
+            <button
+              id="btn-poignee"
+              class="poignee"
+              type="button"
+              title="Replier ou agrandir le panneau"
+            >
+              ▾
+            </button>
             <button data-onglet="inspecteur" class="actif">Personnage</button>
             <button data-onglet="journal">Journal</button>
             <button data-onglet="conversations">Conversations</button>

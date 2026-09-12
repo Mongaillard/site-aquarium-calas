@@ -173,6 +173,7 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
       prieres: 0,
       offrandes: 0,
       exaucees: 0,
+      providence: false,
     },
     questions: [],
     prieres: [],

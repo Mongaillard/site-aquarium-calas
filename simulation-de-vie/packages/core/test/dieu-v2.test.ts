@@ -203,6 +203,38 @@ describe("mode Dieu v2 : prières et autel", () => {
   });
 });
 
+describe("mode Dieu v2 : providence", () => {
+  it("répond de lui-même aux prières avec le premier pouvoir payable, une fois par prière", () => {
+    const sim = colonie();
+    const p = adulte(sim);
+    p.foi = 5;
+    p.besoins.faim = 30;
+    jouer(sim, p, { type: "prier" });
+    expect(p.priere?.exaucee).toBe(false);
+    sim.faveur.valeur = 40;
+    // Sans providence : rien ne se passe.
+    sim.avancer(12);
+    expect(p.priere?.exaucee).toBe(false);
+    sim.definirProvidence(true);
+    sim.avancer(6);
+    expect(p.priere?.exaucee).toBe(true);
+    const e = sim.journal.parType("divin").at(-1);
+    expect(e?.details).toMatchObject({ pouvoir: "pluie", auto: true });
+    expect(String(e?.details.exauces)).toContain(p.identite.prenom);
+    expect(sim.faveur.miracles).toBe(1);
+    // Une seule réponse par prière, et jamais sans faveur.
+    sim.avancer(12);
+    expect(sim.faveur.miracles).toBe(1);
+    sim.faveur.valeur = 0;
+    p.priere = { tick: sim.tick, sujet: "soin", autel: false, exaucee: false };
+    sim.avancer(6);
+    expect(p.priere.exaucee).toBe(false);
+    // La providence survit à une sauvegarde.
+    const copie = Simulation.restaurer(JSON.parse(JSON.stringify(sim.sauvegarder())));
+    expect(copie.faveur.providence).toBe(true);
+  });
+});
+
 describe("mode Dieu v2 : nouveaux pouvoirs", () => {
   it("le troupeau offert fait paître quatre mouflons, jamais sur l'eau ni un bâtiment", () => {
     const sim = colonie();

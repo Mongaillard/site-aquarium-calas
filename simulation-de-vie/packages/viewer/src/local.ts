@@ -124,6 +124,9 @@ export class LiaisonLocale implements Liaison {
         sim.demanderConseil(commande.id);
         this.aDiffuser = true;
         return;
+      case "providence":
+        sim.definirProvidence(commande.actif);
+        break;
     }
     if (this.minuteur !== null) this.diffuser();
   }

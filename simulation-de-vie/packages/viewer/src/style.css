@@ -401,15 +401,61 @@ table.saisons td:first-child {
   margin-left: auto;
 }
 
+.btn-menu,
+.vitesse-select,
+.poignee {
+  display: none;
+}
+.pouvoir.providence[aria-pressed="true"] {
+  background: #3b6a3f;
+  box-shadow: 0 0 0 2px #7dffa0 inset;
+}
 @media (max-width: 900px) {
   #principal {
     grid-template-columns: 1fr;
-    grid-template-rows: 52% 48%;
+    grid-template-rows: 1fr auto;
+  }
+  #principal,
+  #panneau,
+  #barre {
+    min-width: 0;
+    max-width: 100vw;
   }
   #panneau {
     border-left: none;
     border-top: 1px solid var(--bord);
+    height: 46vh;
+    transition: height 0.2s ease;
   }
+  #barre {
+    white-space: normal;
+  }
+  #barre .horloge {
+    font-size: 13px;
+  }
+  #panneau.replie {
+    height: 46px;
+    min-height: 46px;
+    overflow: hidden;
+  }
+  #panneau.replie .onglet {
+    display: none;
+  }
+  .poignee {
+    display: inline-block;
+    min-width: 36px;
+    font-size: 14px;
+  }
+  #onglets {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  #onglets button {
+    white-space: nowrap;
+    min-height: 32px;
+  }
+
   #barre .resume {
     display: none;
   }
@@ -438,9 +484,47 @@ table.saisons td:first-child {
     font-size: 15px;
   }
 }
+@media (max-width: 640px) {
+  #barre {
+    gap: 4px 6px;
+    padding: 4px 8px;
+    min-height: 0;
+  }
+  #barre button,
+  #barre select {
+    min-height: 34px;
+    padding: 4px 8px;
+  }
+  #barre .vitesses {
+    display: none;
+  }
+  .vitesse-select {
+    display: inline-block;
+  }
+  .btn-menu {
+    display: inline-block;
+    margin-left: auto;
+  }
+  #barre .local {
+    display: none;
+    flex-basis: 100%;
+  }
+  #barre .local.ouvert {
+    display: flex;
+  }
+  #barre .connexion {
+    flex-basis: 100%;
+    font-size: 11px;
+    margin: 0;
+  }
+  .btn-question {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+}
 @media (max-width: 520px) {
   #barre {
-    gap: 4px 8px;
+    gap: 4px 6px;
     padding: 4px 8px;
   }
   #barre .titre {
@@ -772,4 +856,31 @@ table.saisons td:first-child {
 .puce.blessure {
   background: #4a2323;
   color: #ffb3b3;
+}
+
+/* Écran étroit : les règles ci-dessous doivent l'emporter sur celles du mode Dieu, d'où leur place. */
+@media (max-width: 900px) {
+  .pouvoirs .colonne {
+    display: none;
+  }
+  .prieres {
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    max-width: none;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+    pointer-events: none;
+  }
+  .prieres button {
+    pointer-events: auto;
+    white-space: nowrap;
+    flex: none;
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+  .prieres button .discret {
+    display: none;
+  }
 }

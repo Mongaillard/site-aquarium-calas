@@ -2,6 +2,20 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M16 – Providence et interface mobile (2026-09-12)
+
+- **Providence** (mode automatique de réponse aux prières) : bouton « 🙏 auto » dans la barre de
+  pouvoirs, commande `providence`. Chaque heure simulée, pour chaque prière en attente, le ciel
+  exerce de lui-même le premier pouvoir qui l'exauce (bienfaits seulement), s'il est payable et
+  rechargé, sur la personne ou sa tuile ; une réponse par prière, journalisée comme un miracle
+  « Providence ». L'état survit à la sauvegarde. Déterministe : même graine, mêmes prières,
+  mêmes réponses.
+- **Mobile** (écrans jusqu'à 640 px) : barre compacte (graine, « Nouveau monde » et sauvegardes
+  derrière un bouton « ⋯ », vitesse en liste déroulante, boutons de 34 px) ; panneau du bas
+  repliable par une poignée (replié : onglets seuls et carte presque plein écran ; normal ;
+  grand), déplié automatiquement quand on touche un personnage ; prières en bandeau défilant en
+  haut de la carte ; onglets défilants. La carte occupe tout ce que le panneau lui laisse.
+
 ## M15 – Sauvegarde et reprise (2026-09-12)
 
 - **Sauvegarde complète du moteur** (`packages/core/src/sauvegarde.ts`, `Simulation.sauvegarder()`

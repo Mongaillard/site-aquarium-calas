@@ -300,6 +300,7 @@ export {
   faveurEtat,
   gagnerFaveur,
   exercer,
+  providence,
 } from "./monde/divin.js";
 export type { CommandePouvoir, EtatFaveur, ResultatPouvoir, RaisonRefus } from "./monde/divin.js";
 export {

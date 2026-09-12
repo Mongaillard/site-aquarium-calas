@@ -101,6 +101,7 @@ import {
   exercer as exercerPouvoir,
   faveurEtat,
   gagnerFaveur,
+  providence,
   saisonSansMiracle,
 } from "./monde/divin.js";
 import type { PriereEtat } from "@sdv/protocole";
@@ -200,6 +201,7 @@ interface EtatSimulation {
     readonly prieres: number;
     readonly offrandes: number;
     readonly exaucees: number;
+    readonly providence: boolean;
     readonly recharges: [Pouvoir, number][];
   };
   readonly questionEnCours: QuestionConseil | null;
@@ -265,6 +267,7 @@ export class Simulation implements Monde {
       this.faveur.prieres = etat.faveur.prieres;
       this.faveur.offrandes = etat.faveur.offrandes;
       this.faveur.exaucees = etat.faveur.exaucees;
+      this.faveur.providence = etat.faveur.providence;
       for (const [k, v] of etat.faveur.recharges) this.faveur.recharges.set(k, v);
       this.questionEnCours = etat.questionEnCours;
       this.fileConseils.push(...etat.fileConseils);
@@ -402,6 +405,11 @@ export class Simulation implements Monde {
   /** La faveur, telle que le protocole la transporte. */
   etatFaveur(): FaveurEtat {
     return faveurEtat(this.faveur);
+  }
+
+  /** Providence : le ciel répond de lui-même aux prières (commande `providence`). */
+  definirProvidence(actif: boolean): void {
+    this.faveur.providence = actif;
   }
 
   /** Fait naître un troupeau (ou une meute) : troupeau offert, loups envoyés. */
@@ -816,6 +824,7 @@ export class Simulation implements Monde {
         prieres: this.faveur.prieres,
         offrandes: this.faveur.offrandes,
         exaucees: this.faveur.exaucees,
+        providence: this.faveur.providence,
         recharges: [...this.faveur.recharges.entries()],
       },
       questionEnCours: this.questionEnCours,
@@ -1151,6 +1160,7 @@ export class Simulation implements Monde {
       this.heureDeDanger();
       heureContagion(this);
       this.heureDuBetail();
+      providence(this, this.faveur);
     }
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();

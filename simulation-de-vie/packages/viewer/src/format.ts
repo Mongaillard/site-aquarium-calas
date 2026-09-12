@@ -439,7 +439,7 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       }
     }
     case "divin":
-      return `✨ ${String(d.nom)} en (${String(d.x)}, ${String(d.y)}) : ${String(d.effet)}${d.reaction !== null && d.reaction !== undefined && qui ? ` — ${qui} : « ${String(d.reaction)} »` : ""}${typeof d.exauces === "string" && d.exauces !== "" ? ` — prière exaucée : ${d.exauces}` : ""}`;
+      return `${d.auto === true ? "🙏✨ Providence : " : "✨ "}${String(d.nom)} en (${String(d.x)}, ${String(d.y)}) : ${String(d.effet)}${d.reaction !== null && d.reaction !== undefined && qui ? ` — ${qui} : « ${String(d.reaction)} »` : ""}${typeof d.exauces === "string" && d.exauces !== "" ? ` — prière exaucée : ${d.exauces}` : ""}`;
     case "priere":
       return `🙏 ${qui} prie pour ${LIBELLES_SUJET[String(d.sujet)] ?? String(d.sujet)}${d.autel === true ? " à l'autel" : ""}${typeof d.offrande === "string" ? ` et offre ${d.offrande}` : ""}.`;
     case "conseil":

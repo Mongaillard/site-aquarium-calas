@@ -50,7 +50,8 @@ mobile) sur une tuile connue, une personne ou un bâtiment ; les personnages int
 miracle, ils n'obéissent pas. Chacun a une **foi** : qui croit prie le ciel quand ça va mal
 (les prières en attente s'affichent en mode Dieu, avec les pouvoirs qui les exaucent), une
 famille croyante bâtit un autel où laisser des offrandes, et la réputation du dieu décide si
-l'on voit sa main ou le hasard dans ce qui arrive.
+l'on voit sa main ou le hasard dans ce qui arrive. Le bouton « 🙏 auto » (providence) laisse le
+ciel répondre de lui-même aux prières tant que la faveur le permet.
 
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la
@@ -82,7 +83,8 @@ Dans ce mode la simulation tourne dans la page elle-même : la même interface, 
 messages, aucun serveur. Ajoutez `?seed=123&jours=40` à l'URL pour choisir la graine et le
 nombre de jours simulés avant l'affichage, ou changez la graine directement dans la barre
 (« Nouveau monde »). Sur un écran tactile : un doigt pour déplacer la carte, deux pour zoomer,
-toucher un personnage ou un bâtiment pour l'inspecter, bouton « ? » pour la légende. La page
+toucher un personnage ou un bâtiment pour l'inspecter, bouton « ? » pour la légende, « ⋯ » pour
+la graine et les sauvegardes, poignée « ▾ » pour replier ou agrandir le panneau du bas. La page
 servie par `pnpm serve` accepte aussi `?local` pour basculer dans ce mode.
 
 ## Structure
