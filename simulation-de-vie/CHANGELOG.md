@@ -2,6 +2,33 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M17 – Mode Dieu v3 et carte plein écran (2026-09-12)
+
+- **Épreuves lourdes** : Gel précoce (18 ✦, trois jours de neige quelle que soit la saison), Sécheresse
+  (20 ✦, dix jours de canicule et baies, fibres et poissons réduits de moitié à douze tuiles),
+  Fièvre envoyée (10 ✦, la fièvre des eaux prend une personne, une fois), Secousse (22 ✦,
+  bâtiments −50 de solidité à six tuiles, fractures pour trois personnes sur dix, sécurité −40 et
+  peur à douze tuiles). La météo imposée par un miracle est un état du monde
+  (`meteoForcee`), sauvegardé, qui remplace le tirage quotidien sans changer la suite du hasard.
+- **Épiphanie** (30 ✦, vingt jours de recharge) : la personne gagne un niveau dans sa
+  meilleure compétence, cinq jours d'humeur haute, et ceux qui sont à huit tuiles font la fête.
+- **Culte** : la foi moyenne des adultes donne un niveau de culte (personne ne prie, on prie, un
+  culte, la dévotion), recalculé chaque aube ; chaque niveau ajoute dix à la faveur maximale.
+  **Gardien de l'autel** : qui a prié cinq fois à l'autel en porte le titre.
+- **Trois leçons** : « Le ciel écoute » (deux prières exaucées ; prier vaut davantage), « Le ciel
+  frappe » (témoin d'une épreuve attribuée au ciel ; prier vaut davantage), « Ne pas attendre le
+  ciel » (trois prières restées trois jours sans réponse ; prier vaut moins). Le Songe les
+  connaît.
+- **Migration conseillée** : après cinq jours de faim ou de froid, Claude peut proposer
+  `migrer:<direction>` ; toute la famille adulte prend l'ambition, explore trois fois plus loin
+  dans cette direction, et, à seize tuiles du vieux foyer, bâtit un abri sur place ; l'ambition
+  est accomplie quand un abri neuf existe loin de l'ancien.
+- **Carte plein écran** : bouton « ⛶ » (touche `p`) ; la carte prend tout l'écran (et le vrai
+  plein écran du navigateur quand il est permis), avec des commandes flottantes : « ☰ » ouvre
+  toutes les commandes de la barre en menu, « ⏸ » et l'horloge restent visibles, « 📋 » ouvre le
+  panneau (personnage, journal, statistiques) en volet, « ✕ » ou Échap sortent. Toucher un
+  personnage ouvre le volet.
+
 ## M16 – Providence et interface mobile (2026-09-12)
 
 - **Providence** (mode automatique de réponse aux prières) : bouton « 🙏 auto » dans la barre de

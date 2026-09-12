@@ -55,6 +55,18 @@ export const LECONS = {
     morale:
       "La meute vient quand tout le monde dort : qu'un de nous veille au feu, à tour de rôle.",
   },
+  le_ciel_ecoute: {
+    titre: "Le ciel écoute",
+    morale: "Deux fois j'ai prié, deux fois le ciel a répondu : quand ça va mal, on prie.",
+  },
+  le_ciel_frappe: {
+    titre: "Le ciel frappe",
+    morale: "Le ciel peut frapper sans prévenir : mieux vaut l'avoir de son côté.",
+  },
+  ne_pas_attendre_le_ciel: {
+    titre: "Ne pas attendre le ciel",
+    morale: "Trois prières sans réponse : le ciel n'aide que ceux qui se lèvent.",
+  },
 } as const satisfies Record<string, FicheLecon>;
 export type Lecon = keyof typeof LECONS;
 

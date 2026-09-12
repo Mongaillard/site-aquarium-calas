@@ -3,6 +3,7 @@ import type { Biome } from "../src/monde/biomes.js";
 import { Grille } from "../src/monde/grille.js";
 import type { Tuile } from "../src/monde/grille.js";
 import type { Gisement } from "../src/monde/ressources.js";
+import type { Simulation } from "../src/simulation.js";
 
 export interface Surcharge {
   readonly x: number;
@@ -39,4 +40,16 @@ export function gisementBaies(quantite = 5): Gisement {
 
 export function gisementBois(quantite = 10): Gisement {
   return { type: "bois", quantite, max: quantite, tauxRegen: 0.2, outilRequis: "hache_pierre" };
+}
+
+/**
+ * Avance de `jours` aubes en rendant la main au processus de test toutes les
+ * `tranche` journées : un test long ne doit pas bloquer sa communication avec
+ * Vitest (délai d'une minute).
+ */
+export async function joursAsync(sim: Simulation, jours: number, tranche = 10): Promise<void> {
+  for (let j = 0; j < jours; j++) {
+    sim.avancerJusquaAube();
+    if (j % tranche === tranche - 1) await new Promise((r) => setTimeout(r, 0));
+  }
 }

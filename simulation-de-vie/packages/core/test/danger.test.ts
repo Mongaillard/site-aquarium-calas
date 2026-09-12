@@ -20,7 +20,7 @@ import {
 } from "../src/monde/danger.js";
 import { Grille } from "../src/monde/grille.js";
 import type { Position } from "../src/monde/grille.js";
-import { grilleUniforme } from "./utils.js";
+import { grilleUniforme, joursAsync } from "./utils.js";
 
 function meute(
   sim: Simulation,
@@ -290,9 +290,9 @@ describe("la nuit menace : combat, alarme et défenses", () => {
   it(
     "sur cent vingt jours, des menaces s'ouvrent, l'alarme est donnée et les loups sont tenus à distance",
     { timeout: 180000 },
-    () => {
+    async () => {
       const sim = Simulation.creer({ seed: 42 });
-      for (let j = 0; j < 120; j++) sim.avancerJusquaAube();
+      await joursAsync(sim, 120);
       expect(
         sim.journal.parType("menace").filter((e) => e.details.genre === "menace").length,
       ).toBeGreaterThan(1);

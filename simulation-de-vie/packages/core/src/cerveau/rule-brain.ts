@@ -629,7 +629,12 @@ export class RuleBrain implements Cerveau {
     ) {
       candidats.push({
         intention: { type: "prier" },
-        score: 0.55 + perception.moi.foi * 0.04 + (perception.autelConnu ? 0.15 : 0),
+        score:
+          0.55 +
+          perception.moi.foi * 0.04 +
+          (perception.autelConnu ? 0.15 : 0) +
+          (sait("le_ciel_ecoute") || sait("le_ciel_frappe") ? 0.2 : 0) -
+          (sait("ne_pas_attendre_le_ciel") ? 0.3 : 0),
       });
     }
 

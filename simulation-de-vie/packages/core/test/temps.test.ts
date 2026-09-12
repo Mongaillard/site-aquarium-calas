@@ -28,7 +28,7 @@ import {
 import { sourcesDegats } from "../src/agents/corps.js";
 import { REPARATIONS_MAX } from "../src/monde/recettes.js";
 import { BUCHES_PAR_JOUR_FROID, feuAAlimenter, prochainBatimentNecessaire } from "../src/monde.js";
-import { grilleUniforme } from "./utils.js";
+import { grilleUniforme, joursAsync } from "./utils.js";
 
 function mondePlat(seed: number, initiale: number, eau = false): Simulation {
   const surcharges = eau ? [{ x: 20, y: 20, biome: "eau_peu_profonde" as const }] : [];
@@ -312,9 +312,9 @@ describe("le temps compte : maladies", () => {
   it(
     "sur cent cinquante jours, la colonie tient : feux nourris, nourriture qui se gâte, malades qui guérissent",
     { timeout: 180000 },
-    () => {
+    async () => {
       const sim = Simulation.creer({ seed: 7 });
-      for (let j = 0; j < 150; j++) sim.avancerJusquaAube();
+      await joursAsync(sim, 150);
       expect(sim.vivants().length).toBeGreaterThanOrEqual(11);
       expect(sim.journal.compte("pourriture")).toBeGreaterThan(0);
       expect(sim.journal.compte("maladie")).toBeGreaterThan(0);

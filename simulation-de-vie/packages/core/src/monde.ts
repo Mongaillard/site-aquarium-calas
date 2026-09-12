@@ -199,6 +199,19 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
     (ambition.cible !== "palissade" || tuileEnceinteManquante(monde, p) !== null)
   )
     return ambition.cible as TypeBatiment;
+  // Une migration conseillée : loin du foyer qu'on quitte, il faut d'abord un abri.
+  if (
+    ambition?.issue === "en_cours" &&
+    ambition.genre === "migrer" &&
+    ambition.origine !== undefined &&
+    Grille.distance(p.corps.position, ambition.origine) >= DISTANCE_MIGRATION &&
+    !acces.some(
+      (b) =>
+        PLANS_BATIMENT[b.type].abri &&
+        Grille.distance(b.position, p.corps.position) <= DISTANCE_MIGRATION / 2,
+    )
+  )
+    return "abri";
   const famille = membresFamille(monde, p).length;
   let capacite = 0;
   for (const b of acces) capacite += PLANS_BATIMENT[b.type].capaciteDormeurs;
@@ -256,6 +269,9 @@ export function grainesAccessibles(monde: Monde, p: Personnage): number {
     if (b.etat === "termine" && b.stock !== null) n += b.stock.ressources.graines ?? 0;
   return n;
 }
+
+/** Distance au vieux foyer à partir de laquelle une migration s'installe (nouvel abri). */
+export const DISTANCE_MIGRATION = 16;
 
 /** Rayon de l'enceinte de palissade autour de l'abri familial. */
 export const RAYON_ENCEINTE = 3;

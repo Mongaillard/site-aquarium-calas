@@ -36,7 +36,7 @@ describe("sauvegarde", () => {
   it(
     "un monde restauré continue exactement comme l'original (journal identique sur 60 jours)",
     { timeout: 120_000 },
-    () => {
+    async () => {
       const sim = Simulation.creer({ seed: 11, population: { initiale: 6, familles: 2 } });
       sim.avancer(40 * 144 + 37);
       // Des miracles et une question ouverte : tout doit survivre à la sauvegarde.
@@ -73,8 +73,11 @@ describe("sauvegarde", () => {
       expect(gisements).toBeGreaterThan(50);
       // Même avenir.
       const depuis = sim.tick;
-      sim.avancer(60 * 144);
-      copie.avancer(60 * 144);
+      for (let j = 0; j < 60; j += 5) {
+        sim.avancer(5 * 144);
+        copie.avancer(5 * 144);
+        await new Promise((r) => setTimeout(r, 0));
+      }
       expect(empreinte(copie, depuis)).toBe(empreinte(sim, depuis));
       expect(copie.vivants().map((x) => [x.id, x.corps.position, x.besoins.faim])).toEqual(
         sim.vivants().map((x) => [x.id, x.corps.position, x.besoins.faim]),

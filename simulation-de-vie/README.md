@@ -51,7 +51,11 @@ miracle, ils n'obéissent pas. Chacun a une **foi** : qui croit prie le ciel qua
 (les prières en attente s'affichent en mode Dieu, avec les pouvoirs qui les exaucent), une
 famille croyante bâtit un autel où laisser des offrandes, et la réputation du dieu décide si
 l'on voit sa main ou le hasard dans ce qui arrive. Le bouton « 🙏 auto » (providence) laisse le
-ciel répondre de lui-même aux prières tant que la faveur le permet.
+ciel répondre de lui-même aux prières tant que la faveur le permet. Les épreuves lourdes (gel,
+sécheresse, fièvre, secousse) et l'Épiphanie complètent le catalogue ; la foi moyenne fait un
+culte qui relève la faveur, et trois leçons (le ciel écoute, le ciel frappe, ne pas attendre le
+ciel) se retiennent des prières. Le bouton « ⛶ » (touche `p`) met la carte en plein écran avec
+les commandes en menus flottants.
 
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la

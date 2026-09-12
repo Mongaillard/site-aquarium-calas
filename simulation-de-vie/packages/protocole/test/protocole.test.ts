@@ -36,7 +36,16 @@ describe("protocole", () => {
       analyserCommande('{"type":"pouvoir","pouvoir":"songe","x":0,"y":0,"cibleId":"p-0001"}'),
     ).toEqual({ type: "pouvoir", pouvoir: "songe", x: 0, y: 0, cibleId: "p-0001" });
     expect(analyserCommande('{"type":"pouvoir","pouvoir":"apocalypse","x":0,"y":0}')).toBeNull();
-    for (const p of ["troupeau", "idee", "loups"])
+    for (const p of [
+      "troupeau",
+      "idee",
+      "loups",
+      "gel",
+      "secheresse",
+      "fievre",
+      "secousse",
+      "epiphanie",
+    ])
       expect(analyserCommande(JSON.stringify({ type: "pouvoir", pouvoir: p, x: 0, y: 0 }))).toEqual(
         {
           type: "pouvoir",

@@ -56,9 +56,10 @@ export class Panneaux {
   }
 
   private installerControles(): void {
-    $("btn-pause").addEventListener("click", () => {
-      this.inter.envoyer({ type: this.magasin.etat?.pause ? "reprendre" : "pause" });
-    });
+    for (const id of ["btn-pause", "flot-pause"])
+      $(id).addEventListener("click", () => {
+        this.inter.envoyer({ type: this.magasin.etat?.pause ? "reprendre" : "pause" });
+      });
     $("btn-tick").addEventListener("click", () => {
       this.inter.envoyer({ type: "tick" });
     });
@@ -104,6 +105,9 @@ export class Panneaux {
       panneau.classList.remove("replie");
       this.rafraichirPoignee();
     }
+    // En plein écran, le panneau est un volet : une sélection l'ouvre.
+    if (document.getElementById("app")?.classList.contains("plein-ecran"))
+      panneau.classList.add("ouvert");
   }
 
   private installerOnglets(): void {
@@ -206,6 +210,9 @@ export class Panneaux {
     $("horloge").textContent = formaterMoment(etat.moment);
     $("meteo").textContent = LIBELLES_METEO[etat.meteo] ?? etat.meteo;
     $("btn-pause").textContent = etat.pause ? "▶" : "⏸";
+    $("flot-pause").textContent = etat.pause ? "▶" : "⏸";
+    $("flot-horloge").textContent =
+      `${formaterMoment(etat.moment)} · ${LIBELLES_METEO[etat.meteo] ?? etat.meteo} · ${etat.stats.vivants} vivants`;
     for (const b of $("vitesses").querySelectorAll<HTMLButtonElement>("button")) {
       b.classList.toggle(
         "actif",

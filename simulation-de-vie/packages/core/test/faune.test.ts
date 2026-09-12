@@ -20,7 +20,7 @@ import {
 } from "../src/monde/faune.js";
 import type { Espece, Troupeau } from "../src/monde/faune.js";
 import type { Position } from "../src/monde/grille.js";
-import { grilleUniforme } from "./utils.js";
+import { grilleUniforme, joursAsync } from "./utils.js";
 
 function seul(seed = 11): Simulation {
   return Simulation.creer({ seed, population: { initiale: 1, familles: 1 } });
@@ -301,9 +301,9 @@ describe("la faune : forêt, pêche, calendrier et démographie", () => {
   it(
     "sur cent jours, la faune vit : naissances, meutes et chasses apparaissent dans le journal",
     { timeout: 120000 },
-    () => {
+    async () => {
       const sim = Simulation.creer({ seed: 7 });
-      for (let j = 0; j < 100; j++) sim.avancerJusquaAube();
+      await joursAsync(sim, 100);
       const faune = sim.journal.parType("faune");
       expect(faune.length).toBeGreaterThan(0);
       expect(faune.some((e) => e.details.genre === "naissances")).toBe(true);

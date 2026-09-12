@@ -932,6 +932,7 @@ function tickPrier(
   }
   p.priere = { tick, sujet, autel: autel !== null, exaucee: false };
   p.dernierePriere = tick;
+  if (autel !== null) p.prieresAutel += 1;
   monde.emettre(
     "priere",
     p,

@@ -14,6 +14,7 @@ import type { Invention, Lecon } from "../savoirs/catalogue.js";
 import { besoinRessenti } from "../savoirs/inventions.js";
 import { apprendre } from "../savoirs/lecons.js";
 import {
+  DISTANCE_MIGRATION,
   batimentsAccessibles,
   estEau,
   grainesAccessibles,
@@ -190,6 +191,9 @@ export function leconsUtiles(monde: Monde, p: Personnage): { lecon: Lecon; pourq
       ok: membresFamille(monde, p).some((m) => m.corps.enceinte !== null),
       pourquoi: "une grossesse dans la famille",
     },
+    { lecon: "le_ciel_ecoute", ok: p.foi >= 5, pourquoi: "une foi déjà solide" },
+    { lecon: "le_ciel_frappe", ok: false, pourquoi: "le ciel n'a rien montré" },
+    { lecon: "ne_pas_attendre_le_ciel", ok: false, pourquoi: "rien à en dire" },
   ];
   const utiles = regles.filter((r) => r.ok && !connaitSavoir(p, r.lecon));
   const autres = regles.filter((r) => !r.ok && !connaitSavoir(p, r.lecon));
@@ -259,6 +263,26 @@ function batimentsPossibles(monde: Monde, p: Personnage): OptionConseil[] {
   return options;
 }
 
+/** Faim ou froid qui durent : à partir de ce nombre de jours, on peut conseiller de migrer. */
+export const JOURS_AVANT_MIGRATION = 5;
+export const JOURS_AMBITION_MIGRER = 10;
+
+/** Migrer : la direction la moins connue, si la misère dure. */
+function migrationPossible(monde: Monde, p: Personnage): OptionConseil[] {
+  if (p.drapeaux.joursFaim < JOURS_AVANT_MIGRATION && p.drapeaux.joursFroid < JOURS_AVANT_MIGRATION)
+    return [];
+  const dir = directionsPossibles(monde, p)[0];
+  if (dir === undefined) return [];
+  const nom = dir.id.slice("explorer:".length);
+  return [
+    {
+      id: `migrer:${nom}`,
+      libelle: `partir vivre ailleurs, ${LIBELLES_DIRECTION[nom] ?? nom}`,
+      pourquoi: "ici, la faim ou le froid durent depuis des jours",
+    },
+  ];
+}
+
 /** Directions dans lesquelles il y a encore à découvrir (au plus deux). */
 function directionsPossibles(monde: Monde, p: Personnage): OptionConseil[] {
   const pos = p.corps.position;
@@ -310,7 +334,8 @@ export function optionsConseil(monde: Monde, p: Personnage): OptionConseil[] {
       pourquoi: "une ligne de conduite",
     });
   options.push(...directionsPossibles(monde, p));
-  return options.slice(0, 9);
+  options.push(...migrationPossible(monde, p));
+  return options.slice(0, 10);
 }
 
 /** Le contexte compact d'une question, construit par le moteur. */
@@ -416,7 +441,15 @@ export function appliquerConseil(
   const [genreBrut, cible = ""] = option.id.split(":");
   const genre = genreBrut as Ambition["genre"];
   const jours =
-    choix.ambition?.jours ?? (genre === "explorer" ? JOURS_AMBITION_EXPLORER : JOURS_AMBITION);
+    choix.ambition?.jours ??
+    (genre === "explorer"
+      ? JOURS_AMBITION_EXPLORER
+      : genre === "migrer"
+        ? JOURS_AMBITION_MIGRER
+        : JOURS_AMBITION);
+  const foyer = batimentsAccessibles(monde, p).find(
+    (b) => b.etat === "termine" && PLANS_BATIMENT[b.type].abri,
+  );
   const pensee = choix.pensee.trim().slice(0, 300);
   if (p.ambition !== null && p.ambition.issue === "en_cours") p.ambition.issue = "abandonnee";
   const ambition: Ambition = {
@@ -428,6 +461,7 @@ export function appliquerConseil(
     jusqua: tick + Math.max(1, Math.min(30, jours)) * T,
     issue: "en_cours",
     lieuxAuDepart: p.connaissance.size,
+    ...(genre === "migrer" ? { origine: { ...(foyer?.position ?? p.corps.position) } } : {}),
   };
   p.ambition = ambition;
   p.drapeaux.conseilDemandeA = tick;
@@ -454,6 +488,23 @@ export function appliquerConseil(
       break;
     case "explorer":
       p.drapeaux.explorerPlusLoinJusqua = ambition.jusqua;
+      break;
+    case "migrer":
+      // Toute la famille adulte part : même ambition, même direction, même échéance.
+      p.drapeaux.explorerPlusLoinJusqua = ambition.jusqua;
+      for (const m of membresFamille(monde, p)) {
+        if (m.id === p.id || !m.vivant || m.corps.stade === "enfant") continue;
+        if (m.ambition?.issue === "en_cours") m.ambition.issue = "abandonnee";
+        m.ambition = { ...ambition, pensee: "", lieuxAuDepart: m.connaissance.size };
+        m.drapeaux.explorerPlusLoinJusqua = ambition.jusqua;
+        m.memoire.ajouter(
+          tick,
+          "reflexion",
+          `${p.identite.prenom} veut partir vivre ailleurs ; je pars avec.`,
+          6,
+          [p.id],
+        );
+      }
       break;
     case "batiment":
     case "priorite":
@@ -485,6 +536,18 @@ export function jourAmbition(monde: Monde, p: Personnage): Ambition["issue"] | n
       break;
     case "explorer":
       accompli = p.connaissance.size >= a.lieuxAuDepart + LIEUX_A_DECOUVRIR;
+      break;
+    case "migrer":
+      accompli =
+        a.origine !== undefined &&
+        batimentsAccessibles(monde, p).some(
+          (b) =>
+            b.etat === "termine" &&
+            PLANS_BATIMENT[b.type].abri &&
+            b.termineAuTick !== null &&
+            b.termineAuTick >= a.depuis &&
+            Grille.distance(b.position, a.origine ?? b.position) >= DISTANCE_MIGRATION,
+        );
       break;
     case "lecon":
     case "priorite":
@@ -543,7 +606,7 @@ export function bonusPriorite(priorite: Priorite | null, intention: Intention): 
 /** Direction d'exploration voulue par l'ambition, ou null. */
 export function directionVoulue(p: Personnage): readonly [number, number] | null {
   const a = p.ambition;
-  if (a?.issue !== "en_cours" || a.genre !== "explorer") return null;
+  if (a?.issue !== "en_cours" || (a.genre !== "explorer" && a.genre !== "migrer")) return null;
   return DIRECTIONS[a.cible] ?? null;
 }
 

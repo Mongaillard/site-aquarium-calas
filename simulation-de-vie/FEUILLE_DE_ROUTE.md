@@ -89,7 +89,7 @@ L'élevage, les champs et les métiers, en trois générations.
 
 Ce qu'on verra : des brebis derrière la palissade, des champs qui changent de couleur, « le pêcheur » sous un prénom, « elle a échangé trois poissons contre une hache » dans le Journal.
 
-### Jalon D — Le mode Dieu — livré en v1 et v2 (M13 : faveur, neuf pouvoirs, effets et gestes, demander à Claude, ambitions ; M14 : foi, prières, autel, réputation, trois pouvoirs)
+### Jalon D — Le mode Dieu — livré en v1, v2 et v3 (M13 : faveur, neuf pouvoirs, effets et gestes, demander à Claude, ambitions ; M14 : foi, prières, autel, réputation, trois pouvoirs ; M16 : providence ; M17 : épreuves lourdes, Épiphanie, culte, gardien, trois leçons, migration)
 
 L'observateur devient un personnage de l'histoire : un dieu qui aide ou éprouve, et à qui l'on
 demande conseil. Trois études (game design, interaction, boucle de conseil) ont fixé le cadre.
@@ -104,9 +104,11 @@ demande conseil. Trois études (game design, interaction, boucle de conseil) ont
   épreuves plus dures) ; Troupeau offert, Idée soufflée, Loups au bord du halo. La migration
   conseillée (déménager le foyer) est reportée en v3 : elle demande un site de construction
   loin de l'ancien foyer, que le planificateur ne sait pas encore choisir.
-- **v3** : les épreuves lourdes (gel précoce, sécheresse, fièvre envoyée, secousse), l'Épiphanie,
-  les niveaux de culte, les lieux interdits, les leçons « le ciel écoute », « le ciel frappe »,
-  « ne pas attendre le ciel ».
+- **v3 (livrée, sauf les lieux interdits)** : les épreuves lourdes (gel précoce, sécheresse,
+  fièvre envoyée, secousse), l'Épiphanie, les niveaux de culte et le gardien de l'autel, les
+  leçons « le ciel écoute », « le ciel frappe », « ne pas attendre le ciel », la migration
+  conseillée. Les lieux interdits (une tuile que le ciel déclare sacrée et que l'on contourne)
+  restent à faire.
 
 ### Jalon 13 — La société
 

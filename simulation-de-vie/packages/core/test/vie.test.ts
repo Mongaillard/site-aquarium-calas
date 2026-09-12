@@ -20,7 +20,7 @@ import { eligibles, partenaireDe, unir, veutCourtiser } from "../src/social/coup
 import { Simulation } from "../src/simulation.js";
 import { observer, percevoir } from "../src/cerveau/perception.js";
 import { RuleBrain } from "../src/cerveau/rule-brain.js";
-import { grilleUniforme } from "./utils.js";
+import { grilleUniforme, joursAsync } from "./utils.js";
 
 /** Monde 24×24 : deux familles, a (F) et b (M) de familles différentes, c (F) sœur de a. */
 function scenario() {
@@ -424,9 +424,9 @@ describe("hiver : chaleur, pêche et provisions", () => {
     expect(types).toContain(JSON.stringify({ type: "fabriquer", recette: "canne_a_peche" }));
   });
 
-  it("M4 : la colonie passe l'hiver (120 jours) avec des naissances et sans effondrement", () => {
+  it("M4 : la colonie passe l'hiver (120 jours) avec des naissances et sans effondrement", async () => {
     const sim = Simulation.creer({ seed: 42 });
-    for (let j = 0; j < 120; j++) sim.avancerJusquaAube();
+    await joursAsync(sim, 120);
     expect(sim.horloge.moment().saison).toBe("printemps");
     expect(sim.statistiques().vivants).toBeGreaterThanOrEqual(12);
     expect(sim.journal.compte("naissance")).toBeGreaterThanOrEqual(3);

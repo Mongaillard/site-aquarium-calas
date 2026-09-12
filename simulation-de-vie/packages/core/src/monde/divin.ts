@@ -16,6 +16,10 @@ import { INFO_BIOME } from "./biomes.js";
 import { estEau } from "../monde.js";
 import { prochainCrepuscule } from "./danger.js";
 import type { EtatDanger } from "./danger.js";
+import type { Rng } from "../rng.js";
+import { COMPETENCES, niveau } from "../agents/competences.js";
+import type { Competence } from "../agents/competences.js";
+import { tomberMalade } from "../agents/maladies.js";
 import { ajouterHumeur, blesser } from "../agents/corps.js";
 import { foiInitiale } from "../agents/personnage.js";
 import type { Personnage } from "../agents/personnage.js";
@@ -64,10 +68,79 @@ export const FAVEUR_OFFRANDE = 2;
 export const FAVEUR_EXAUCEMENT = 2;
 /** Taille du troupeau offert. */
 export const TAILLE_TROUPEAU_OFFERT = 4;
+/** Jours de neige d'un gel précoce, de canicule d'une sécheresse. */
+export const JOURS_GEL = 3;
+export const JOURS_SECHERESSE = 10;
+/** Faveur maximale de base, et gain par niveau de culte. */
+export const FAVEUR_MAX_PAR_CULTE = 10;
+/** Prières exaucées pour retenir « le ciel écoute » ; prières sans réponse pour « ne pas attendre le ciel ». */
+export const EXAUCEMENTS_POUR_LECON = 2;
+export const SILENCES_POUR_LECON = 3;
+/** Prières à l'autel pour mériter le titre de gardien. */
+export const PRIERES_GARDIEN = 5;
+
+/** Niveau de culte 0..3 : la foi moyenne des adultes vivants. */
+export function niveauCulte(monde: Monde): number {
+  const adultes = monde.personnages.filter((p) => p.vivant && p.corps.stade !== "enfant");
+  if (adultes.length === 0) return 0;
+  const moyenne = adultes.reduce((t, p) => t + p.foi, 0) / adultes.length;
+  return moyenne < 3 ? 0 : moyenne < 6 ? 1 : moyenne < 9 ? 2 : 3;
+}
+
+/** Le gardien de l'autel : qui y a le plus prié (cinq fois au moins), s'il y a un autel. */
+export function gardienDeLAutel(monde: Monde): Personnage | null {
+  if (![...monde.batiments.values()].some((b) => b.type === "autel" && b.etat === "termine"))
+    return null;
+  let meilleur: Personnage | null = null;
+  for (const p of monde.personnages) {
+    if (!p.vivant || p.prieresAutel < PRIERES_GARDIEN) continue;
+    if (meilleur === null || p.prieresAutel > meilleur.prieresAutel) meilleur = p;
+  }
+  return meilleur;
+}
+
+/**
+ * Chaque aube : le culte fixe la faveur maximale, et les prières restées trois
+ * jours sans réponse sont comptées (trois silences : « ne pas attendre le ciel »).
+ */
+export function jourDuCiel(monde: Monde, etat: EtatFaveur): void {
+  etat.culte = niveauCulte(monde);
+  etat.max = FAVEUR_MAX + FAVEUR_MAX_PAR_CULTE * etat.culte;
+  etat.valeur = Math.min(etat.valeur, etat.max);
+  const T = monde.horloge.ticksParJour;
+  const tick = monde.horloge.tick;
+  for (const p of monde.personnages) {
+    const priere = p.priere;
+    if (!p.vivant || priere === null || priere.exaucee || priere.sansReponse === true) continue;
+    if (tick - priere.tick <= JOURS_PRIERE * T) continue;
+    priere.sansReponse = true;
+    p.prieresSansReponse += 1;
+    if (
+      p.prieresSansReponse >= SILENCES_POUR_LECON &&
+      apprendre(p, "ne_pas_attendre_le_ciel", 1, null, tick)
+    ) {
+      p.memoire.ajouter(tick, "reflexion", LECONS.ne_pas_attendre_le_ciel.morale, 7, []);
+      monde.emettre(
+        "lecon",
+        p,
+        {
+          cause: "des prières sans réponse",
+          lecon: "ne_pas_attendre_le_ciel",
+          titre: LECONS.ne_pas_attendre_le_ciel.titre,
+          morale: LECONS.ne_pas_attendre_le_ciel.morale,
+          apprenants: 1,
+        },
+        6,
+      );
+    }
+  }
+}
 
 export interface EtatFaveur {
   valeur: number;
-  readonly max: number;
+  max: number;
+  /** Niveau de culte 0..3 (recalculé chaque aube). */
+  culte: number;
   readonly recharges: Map<Pouvoir, number>;
   miracles: number;
   reputation: number;
@@ -89,6 +162,7 @@ export function etatFaveurInitial(): EtatFaveur {
     offrandes: 0,
     exaucees: 0,
     providence: false,
+    culte: 0,
   };
 }
 
@@ -164,6 +238,7 @@ export function faveurEtat(etat: EtatFaveur): FaveurEtat {
     offrandes: etat.offrandes,
     exaucees: etat.exaucees,
     providence: etat.providence,
+    culte: etat.culte,
   };
 }
 
@@ -189,6 +264,8 @@ export interface MondeDivin extends Monde {
   readonly danger: EtatDanger;
   /** Fait naître un troupeau ou une meute à cet endroit. */
   ajouterTroupeau(position: Position, espece: Espece, taille: number): Troupeau;
+  /** Impose une météo pendant des jours (gel précoce, sécheresse). */
+  forcerMeteo(meteo: Meteo, jours: number): void;
 }
 
 function temoinProche(monde: Monde, pos: Position, rayon: number): Personnage | null {
@@ -269,6 +346,23 @@ export function exercer(
     case "loups":
       resultat = loups(monde, pos);
       break;
+    case "gel":
+      resultat = gel(monde, pos);
+      break;
+    case "secheresse":
+      resultat = secheresse(monde, pos);
+      break;
+    case "fievre":
+      resultat =
+        cible === undefined ? { ok: false, raison: "cible_invalide" } : fievre(monde, cible);
+      break;
+    case "secousse":
+      resultat = secousse(monde, pos, rng);
+      break;
+    case "epiphanie":
+      resultat =
+        cible === undefined ? { ok: false, raison: "cible_invalide" } : epiphanie(monde, cible);
+      break;
   }
   if (!resultat.ok) return resultat;
   etat.valeur -= fiche.cout;
@@ -287,7 +381,24 @@ export function exercer(
       priere.exaucee = true;
       p.foi = Math.min(10, p.foi + 2);
       p.dernierMiracleVu = tick;
+      p.prieresExaucees += 1;
       etat.exaucees += 1;
+      if (
+        p.prieresExaucees >= EXAUCEMENTS_POUR_LECON &&
+        apprendre(p, "le_ciel_ecoute", 1, null, tick)
+      )
+        monde.emettre(
+          "lecon",
+          p,
+          {
+            cause: "des prières exaucées",
+            lecon: "le_ciel_ecoute",
+            titre: LECONS.le_ciel_ecoute.titre,
+            morale: LECONS.le_ciel_ecoute.morale,
+            apprenants: 1,
+          },
+          6,
+        );
       gagnerFaveur(etat, FAVEUR_EXAUCEMENT);
       p.memoire.ajouter(
         tick,
@@ -320,6 +431,20 @@ export function exercer(
     ajouterHumeur(temoin, "miracle", fiche.bienfait ? 8 : -12, 3 * T, tick);
     temoin.foi = Math.min(10, temoin.foi + (fiche.bienfait ? 1 : 2));
     temoin.dernierMiracleVu = tick;
+    // Une épreuve reconnue comme venue du ciel apprend à le craindre.
+    if (!fiche.bienfait && attribue && apprendre(temoin, "le_ciel_frappe", 1, null, tick))
+      monde.emettre(
+        "lecon",
+        temoin,
+        {
+          cause: "une épreuve du ciel",
+          lecon: "le_ciel_frappe",
+          titre: LECONS.le_ciel_frappe.titre,
+          morale: LECONS.le_ciel_frappe.morale,
+          apprenants: 1,
+        },
+        6,
+      );
   }
   if (commande.pouvoir !== "regard")
     etat.reputation = Math.max(
@@ -608,6 +733,125 @@ function songe(monde: Monde, p: Personnage): ResultatPouvoir {
   return {
     ok: true,
     effet: `${p.identite.prenom} rêve : « ${LECONS[utile.lecon].titre} »`,
+    temoin: p,
+  };
+}
+
+function gel(monde: MondeDivin, pos: Position): ResultatPouvoir {
+  monde.forcerMeteo("neige", JOURS_GEL);
+  monde.meteo = "neige";
+  return {
+    ok: true,
+    effet: `la neige tombe pour ${String(JOURS_GEL)} jours, en pleine ${monde.horloge.moment().saison === "ete" ? "été" : monde.horloge.moment().saison}`,
+    temoin: temoinProche(monde, pos, RAYON_TEMOIN),
+  };
+}
+
+function secheresse(monde: MondeDivin, pos: Position): ResultatPouvoir {
+  monde.forcerMeteo("canicule", JOURS_SECHERESSE);
+  monde.meteo = "canicule";
+  let n = 0;
+  const rayon = FICHES_POUVOIR.secheresse.rayon;
+  for (let dy = -rayon; dy <= rayon; dy++)
+    for (let dx = -rayon; dx <= rayon; dx++) {
+      const g = monde.grille.tuileSiGeneree(pos.x + dx, pos.y + dy)?.gisement ?? null;
+      if (g === null || g.quantite <= 0) continue;
+      if (g.type === "baies" || g.type === "fibres" || g.type === "poisson") {
+        g.quantite = Math.floor(g.quantite / 2);
+        n++;
+      }
+    }
+  return {
+    ok: true,
+    effet: `${String(JOURS_SECHERESSE)} jours de canicule, ${String(n)} gisement${n > 1 ? "s" : ""} réduit${n > 1 ? "s" : ""} de moitié`,
+    temoin: temoinProche(monde, pos, RAYON_TEMOIN),
+  };
+}
+
+function fievre(monde: Monde, p: Personnage): ResultatPouvoir {
+  const m = tomberMalade(monde, p, "fievre_des_eaux", "une fièvre venue du ciel");
+  if (m === null) return { ok: false, raison: "sans_effet" };
+  return { ok: true, effet: `${p.identite.prenom} prend la fièvre`, temoin: p };
+}
+
+function secousse(monde: MondeDivin, pos: Position, rng: Rng): ResultatPouvoir {
+  const tick = monde.horloge.tick;
+  const T = monde.horloge.ticksParJour;
+  let ebranles = 0;
+  let detruits = 0;
+  for (const b of [...monde.batiments.values()]) {
+    if (b.etat !== "termine" || b.type === "tombe") continue;
+    if (Grille.distance(b.position, pos) > FICHES_POUVOIR.secousse.rayon) continue;
+    b.solidite -= 50;
+    ebranles++;
+    if (b.solidite <= 0) {
+      detruits++;
+      monde.detruireBatiment(b.id);
+    }
+  }
+  let blesses = 0;
+  const lieux = ["bras", "jambe"] as const;
+  for (const p of monde.personnages) {
+    if (!p.vivant) continue;
+    const d = Grille.distance(p.corps.position, pos);
+    if (d <= FICHES_POUVOIR.secousse.rayon && rng.chance(0.3)) {
+      blesser(
+        monde,
+        p,
+        "fracture",
+        rng.chance(0.5) ? 2 : 1,
+        lieux[rng.entier(0, 1)] ?? "jambe",
+        "quand la terre a tremblé",
+      );
+      blesses++;
+    }
+    if (d <= 12) {
+      p.besoins.securite = Math.max(0, p.besoins.securite - 40);
+      ajouterHumeur(p, "peur", -12, 4 * T, tick);
+    }
+  }
+  return {
+    ok: true,
+    effet: `la terre tremble : ${String(ebranles)} bâtiment${ebranles > 1 ? "s" : ""} ébranlé${ebranles > 1 ? "s" : ""}${detruits > 0 ? ` (${String(detruits)} détruit${detruits > 1 ? "s" : ""})` : ""}, ${String(blesses)} fracture${blesses > 1 ? "s" : ""}`,
+    temoin: temoinProche(monde, pos, RAYON_TEMOIN),
+  };
+}
+
+function epiphanie(monde: Monde, p: Personnage): ResultatPouvoir {
+  if (p.corps.stade === "enfant") return { ok: false, raison: "cible_invalide" };
+  let meilleure: Competence = "recolte";
+  for (const c of COMPETENCES) if (p.experience[c] > p.experience[meilleure]) meilleure = c;
+  const actuel = niveau(p.experience[meilleure]);
+  if (actuel >= 10) return { ok: false, raison: "sans_effet" };
+  p.experience[meilleure] = (actuel + 1) * (actuel + 1) * 10;
+  const tick = monde.horloge.tick;
+  const T = monde.horloge.ticksParJour;
+  ajouterHumeur(p, "epiphanie", 20, 5 * T, tick);
+  p.memoire.ajouter(
+    tick,
+    "reflexion",
+    `J'ai vu clair d'un coup : je sais maintenant ${meilleure} comme jamais.`,
+    8,
+    [],
+  );
+  let convives = 0;
+  for (const autre of monde.personnages) {
+    if (!autre.vivant || autre.id === p.id) continue;
+    if (Grille.distance(autre.corps.position, p.corps.position) > FICHES_POUVOIR.epiphanie.rayon)
+      continue;
+    ajouterHumeur(autre, "fete", 10, 3 * T, tick);
+    autre.memoire.ajouter(
+      tick,
+      "observation",
+      `On a fêté ${p.identite.prenom}, qui a eu une révélation.`,
+      5,
+      [p.id],
+    );
+    convives++;
+  }
+  return {
+    ok: true,
+    effet: `${p.identite.prenom} passe au niveau ${String(actuel + 1)} en ${meilleure}, et ${String(convives)} personne${convives > 1 ? "s" : ""} font la fête`,
     temoin: p,
   };
 }

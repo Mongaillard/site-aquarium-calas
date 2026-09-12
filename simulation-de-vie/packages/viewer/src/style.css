@@ -884,3 +884,127 @@ table.saisons td:first-child {
     display: none;
   }
 }
+
+/* Plein écran : la carte prend tout, la barre et le panneau deviennent des menus flottants. */
+.flottants {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  pointer-events: none;
+  z-index: 3;
+}
+.flottants > * {
+  pointer-events: auto;
+}
+.flottants button {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  background: rgba(20, 23, 28, 0.9);
+  border: 1px solid var(--bord);
+  font-size: 16px;
+}
+.flottants .flot-horloge {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(20, 23, 28, 0.8);
+  border: 1px solid var(--bord);
+  font-variant-numeric: tabular-nums;
+}
+#app.plein-ecran {
+  grid-template-rows: 1fr;
+}
+#app.plein-ecran #barre {
+  position: absolute;
+  left: 8px;
+  top: 56px;
+  z-index: 4;
+  width: min(360px, calc(100vw - 16px));
+  max-height: calc(100vh - 72px);
+  overflow: auto;
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  flex-direction: column;
+  align-items: stretch;
+  white-space: normal;
+  display: none;
+}
+#app.plein-ecran #barre.ouvert {
+  display: flex;
+}
+#app.plein-ecran #barre .titre,
+#app.plein-ecran #barre .horloge,
+#app.plein-ecran #barre .meteo,
+#app.plein-ecran #barre .resume,
+#app.plein-ecran #barre .btn-menu,
+#app.plein-ecran #barre .btn-plein,
+#app.plein-ecran #barre .vitesse-select {
+  display: none;
+}
+#app.plein-ecran #barre .local {
+  display: flex;
+}
+#app.plein-ecran #barre .vitesses {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+#app.plein-ecran #barre button {
+  min-height: 36px;
+}
+#app.plein-ecran #principal {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+#app.plein-ecran #panneau {
+  position: absolute;
+  right: 8px;
+  top: 56px;
+  bottom: 8px;
+  width: min(420px, calc(100vw - 16px));
+  height: auto;
+  min-height: 0;
+  z-index: 4;
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: none;
+}
+#app.plein-ecran #panneau.ouvert {
+  display: flex;
+}
+#app.plein-ecran .poignee,
+#app.plein-ecran .legende {
+  display: none;
+}
+#app.plein-ecran .btn-legende {
+  display: block;
+}
+#app.plein-ecran .prieres {
+  top: 56px;
+}
+@media (max-width: 640px) {
+  #app.plein-ecran #panneau {
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: 8px;
+    width: auto;
+    height: 62vh;
+  }
+  #app.plein-ecran .flottants .flot-horloge {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+}

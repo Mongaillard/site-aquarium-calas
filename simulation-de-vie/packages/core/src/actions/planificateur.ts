@@ -40,6 +40,7 @@ import { connait } from "../savoirs/lecons.js";
 import { cleLieu } from "../agents/personnage.js";
 import { PROFILS } from "../monde/faune.js";
 import { directionVoulue } from "../cerveau/conseil.js";
+import { DISTANCE_MIGRATION } from "../monde.js";
 import type { Troupeau } from "../monde/faune.js";
 import type { Action, Intention } from "./types.js";
 
@@ -646,7 +647,8 @@ function planifierExploration(monde: Monde, p: Personnage): ResultatPlan {
   // Une ambition d'exploration (conseil de Claude) : la direction voulue et ses deux
   // voisines seulement, et deux fois plus loin.
   const voulue = directionVoulue(p);
-  const rayonMax = voulue === null ? RAYON_EXPLORATION : RAYON_EXPLORATION * 2;
+  const migre = p.ambition?.issue === "en_cours" && p.ambition.genre === "migrer";
+  const rayonMax = voulue === null ? RAYON_EXPLORATION : RAYON_EXPLORATION * (migre ? 3 : 2);
   const candidats: { cible: Position; score: number }[] = [];
   for (const [dx, dy] of directions) {
     if (voulue !== null && dx * voulue[0] + dy * voulue[1] <= 0) continue;
@@ -843,7 +845,14 @@ function planifierFondation(monde: Monde, p: Personnage, type: TypeBatiment): Re
 export function choisirSite(monde: Monde, p: Personnage, type: TypeBatiment): Position | null {
   if (type === "palissade") return tuileEnceinteManquante(monde, p);
   const acces = batimentsAccessibles(monde, p);
-  const centre = acces[0]?.position ?? p.corps.position;
+  // En migration, loin du vieux foyer, on bâtit là où l'on est.
+  const a = p.ambition;
+  const migre =
+    a?.issue === "en_cours" &&
+    a.genre === "migrer" &&
+    a.origine !== undefined &&
+    Grille.distance(p.corps.position, a.origine) >= DISTANCE_MIGRATION;
+  const centre = migre ? p.corps.position : (acces[0]?.position ?? p.corps.position);
   const eaux = lieuxConnusTries(p, "eau");
   let meilleur: Position | null = null;
   let meilleurScore = Infinity;

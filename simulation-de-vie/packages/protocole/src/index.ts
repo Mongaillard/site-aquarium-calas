@@ -220,6 +220,11 @@ export const POUVOIRS = [
   "troupeau",
   "idee",
   "loups",
+  "gel",
+  "secheresse",
+  "fievre",
+  "secousse",
+  "epiphanie",
 ] as const;
 export type Pouvoir = (typeof POUVOIRS)[number];
 
@@ -361,7 +366,61 @@ export const FICHES_POUVOIR: Readonly<Record<Pouvoir, FichePouvoir>> = {
     bienfait: false,
     description: "Une meute affamée arrive ici et menacera le village dès ce soir.",
   },
+  gel: {
+    nom: "Gel précoce",
+    emoji: "❄️",
+    cout: 18,
+    cible: "tuile",
+    rayon: 0,
+    rechargeJours: 8,
+    bienfait: false,
+    description: "Trois jours de neige, quelle que soit la saison : les feux dévorent le bois.",
+  },
+  secheresse: {
+    nom: "Sécheresse",
+    emoji: "🌵",
+    cout: 20,
+    cible: "tuile",
+    rayon: 12,
+    rechargeJours: 10,
+    bienfait: false,
+    description: "Dix jours de canicule ; baies, fibres et poissons alentour réduits de moitié.",
+  },
+  fievre: {
+    nom: "Fièvre envoyée",
+    emoji: "🤒",
+    cout: 10,
+    cible: "personnage",
+    rayon: 0,
+    rechargeJours: 5,
+    bienfait: false,
+    description: "La fièvre des eaux prend cette personne (une semaine, immunité après).",
+  },
+  secousse: {
+    nom: "Secousse",
+    emoji: "🌋",
+    cout: 22,
+    cible: "tuile",
+    rayon: 6,
+    rechargeJours: 12,
+    bienfait: false,
+    description: "La terre tremble : bâtiments ébranlés à six tuiles, fractures, peur à douze.",
+  },
+  epiphanie: {
+    nom: "Épiphanie",
+    emoji: "🌟",
+    cout: 30,
+    cible: "personnage",
+    rayon: 8,
+    rechargeJours: 20,
+    bienfait: true,
+    description:
+      "Cette personne gagne un niveau dans ce qu'elle sait le mieux faire, et l'on fête ça.",
+  },
 };
+
+/** Niveaux de culte (foi moyenne des adultes) : 0 « personne ne prie », 1 « on prie », 2 « un culte », 3 « la dévotion ». */
+export const NOMS_CULTE = ["personne ne prie", "on prie", "un culte", "la dévotion"] as const;
 
 /** Ce qu'une prière demande, et les pouvoirs qui l'exaucent. */
 export const SUJETS_PRIERE = ["faim", "froid", "soin", "securite", "moral", "protection"] as const;
@@ -401,6 +460,8 @@ export interface FaveurEtat {
   readonly exaucees: number;
   /** Providence : le ciel répond de lui-même aux prières, avec la faveur disponible. */
   readonly providence: boolean;
+  /** Niveau de culte 0..3 (foi moyenne des adultes) ; chaque niveau ajoute dix à la faveur maximale. */
+  readonly culte: number;
 }
 
 /** Contexte d'une demande de conseil, construit par le moteur (jamais par la page). */

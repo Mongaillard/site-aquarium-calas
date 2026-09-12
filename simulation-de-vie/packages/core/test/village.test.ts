@@ -22,7 +22,7 @@ import {
 } from "../src/monde/village.js";
 import type { Bete } from "../src/monde/village.js";
 import type { Troupeau } from "../src/monde/faune.js";
-import { grilleUniforme } from "./utils.js";
+import { grilleUniforme, joursAsync } from "./utils.js";
 
 function mondePlat(seed: number, initiale: number): Simulation {
   const sim = Simulation.creerAvecGrille(
@@ -310,9 +310,9 @@ describe("le village apprivoise : champs et métiers", () => {
   it(
     "sur deux cent quarante jours, des champs se sèment et mûrissent, on chasse, des métiers apparaissent",
     { timeout: 240000 },
-    () => {
+    async () => {
       const sim = Simulation.creer({ seed: 7 });
-      for (let j = 0; j < 240; j++) sim.avancerJusquaAube();
+      await joursAsync(sim, 240);
       expect(sim.journal.compte("semis")).toBeGreaterThan(0);
       expect(sim.journal.parType("champ").some((e) => e.details.genre === "mur")).toBe(true);
       expect(sim.journal.compte("chasse")).toBeGreaterThan(0);

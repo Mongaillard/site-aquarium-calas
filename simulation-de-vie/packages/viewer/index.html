@@ -27,6 +27,9 @@
         >
           ⋯
         </button>
+        <button id="btn-plein" class="btn-plein" type="button" title="Carte en plein écran (p)">
+          ⛶
+        </button>
         <form id="local" class="local" hidden>
           <label for="graine-entree" class="discret">graine</label>
           <input id="graine-entree" type="text" inputmode="numeric" size="6" value="42" />
@@ -95,6 +98,15 @@
             <button id="btn-appliquer" class="btn-appliquer" type="button" hidden>✓ Ici</button>
           </div>
           <div id="prieres" class="prieres" hidden></div>
+          <div id="flottants" class="flottants" hidden>
+            <button id="flot-menu" type="button" title="Commandes">☰</button>
+            <button id="flot-pause" type="button" title="Pause / reprendre">⏸</button>
+            <span id="flot-horloge" class="flot-horloge"></span>
+            <button id="flot-panneau" type="button" title="Personnage, journal, statistiques">
+              📋
+            </button>
+            <button id="flot-sortir" type="button" title="Quitter le plein écran">✕</button>
+          </div>
         </div>
         <aside id="panneau">
           <nav id="onglets">

@@ -389,6 +389,8 @@ export function libelleAmbition(genre: string, cible: string): string {
       return LIBELLES_PRIORITE[cible] ?? cible;
     case "explorer":
       return `explorer ${LIBELLES_DIRECTION[cible] ?? cible}`;
+    case "migrer":
+      return `migrer ${LIBELLES_DIRECTION[cible] ?? cible}`;
     default:
       return cible;
   }

@@ -943,6 +943,11 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   Loups au bord du halo (qui passe par le directeur de danger, jamais à côté). La fiche expose
   la question posée à Claude (motifs, options) et la réponse, pour que l'observateur voie ce que
   le moteur a proposé et ce que Claude a choisi.
+- **v3 (M17)** : la météo imposée par un miracle (`meteoForcee`) remplace le tirage du jour sans
+  toucher au flux de hasard ; le culte (foi moyenne des adultes) fixe la faveur maximale chaque
+  aube ; les leçons du ciel viennent des prières (exaucées, sans réponse) et des épreuves
+  attribuées ; la migration conseillée passe par le catalogue (`migrer:<direction>`), le
+  planificateur bâtissant sur place à seize tuiles du vieux foyer.
 
 ## 15 bis. Savoirs : leçons et inventions
 

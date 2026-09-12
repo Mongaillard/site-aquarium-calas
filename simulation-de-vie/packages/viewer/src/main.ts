@@ -1,7 +1,7 @@
 /** Point d'entrée du viewer : liaison (serveur ou locale), rendu, interactions souris et tactiles. */
 import "./style.css";
 import type { Commande, MessageServeur, Pouvoir } from "@sdv/protocole";
-import { FICHES_POUVOIR, POUVOIRS, POUVOIRS_EXAUCANT, VITESSES } from "@sdv/protocole";
+import { FICHES_POUVOIR, NOMS_CULTE, POUVOIRS, POUVOIRS_EXAUCANT, VITESSES } from "@sdv/protocole";
 import { LIBELLES_SUJET, libelleReputation } from "./format.js";
 import type { Camera } from "./camera.js";
 import { cadrer, centrerSur, deplacer, versMonde, zoomer } from "./camera.js";
@@ -217,6 +217,45 @@ function sauvegardeAutomatique(maintenant: number, force = false): void {
 const btnMenu = element("btn-menu", HTMLButtonElement);
 btnMenu.addEventListener("click", () => {
   formulaireLocal.classList.toggle("ouvert");
+});
+
+// Plein écran : la carte prend tout l'écran, les commandes deviennent des menus flottants.
+const app = element("app", HTMLDivElement);
+const barre = element("barre", HTMLElement);
+const panneauEl = element("panneau", HTMLElement);
+const flottants = element("flottants", HTMLDivElement);
+function basculerPleinEcran(valeur = !app.classList.contains("plein-ecran")): void {
+  app.classList.toggle("plein-ecran", valeur);
+  flottants.hidden = !valeur;
+  barre.classList.remove("ouvert");
+  panneauEl.classList.toggle("ouvert", valeur && magasin.selection !== null);
+  if (valeur) {
+    // Le vrai plein écran du navigateur quand il est permis ; sinon, la page seule suffit.
+    if (document.fullscreenElement === null)
+      document.documentElement.requestFullscreen().catch(() => undefined);
+  } else if (document.fullscreenElement !== null) {
+    document.exitFullscreen().catch(() => undefined);
+  }
+  redimensionner();
+}
+element("btn-plein", HTMLButtonElement).addEventListener("click", () => {
+  basculerPleinEcran(true);
+});
+element("flot-sortir", HTMLButtonElement).addEventListener("click", () => {
+  basculerPleinEcran(false);
+});
+element("flot-menu", HTMLButtonElement).addEventListener("click", () => {
+  barre.classList.toggle("ouvert");
+  panneauEl.classList.remove("ouvert");
+});
+element("flot-panneau", HTMLButtonElement).addEventListener("click", () => {
+  panneauEl.classList.toggle("ouvert");
+  barre.classList.remove("ouvert");
+});
+document.addEventListener("fullscreenchange", () => {
+  // Échap ou geste du navigateur : on quitte aussi le mode plein écran de la page.
+  if (document.fullscreenElement === null && app.classList.contains("plein-ecran"))
+    basculerPleinEcran(false);
 });
 if (modeLocal) {
   formulaireLocal.hidden = false;
@@ -612,7 +651,7 @@ function rafraichirPouvoirs(): void {
   if (magasin.pouvoirArme !== null && boutonsPouvoir.get(magasin.pouvoirArme)?.disabled === true)
     desarmer();
   btnProvidence.setAttribute("aria-pressed", f.providence ? "true" : "false");
-  reputationEl.textContent = `Réputation du ciel : ${libelleReputation(f.reputation)} · ${String(f.prieres)} prière${f.prieres > 1 ? "s" : ""}, ${String(f.exaucees)} exaucée${f.exaucees > 1 ? "s" : ""}`;
+  reputationEl.textContent = `Réputation du ciel : ${libelleReputation(f.reputation)} · culte : ${NOMS_CULTE[f.culte] ?? "?"} · ${String(f.prieres)} prière${f.prieres > 1 ? "s" : ""}, ${String(f.exaucees)} exaucée${f.exaucees > 1 ? "s" : ""}`;
   // Les prières en attente : ce que la colonie demande au ciel, et ce qui l'exaucerait.
   const prieres = etat.prieres.slice(0, 4);
   prieresEl.hidden = prieres.length === 0;
@@ -747,6 +786,9 @@ window.addEventListener("keydown", (ev) => {
     }
     case "f":
       camAjustee = false;
+      break;
+    case "p":
+      basculerPleinEcran();
       break;
     case "b":
       basculerBrouillard();

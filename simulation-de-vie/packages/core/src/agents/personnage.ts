@@ -91,8 +91,10 @@ export interface Drapeaux {
  * combien de temps, et ce qu'il en est advenu. Une seule à la fois.
  */
 export interface Ambition {
-  readonly genre: "invention" | "batiment" | "lecon" | "priorite" | "explorer";
+  readonly genre: "invention" | "batiment" | "lecon" | "priorite" | "explorer" | "migrer";
   readonly cible: string;
+  /** Migration : le foyer qu'on quitte (le nouvel abri doit en être loin). */
+  readonly origine?: Position | undefined;
   readonly but: string;
   readonly pensee: string;
   readonly depuis: number;
@@ -108,6 +110,8 @@ export interface Priere {
   readonly sujet: SujetPriere;
   readonly autel: boolean;
   exaucee: boolean;
+  /** Restée sans réponse et déjà comptée comme telle. */
+  sansReponse?: boolean;
 }
 
 export const SUJETS_PRIERE = ["faim", "froid", "soin", "securite", "moral", "protection"] as const;
@@ -169,6 +173,10 @@ export interface Personnage {
   dernierePriere: number;
   /** La prière en attente (ou la dernière). */
   priere: Priere | null;
+  /** Prières exaucées, prières restées sans réponse, prières faites à l'autel. */
+  prieresExaucees: number;
+  prieresSansReponse: number;
+  prieresAutel: number;
   /** Modificateurs d'humeur datés (deuil, blessure, naissance…). */
   readonly humeur: Modificateur[];
   readonly relations: Map<string, Relation>;
@@ -258,6 +266,9 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
     dernierMiracleVu: -1,
     dernierePriere: -1,
     priere: null,
+    prieresExaucees: 0,
+    prieresSansReponse: 0,
+    prieresAutel: 0,
     humeur: [],
     relations: new Map(),
     memoire: new FluxMemoire({

@@ -101,6 +101,8 @@ import {
   exercer as exercerPouvoir,
   faveurEtat,
   gagnerFaveur,
+  gardienDeLAutel,
+  jourDuCiel,
   providence,
   saisonSansMiracle,
 } from "./monde/divin.js";
@@ -202,8 +204,11 @@ interface EtatSimulation {
     readonly offrandes: number;
     readonly exaucees: number;
     readonly providence: boolean;
+    readonly culte: number;
+    readonly max: number;
     readonly recharges: [Pouvoir, number][];
   };
+  readonly meteoForcee: { readonly meteo: Meteo; readonly jusquaJour: number } | null;
   readonly questionEnCours: QuestionConseil | null;
   readonly fileConseils: { id: string; motifs: Motif[]; score: number }[];
   readonly journal: ReturnType<Journal["etat"]>;
@@ -233,6 +238,8 @@ export class Simulation implements Monde {
   readonly fileConseils: { id: string; motifs: Motif[]; score: number }[] = [];
   private conseilsDuJour = 0;
   private compteurQuestions = 0;
+  /** Météo imposée par un miracle (gel précoce, sécheresse), jusqu'à ce jour absolu inclus. */
+  meteoForcee: { readonly meteo: Meteo; readonly jusquaJour: number } | null = null;
 
   private constructor(
     readonly config: SimConfig,
@@ -268,6 +275,9 @@ export class Simulation implements Monde {
       this.faveur.offrandes = etat.faveur.offrandes;
       this.faveur.exaucees = etat.faveur.exaucees;
       this.faveur.providence = etat.faveur.providence;
+      this.faveur.culte = etat.faveur.culte;
+      this.faveur.max = etat.faveur.max;
+      this.meteoForcee = etat.meteoForcee;
       for (const [k, v] of etat.faveur.recharges) this.faveur.recharges.set(k, v);
       this.questionEnCours = etat.questionEnCours;
       this.fileConseils.push(...etat.fileConseils);
@@ -410,6 +420,11 @@ export class Simulation implements Monde {
   /** Providence : le ciel répond de lui-même aux prières (commande `providence`). */
   definirProvidence(actif: boolean): void {
     this.faveur.providence = actif;
+  }
+
+  /** Impose une météo pour `jours` jours à compter d'aujourd'hui (miracles). */
+  forcerMeteo(meteo: Meteo, jours: number): void {
+    this.meteoForcee = { meteo, jusquaJour: this.horloge.moment().jourAbsolu + jours - 1 };
   }
 
   /** Fait naître un troupeau (ou une meute) : troupeau offert, loups envoyés. */
@@ -825,8 +840,11 @@ export class Simulation implements Monde {
         offrandes: this.faveur.offrandes,
         exaucees: this.faveur.exaucees,
         providence: this.faveur.providence,
+        culte: this.faveur.culte,
+        max: this.faveur.max,
         recharges: [...this.faveur.recharges.entries()],
       },
+      meteoForcee: this.meteoForcee,
       questionEnCours: this.questionEnCours,
       fileConseils: this.fileConseils,
       journal: this.journal.etat(EVENEMENTS_GARDES),
@@ -1182,6 +1200,10 @@ export class Simulation implements Monde {
   private nouveauJour(): void {
     const moment = this.horloge.moment();
     this.meteo = tirerMeteo(this.rng, moment.saison, moment.jourAbsolu);
+    if (this.meteoForcee !== null) {
+      if (moment.jourAbsolu <= this.meteoForcee.jusquaJour) this.meteo = this.meteoForcee.meteo;
+      else this.meteoForcee = null;
+    }
     this.emettre(
       "meteo",
       null,
@@ -1213,6 +1235,7 @@ export class Simulation implements Monde {
       this.conseilsDuJour = 0;
       gagnerFaveur(this.faveur, FAVEUR_PAR_JOUR);
       if (moment.jourDeSaison === 1) saisonSansMiracle(this);
+      jourDuCiel(this, this.faveur);
       for (const p of this.vivants()) {
         jourCompteurs(p);
         const issue = jourAmbition(this, p);
@@ -1480,6 +1503,9 @@ export class Simulation implements Monde {
 
   /** Titre de métier d'un personnage (« la pêcheuse »), s'il en a un. */
   titre(p: Personnage): string | null {
+    const gardien = gardienDeLAutel(this);
+    if (gardien?.id === p.id)
+      return p.identite.sexe === "F" ? "gardienne de l'autel" : "gardien de l'autel";
     return titreDe(p);
   }
 
