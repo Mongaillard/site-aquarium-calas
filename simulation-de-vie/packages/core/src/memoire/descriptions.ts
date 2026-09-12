@@ -189,6 +189,46 @@ export function decrireEvenement(
     }
     case "invention":
       return temoin ? `J'ai vu ${qui} réussir son ${String(d.nom ?? "invention")}.` : null;
+    case "blessure":
+      return temoin
+        ? `${qui} s'est blessé${e_} ${String(d.contexte ?? "")}.`
+        : `Je me suis blessé${e_} ${String(d.contexte ?? "")} : ${String(d.type)} ${d.lieu === "main" ? "à la main" : d.lieu === "bras" ? "au bras" : d.lieu === "jambe" ? "à la jambe" : "au flanc"}.`;
+    case "infection":
+      return temoin ? null : "Ma plaie s'est infectée ; la fièvre est là.";
+    case "soin":
+      return temoin
+        ? `${qui} a soigné ${noms.prenom(String(d.cible ?? ""))}.`
+        : d.soiMeme === true
+          ? `Je me suis soigné${e_} (${String(d.soin)}).`
+          : `J'ai soigné ${noms.prenom(String(d.cible ?? ""))} (${String(d.soin)}).`;
+    case "guerison":
+      return temoin
+        ? null
+        : d.cicatrice === true
+          ? "Ma blessure est guérie ; j'en garderai la marque."
+          : "Ma blessure est guérie.";
+    case "sequelle":
+      return temoin
+        ? `${qui} ${d.handicap === "boiterie" ? "boite désormais" : d.handicap === "sans_dents" ? "a perdu ses dents" : "a la main raide"}.`
+        : d.handicap === "boiterie"
+          ? "Je boiterai toute ma vie. Il faudra faire avec."
+          : d.handicap === "sans_dents"
+            ? "Mes dents s'en vont ; le cru me fait peine."
+            : "Ma main ne se refermera plus vraiment.";
+    case "carence":
+      return temoin
+        ? null
+        : d.carence === "gencives"
+          ? "Mes gencives saignent ; trop de poisson, pas assez du reste."
+          : "Le ventre creux malgré les baies : il me faut autre chose.";
+    case "epuisement":
+      return null; // souvenir ajouté par le moteur
+    case "accouchement":
+      return temoin
+        ? d.accoucheuse === null
+          ? `${qui} a accouché seule.`
+          : `${qui} a accouché, ${String(d.accoucheuse)} à ses côtés.`
+        : null;
     case "jeu":
       return temoin
         ? null

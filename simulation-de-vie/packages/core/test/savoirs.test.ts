@@ -175,6 +175,7 @@ describe("inventions", () => {
     const p = sim.personnages.find((x) => x.corps.stade === "adulte");
     if (!p) throw new Error("vide");
     p.identite.personnalite.ouverture = 0.9;
+    p.savoirs.clear(); // aucune idée déjà en cours
     p.corps.inventaire.ressources = {};
     p.corps.inventaire.objets.length = 0;
     p.connaissance.clear(); // sans gibier connu, pas d'idée de piège : la faim mène au filet

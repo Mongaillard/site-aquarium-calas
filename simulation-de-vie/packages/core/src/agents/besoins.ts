@@ -33,6 +33,8 @@ export interface ContexteBesoins {
   readonly aAbri: boolean;
   /** Dort sur une couche de fibres (sommeil réparateur). */
   readonly aCouche?: boolean;
+  /** Somme des modificateurs d'humeur du moment (−40..40). */
+  readonly humeur?: number;
   readonly enCompagnie: boolean;
   readonly extraversion: number;
   /**
@@ -109,7 +111,7 @@ export function appliquerTickBesoins(b: Besoins, ctx: ContexteBesoins): EffetBes
     0.1 * b.chaleur +
     0.15 * b.securite +
     0.15 * b.social;
-  b.moral = clamp(b.moral + (cibleMoral - b.moral) * 0.05);
+  b.moral = clamp(b.moral + (clamp(cibleMoral + (ctx.humeur ?? 0)) - b.moral) * 0.05);
 
   // Causes classées par gravité : la première sert de cause de décès.
   const causes: ("soif" | "froid" | "faim")[] = [];

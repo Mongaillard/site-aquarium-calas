@@ -2,6 +2,15 @@
 import { INVENTIONS, SEUIL_SAVOIR } from "../savoirs/catalogue.js";
 import type { Invention, Savoir } from "../savoirs/catalogue.js";
 import { savoirsConnus } from "../savoirs/lecons.js";
+import {
+  aDeLaFievre,
+  capacites,
+  estEpuise,
+  fractureNonImmobilisee,
+  graviteMax,
+  saigne,
+  soinNecessaire,
+} from "../agents/corps.js";
 import type { TypeObjet } from "../monde/recettes.js";
 import type { Besoins } from "../agents/besoins.js";
 import type { Personnalite } from "../agents/identite.js";
@@ -61,6 +70,9 @@ export interface PersonneVisible {
   /** Je souhaite courtiser cette personne (attirance, affinité, éligibilité). */
   readonly courtisable: boolean;
   readonly estMonEnfant: boolean;
+  /** Blessé visible : ce qu'il lui faudrait. */
+  readonly soinNecessaire: "bandage" | "cataplasme" | "attelle" | null;
+  readonly saigne: boolean;
   readonly estMonParent: boolean;
   readonly estMonPartenaire: boolean;
 }
@@ -79,6 +91,8 @@ export interface PerceptionLegere {
     readonly besoins: Readonly<Besoins>;
     readonly nourritureEnPoche: boolean;
     readonly savoirs: ReadonlySet<Savoir>;
+    /** Je saigne et j'ai un bandage sur moi : on s'en occupe tout de suite. */
+    readonly saigneAvecBandage?: boolean;
   };
   readonly abriDisponible: boolean;
   readonly feuConnu: boolean;
@@ -98,6 +112,7 @@ export function percevoirLeger(monde: Monde, p: Personnage): PerceptionLegere {
       besoins: p.besoins,
       nourritureEnPoche: quantiteNourriture(p.corps.inventaire) > 0,
       savoirs: savoirsConnus(p),
+      saigneAvecBandage: saigne(p) && possede(p.corps.inventaire, "bandage"),
     },
     abriDisponible: abriDisponible(monde, p) !== null,
     feuConnu: feuConnu(monde),
@@ -149,6 +164,18 @@ export interface Perception {
     readonly possede: (objet: TypeObjet) => boolean;
     readonly cuir: number;
     readonly poissonCru: number;
+    /** Le corps : ce qui saigne, ce qui brûle de fièvre, ce qui est cassé, la fatigue. */
+    readonly corps: {
+      readonly blesse: boolean;
+      readonly saigne: boolean;
+      readonly fievre: boolean;
+      readonly fractureLibre: boolean;
+      readonly graviteMax: number;
+      readonly fatigue: number;
+      readonly epuise: boolean;
+      readonly mobilite: number;
+      readonly soinNecessaire: "bandage" | "cataplasme" | "attelle" | null;
+    };
     readonly explorerPlusLoin: boolean;
   };
   readonly moment: Moment;
@@ -261,6 +288,8 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
         enceinte: autre.corps.enceinte !== null,
         courtisable: veutCourtiser(monde, p, autre),
         estMonEnfant: rel.lien === "enfant",
+        soinNecessaire: soinNecessaire(autre, monde.horloge.tick),
+        saigne: saigne(autre),
         estMonParent: rel.lien === "parent",
         estMonPartenaire: rel.lien === "partenaire",
       });
@@ -340,6 +369,17 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
       possede: (objet) => possede(inv, objet),
       cuir: quantite(inv, "cuir"),
       poissonCru: quantite(inv, "poisson"),
+      corps: {
+        blesse: p.corps.etat.blessures.length > 0,
+        saigne: saigne(p),
+        fievre: aDeLaFievre(p, monde.horloge.tick),
+        fractureLibre: fractureNonImmobilisee(p),
+        graviteMax: graviteMax(p),
+        fatigue: p.corps.etat.fatigue,
+        epuise: estEpuise(p),
+        mobilite: capacites(p, monde.config.vie.joursParAnnee, monde.horloge.tick).mobilite,
+        soinNecessaire: soinNecessaire(p, monde.horloge.tick),
+      },
       explorerPlusLoin: p.drapeaux.explorerPlusLoinJusqua > monde.horloge.tick,
     },
     moment,

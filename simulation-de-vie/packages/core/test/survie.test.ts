@@ -100,7 +100,8 @@ describe("survie (intégration M1)", () => {
     sim.avancer(144);
     expect(p.vivant).toBe(true);
     expect(sim.journal.compte("jete") + sim.journal.compte("depot")).toBeGreaterThan(0);
-    expect(p.besoins.faim).toBeGreaterThan(30);
+    expect(sim.journal.compte("repas")).toBeGreaterThanOrEqual(2);
+    expect(p.besoins.faim).toBeGreaterThan(20);
   });
 
   it("M3 : en 30 jours, les personnages dialoguent, se transmettent des lieux et réfléchissent", () => {

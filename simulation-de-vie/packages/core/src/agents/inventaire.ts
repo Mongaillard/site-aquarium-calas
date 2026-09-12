@@ -69,6 +69,19 @@ export function outilSatisfait(inv: Inventaire, outil: Outil | null): boolean {
   return false;
 }
 
+/** Retire un objet du type donné (le plus usé d'abord) ; vrai s'il y en avait un. */
+export function retirerObjet(inv: Inventaire, type: TypeObjet): boolean {
+  let indice = -1;
+  for (let i = 0; i < inv.objets.length; i++) {
+    const o = inv.objets[i];
+    if (o?.type === type && (indice < 0 || o.solidite < (inv.objets[indice]?.solidite ?? Infinity)))
+      indice = i;
+  }
+  if (indice < 0) return false;
+  inv.objets.splice(indice, 1);
+  return true;
+}
+
 export function ajouterObjet(inv: Inventaire, objet: Objet): boolean {
   if (placeLibre(inv) <= 0) return false;
   inv.objets.push(objet);

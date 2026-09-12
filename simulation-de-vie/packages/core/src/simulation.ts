@@ -4,7 +4,21 @@
  * perception, de la décision, de la planification et de l'exécution de M1.
  */
 import { appliquerTickBesoins } from "./agents/besoins.js";
-import { possede, transferer } from "./agents/inventaire.js";
+import { possede, transferer, placeLibre } from "./agents/inventaire.js";
+import type { TypeAction } from "./actions/types.js";
+import { gagnerExperience } from "./agents/competences.js";
+import {
+  capacites,
+  fatigueEffort,
+  fatigueRepos,
+  humeur,
+  passeQuotidienneCorps,
+  risqueAccouchement,
+  saigne,
+  sourcesDegats,
+  estEpuise,
+  ajouterHumeur,
+} from "./agents/corps.js";
 import type { Ressource } from "./monde/ressources.js";
 import type { Personnage } from "./agents/personnage.js";
 import { genererPopulation } from "./agents/population.js";
@@ -266,9 +280,11 @@ export class Simulation implements Monde {
       lecons[0] !== undefined
         ? `${defunt.identite.prenom}, mort${f ? "e" : ""} de ${cause}. ${LECONS[lecons[0]].morale}`
         : `Ici repose ${defunt.identite.prenom}, mort${f ? "e" : ""} de ${cause}.`;
-    const tuile = this.grille.tuileOuNull(defunt.corps.position.x, defunt.corps.position.y);
-    if (tuile !== null && tuile.batiment === null && INFO_BIOME[tuile.biome].constructible) {
-      const tombe = this.fonderChantier("tombe", defunt.corps.position, defunt);
+    // La tombe se creuse sur place, ou sur la tuile libre la plus proche (un mort
+    // dans un abri n'y est pas enterré).
+    const place = this.tuileLibreProche(defunt.corps.position, 3);
+    if (place !== null) {
+      const tombe = this.fonderChantier("tombe", place, defunt);
       tombe.etat = "termine";
       tombe.travailRestant = 0;
       tombe.termineAuTick = this.tick;
@@ -300,6 +316,24 @@ export class Simulation implements Monde {
         8,
       );
     }
+  }
+
+  /** Tuile constructible sans bâtiment la plus proche d'une position, dans un rayon donné. */
+  private tuileLibreProche(centre: Position, rayon: number): Position | null {
+    let meilleure: Position | null = null;
+    let meilleureDistance = Infinity;
+    for (let dy = -rayon; dy <= rayon; dy++) {
+      for (let dx = -rayon; dx <= rayon; dx++) {
+        const pos = { x: centre.x + dx, y: centre.y + dy };
+        const d = Math.abs(dx) + Math.abs(dy);
+        if (d >= meilleureDistance) continue;
+        const tuile = this.grille.tuileOuNull(pos.x, pos.y);
+        if (tuile?.batiment !== null || !INFO_BIOME[tuile.biome].constructible) continue;
+        meilleure = pos;
+        meilleureDistance = d;
+      }
+    }
+    return meilleure;
   }
 
   /** Crée une simulation neuve à partir d'une configuration (partielle ou non). */
@@ -365,6 +399,39 @@ export class Simulation implements Monde {
     });
   }
 
+  /** Fatigue : l'effort la fait monter, le sommeil et le repos la font descendre. */
+  private compterFatigue(p: Personnage, action: TypeAction): void {
+    const effort =
+      action === "recolter" ||
+      action === "construire" ||
+      action === "deplacer" ||
+      action === "fabriquer" ||
+      action === "fonder";
+    if (p.corps.endormi) {
+      fatigueRepos(p, "sommeil");
+    } else if (action === "se_reposer" || action === "se_rechauffer" || action === "attendre") {
+      fatigueRepos(p, "repos");
+    } else if (effort) {
+      const inv = p.corps.inventaire;
+      const sacLourd = placeLibre(inv) <= inv.capacite * 0.2;
+      fatigueEffort(p, sacLourd, action === "deplacer");
+      if (estEpuise(p) && !p.corps.etat.epuisementSignale) {
+        p.corps.etat.epuisementSignale = true;
+        ajouterHumeur(p, "epuisement", -8, 3 * this.horloge.ticksParJour, this.tick);
+        this.emettre("epuisement", p, { fatigue: Math.round(p.corps.etat.fatigue) }, 5);
+        p.memoire.ajouter(
+          this.tick,
+          "observation",
+          "Je n'en peux plus ; il faut que je dorme.",
+          4,
+          [],
+        );
+      }
+    } else {
+      fatigueRepos(p, "calme");
+    }
+  }
+
   fonderChantier(type: TypeBatiment, position: Position, fondateur: Personnage): Batiment {
     const tuile = this.grille.tuile(position.x, position.y);
     if (tuile.batiment !== null) throw new Error(`Tuile (${position.x}, ${position.y}) déjà bâtie`);
@@ -423,6 +490,7 @@ export class Simulation implements Monde {
     });
     enfant.besoins.faim = 80;
     enfant.besoins.soif = 80;
+    enfant.corps.sante = 60;
     this.personnages.push(enfant);
     this.cerveaux.set(id, new RuleBrain(enfant));
     for (const parent of [mere, pere]) {
@@ -448,6 +516,37 @@ export class Simulation implements Monde {
       },
       10,
     );
+    // L'accouchement a ses risques ; une accoucheuse les divise par deux.
+    const risque = risqueAccouchement(this, mere);
+    const meteo = this.horloge.moment().saison;
+    this.emettre(
+      "accouchement",
+      mere,
+      {
+        enfant: id,
+        accoucheuse: risque.accoucheuse?.identite.prenom ?? null,
+        risque: Math.round(risque.probabilite * 1000) / 10,
+        saison: meteo,
+      },
+      6,
+    );
+    if (risque.accoucheuse !== null) {
+      gagnerExperience(risque.accoucheuse.experience, "soin", 10);
+      risque.accoucheuse.memoire.ajouter(
+        this.tick,
+        "action",
+        `J'ai aidé ${mere.identite.prenom} à mettre son enfant au monde.`,
+        7,
+        [mere.id],
+      );
+    }
+    for (const parent of [mere, pere])
+      ajouterHumeur(parent, "naissance", 15, 20 * this.horloge.ticksParJour, this.tick);
+    if (this.rng.fork(`accouchement/${id}`).chance(risque.probabilite)) {
+      mere.corps.dernierAccouchement = this.tick;
+      this.mourir(mere, "accouchement");
+      return enfant;
+    }
     const fille = enfant.identite.sexe === "F";
     pere.memoire.ajouter(
       this.tick,
@@ -566,6 +665,7 @@ export class Simulation implements Monde {
       for (const p of this.vivants()) {
         p.corps.ageJours += 1;
         tickVieQuotidien(this, p);
+        if (p.vivant) passeQuotidienneCorps(this, p);
       }
     }
     for (const p of this.vivants()) {
@@ -588,7 +688,7 @@ export class Simulation implements Monde {
       const gisement = tuile.gisement;
       if (gisement === null || gisement.tauxRegen <= 0 || gisement.quantite >= gisement.max)
         continue;
-      const facteur = gisement.type === "baies" ? facteurBaies : 1;
+      const facteur = gisement.type === "baies" || gisement.type === "herbes" ? facteurBaies : 1;
       if (facteur <= 0) continue;
       gisement.quantite = Math.min(
         gisement.max,
@@ -640,13 +740,45 @@ export class Simulation implements Monde {
       perteChaleur,
       gainChaleur,
       facteurSoif: meteo.soif,
-      facteurFaim: p.corps.enceinte !== null ? 1.3 : p.corps.stade === "enfant" ? 0.7 : 1,
+      facteurFaim:
+        (p.corps.enceinte !== null ? 1.3 : p.corps.stade === "enfant" ? 0.7 : 1) *
+        (p.corps.etat.carence === "ventre_creux" ? 1.15 : 1),
+      humeur: humeur(p, this.tick),
     });
-    p.corps.sante = Math.min(100, p.corps.sante + effet.deltaSante);
+    // Sources de dégâts nommées : besoins vitaux, puis le corps (hémorragie, infection, carence).
+    const T = this.horloge.ticksParJour;
+    const sources = sourcesDegats(p, this.tick);
+    let deltaSante = effet.deltaSante;
+    const blesse = p.corps.etat.blessures.length > 0;
+    if (deltaSante > 0 && blesse) {
+      // Convalescence : on ne se répare qu'au repos, au chaud, sans saigner.
+      const auRepos = p.corps.endormi || p.actionEnCours?.type === "se_reposer";
+      deltaSante = saigne(p) ? 0 : auRepos && abriIci !== null ? 5 / T : 2 / T;
+    }
+    for (const source of sources) deltaSante -= source.perteParJour / T;
+    p.corps.sante = Math.min(100, p.corps.sante + deltaSante);
+    if (blesse && (p.corps.endormi || p.actionEnCours?.type === "se_reposer"))
+      for (const b of p.corps.etat.blessures) b.ticksRepos += 1;
     p.drapeaux.faimMinDuJour = Math.min(p.drapeaux.faimMinDuJour, p.besoins.faim);
     p.drapeaux.chaleurMinDuJour = Math.min(p.drapeaux.chaleurMinDuJour, p.besoins.chaleur);
     if (p.corps.sante <= 0) {
-      this.mourir(p, effet.causes[0] ?? "inconnue");
+      const vitales: Record<string, number> = { soif: 25, froid: 15, faim: 10 };
+      let cause = "inconnue";
+      let pire = 0;
+      for (const c of effet.causes) {
+        const perte = vitales[c] ?? 0;
+        if (perte > pire) {
+          pire = perte;
+          cause = c;
+        }
+      }
+      for (const source of sources) {
+        if (source.perteParJour > pire) {
+          pire = source.perteParJour;
+          cause = source.cause;
+        }
+      }
+      this.mourir(p, cause);
       return;
     }
 
@@ -657,7 +789,8 @@ export class Simulation implements Monde {
     }
 
     // Observation à chaque tick (connaissance des lieux) ; perception complète seulement pour décider.
-    observer(this, p, rayonVision(this, moment));
+    const vue = capacites(p, this.config.vie.joursParAnnee, this.tick).vue;
+    observer(this, p, Math.max(1, Math.round(rayonVision(this, moment) * vue)));
     const legere = percevoirLeger(this, p);
     const cerveau = this.cerveaux.get(p.id);
     if (cerveau === undefined) return;
@@ -715,6 +848,7 @@ export class Simulation implements Monde {
     if (action === null) return;
 
     const resultat = executerTick(this, p, action);
+    this.compterFatigue(p, action.type);
     if (resultat.statut === "terminee") {
       p.actionEnCours = null;
       if (p.plan.length === 0) {

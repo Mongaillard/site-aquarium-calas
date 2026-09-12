@@ -31,6 +31,7 @@ import { SEUILS_COUPLE, accepteCour, eligibles, gainAttirance, unir } from "../s
 import { rayonVision } from "../cerveau/perception.js";
 import { avancementGrossesse, peutConcevoir } from "../agents/vie.js";
 import { COUT_EAU_PIROGUE, estTuileEau, trouverChemin } from "./chemin.js";
+import { capacites, enregistrerRepas, soignerAvec, tirerAccident } from "../agents/corps.js";
 import type { Action } from "./types.js";
 import { INVENTIONS, LECONS, estLecon } from "../savoirs/catalogue.js";
 import { apprendre, connait } from "../savoirs/lecons.js";
@@ -57,6 +58,7 @@ export function vitesse(p: Personnage, monde?: Monde): number {
   if (monde) {
     v *= EFFETS_METEO[monde.meteo].vitesse;
     if (p.corps.enceinte !== null && avancementGrossesse(monde, p) > 2 / 3) v *= 0.8;
+    v *= capacites(p, monde.config.vie.joursParAnnee, monde.horloge.tick).mobilite;
   }
   return v;
 }
@@ -114,7 +116,39 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       action.ticksRestants -= 1;
       return p.besoins.chaleur >= 85 || action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
     }
+    case "se_reposer":
+      action.ticksRestants -= 1;
+      return action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
+    case "soigner":
+      return tickSoigner(monde, p, action);
   }
+}
+
+function tickSoigner(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "soigner" }>,
+): Resultat {
+  const cible = action.cible === p.id ? p : monde.personnages.find((a) => a.id === action.cible);
+  if (!cible?.vivant) return echec("personne à soigner");
+  if (cible.id !== p.id && Grille.distance(p.corps.position, cible.corps.position) > 2)
+    return echec(`${cible.identite.prenom} est trop loin`);
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+  const fait = soignerAvec(monde, p, cible);
+  if (fait === null) return echec("rien pour soigner");
+  monde.emettre("soin", p, { cible: cible.id, soin: fait, soiMeme: cible.id === p.id }, 5);
+  if (cible.id !== p.id) {
+    effetsDon(p, cible, 2, monde.horloge.tick);
+    cible.memoire.ajouter(
+      monde.horloge.tick,
+      "action",
+      `${p.identite.prenom} m'a soigné (${fait}).`,
+      7,
+      [p.id],
+    );
+  }
+  return TERMINEE;
 }
 
 function tickCourtiser(
@@ -569,6 +603,12 @@ function tickDeplacer(
     action.progression -= cout;
     p.corps.position = { x: suivante.x, y: suivante.y };
     action.chemin.shift();
+    if (
+      biome === "montagne" &&
+      EFFETS_METEO[monde.meteo].tempete &&
+      tirerAccident(monde, p, "montagne", 5) !== null
+    )
+      return echec("chute");
   }
   return action.chemin.length === 0 ? TERMINEE : ENCOURS;
 }
@@ -599,8 +639,26 @@ function tickRecolter(
   // Un filet prend deux fois plus de poisson qu'une canne.
   const auFilet = gisement.type === "poisson" && possede(p.corps.inventaire, "filet");
   const aLArc = gisement.type === "gibier" && possede(p.corps.inventaire, "arc");
-  const parAction =
-    (1 + Math.floor(niv / 2)) * (outil === "hache_pierre" || auFilet || aLArc ? 2 : 1);
+  // Accidents : la hache glisse, le sanglier mord.
+  if (gisement.type === "bois" && tirerAccident(monde, p, "bois", niv) !== null) return TERMINEE;
+  if (
+    gisement.type === "gibier" &&
+    tirerAccident(monde, p, "chasse", niveau(p.experience.chasse)) !== null
+  )
+    return TERMINEE;
+  const manipulation = capacites(
+    p,
+    monde.config.vie.joursParAnnee,
+    monde.horloge.tick,
+  ).manipulation;
+  const parAction = Math.max(
+    1,
+    Math.floor(
+      (1 + Math.floor(niv / 2)) *
+        (outil === "hache_pierre" || auFilet || aLArc ? 2 : 1) *
+        manipulation,
+    ),
+  );
   const rendement = Math.min(
     Math.floor(gisement.quantite),
     parAction,
@@ -669,6 +727,7 @@ function tickManger(
   }
   if (mange === 0) return echec("pas faim");
   p.besoins.moral = clamp(p.besoins.moral + (action.ressource === "repas_cuit" ? 6 : 2));
+  for (let i = 0; i < mange; i++) enregistrerRepas(p, action.ressource);
   monde.emettre("repas", p, { ressource: action.ressource, quantite: mange }, 2);
   return TERMINEE;
 }

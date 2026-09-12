@@ -9,6 +9,9 @@ import {
   LIBELLES_SAISON,
   LIBELLES_TYPE,
   NOMS_BATIMENT,
+  NOMS_CARENCE,
+  NOMS_HANDICAP,
+  NOMS_LIEU,
   couleurFamille,
   echapper,
   formaterMoment,
@@ -305,6 +308,44 @@ export class Panneaux {
             `<span class="puce" title="${e(s.texte)}${s.origine ? ` — ${e(s.origine)}` : ""}">${s.genre === "lecon" ? "📜" : "💡"} ${e(s.titre)}${s.force < 1 ? " (idée)" : ""}</span>`,
         )
         .join("") || "<span class='discret'>rien encore</span>";
+    const corps = f.corps;
+    const blessures =
+      corps.blessures
+        .map((b) => {
+          const etatB = [
+            b.saigne ? "saigne" : null,
+            b.bandee ? "bandée" : null,
+            b.infectee ? "infectée" : null,
+            b.immobilisee ? "attelle" : null,
+          ]
+            .filter((x) => x !== null)
+            .join(", ");
+          return `<span class="puce blessure">🩸 ${e(b.type)} ${e(NOMS_LIEU[b.lieu] ?? b.lieu)} (g${b.gravite}, ${b.jours} j${etatB ? ", " + e(etatB) : ""})</span>`;
+        })
+        .join("") || "";
+    const corpsPuces = [
+      ...corps.handicaps.map((h) => `<span class="puce">♿ ${e(NOMS_HANDICAP[h] ?? h)}</span>`),
+      corps.carence
+        ? `<span class="puce">🍽 ${e(NOMS_CARENCE[corps.carence] ?? corps.carence)}</span>`
+        : "",
+      corps.cicatrices > 0
+        ? `<span class="puce">${corps.cicatrices} cicatrice${corps.cicatrices > 1 ? "s" : ""}</span>`
+        : "",
+      corps.epuise ? `<span class="puce blessure">épuisé</span>` : "",
+    ].join("");
+    const capacitesTexte = Object.entries(corps.capacites)
+      .filter(([, v]) => v < 0.99)
+      .map(([k, v]) => `<span class="puce">${e(k)} ${Math.round(v * 100)} %</span>`)
+      .join("");
+    const humeur =
+      f.humeur.length > 0
+        ? f.humeur
+            .map(
+              (m) =>
+                `<span class="puce ${m.valeur < 0 ? "blessure" : ""}">${e(m.cle.split(":")[0] ?? m.cle)} ${m.valeur > 0 ? "+" : ""}${m.valeur}</span>`,
+            )
+            .join("")
+        : "<span class='discret'>rien de particulier</span>";
     const souvenirs = (l: MessageFiche["souvenirsRecents"]): string =>
       l.length > 0
         ? `<ol class="liste">${l.map((s) => `<li class="${s.importance >= 6 ? "majeur" : s.importance >= 3 ? "important" : ""}"><span class="quand">${e(tick(s.tick))}</span>${e(s.texte)}</li>`).join("")}</ol>`
@@ -331,6 +372,11 @@ export class Panneaux {
       <div class="discret">Action : ${e(f.action ?? "—")}${f.plan.length > 0 ? ` · puis ${e(f.plan.join(", "))}` : ""}</div>
       <h3>Besoins</h3>
       <div class="jauges">${jauge("faim", f.besoins.faim)}${jauge("soif", f.besoins.soif)}${jauge("sommeil", f.besoins.sommeil)}${jauge("chaleur", f.besoins.chaleur)}${jauge("sécurité", f.besoins.securite)}${jauge("social", f.besoins.social)}${jauge("moral", f.besoins.moral)}</div>
+      <h3>Corps</h3>
+      <div class="jauges">${jauge("forme", 100 - corps.fatigue)}</div>
+      <div class="puces">${blessures}${corpsPuces}${capacitesTexte}${!blessures && !corpsPuces && !capacitesTexte ? "<span class='discret'>en forme</span>" : ""}</div>
+      <h3>Humeur</h3>
+      <div class="puces">${humeur}</div>
       <h3>Famille</h3>
       <div>Parents : ${liste(f.famille.parents)} · Partenaire : ${f.famille.partenaire ? personne(f.famille.partenaire) : "—"}</div>
       <div>Enfants : ${liste(f.famille.enfants)} · Fratrie : ${liste(f.famille.fratrie)}</div>

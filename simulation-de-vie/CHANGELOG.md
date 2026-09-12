@@ -2,6 +2,58 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M8 – Le corps (jalon 1 de la feuille de route) (2026-09-12)
+
+- Un personnage peut être diminué sans être mort. Le corps porte un état (`EtatCorps`) :
+  blessures, fatigue, carence, handicaps, cicatrices, derniers repas. La santé ne bouge plus que
+  par des sources de dégâts nommées (soif, froid, faim, hémorragie, infection, carence), et la
+  cause de décès est la source dominante. Quatre capacités dérivées (mobilité, manipulation,
+  vue, vigueur) sont lues par la vitesse, la récolte et la vision ; elles déclinent avec l'âge
+  (vue et vigueur après 40 ans, mobilité après 50).
+- Blessures : coupures au bois (0,5 % par récolte), morsures à la chasse (3 %),
+  fractures en montagne sous l'orage ; gravité 1 à 3, saignement (4, 8 ou 15 points de santé par
+  jour, une plaie légère s'arrête seule en un jour, une moyenne en trois, une grave jamais),
+  infection (10 % par jour, 25 % pour une morsure, trois fois moins sous bandage) avec huit
+  jours de fièvre, guérison en 4 jours par degré de gravité (30 pour une fracture), cicatrice
+  dès la gravité 2, séquelle possible (boiterie, main raide) sur une fracture non immobilisée.
+  Compétence « soin » : elle accélère la guérison et divise les accidents par deux au niveau 5.
+- Soins : le bandage (déjà au catalogue, enfin utile) arrête le saignement ; le cataplasme
+  (deux herbes, nouvelle ressource des prairies et forêts) ramène la fièvre à deux jours ;
+  l'attelle (bois + corde) immobilise une fracture. Deux nouvelles intentions : `soigner`
+  (soi-même ou un blessé à portée) et `se_reposer` (à l'abri de préférence) ; la convalescence
+  ne répare qu'au repos, au chaud, sans saigner (5 points par jour, 2 sinon, 0 en saignant).
+  Le cerveau à règles bande d'abord ce qui saigne (urgence), fabrique ce qui manque, soigne un
+  voisin qu'il voit souffrir, et garde un bandage sur lui quand il a retenu la leçon.
+- Fatigue : une dette d'effort distincte du sommeil ; une journée de travail ajoute 25 à 45
+  points selon l'endurance et la charge, une nuit de sommeil (les nuits sont courtes, 25 à 35
+  ticks) en efface 60 à 80 ; au-delà de 60 la manipulation
+  et la mobilité baissent, au-delà de 85 c'est l'épuisement (accidents triplés, sommeil forcé la
+  nuit, humeur −8).
+- Nutrition : quatre familles d'aliments (baies, poisson, viande, cuit) ; vingt repas d'une
+  seule famille (neuf repas sur dix) donnent une carence bénigne mais visible (gencives pour le
+  poisson : 1 point de santé par jour ; ventre creux pour les baies : faim ×1,15), qui ne
+  s'efface qu'une fois le régime revenu sous sept repas sur dix.
+- Humeur : le moral cible additionne des modificateurs datés (blessure, fièvre, séquelle,
+  carence, épuisement, guérison, deuil, naissance), bornés à ±40, qui s'effacent sur leur
+  dernier quart.
+- Naissances : 3 % de mortalité maternelle (×2 en mauvaise santé ou après 40 ans, ÷2 avec une
+  accoucheuse à portée, ÷10 si elle a retenu la leçon « accoucheuse »), nouveau-né à 60 de
+  santé, mort au berceau rare avant deux ans (modulée par l'immunité). Événement
+  `accouchement` avec l'accoucheuse et le risque.
+- Deux leçons de plus au catalogue : « soigner les blessés » (mort d'hémorragie ou
+  d'infection) et « accoucheuse » (mort en couches).
+- Les tombes se creusent sur la tuile libre la plus proche, un mort à l'abri n'y est plus
+  enterré sans tombe.
+- Viewer : bandeau rouge sur les personnages blessés ; sections « Corps » (fatigue, blessures
+  et leur état, handicaps, carence, cicatrices, capacités diminuées) et « Humeur » dans la
+  fiche ; huit nouveaux événements dans le Journal ; les herbes dessinées sur la carte.
+- Équilibrage : première version trop dure (tout le monde épuisé au vingtième jour, personne
+  ne récoltait plus) ; corrigée en calibrant l'effort par tick, la récupération graduée
+  (sommeil, repos, calme) et en ne laissant pas le repos passer avant la faim.
+  Sur cinq graines et 450 jours (quatre hivers) : 21 à 27 vivants, neuf décès en tout, tous
+  nommés : cinq en couches, trois au berceau, un de carence ; trois à dix blessures par monde,
+  toutes soignées ou guéries, aucune séquelle encore.
+
 ## M7c – Dix inventions et les hivers suivants (2026-09-12)
 
 - Équilibrage : l'ancienne version s'effondrait au deuxième hiver, quand la colonie avait grandi.

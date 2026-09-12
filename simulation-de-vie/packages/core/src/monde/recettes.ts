@@ -18,6 +18,8 @@ export const TYPES_OBJET = [
   "couche",
   "traineau",
   "flute",
+  "cataplasme",
+  "attelle",
 ] as const;
 export type TypeObjet = (typeof TYPES_OBJET)[number];
 
@@ -230,9 +232,27 @@ export const RECETTES = {
     produit: { objet: "bandage" },
     ingredients: { fibres: 2 },
     competence: "soin",
-    niveauRequis: 1,
+    niveauRequis: 0,
     atelier: null,
     duree: 2,
+  },
+  cataplasme: {
+    nom: "cataplasme d'herbes",
+    produit: { objet: "cataplasme" },
+    ingredients: { herbes: 2 },
+    competence: "soin",
+    niveauRequis: 0,
+    atelier: null,
+    duree: 2,
+  },
+  attelle: {
+    nom: "attelle",
+    produit: { objet: "attelle" },
+    ingredients: { bois: 1, corde: 1 },
+    competence: "soin",
+    niveauRequis: 0,
+    atelier: null,
+    duree: 3,
   },
 } as const satisfies Record<string, Recette>;
 
@@ -260,4 +280,6 @@ export const SOLIDITE_INITIALE: Record<TypeObjet, number> = {
   couche: 100,
   traineau: 100,
   flute: 100,
+  cataplasme: 1,
+  attelle: 1,
 };

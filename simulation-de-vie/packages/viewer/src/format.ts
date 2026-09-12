@@ -22,6 +22,7 @@ export const COULEURS_RESSOURCE: Readonly<Record<string, string>> = {
   fibres: "#d6e04b",
   argile: "#c46a2b",
   graines: "#f0e68c",
+  herbes: "#5fb36a",
 };
 
 export const LETTRES_BATIMENT: Readonly<Record<string, string>> = {
@@ -144,6 +145,7 @@ export function formaterTick(tick: number, ticksParJour: number, joursParSaison:
 
 const NOMS_RESSOURCES_EV: Readonly<Record<string, string>> = {
   poisson_fume: "du poisson fumé",
+  herbes: "des herbes",
   bois: "du bois",
   pierre: "de la pierre",
   baies: "des baies",
@@ -154,6 +156,24 @@ const NOMS_RESSOURCES_EV: Readonly<Record<string, string>> = {
   corde: "de la corde",
   repas_cuit: "un repas cuit",
   cuir: "du cuir",
+};
+
+export const NOMS_LIEU: Readonly<Record<string, string>> = {
+  main: "à la main",
+  bras: "au bras",
+  jambe: "à la jambe",
+  flanc: "au flanc",
+};
+
+export const NOMS_HANDICAP: Readonly<Record<string, string>> = {
+  boiterie: "une boiterie",
+  main_raide: "une main raide",
+  sans_dents: "plus de dents",
+};
+
+export const NOMS_CARENCE: Readonly<Record<string, string>> = {
+  gencives: "gencives qui saignent, trop de poisson",
+  ventre_creux: "ventre creux, rien que des baies",
 };
 
 function res(d: EvenementEtat["details"]): string {
@@ -253,6 +273,24 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       return d.jeu === "flute"
         ? `${qui} joue de la flûte pour ${cible("avec")}.`
         : `${qui} joue aux osselets avec ${cible("avec")}.`;
+    case "blessure":
+      return `${qui} se blesse (${String(d.type)} ${NOMS_LIEU[String(d.lieu)] ?? String(d.lieu)}, gravité ${String(d.gravite)}) ${String(d.contexte)}.`;
+    case "infection":
+      return `La plaie de ${qui} s'infecte : la fièvre monte.`;
+    case "soin":
+      return d.soiMeme === true
+        ? `${qui} se soigne (${String(d.soin)}).`
+        : `${qui} soigne ${cible("cible")} (${String(d.soin)}).`;
+    case "guerison":
+      return `${qui} guérit de sa ${String(d.type)}${d.cicatrice === true ? ", qui laisse une cicatrice" : ""}.`;
+    case "sequelle":
+      return `${qui} garde une séquelle : ${NOMS_HANDICAP[String(d.handicap)] ?? String(d.handicap)}.`;
+    case "carence":
+      return `${qui} souffre d'une carence (${NOMS_CARENCE[String(d.carence)] ?? String(d.carence)}).`;
+    case "epuisement":
+      return `${qui} est à bout de forces (fatigue ${String(d.fatigue)}).`;
+    case "accouchement":
+      return `${qui} accouche${d.accoucheuse ? `, assistée par ${String(d.accoucheuse)}` : ", seule"} (risque ${String(d.risque)} %).`;
     case "claude":
       return d.genre === "pensee"
         ? `🧠 ${qui} pense : « ${String(d.texte)} »`

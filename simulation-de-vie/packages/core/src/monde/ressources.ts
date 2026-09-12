@@ -15,6 +15,7 @@ export const RESSOURCES = [
   "corde",
   "repas_cuit",
   "poisson_fume",
+  "herbes",
 ] as const;
 export type Ressource = (typeof RESSOURCES)[number];
 
@@ -60,6 +61,7 @@ export const GISEMENTS_PAR_BIOME: Record<Biome, readonly ProfilGisement[]> = {
   plage: [{ type: "argile", probabilite: 0.12, min: 3, max: 8, tauxRegen: 0.1, outilRequis: null }],
   prairie: [
     { type: "baies", probabilite: 0.1, min: 2, max: 6, tauxRegen: 0.5, outilRequis: null },
+    { type: "herbes", probabilite: 0.06, min: 2, max: 5, tauxRegen: 0.5, outilRequis: null },
     { type: "fibres", probabilite: 0.25, min: 3, max: 8, tauxRegen: 1, outilRequis: null },
     { type: "bois", probabilite: 0.04, min: 1, max: 2, tauxRegen: 0.2, outilRequis: null },
     { type: "gibier", probabilite: 0.04, min: 1, max: 3, tauxRegen: 0.2, outilRequis: "lance" },
@@ -75,6 +77,7 @@ export const GISEMENTS_PAR_BIOME: Record<Biome, readonly ProfilGisement[]> = {
       outilRequis: "hache_pierre",
     },
     { type: "baies", probabilite: 0.25, min: 3, max: 8, tauxRegen: 0.5, outilRequis: null },
+    { type: "herbes", probabilite: 0.05, min: 2, max: 5, tauxRegen: 0.5, outilRequis: null },
     { type: "gibier", probabilite: 0.08, min: 1, max: 4, tauxRegen: 0.2, outilRequis: "lance" },
   ],
   colline: [{ type: "pierre", probabilite: 0.4, min: 8, max: 25, tauxRegen: 0, outilRequis: null }],
@@ -102,4 +105,5 @@ export const ASCII_RESSOURCE: Record<Ressource, string> = {
   corde: "r",
   repas_cuit: "p",
   poisson_fume: "s",
+  herbes: "h",
 };

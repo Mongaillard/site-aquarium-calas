@@ -121,6 +121,7 @@ export class Rendu {
           marche: pos.enMouvement,
           phase: (maintenant / 400) % 1,
           enceinte: p.enceinte,
+          blesse: p.blesse,
           selection: p.id === magasin.selection,
           survol: p.id === survol,
         });

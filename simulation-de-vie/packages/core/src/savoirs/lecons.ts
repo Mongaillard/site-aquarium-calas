@@ -87,6 +87,13 @@ export function tirerLecons(monde: Monde, defunt: Personnage, cause: string): Le
     case "soif":
       if (!puits) lecons.push("puits_pres_du_village");
       break;
+    case "hémorragie":
+    case "infection":
+      lecons.push("soigner_les_blesses");
+      break;
+    case "accouchement":
+      lecons.push("accoucheuse");
+      break;
     default:
       break;
   }

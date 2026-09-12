@@ -46,6 +46,14 @@ export const TYPES_EVENEMENT = [
   "prototype_rate",
   "jeu",
   "claude",
+  "blessure",
+  "infection",
+  "soin",
+  "guerison",
+  "sequelle",
+  "carence",
+  "epuisement",
+  "accouchement",
 ] as const;
 export type TypeEvenement = (typeof TYPES_EVENEMENT)[number];
 

@@ -244,6 +244,24 @@ interface Corps {
 **[DÉCISION]** Échelle temporelle de vie : 1 année de jeu = 120 jours de jeu (4 saisons
 de 30 jours). Espérance de vie moyenne 70 ans, avec mortalité aléatoire croissante après 55.
 
+**État du corps (M8).** `corps.etat` porte les blessures (type coupure / fracture / morsure,
+gravité 1-3, lieu, saigne, bandée, infectée, fièvre, immobilisée, ticks de repos), la fatigue
+(0-100, dette d'effort distincte du sommeil), la carence (gencives, ventre creux), les
+handicaps (boiterie, main raide, sans dents), les cicatrices et les vingt derniers repas. La
+santé n'est modifiée que par des **sources de dégâts nommées** (soif 25/j, froid 15/j, faim
+10/j, hémorragie 4/8/15 par jour selon la gravité, infection 6/j modulé par l'immunité, carence
+1/j) ; la cause du décès est la source dominante au moment où la santé atteint 0. Quatre
+**capacités** dérivées (mobilité, manipulation, vue, vigueur ; plancher 0,2) sont lues par la
+vitesse, le rendement de récolte et le rayon de vision ; elles déclinent avec l'âge (vue et
+vigueur −1 % par an après 40, mobilité −1,5 % par an après 50) et avec la fatigue (> 60). Un
+handicap se compense à moitié après trente jours. Le **moral** cible additionne des
+modificateurs datés (`personnage.humeur`, somme bornée à ±40, effacement sur le dernier
+quart). Soins : bandage (arrête le saignement), cataplasme (deux herbes, fièvre ramenée à
+deux jours), attelle (bois + corde, immobilise) ; intentions `soigner` et `se_reposer` ;
+convalescence 5/j au repos à l'abri, 2/j sinon, 0 en saignant. Accouchement : 3 % de mortalité
+maternelle, ×2 si santé < 50 ou âge > 40, ÷2 avec une accoucheuse à portée (÷10 si elle
+connaît la leçon), nouveau-né à 60 de santé, mort au berceau 0,02 % par jour avant deux ans.
+
 ### 5.3 Compétences
 
 Niveaux 0..10, progressent par la pratique (courbe logarithmique). Modifient vitesse,

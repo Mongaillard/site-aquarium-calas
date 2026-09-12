@@ -14,6 +14,8 @@ import {
   estLecon,
   titreSavoir,
   avancementGrossesse,
+  capacites,
+  estEpuise,
   codeBiome,
   decrireAction,
   decrireIntention,
@@ -79,6 +81,8 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     causeDeces: p.causeDeces,
     teint: p.identite.apparence.teint,
     cheveux: p.identite.apparence.cheveux,
+    blesse: p.corps.etat.blessures.length > 0,
+    epuise: estEpuise(p),
   };
 }
 
@@ -379,6 +383,14 @@ export function pensee(sim: Simulation, p: Personnage): string {
         : "Un peu de chaleur avant de repartir.";
     case "attendre":
       return "Rien ne presse.";
+    case "soigner":
+      return i.cible === p.id
+        ? "Il faut que je m'occupe de cette blessure."
+        : `${prenom(i.cible)} souffre, je vais le soigner.`;
+    case "se_reposer":
+      return p.corps.etat.blessures.length > 0
+        ? "Je dois me ménager, le temps que ça guérisse."
+        : "Je n'en peux plus, un peu de repos.";
   }
 }
 
@@ -474,6 +486,39 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
       origine: s.origine,
     })),
     nombreSouvenirs: p.memoire.taille,
+    corps: ficheCorps(sim, p),
+    humeur: p.humeur
+      .filter((m) => m.jusqua > sim.tick)
+      .map((m) => ({ cle: m.cle, valeur: Math.round(m.valeur) })),
+  };
+}
+
+function ficheCorps(sim: Simulation, p: Personnage): MessageFiche["corps"] {
+  const etat = p.corps.etat;
+  const T = sim.horloge.ticksParJour;
+  const c = capacites(p, sim.config.vie.joursParAnnee, sim.tick);
+  return {
+    fatigue: Math.round(etat.fatigue),
+    epuise: estEpuise(p),
+    blessures: etat.blessures.map((b) => ({
+      type: b.type,
+      gravite: b.gravite,
+      lieu: b.lieu,
+      jours: Math.floor((sim.tick - b.depuis) / T),
+      saigne: b.saigne,
+      bandee: b.bandee,
+      infectee: b.infectee,
+      immobilisee: b.immobilisee,
+    })),
+    carence: etat.carence,
+    handicaps: etat.handicaps.map((h) => h.type),
+    cicatrices: etat.cicatrices,
+    capacites: {
+      mobilite: Math.round(c.mobilite * 100) / 100,
+      manipulation: Math.round(c.manipulation * 100) / 100,
+      vue: Math.round(c.vue * 100) / 100,
+      vigueur: Math.round(c.vigueur * 100) / 100,
+    },
   };
 }
 

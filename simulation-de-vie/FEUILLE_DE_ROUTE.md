@@ -23,7 +23,7 @@ La colonie sait aujourd'hui survivre, bâtir, parler, se reproduire, tirer des l
 
 L'ordre suit les dépendances : on ne peut pas faire attaquer un loup sans blessures, ni élever une brebis sans troupeau, ni bannir sans justice. Tailles : S (quelques heures), M (une journée), L (plusieurs jours), XL (une semaine ou plus).
 
-### Jalon 8 — Le corps
+### Jalon 8 — Le corps — livré (M8)
 
 Le socle de tout le reste : un personnage peut être diminué sans être mort.
 

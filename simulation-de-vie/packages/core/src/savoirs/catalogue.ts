@@ -37,6 +37,15 @@ export const LECONS = {
     titre: "Des vêtements chauds",
     morale: "Le froid passe à travers les fibres : il faut du cuir sur le dos avant l'hiver.",
   },
+  soigner_les_blesses: {
+    titre: "Soigner les blessés",
+    morale:
+      "Une plaie qu'on ne bande pas emporte quelqu'un en une semaine : on soigne d'abord, et on garde un bandage.",
+  },
+  accoucheuse: {
+    titre: "Une accoucheuse",
+    morale: "Une femme n'accouche pas seule : qu'une autre, qui sait, soit près d'elle.",
+  },
 } as const satisfies Record<string, FicheLecon>;
 export type Lecon = keyof typeof LECONS;
 

@@ -54,6 +54,9 @@ export interface PersonnageEtat {
   readonly causeDeces: string | null;
   readonly teint: string;
   readonly cheveux: string;
+  /** Le corps (jalon « le corps ») : blessé (bande rouge), épuisé. */
+  readonly blesse: boolean;
+  readonly epuise: boolean;
 }
 
 export interface BatimentEtat {
@@ -193,6 +196,37 @@ export interface PersonneCourte {
   readonly vivant: boolean;
 }
 
+export interface BlessureFiche {
+  readonly type: string;
+  readonly gravite: number;
+  readonly lieu: string;
+  readonly jours: number;
+  readonly saigne: boolean;
+  readonly bandee: boolean;
+  readonly infectee: boolean;
+  readonly immobilisee: boolean;
+}
+
+export interface CorpsFiche {
+  readonly fatigue: number;
+  readonly epuise: boolean;
+  readonly blessures: readonly BlessureFiche[];
+  readonly carence: string | null;
+  readonly handicaps: readonly string[];
+  readonly cicatrices: number;
+  readonly capacites: {
+    readonly mobilite: number;
+    readonly manipulation: number;
+    readonly vue: number;
+    readonly vigueur: number;
+  };
+}
+
+export interface HumeurFiche {
+  readonly cle: string;
+  readonly valeur: number;
+}
+
 export interface MessageFiche {
   readonly type: "fiche";
   readonly id: string;
@@ -239,6 +273,8 @@ export interface MessageFiche {
   readonly lieuxConnus: number;
   readonly nombreSouvenirs: number;
   readonly savoirs: readonly SavoirFiche[];
+  readonly corps: CorpsFiche;
+  readonly humeur: readonly HumeurFiche[];
 }
 
 export interface MessageErreur {

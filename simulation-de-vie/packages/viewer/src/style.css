@@ -485,3 +485,8 @@ table.saisons td:first-child {
     transition: none !important;
   }
 }
+
+.puce.blessure {
+  background: #4a2323;
+  color: #ffb3b3;
+}

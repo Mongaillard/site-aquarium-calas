@@ -97,7 +97,34 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       return planifierSuivi(monde, intention.cible);
     case "se_rechauffer":
       return planifierRechauffement(monde, p);
+    case "soigner":
+      if (intention.cible === p.id) return ok([{ type: "soigner", cible: p.id, ticksRestants: 3 }]);
+      return planifierRencontre(monde, p, intention.cible, (cible) => ({
+        type: "soigner",
+        cible: cible.id,
+        ticksRestants: 3,
+      }));
+    case "se_reposer":
+      return planifierRepos(monde, p);
   }
+}
+
+/** Se reposer à l'abri (jusqu'à 80 tuiles), sinon près d'un feu, sinon sur place. */
+function planifierRepos(monde: Monde, p: Personnage): ResultatPlan {
+  const pos = p.corps.position;
+  const repos: Action = { type: "se_reposer", ticksRestants: 36 };
+  const abri = abriDisponible(monde, p);
+  if (abri !== null && Grille.distance(pos, abri.position) <= 80) {
+    if (pos.x === abri.position.x && pos.y === abri.position.y) return ok([repos]);
+    const aller = allerSur(monde, p, abri.position);
+    if (aller) return ok([aller, repos]);
+  }
+  const feu = feuLePlusProche(monde, pos, 25);
+  if (feu !== null && feuProche(monde, pos) === null) {
+    const aller = allerPresDe(monde, p, feu.position);
+    if (aller) return ok([aller, repos]);
+  }
+  return ok([repos]);
 }
 
 /**

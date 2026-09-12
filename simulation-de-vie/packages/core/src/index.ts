@@ -94,6 +94,24 @@ export { LECONS, INVENTIONS, SEUIL_SAVOIR, estLecon, titreSavoir } from "./savoi
 export type { Lecon, Invention, Savoir, SavoirAcquis, Domaine } from "./savoirs/catalogue.js";
 export { apprendre, connait, savoirsConnus, tirerLecons, apprenants } from "./savoirs/lecons.js";
 export { inventer } from "./savoirs/inventions.js";
+export {
+  capacites,
+  estEpuise,
+  humeur,
+  saigne,
+  aDeLaFievre,
+  SEUIL_EPUISEMENT,
+  SEUIL_FATIGUE,
+} from "./agents/corps.js";
+export type {
+  Blessure,
+  Capacites,
+  Carence,
+  EtatCorps,
+  Handicap,
+  Modificateur,
+  TypeBlessure,
+} from "./agents/corps.js";
 export type { Evenement, TypeEvenement, Auditeur } from "./evenements/journal.js";
 export { estEau, eauAdjacente, personnagesVivants } from "./monde.js";
 export type { Monde } from "./monde.js";

@@ -64,7 +64,9 @@ export type Action =
     }
   | { readonly type: "se_reproduire"; readonly partenaire: string; ticksRestants: number | null }
   | { readonly type: "suivre"; readonly cible: string; ticksRestants: number }
-  | { readonly type: "se_rechauffer"; ticksRestants: number };
+  | { readonly type: "se_rechauffer"; ticksRestants: number }
+  | { readonly type: "soigner"; readonly cible: string; ticksRestants: number }
+  | { readonly type: "se_reposer"; ticksRestants: number };
 
 export type TypeAction = Action["type"];
 
@@ -85,7 +87,9 @@ export type Intention =
   | { readonly type: "courtiser"; readonly cible: string }
   | { readonly type: "se_reproduire" }
   | { readonly type: "suivre"; readonly cible: string }
-  | { readonly type: "se_rechauffer" };
+  | { readonly type: "se_rechauffer" }
+  | { readonly type: "soigner"; readonly cible: string }
+  | { readonly type: "se_reposer" };
 
 export type TypeIntention = Intention["type"];
 
@@ -107,6 +111,8 @@ export function decrireIntention(i: Intention): string {
       return `courtiser:${i.cible}`;
     case "suivre":
       return `suivre:${i.cible}`;
+    case "soigner":
+      return `soigner:${i.cible}`;
     default:
       return i.type;
   }
@@ -154,6 +160,10 @@ export function decrireAction(a: Action): string {
       return `suivre:${a.cible}`;
     case "se_rechauffer":
       return `se_rechauffer:${a.ticksRestants}`;
+    case "soigner":
+      return `soigner:${a.cible}`;
+    case "se_reposer":
+      return `se_reposer:${a.ticksRestants}`;
   }
 }
 

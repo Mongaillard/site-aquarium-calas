@@ -8,6 +8,8 @@ import type { Rng } from "../rng.js";
 import { relationVierge } from "../social/relations.js";
 import type { Relation } from "../social/relations.js";
 import { besoinsInitiaux } from "./besoins.js";
+import { etatCorpsInitial } from "./corps.js";
+import type { EtatCorps, Modificateur } from "./corps.js";
 import type { Besoins } from "./besoins.js";
 import { experienceInitiale } from "./competences.js";
 import type { Experience } from "./competences.js";
@@ -35,6 +37,8 @@ export interface Corps {
   enceinte: Grossesse | null;
   /** Tick du dernier accouchement (délai avant une nouvelle grossesse). */
   dernierAccouchement: number | null;
+  /** Blessures, fatigue, carences, handicaps, cicatrices, régime. */
+  etat: EtatCorps;
 }
 
 /** Lieu mémorisé : gisement ou point d'eau vu par le personnage (préfigure la mémoire de M3). */
@@ -89,6 +93,8 @@ export interface Personnage {
   readonly savoirs: Map<Savoir, SavoirAcquis>;
   /** Pensée intérieure soufflée par Claude (M5), valable une journée. */
   penseeClaude: { texte: string; tick: number } | null;
+  /** Modificateurs d'humeur datés (deuil, blessure, naissance…). */
+  readonly humeur: Modificateur[];
   readonly relations: Map<string, Relation>;
   readonly memoire: FluxMemoire;
   /** Réputation -100..100, modifiée par les témoins de ses actes. */
@@ -156,6 +162,7 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
       endormi: false,
       enceinte: null,
       dernierAccouchement: null,
+      etat: etatCorpsInitial(),
     },
     besoins: besoinsInitiaux(rng),
     experience: experienceInitiale(),
@@ -169,6 +176,7 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
     connaissance: new Map(),
     savoirs: new Map(),
     penseeClaude: null,
+    humeur: [],
     relations: new Map(),
     memoire: new FluxMemoire({
       ticksParJour: options.ticksParJour,

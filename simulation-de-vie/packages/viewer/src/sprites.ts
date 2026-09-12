@@ -378,6 +378,8 @@ export interface AspectPersonnage {
   readonly enceinte: boolean;
   readonly selection: boolean;
   readonly survol: boolean;
+  /** Blessé : un bandeau rouge sur le corps. */
+  readonly blesse?: boolean;
 }
 
 export const TEINTS: Readonly<Record<string, string>> = {
@@ -445,6 +447,10 @@ export function personnage(ctx: Ctx, x: number, y: number, a: AspectPersonnage):
   ctx.lineTo(cx - 0.2 * s, sol - 0.2 * s);
   ctx.closePath();
   ctx.fill();
+  if (a.blesse === true) {
+    ctx.fillStyle = "#d63b3b";
+    ctx.fillRect(cx - 0.19 * s, sol - 0.5 * s, 0.38 * s, 0.07 * s);
+  }
   ctx.strokeStyle = a.contour;
   ctx.lineWidth = 0.035;
   ctx.stroke();

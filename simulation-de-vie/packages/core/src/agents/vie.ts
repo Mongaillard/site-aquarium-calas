@@ -5,7 +5,8 @@
 import { apprendre } from "../savoirs/lecons.js";
 import { gagnerExperience } from "./competences.js";
 import type { Competence } from "./competences.js";
-import { probabiliteMortNaturelle } from "./genetique.js";
+import { phenotype, probabiliteMortNaturelle } from "./genetique.js";
+import { ajouterHumeur } from "./corps.js";
 import { NOURRITURE, placeLibre, transferer } from "./inventaire.js";
 import { clamp } from "./besoins.js";
 import { mettreAJourStade, relationAvec } from "./personnage.js";
@@ -94,6 +95,14 @@ export function tickVieQuotidien(monde: Monde, p: Personnage): void {
   const ageAnnees = p.corps.ageJours / joursParAnnee;
   if (p.rng.chance(probabiliteMortNaturelle(ageAnnees, p.identite.genome, ageAncien))) {
     monde.tuer(p, "vieillesse");
+    return;
+  }
+  // Les deux premières années sont fragiles : mort au berceau, rare mais réelle.
+  if (
+    ageAnnees < 2 &&
+    p.rng.chance(0.0002 * (1.4 - 0.8 * phenotype(p.identite.genome, "immunite")))
+  ) {
+    monde.tuer(p, "mort au berceau");
   }
 }
 
@@ -198,6 +207,13 @@ export function deuil(monde: Monde, defunt: Personnage, cause: string): void {
     if (!proche && !ami) continue;
     p.besoins.moral = clamp(p.besoins.moral - (proche ? 25 : 10));
     p.besoins.social = clamp(p.besoins.social - (proche ? 20 : 5));
+    ajouterHumeur(
+      p,
+      `deuil:${defunt.id}`,
+      proche ? -12 : -4,
+      60 * monde.horloge.ticksParJour,
+      tick,
+    );
     const f = defunt.identite.sexe === "F";
     p.memoire.ajouter(
       tick,

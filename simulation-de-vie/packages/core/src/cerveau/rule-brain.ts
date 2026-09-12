@@ -46,6 +46,8 @@ export class RuleBrain implements Cerveau {
     const affame = b.faim < SEUILS_URGENCE.faim;
     if (gele && !(affame && perception.moi.nourritureEnPoche)) return { type: "se_rechauffer" };
     if (affame) return { type: "manger" };
+    if (perception.moi.saigneAvecBandage === true)
+      return { type: "soigner", cible: this.personnage.id };
     return null;
   }
 
@@ -54,10 +56,19 @@ export class RuleBrain implements Cerveau {
     let meilleur: Candidat | null = null;
     for (const c of candidats) {
       const bruit = 0.9 + 0.2 * this.personnage.rng.suivant();
-      const score = c.score * bruit;
+      const score = this.ponderer(c.intention, c.score, perception.moi.corps.mobilite) * bruit;
       if (meilleur === null || score > meilleur.score) meilleur = { intention: c.intention, score };
     }
     return meilleur?.intention ?? { type: "attendre", ticks: 3 };
+  }
+
+  /** Pondération finale : un corps diminué se détourne des tâches qui demandent des jambes. */
+  private ponderer(intention: Intention, score: number, mobilite: number): number {
+    if (mobilite >= 0.8) return score;
+    const marche =
+      intention.type === "explorer" ||
+      (intention.type === "recolter" && intention.ressource === "gibier");
+    return marche ? score * 0.4 : score;
   }
 
   /** Candidats et scores bruts (exposé pour les tests). */
@@ -102,6 +113,79 @@ export class RuleBrain implements Cerveau {
 
     const saisonFroide = perception.saison === "automne" || perception.saison === "hiver";
     const sait = (s: Savoir): boolean => perception.moi.savoirs.has(s);
+    const corps = perception.moi.corps;
+
+    // Le corps d'abord : se soigner, se reposer, dormir quand on n'en peut plus.
+    if (corps.soinNecessaire !== null) {
+      if (perception.moi.possede(corps.soinNecessaire)) {
+        candidats.push({
+          intention: { type: "soigner", cible: perception.moi.id },
+          score: 1.2 + (corps.saigne ? 1 : 0) + (corps.fievre ? 0.5 : 0),
+        });
+      } else if (adulte) {
+        candidats.push({
+          intention: { type: "fabriquer", recette: corps.soinNecessaire },
+          score: 0.9 + (corps.saigne ? 1 : 0) + (corps.fievre ? 0.4 : 0),
+        });
+      }
+    }
+    // Le repos ne passe pas avant la faim ni la soif.
+    if (
+      (corps.blesse || corps.fievre || corps.fatigue > 80) &&
+      perception.abriDisponible &&
+      besoins.faim >= 35 &&
+      besoins.soif >= 35
+    ) {
+      candidats.push({
+        intention: { type: "se_reposer" },
+        score:
+          0.35 +
+          0.15 * corps.graviteMax +
+          (corps.fievre ? 0.5 : 0) +
+          (corps.fatigue > 80 ? (corps.fatigue - 80) / 40 : 0) +
+          (nuit ? 0.2 : 0),
+      });
+    }
+    if (corps.epuise && (nuit || corps.fatigue >= 95))
+      candidats.push({ intention: { type: "dormir" }, score: 1.6 });
+    // Soigner quelqu'un qu'on voit souffrir, si l'on a de quoi.
+    const blesse = perception.personnesVisibles.find(
+      (v) => v.soinNecessaire !== null && perception.moi.possede(v.soinNecessaire),
+    );
+    if (adulte && blesse !== undefined && blesse.soinNecessaire !== null) {
+      candidats.push({
+        intention: { type: "soigner", cible: blesse.id },
+        score:
+          0.9 +
+          (blesse.saigne ? 0.6 : 0) +
+          (blesse.famille ? 0.4 : 0) +
+          blesse.affinite / 200 +
+          personnalite.agreabilite * 0.3 +
+          (sait("soigner_les_blesses") ? 0.5 : 0),
+      });
+    }
+    // Fabriquer ce qui manque à un blessé visible, ou garder un bandage d'avance.
+    const aSoigner = perception.personnesVisibles.find((v) => v.soinNecessaire !== null);
+    if (
+      adulte &&
+      aSoigner?.soinNecessaire != null &&
+      !perception.moi.possede(aSoigner.soinNecessaire)
+    ) {
+      candidats.push({
+        intention: { type: "fabriquer", recette: aSoigner.soinNecessaire },
+        score: 0.6 + (aSoigner.saigne ? 0.5 : 0) + (aSoigner.famille ? 0.3 : 0),
+      });
+    } else if (
+      adulte &&
+      sait("soigner_les_blesses") &&
+      !perception.moi.possede("bandage") &&
+      placeLibre > 0
+    ) {
+      candidats.push({
+        intention: { type: "fabriquer", recette: "bandage" },
+        score: 0.35 + personnalite.conscience * 0.2,
+      });
+    }
 
     // Se réchauffer au feu ou à l'abri quand on a froid (plus tôt si l'on a retenu la leçon).
     if (
