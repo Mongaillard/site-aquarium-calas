@@ -241,10 +241,10 @@ describe("chantiers et bâtiments", () => {
     abri.etat = "termine";
     abri.solidite = 3;
     sim.avancerJusquaAube();
-    sim.tick1(); // l'aube est traitée au premier tick du jour : usure de 1 (ou 4 sous orage)
+    sim.tick1(); // l'aube est traitée au premier tick du jour : usure de 0,5 (ou 3 sous orage)
     if (sim.batiments.has(abri.id)) {
       expect(abri.solidite).toBeLessThan(3);
-      abri.solidite = 1;
+      abri.solidite = 0.4;
       sim.avancerJusquaAube();
       sim.tick1();
     }

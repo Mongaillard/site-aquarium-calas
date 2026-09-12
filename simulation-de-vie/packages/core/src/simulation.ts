@@ -4,7 +4,8 @@
  * perception, de la décision, de la planification et de l'exécution de M1.
  */
 import { appliquerTickBesoins } from "./agents/besoins.js";
-import { possede } from "./agents/inventaire.js";
+import { possede, transferer } from "./agents/inventaire.js";
+import type { Ressource } from "./monde/ressources.js";
 import type { Personnage } from "./agents/personnage.js";
 import { genererPopulation } from "./agents/population.js";
 import { creerPersonnage } from "./agents/personnage.js";
@@ -472,6 +473,22 @@ export class Simulation implements Monde {
   detruireBatiment(id: string): void {
     const b = this.batiments.get(id);
     if (b === undefined) return;
+    // Ce qu'un bâtiment effondré contenait est sauvé dans le stock familial le plus proche.
+    if (b.stock !== null) {
+      const refuges = [...this.batiments.values()]
+        .filter(
+          (x) => x.id !== id && x.etat === "termine" && x.stock !== null && x.famille === b.famille,
+        )
+        .sort(
+          (x, y) =>
+            Grille.distance(x.position, b.position) - Grille.distance(y.position, b.position),
+        );
+      for (const refuge of refuges) {
+        if (refuge.stock === null) continue;
+        for (const [r, n] of Object.entries(b.stock.ressources) as [Ressource, number][])
+          transferer(b.stock, refuge.stock, r, n);
+      }
+    }
     this.batiments.delete(id);
     const tuile = this.grille.tuile(b.position.x, b.position.y);
     if (tuile.batiment?.id === id) tuile.batiment = null;
@@ -538,7 +555,7 @@ export class Simulation implements Monde {
     const tempete = EFFETS_METEO[this.meteo].tempete;
     for (const b of [...this.batiments.values()]) {
       if (b.etat !== "termine") continue;
-      b.solidite -= tempete ? 4 : 1;
+      b.solidite -= tempete ? 3 : 0.5;
       if (tempete && b.type === "feu_de_camp" && b.allume) {
         b.allume = false;
         this.emettre("feu_eteint", null, { batiment: b.id }, 3, b.position);
@@ -620,7 +637,7 @@ export class Simulation implements Monde {
       perteChaleur,
       gainChaleur,
       facteurSoif: meteo.soif,
-      facteurFaim: p.corps.enceinte !== null ? 1.3 : 1,
+      facteurFaim: p.corps.enceinte !== null ? 1.3 : p.corps.stade === "enfant" ? 0.7 : 1,
     });
     p.corps.sante = Math.min(100, p.corps.sante + effet.deltaSante);
     p.drapeaux.faimMinDuJour = Math.min(p.drapeaux.faimMinDuJour, p.besoins.faim);

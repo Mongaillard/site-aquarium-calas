@@ -405,6 +405,7 @@ export class RuleBrain implements Cerveau {
           0.3 +
           personnalite.conscience * 0.4 +
           (projet !== null ? 0.15 : 0) +
+          (perception.reparationNecessaire && projet === null ? 0.5 : 0) +
           (besoinAbri ? 0.5 + urgence(besoins.securite) + froid : 0) +
           (perception.moi.chercheAbri && (type === "abri" || type === "maison") ? 0.4 : 0) +
           (besoinFeu ? 0.3 + froid : 0) -

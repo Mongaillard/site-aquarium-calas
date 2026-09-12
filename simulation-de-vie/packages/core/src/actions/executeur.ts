@@ -443,6 +443,25 @@ function tickOffrir(
 ): Resultat {
   const cible = interlocuteur(monde, p, action.cible);
   if (typeof cible === "string") return echec(cible);
+  // Un sac plein n'empêche pas de manger : la nourriture offerte se mange sur place.
+  const valeur = NOURRITURE[action.ressource];
+  if (
+    valeur !== undefined &&
+    placeLibre(cible.corps.inventaire) <= 0 &&
+    cible.besoins.faim < 90 &&
+    retirer(p.corps.inventaire, action.ressource, 1) === 1
+  ) {
+    cible.besoins.faim = clamp(cible.besoins.faim + valeur);
+    monde.emettre("repas", cible, { ressource: action.ressource, quantite: 1 }, 2);
+    monde.emettre(
+      "offre",
+      p,
+      { cible: cible.id, ressource: action.ressource, quantite: 1, surPlace: true },
+      3,
+    );
+    effetsDon(p, cible, 1, monde.horloge.tick);
+    return TERMINEE;
+  }
   const n = transferer(
     p.corps.inventaire,
     cible.corps.inventaire,

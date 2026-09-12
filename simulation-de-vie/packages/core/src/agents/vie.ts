@@ -6,7 +6,7 @@ import { apprendre } from "../savoirs/lecons.js";
 import { gagnerExperience } from "./competences.js";
 import type { Competence } from "./competences.js";
 import { probabiliteMortNaturelle } from "./genetique.js";
-import { transferer } from "./inventaire.js";
+import { NOURRITURE, placeLibre, transferer } from "./inventaire.js";
 import { clamp } from "./besoins.js";
 import { mettreAJourStade, relationAvec } from "./personnage.js";
 import type { Personnage } from "./personnage.js";
@@ -21,7 +21,7 @@ import type { Ressource } from "../monde/ressources.js";
 export const AGE_MATERNITE = { min: 16, max: 45 } as const;
 
 /** Jours de jeu avant qu'une mère puisse concevoir à nouveau. */
-export const DELAI_POST_PARTUM_JOURS = 20;
+export const DELAI_POST_PARTUM_JOURS = 120;
 
 /** Une femme peut-elle concevoir ? (adulte, âge, pas enceinte, délai post-partum) */
 export function peutConcevoir(monde: Monde, femme: Personnage): boolean {
@@ -131,8 +131,15 @@ export function heriter(monde: Monde, defunt: Personnage): Personnage | null {
   if (heritier === null) return null;
   const inv = defunt.corps.inventaire;
   let transmis = 0;
-  for (const [r, n] of Object.entries(inv.ressources) as [Ressource, number][])
+  const enfant = heritier.corps.stade === "enfant";
+  // La nourriture d'abord ; un enfant n'hérite que de quoi manger, le reste va au stock.
+  const ordre = (Object.entries(inv.ressources) as [Ressource, number][]).sort(
+    ([a], [b]) => Number(NOURRITURE[b] !== undefined) - Number(NOURRITURE[a] !== undefined),
+  );
+  for (const [r, n] of ordre) {
+    if (enfant && NOURRITURE[r] === undefined) continue;
     transmis += transferer(inv, heritier.corps.inventaire, r, n);
+  }
   const stock = batimentsAccessibles(monde, heritier).find(
     (b) => b.etat === "termine" && b.stock !== null,
   );
@@ -140,7 +147,10 @@ export function heriter(monde: Monde, defunt: Personnage): Personnage | null {
     for (const [r, n] of Object.entries(inv.ressources) as [Ressource, number][])
       transmis += transferer(inv, stock.stock, r, n);
   }
-  for (const o of inv.objets.splice(0)) heritier.corps.inventaire.objets.push(o);
+  for (const o of inv.objets.splice(0)) {
+    if (!enfant && placeLibre(heritier.corps.inventaire) > 0)
+      heritier.corps.inventaire.objets.push(o);
+  }
   let batiments = 0;
   for (const b of monde.batiments.values()) {
     if (b.proprietaire === defunt.id) {
