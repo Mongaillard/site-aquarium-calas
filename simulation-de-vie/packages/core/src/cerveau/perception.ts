@@ -49,7 +49,7 @@ import type { Souvenir } from "../memoire/souvenir.js";
 import type { Lien } from "../social/relations.js";
 import { meilleureNourritureConnue, stockVolable } from "../actions/planificateur.js";
 import { eligibles, partenaireDe, veutCourtiser } from "../social/couple.js";
-import { avancementGrossesse, peutConcevoir } from "../agents/vie.js";
+import { avancementGrossesse, grandEnfant, peutConcevoir } from "../agents/vie.js";
 import { PROFILS, troupeauxVisiblesDepuis } from "../monde/faune.js";
 import { betesDe } from "../monde/village.js";
 import { prioriteEnCours } from "./conseil.js";
@@ -213,6 +213,8 @@ export interface Perception {
     readonly besoins: Readonly<Besoins>;
     readonly sante: number;
     readonly stade: Stade;
+    /** Enfant d'au moins six ans : il cueille des baies lui-même. */
+    readonly grandEnfant: boolean;
     readonly personnalite: Personnalite;
     readonly endormi: boolean;
     readonly placeLibre: number;
@@ -463,6 +465,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
       besoins: p.besoins,
       sante: p.corps.sante,
       stade: p.corps.stade,
+      grandEnfant: grandEnfant(monde, p),
       personnalite: p.identite.personnalite,
       endormi: p.corps.endormi,
       placeLibre: placeLibre(inv),

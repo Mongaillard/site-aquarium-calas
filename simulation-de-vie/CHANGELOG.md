@@ -49,6 +49,12 @@ Le monde sans limite prend son sens : plusieurs villages. Module `monde/villages
   répare au lieu d'échouer. Enfants adultes à quatorze ans (adolescents dès dix). Sur cinq
   graines et six cents jours, plus aucune mort de faim ; la graine 42 passe de zéro survivant
   en l'an cinq à vingt-deux.
+- **La faim de l'an dix** : passé l'an quatre, la même graine montait à trente-cinq habitants
+  dont vingt-neuf enfants pour six adultes, puis mourait de faim en l'an onze. Deux freins :
+  une mère ne conçoit plus quand sa famille compte déjà deux enfants par paire de bras
+  (adolescents et adultes), et attend deux ans entre deux naissances (un an avant) ; et les
+  grands enfants, dès six ans, cueillent des baies eux-mêmes, pour eux et pour le garde-manger
+  quand il se vide.
 
 ## M20 – La psyché et la mémoire (jalon 14, 2026-09-13)
 

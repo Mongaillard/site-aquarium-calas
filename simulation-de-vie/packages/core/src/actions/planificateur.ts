@@ -33,6 +33,7 @@ import {
   tuileEnceinteManquante,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
+import { grandEnfant } from "../agents/vie.js";
 import { eviteLeLieu } from "../social/societe.js";
 import { lieuEvite } from "../memoire/psyche.js";
 import { partenaireDe } from "../social/couple.js";
@@ -478,16 +479,27 @@ function planifierManger(monde: Monde, p: Personnage): ResultatPlan {
       );
     const parent =
       parents.find((x) => nourritureDisponible(x.corps.inventaire) !== null) ?? parents[0];
-    if (parent !== undefined && Grille.distance(p.corps.position, parent.corps.position) <= 30) {
-      const ressource = nourritureDisponible(parent.corps.inventaire);
-      if (ressource === null) return echec(`${parent.identite.prenom} n'a rien à donner`);
-      return planifierRencontre(monde, p, parent.id, (cible) => ({
+    const parentProche =
+      parent !== undefined && Grille.distance(p.corps.position, parent.corps.position) <= 30
+        ? parent
+        : undefined;
+    const ressource =
+      parentProche === undefined ? null : nourritureDisponible(parentProche.corps.inventaire);
+    if (parentProche !== undefined && ressource !== null) {
+      return planifierRencontre(monde, p, parentProche.id, (cible) => ({
         type: "demander",
         cible: cible.id,
         ressource,
         quantite: 1,
       }));
     }
+    // Un grand enfant (six ans) va cueillir des baies lui-même.
+    if (grandEnfant(monde, p)) {
+      const cueillette = planifierRecolte(monde, p, "baies", 2, true);
+      if (cueillette.ok) return cueillette;
+    }
+    if (parentProche !== undefined)
+      return echec(`${parentProche.identite.prenom} n'a rien à donner`);
     return echec("trop jeune pour récolter : il faut demander");
   }
 

@@ -45,7 +45,7 @@ import { accepteDemande, effetsDon, effetsRefus, effetsVol } from "../social/ech
 import { ajusterRelation } from "../social/relations.js";
 import { SEUILS_COUPLE, accepteCour, eligibles, gainAttirance, unir } from "../social/couple.js";
 import { rayonVision } from "../cerveau/perception.js";
-import { avancementGrossesse, peutConcevoir } from "../agents/vie.js";
+import { avancementGrossesse, grandEnfant, peutConcevoir } from "../agents/vie.js";
 import { COUT_EAU_PIROGUE, estTuileEau, trouverChemin } from "./chemin.js";
 import {
   blesser,
@@ -687,7 +687,9 @@ function tickRecolter(
   if (Grille.distance(p.corps.position, action.cible) > 1) return echec("gisement trop loin");
   const outil = gisement.outilRequis;
   if (!outilSatisfait(p.corps.inventaire, outil)) return echec(`outil requis : ${outil ?? ""}`);
-  if (p.corps.stade === "enfant") return echec("trop jeune pour récolter");
+  // Un grand enfant cueille des baies ; le reste attend l'adolescence.
+  if (p.corps.stade === "enfant" && !(gisement.type === "baies" && grandEnfant(monde, p)))
+    return echec("trop jeune pour récolter");
   if (gisement.quantite < 1) return echec("gisement épuisé");
   if (placeLibre(p.corps.inventaire) <= 0) return echec("inventaire plein");
 

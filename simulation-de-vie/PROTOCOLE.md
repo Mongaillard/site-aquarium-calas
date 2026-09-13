@@ -497,7 +497,10 @@ entretenus (`Construire` sur un bâtiment existant = réparation).
    (monogamie par défaut ; un trait `volage` autorise des exceptions, avec conséquences
    relationnelles).
 3. `SeReproduire` requiert : lien partenaire, les deux dans un abri/maison dont l'un est
-   autorisé, besoins de base > 40, femme non enceinte, âge 16–45 pour la mère.
+   autorisé, besoins de base > 40, femme non enceinte, âge 16–45 pour la mère, deux ans depuis
+   la dernière naissance, et une famille qui a encore les bras pour un enfant de plus (moins
+   de deux enfants par adolescent ou adulte : **[DÉCISION M21]** frein démographique, sans
+   lequel les colonies meurent de faim en l'an dix sous le nombre de bouches).
 4. Probabilité de grossesse par acte : **[DÉCISION]** 25 %, réduite si faim ou santé basse.
 5. Grossesse : **[DÉCISION]** 30 jours de jeu. La mère a des besoins accrus (faim ×1,3),
    vitesse réduite au dernier tiers. Risque de fausse couche si santé < 30.
@@ -532,7 +535,9 @@ interface Genome {
 
 - Enfant (0–10 ans, adolescent de 10 à 14, adulte à 14 : **[DÉCISION M21]** la relève doit arriver avant que les fondateurs ne s'éteignent) : ne peut pas récolter de ressources lourdes, ni construire, ni se
   battre ; mange à partir des stocks familiaux ; suit un parent ou joue ; apprend par
-  observation (5.3).
+  observation (5.3). Dès six ans, un grand enfant cueille des baies lui-même, pour lui et pour
+  le garde-manger quand il se vide (**[DÉCISION M21]** : sans cela, une famille de six adultes
+  et vingt-neuf enfants meurt de faim en l'an dix).
 - Adolescent (10–14) : actions d'adulte avec rendement ×0,6 ; commence à avoir son propre
   cerveau LLM (avant : `RuleBrain` uniquement, pour limiter le coût **[DÉCISION]**).
 - Un enfant dont les deux parents meurent est pris en charge par un adulte ayant la

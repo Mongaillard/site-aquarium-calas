@@ -12,7 +12,7 @@ import { clamp } from "./besoins.js";
 import { mettreAJourStade, relationAvec } from "./personnage.js";
 import type { Personnage } from "./personnage.js";
 import { personnaliteDepuisGenome } from "./identite.js";
-import { batimentsAccessibles } from "../monde.js";
+import { batimentsAccessibles, membresFamille } from "../monde.js";
 import type { Monde } from "../monde.js";
 import { rompre } from "../social/couple.js";
 import { relationFamiliale } from "../social/relations.js";
@@ -21,8 +21,33 @@ import type { Ressource } from "../monde/ressources.js";
 /** Âge minimal et maximal de la mère, en années. */
 export const AGE_MATERNITE = { min: 16, max: 45 } as const;
 
-/** Jours de jeu avant qu'une mère puisse concevoir à nouveau. */
-export const DELAI_POST_PARTUM_JOURS = 120;
+/** Jours de jeu avant qu'une mère puisse concevoir à nouveau (deux ans). */
+export const DELAI_POST_PARTUM_JOURS = 240;
+
+/** Âge (années) à partir duquel un enfant cueille des baies lui-même. */
+export const AGE_CUEILLETTE = 6;
+
+/**
+ * Enfants par bras (adolescents et adultes) au-delà desquels une famille n'a
+ * plus de quoi nourrir un nouveau-né : on n'y conçoit plus.
+ */
+export const ENFANTS_PAR_BRAS_MAX = 2;
+
+/** Un grand enfant : encore enfant, mais assez grand pour cueillir. */
+export function grandEnfant(monde: Monde, p: Personnage): boolean {
+  return (
+    p.corps.stade === "enfant" &&
+    p.corps.ageJours / monde.config.vie.joursParAnnee >= AGE_CUEILLETTE
+  );
+}
+
+/** La famille a-t-elle encore les bras pour nourrir un enfant de plus ? */
+export function familleSaturee(monde: Monde, p: Personnage): boolean {
+  const membres = membresFamille(monde, p);
+  const enfants = membres.filter((m) => m.corps.stade === "enfant").length;
+  const bras = membres.length - enfants;
+  return enfants >= ENFANTS_PAR_BRAS_MAX * Math.max(1, bras);
+}
 
 /** Une femme peut-elle concevoir ? (adulte, âge, pas enceinte, délai post-partum) */
 export function peutConcevoir(monde: Monde, femme: Personnage): boolean {
@@ -34,6 +59,7 @@ export function peutConcevoir(monde: Monde, femme: Personnage): boolean {
     return false;
   const age = femme.corps.ageJours / monde.config.vie.joursParAnnee;
   if (age < AGE_MATERNITE.min || age > AGE_MATERNITE.max) return false;
+  if (familleSaturee(monde, femme)) return false;
   const dernier = femme.corps.dernierAccouchement;
   return (
     dernier === null ||

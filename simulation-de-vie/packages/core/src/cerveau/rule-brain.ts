@@ -307,7 +307,22 @@ export class RuleBrain implements Cerveau {
           Math.min(3, perception.moi.enfantsACharge) * 0.1,
       });
     }
-    if (adulte && perception.stockAccessible && perception.nourritureEnPocheQuantite >= 6) {
+    // Un grand enfant cueille des baies : pour lui, et pour le garde-manger quand il se vide.
+    if (!adulte && perception.moi.grandEnfant && connait("baies") && placeLibre > 1) {
+      candidats.push({
+        intention: { type: "recolter", ressource: "baies" },
+        score:
+          0.25 +
+          personnalite.conscience * 0.3 +
+          urgence(besoins.faim) * 0.4 +
+          (perception.stockAccessible && perception.reserveJours < RESERVE_VISEE ? 0.35 : 0),
+      });
+    }
+    if (
+      (adulte || perception.moi.grandEnfant) &&
+      perception.stockAccessible &&
+      perception.nourritureEnPocheQuantite >= 6
+    ) {
       candidats.push({
         intention: { type: "stocker" },
         score: 0.5 + personnalite.conscience * 0.3,
