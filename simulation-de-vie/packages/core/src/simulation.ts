@@ -22,7 +22,7 @@ import {
 import type { Gisement, Ressource } from "./monde/ressources.js";
 import type { Personnage } from "./agents/personnage.js";
 import { genererPopulation } from "./agents/population.js";
-import { creerPersonnage } from "./agents/personnage.js";
+import { creerPersonnage, elaguerConnaissance } from "./agents/personnage.js";
 import { heriter as heriterGenome } from "./agents/genetique.js";
 import {
   adopter,
@@ -1337,7 +1337,10 @@ export class Simulation implements Monde {
       this.jourDuVillage();
       this.regenererBassins();
       aubeSociete(this);
-      for (const p of this.vivants()) aubePsyche(this, p);
+      for (const p of this.vivants()) {
+        aubePsyche(this, p);
+        elaguerConnaissance(p);
+      }
       aubeVillages(
         this,
         this.rng.fork(`villages/aube/${String(this.tick)}`),
@@ -2008,6 +2011,8 @@ export class Simulation implements Monde {
     this.tirerLeconsDe(p, cause);
     mortSociete(this, p, cause);
     mortPsyche(this, p, cause);
+    // Un mort n'a plus besoin de sa carte mentale (elle pesait lourd dans les sauvegardes).
+    p.connaissance.clear();
     for (const enfant of this.personnages) {
       if (enfant.vivant && (enfant.identite.parents?.includes(p.id) ?? false))
         adopter(this, enfant);

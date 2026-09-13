@@ -73,7 +73,8 @@ reprend ou la supprime ; la page sauvegarde toute seule toutes les vingt seconde
 dès qu'on met en pause et quand elle passe à l'arrière-plan, puis reprend la partie d'elle-même au
 chargement suivant (sauf si l'adresse impose une graine, ou après douze heures : elle propose
 alors « ↩ Reprendre la partie »). Tout est rangé compressé dans le navigateur (IndexedDB), propre
-à l'appareil. Un monde restauré continue exactement comme l'original. Sur mobile, un doigt qui
+à l'appareil ; la sauvegarde de sortie part sans attendre, et une partie avancée est mise à
+l'abri sous son nom avant qu'un nouveau monde ne remplace la sauvegarde automatique. Un monde restauré continue exactement comme l'original. Sur mobile, un doigt qui
 tire en butée ne recharge plus la page.
 
 Pour développer le viewer avec rechargement à chaud : lancez le serveur (`pnpm --filter

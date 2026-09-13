@@ -97,7 +97,16 @@ export class FluxMemoire {
       dernierAcces: tick,
     };
     this.souvenirs.push(s);
-    if (this.souvenirs.length > this.options.maxSouvenirs) this.oublier(tick);
+    if (this.souvenirs.length > this.options.maxSouvenirs) {
+      this.oublier(tick);
+      // Toujours trop plein : on oublie de plus en plus important, de plus en plus vite.
+      for (
+        let importance = 3;
+        this.souvenirs.length > this.options.maxSouvenirs && importance <= 6;
+        importance++
+      )
+        this.oublier(tick, importance, 10);
+    }
     return s;
   }
 

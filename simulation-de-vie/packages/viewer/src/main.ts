@@ -13,10 +13,12 @@ import { Rendu } from "./rendu.js";
 import { retenirLeTirer } from "./gestes.js";
 import {
   NOM_AUTO,
+  copierSauvegarde,
   decrireSauvegarde,
   ecrireSauvegarde,
   lireSauvegarde,
   listerSauvegardes,
+  preparerStockage,
   supprimerSauvegarde,
 } from "./sauvegarde.js";
 import type { Liaison } from "./reseau.js";
@@ -130,12 +132,15 @@ const statutSauvegarde = (texte: string): void => {
   const el = document.getElementById("connexion");
   if (el && !dlgSauvegardes.open) el.textContent = texte;
 };
-/** Sauvegarde le monde courant sous ce nom ; vrai si c'est fait. */
-async function sauvegarderSous(nom: string): Promise<boolean> {
+/**
+ * Sauvegarde le monde courant sous ce nom ; vrai si c'est fait. `immediate` :
+ * sans compression et sans attendre, pour une page qui se cache ou se ferme.
+ */
+async function sauvegarderSous(nom: string, immediate = false): Promise<boolean> {
   const s = liaison instanceof LiaisonLocale ? liaison.sauvegarder() : null;
   if (s === null) return false;
   try {
-    await ecrireSauvegarde(nom, s);
+    await ecrireSauvegarde(nom, s, immediate);
     return true;
   } catch (erreur: unknown) {
     statutSauvegarde(
@@ -232,7 +237,7 @@ function sauvegardeAutomatique(maintenant: number, force = false): void {
   derniereSauvegardeAutoA = maintenant;
   dernierJourSauve = jour;
   const debut = performance.now();
-  void sauvegarderSous(NOM_AUTO).then((fait) => {
+  void sauvegarderSous(NOM_AUTO, force).then((fait) => {
     if (fait) dernierTickSauve = tick;
   });
   // La part synchrone (encoder le monde) vient de s'exécuter : on en déduit la cadence.
@@ -326,25 +331,48 @@ if (modeLocal) {
 
 /** Une sauvegarde plus vieille que cela ne reprend plus toute seule : elle se propose d'un clic. */
 const REPRISE_AUTO_MS = 12 * 3_600_000;
+/** À partir de ce jour, une partie automatique se met à l'abri avant d'être écrasée. */
+const JOUR_PARTIE_PRECIEUSE = 20;
 /**
  * Au chargement : la sauvegarde la plus récente (automatique ou nommée) reprend
  * toute seule si elle est fraîche et que l'adresse n'impose pas de graine ;
  * sinon elle se propose d'un clic. Vrai si la partie a repris.
  */
 async function reprendreAuChargement(): Promise<boolean> {
-  const derniere = (await listerSauvegardes())[0];
+  const sauvegardes = await listerSauvegardes();
+  const derniere = sauvegardes[0];
   if (derniere === undefined) return false;
   btnReprendre.hidden = false;
   btnReprendre.dataset.nom = derniere.nom;
   btnReprendre.textContent = `↩ Reprendre ${derniere.nom === NOM_AUTO ? "la partie" : `« ${derniere.nom} »`} (jour ${String(derniere.jour)}, ${String(derniere.vivants)} vivants)`;
-  if (parametres.has("seed") || Date.now() - derniere.date > REPRISE_AUTO_MS) return false;
-  const s = await lireSauvegarde(derniere.nom);
-  if (s === null) return false;
-  btnReprendre.hidden = true;
-  relancer(s.seed, s);
-  graineEntree.value = s.seed;
-  statutSauvegarde(`Partie reprise au jour ${String(s.jour)}.`);
-  return true;
+  // Un nouveau monde va écraser la sauvegarde automatique : une partie avancée y est d'abord
+  // mise à l'abri sous son propre nom.
+  const auto = sauvegardes.find((e) => e.nom === NOM_AUTO);
+  const proteger = async (): Promise<void> => {
+    if (auto === undefined || auto.jour < JOUR_PARTIE_PRECIEUSE) return;
+    const nom = `Partie du jour ${String(auto.jour)} (graine ${auto.seed})`;
+    if (sauvegardes.some((e) => e.nom === nom)) return;
+    if (await copierSauvegarde(NOM_AUTO, nom)) statutSauvegarde(`« ${nom} » mise à l'abri.`);
+  };
+  if (parametres.has("seed") || Date.now() - derniere.date > REPRISE_AUTO_MS) {
+    await proteger();
+    return false;
+  }
+  try {
+    const s = await lireSauvegarde(derniere.nom);
+    if (s === null) return false;
+    btnReprendre.hidden = true;
+    relancer(s.seed, s);
+    graineEntree.value = s.seed;
+    statutSauvegarde(`Partie reprise au jour ${String(s.jour)}.`);
+    return true;
+  } catch (erreur: unknown) {
+    await proteger();
+    statutSauvegarde(
+      `Reprise impossible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+    );
+    return false;
+  }
 }
 
 function redimensionner(): void {
@@ -907,8 +935,14 @@ function boucle(maintenant: number): void {
 }
 requestAnimationFrame(boucle);
 if (modeLocal) {
+  preparerStockage();
   void reprendreAuChargement()
-    .catch(() => false)
+    .catch((erreur: unknown) => {
+      statutSauvegarde(
+        `Stockage indisponible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+      );
+      return false;
+    })
     .then((reprise) => {
       if (!reprise) liaison.connecter();
     });

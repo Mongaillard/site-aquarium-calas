@@ -2,6 +2,26 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M22 – La partie ne se perd plus à la sortie (2026-09-13)
+
+Sur mobile, quitter l'artefact pouvait perdre la partie : la sauvegarde de sortie était
+compressée hors du fil principal puis écrite, et le navigateur tuait la page avant la fin ;
+au chargement suivant, un monde neuf écrasait la sauvegarde automatique.
+
+- **Sauvegarde de sortie immédiate** : quand la page se cache ou se ferme, le JSON part tel
+  quel, sans compression, dans une écriture lancée dans la foulée sur une connexion IndexedDB
+  gardée ouverte depuis le chargement. Les sauvegardes de routine restent compressées ; une
+  écriture plus récente sur le même nom l'emporte toujours sur une plus ancienne encore en vol.
+- **La partie précédente est mise à l'abri** : avant qu'un nouveau monde (graine imposée,
+  sauvegarde trop vieille pour reprendre seule, reprise impossible) ne remplace la sauvegarde
+  automatique, une partie d'au moins vingt jours est copiée sous son nom (« Partie du jour 312
+  (graine 42) ») et reste dans la boîte 💾. Une reprise qui échoue le dit désormais.
+- **Sauvegardes plus légères** : les souvenirs plafonnent à six cents par personne (deux mille
+  avant ; au-delà, l'oubli monte en importance), les lieux connus à huit cents (les plus
+  anciennement vus s'effacent, la carte les rend), et un mort perd sa carte mentale. Une
+  sauvegarde de quatre cents jours passe de 13 Mo à quelques mégaoctets avant compression, ce
+  qui allège aussi chaque sauvegarde automatique sur mobile.
+
 ## M21 – Le monde s'élargit (jalon 15, 2026-09-13)
 
 Le monde sans limite prend son sens : plusieurs villages. Module `monde/villages.ts`, état

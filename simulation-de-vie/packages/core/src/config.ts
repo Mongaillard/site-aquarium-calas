@@ -93,7 +93,7 @@ export const CONFIG_PAR_DEFAUT: SimConfig = {
     conseilsParJour: 4,
     budgetUsdParJourSimule: 5,
   },
-  memoire: { maxSouvenirs: 2000, topK: 20, demiVieRecenceJours: 1 },
+  memoire: { maxSouvenirs: 600, topK: 20, demiVieRecenceJours: 1 },
   perception: { rayonJour: 6, rayonNuit: 3 },
   social: { monogamie: true, nomFamille: "pere", vouvoiementInconnus: true },
 };

@@ -911,7 +911,10 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   structurelle (chaque champ parcouru), les tuiles se regénèrent de la graine, le journal est
   tronqué à ses trois mille derniers événements (compteurs conservés).
 - La page range les sauvegardes dans IndexedDB (nommées, plus « auto »), en JSON compressé
-  (gzip par `CompressionStream`, à plat si le navigateur ne l'a pas) ; le serveur n'en a pas
+  (gzip par `CompressionStream`, à plat si le navigateur ne l'a pas) ; la sauvegarde de sortie
+  (page cachée ou fermée) part sans compression, dans une écriture lancée dans la foulée sur
+  une connexion gardée ouverte, et une partie d'au moins vingt jours est copiée sous son nom
+  avant qu'un nouveau monde ne remplace « auto » (**[DÉCISION M22]**) ; le serveur n'en a pas
   encore. La sauvegarde automatique suit une cadence adaptative (vingt secondes, allongée pour
   que l'encodage reste sous un quarantième du temps), plus l'aube, la mise en pause et la mise à
   l'arrière-plan ; la plus récente reprend d'elle-même au chargement si elle a moins de douze
@@ -1051,7 +1054,7 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
     "enfantsAvecLLM": false,
     "budgetUsdParJourSimule": 5.0       // au-delà : bascule en "rules" jusqu'au lendemain
   },
-  "memoire": { "maxSouvenirs": 2000, "topK": 20, "demiVieRecenceJours": 1 },
+  "memoire": { "maxSouvenirs": 600, "topK": 20, "demiVieRecenceJours": 1 },
   "perception": { "rayonJour": 6, "rayonNuit": 3 },
   "social": { "monogamie": true, "nomFamille": "pere", "vouvoiementInconnus": true }
 }

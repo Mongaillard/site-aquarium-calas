@@ -53,6 +53,21 @@ export interface LieuConnu {
   tickVu: number;
 }
 
+/** Lieux connus au-delà desquels on oublie les plus anciennement vus (la carte les rend). */
+export const LIEUX_CONNUS_MAX = 800;
+
+/** Oublie les lieux vus il y a le plus longtemps quand on en connaît trop. */
+export function elaguerConnaissance(p: Personnage, max = LIEUX_CONNUS_MAX): number {
+  const surplus = p.connaissance.size - max;
+  if (surplus <= 0) return 0;
+  const parAnciennete = [...p.connaissance.entries()].sort((a, b) => a[1].tickVu - b[1].tickVu);
+  for (let i = 0; i < surplus; i++) {
+    const e = parAnciennete[i];
+    if (e !== undefined) p.connaissance.delete(e[0]);
+  }
+  return surplus;
+}
+
 export interface Echec {
   readonly tick: number;
   readonly action: string;
