@@ -110,7 +110,7 @@ demande conseil. Trois études (game design, interaction, boucle de conseil) ont
   conseillée. Les lieux interdits (une tuile que le ciel déclare sacrée et que l'on contourne)
   restent à faire.
 
-### Jalon 13 — La société
+### Jalon 13 — La société — livré (M19 : les douze briques, avec des décisions collectives limitées aux stocks, au puits et à l'exil)
 
 Comment trois familles deviennent un village avec ses règles.
 

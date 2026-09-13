@@ -29,6 +29,10 @@ export interface Relation {
   interactions: number;
   /** Cours réussies (section 8.1). */
   cours: number;
+  /** Rancune 0..100 : nourrie par les vols et les refus, apaisée d'un point par jour ; à 60, la rixe guette. */
+  rancune: number;
+  /** Haine héréditaire : on l'a laissé mourir de faim ; transmise aux enfants, effacée par le prix du sang. */
+  haine: boolean;
 }
 
 export function relationVierge(cible: string): Relation {
@@ -42,6 +46,8 @@ export function relationVierge(cible: string): Relation {
     dette: 0,
     interactions: 0,
     cours: 0,
+    rancune: 0,
+    haine: false,
   };
 }
 

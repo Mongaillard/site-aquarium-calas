@@ -33,6 +33,7 @@ import {
   tuileEnceinteManquante,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
+import { eviteLeLieu } from "../social/societe.js";
 import { partenaireDe } from "../social/couple.js";
 import { relationAvec } from "../agents/personnage.js";
 import { trouverChemin } from "./chemin.js";
@@ -128,6 +129,13 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       return planifierReparationOutil(monde, p, intention.objet);
     case "prier":
       return planifierPriere(monde, p);
+    case "se_recueillir": {
+      const aller = allerPresDe(monde, p, intention.cible);
+      const recueil: Action = { type: "se_recueillir", cible: intention.cible, ticksRestants: 3 };
+      if (aller === null && Grille.distance(p.corps.position, intention.cible) > 1)
+        return echec("la tombe est hors d'atteinte");
+      return ok(aller ? [aller, recueil] : [recueil]);
+    }
     case "abattre": {
       const bete = monde.betail.get(intention.bete);
       if (bete === undefined) return echec("plus de bête");
@@ -496,7 +504,7 @@ function planifierRecolte(
   if (ressource === "gibier") return planifierChasse(monde, p, puisManger);
   const inv = p.corps.inventaire;
   const lieux = lieuxConnusTries(p, ressource).filter(
-    (l) => l.quantiteVue >= 1 && outilSatisfait(inv, l.outilRequis),
+    (l) => l.quantiteVue >= 1 && outilSatisfait(inv, l.outilRequis) && !eviteLeLieu(monde, p, l),
   );
   if (lieux.length === 0) return echec(`aucun gisement de ${ressource} exploitable connu`);
   const liberation = placeLibre(inv) <= 0 ? libererPlace(monde, p, [ressource]) : [];

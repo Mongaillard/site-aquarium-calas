@@ -8,6 +8,7 @@ import {
   LIBELLES_METEO,
   LIBELLES_MOTIF,
   LIBELLES_SAISON,
+  LIBELLES_FETE,
   LIBELLES_SUJET,
   LIBELLES_TYPE,
   NOMS_BATIMENT,
@@ -41,6 +42,7 @@ export class Panneaux {
   private derniereVersionPopulation = -1;
   private derniereVersionStats = -1;
   private derniereVersionConversations = -1;
+  private derniereVersionVillage = -1;
   private derniereVersionBatiment = -1;
   private dernierRenduLent = 0;
   private ficheAffichee: MessageFiche | null = null;
@@ -184,6 +186,12 @@ export class Panneaux {
         if (force || version !== this.derniereVersionStats) {
           this.stats();
           this.derniereVersionStats = version;
+        }
+        break;
+      case "village":
+        if (force || version !== this.derniereVersionVillage) {
+          this.village();
+          this.derniereVersionVillage = version;
         }
         break;
       case "population":
@@ -493,6 +501,9 @@ export class Panneaux {
       <h3>Foi</h3>
       <div class="jauges"><span>foi</span><div class="jauge"><i style="width:${f.foi * 10}%;background:#ffd479"></i></div><span class="num">${f.foi}/10</span></div>
       <div class="discret">${f.foi >= 3 ? "prie le ciel quand ça va mal" : "ne prie guère"}${f.priere ? ` · dernière prière : ${e(LIBELLES_SUJET[f.priere.sujet] ?? f.priere.sujet)}${f.priere.autel ? " à l'autel" : ""}${f.priere.exaucee ? " — exaucée ✓" : ""}` : ""}</div>
+      <h3>Village</h3>
+      <div class="jauges"><span>prestige</span><div class="jauge"><i style="width:${f.prestige}%;background:#c9a7ff"></i></div><span class="num">${f.prestige}</span></div>
+      <div class="discret">${f.notable ? "⭐ notable du village · " : ""}${f.banni ? `🚫 banni${f.sexe === "F" ? "e" : ""} encore ${f.banni.joursRestants} jour${f.banni.joursRestants > 1 ? "s" : ""} (${e(f.banni.motif)}) · ` : ""}${f.traumatise ? "💔 marqué par une mort violente · " : ""}${f.maitre ? `apprend auprès de ${personne(f.maitre)} · ` : ""}${f.apprentis.length > 0 ? `maître de ${liste(f.apprentis)} · ` : ""}${f.rancunes.length > 0 ? `rancunes : ${f.rancunes.map((r) => `<span class="lien" data-id="${e(r.id)}">${e(r.prenom)}</span> ${r.haine ? "(haine)" : String(r.rancune)}`).join(", ")}` : "sans rancune"}</div>
       <h3>Famille</h3>
       <div>Parents : ${liste(f.famille.parents)} · Partenaire : ${f.famille.partenaire ? personne(f.famille.partenaire) : "—"}</div>
       <div>Enfants : ${liste(f.famille.enfants)} · Fratrie : ${liste(f.famille.fratrie)}</div>
@@ -622,7 +633,7 @@ export class Panneaux {
         ${tuile(s.vivants, "vivants")}${tuile(s.enfants, "enfants")}${tuile(s.population, "population totale")}${tuile(s.morts, "morts")}
         ${tuile(s.naissances, "naissances")}${tuile(s.unions, "unions")}${tuile(s.generations, "générations")}${tuile(s.dialogues, "dialogues")}
         ${tuile(s.batiments, "bâtiments")}${tuile(s.chantiers, "chantiers")}${tuile(s.evenements, "événements")}${tuile(s.tick, "ticks")}
-        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}${tuile(s.foiMoyenne, "foi moyenne /10")}${tuile(`${s.prieres} · ${s.exaucees}`, "prières · exaucées")}
+        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}${tuile(s.foiMoyenne, "foi moyenne /10")}${tuile(`${s.prieres} · ${s.exaucees}`, "prières · exaucées")}${tuile(`${s.veillees} · ${s.fetes}`, "veillées · fêtes")}${tuile(`${s.palabres} · ${s.exils}`, "palabres · exils")}${tuile(s.rixes, "rixes")}
       </div>
       <h3>Où ils vont</h3>
       ${
@@ -648,6 +659,90 @@ export class Panneaux {
       <h3>Par saison</h3>
       <table class="saisons"><tr><th>saison</th><th>naissances</th><th>décès</th></tr>${saisons || "<tr><td colspan='3' class='discret'>rien encore</td></tr>"}</table>`;
     for (const l of $("stats").querySelectorAll<HTMLElement>("[data-id]")) {
+      l.addEventListener("click", () => {
+        this.inter.selectionner(l.dataset.id ?? null);
+        this.afficherOnglet("inspecteur");
+      });
+    }
+  }
+
+  /** Onglet Village : coutumes, notables, factions et tension, griefs, décisions, alliances, tabous. */
+  private village(): void {
+    const etat = this.magasin.etat;
+    if (etat === null) return;
+    const init = this.magasin.init;
+    const s = etat.societe;
+    const jour = etat.moment.jourAbsolu;
+    const quand = (j: number): string =>
+      init
+        ? formaterTick(j * init.ticksParJour, init.ticksParJour, init.joursParSaison).replace(
+            /,.*$/,
+            "",
+          )
+        : `jour ${j}`;
+    const personne = (p: PersonneCourte): string =>
+      `<span class="lien" data-id="${e(p.id)}">${e(p.prenom)}${p.vivant ? "" : " †"}</span>`;
+    const tensionClasse = s.tension >= 70 ? "critique" : s.tension >= 40 ? "bas" : "";
+    const tensionTexte =
+      s.tension >= 70
+        ? "le village se déchire : chaque faction veille de son côté"
+        : s.tension >= 40
+          ? "les rancunes tournent vite en rixe"
+          : "le village vit en paix";
+    const coutumes = s.coutumes.length
+      ? `<ul class="liste">${s.coutumes.map((c) => `<li title="${e(c.morale)}">📜 <b>${e(c.titre)}</b> <span class="discret">depuis ${quand(c.depuisJour)} · ${c.part} % des adultes</span><div class="discret">${e(c.morale)}</div></li>`).join("")}</ul>`
+      : "<p class='discret'>aucune coutume encore : une leçon connue de 60 % des adultes pendant trente jours en devient une</p>";
+    const notables = s.notables.length
+      ? s.notables
+          .map(
+            (n) =>
+              `<span class="puce">⭐ ${personne({ id: n.id, prenom: n.prenom, vivant: true })} <span class="discret">${e(n.nomFamille)} · ${n.prestige}</span></span>`,
+          )
+          .join("")
+      : "<span class='discret'>personne ne se distingue encore (prestige ≥ 15)</span>";
+    const factions = s.factions.length
+      ? s.factions
+          .map(
+            (f) =>
+              `<span class="puce" title="${e(f.familles.join(", "))}">${e(f.nom)}${f.familles.length > 1 ? ` + ${f.familles.length - 1}` : ""} <span class="discret">· ${f.membres} adulte${f.membres > 1 ? "s" : ""}</span></span>`,
+          )
+          .join("")
+      : "<span class='discret'>calculées chaque semaine</span>";
+    const issue: Record<string, string> = {
+      ouvert: "à juger à la prochaine veillée",
+      repare: "réparé",
+      exil: "exil",
+      pardonne: "pardonné",
+      rixe: "réglé à mains nues",
+    };
+    const griefs = s.griefs.length
+      ? `<table class="saisons"><tr><th>quand</th><th>qui</th><th>quoi</th><th>issue</th></tr>${s.griefs.map((g) => `<tr><td>${e(quand(g.jour))}</td><td>${personne(g.accuse)} <span class="discret">← ${personne(g.plaignant)}</span></td><td>${e(g.motif)} (${e(g.details)})</td><td>${g.etat === "ouvert" ? "⏳ " : ""}${e(issue[g.etat] ?? g.etat)}</td></tr>`).join("")}</table>`
+      : "<p class='discret'>aucun grief : un vol vu par un témoin en ouvre un, jugé à la veillée</p>";
+    const decisions = s.decisions.length
+      ? `<ul class="liste">${s.decisions.map((d) => `<li>${d.adoptee ? "✅" : "❌"} <b>${e(d.libelle)}</b> <span class="discret">${e(quand(d.jour))} · ${d.pour} pour, ${d.contre} contre</span></li>`).join("")}</ul>`
+      : "<p class='discret'>aucune décision collective encore (ouvrir les stocks en hiver, creuser un puits commun, bannir)</p>";
+    const alliances = s.alliances.length
+      ? s.alliances.map(([a, b]) => `<span class="puce">💍 ${e(a)} & ${e(b)}</span>`).join("")
+      : "<span class='discret'>aucune : un mariage entre deux familles les allie</span>";
+    const tabous = s.lieuxInterdits.length
+      ? `<ul class="liste">${s.lieuxInterdits.map((l) => `<li>☠️ ${e(l.motif)} <span class="discret">en (${l.x}, ${l.y}), encore ${l.joursRestants} jour${l.joursRestants > 1 ? "s" : ""}</span></li>`).join("")}</ul>`
+      : "<p class='discret'>aucun lieu interdit : une mort inexpliquée en fait un pour une saison</p>";
+    const veillee = s.veillee
+      ? `<div class="discret">Dernière veillée : ${s.veillee.fete ? `fête ${e(LIBELLES_FETE[s.veillee.fete] ?? s.veillee.fete)}, ` : ""}${s.veillee.participants.length} autour du feu en (${s.veillee.x}, ${s.veillee.y})${etat.tick - s.veillee.tick < 6 ? " — en ce moment" : ""}</div>`
+      : "<div class='discret'>pas encore de veillée : il faut trois adultes éveillés près d'un feu à 21 h</div>";
+    $("village").innerHTML = `
+      <h2>Le village au ${e(quand(jour))}</h2>
+      <div class="jauges"><span>tension</span><div class="jauge ${tensionClasse}"><i style="width:${s.tension}%"></i></div><span class="num">${s.tension}</span></div>
+      <div class="discret">${tensionTexte}${s.stocksOuverts ? " · les stocks sont ouverts à tous" : ""}${s.bannis.length ? ` · banni${s.bannis.length > 1 ? "s" : ""} : ${s.bannis.map(personne).join(", ")}` : ""}</div>
+      ${veillee}
+      <h3>Coutumes du village</h3>${coutumes}
+      <h3>Notables</h3><div class="puces">${notables}</div>
+      <h3>Factions</h3><div class="puces">${factions}</div>
+      <h3>Griefs et palabres</h3>${griefs}
+      <h3>Décisions</h3>${decisions}
+      <h3>Alliances</h3><div class="puces">${alliances}</div>
+      <h3>Lieux interdits</h3>${tabous}`;
+    for (const l of $("village").querySelectorAll<HTMLElement>("[data-id]")) {
       l.addEventListener("click", () => {
         this.inter.selectionner(l.dataset.id ?? null);
         this.afficherOnglet("inspecteur");

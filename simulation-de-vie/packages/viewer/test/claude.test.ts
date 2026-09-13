@@ -46,6 +46,8 @@ function personnage(id: string, vivant: boolean): PersonnageEtat {
     alerte: false,
     malade: false,
     metier: null,
+    notable: false,
+    banni: false,
   };
 }
 
@@ -161,6 +163,11 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
       foiMoyenne: 2,
       prieres: 0,
       exaucees: 0,
+      veillees: 0,
+      fetes: 0,
+      palabres: 0,
+      exils: 0,
+      rixes: 0,
     },
     decouvertes: [],
     rayonVision: 6,
@@ -178,6 +185,19 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
     },
     questions: [],
     prieres: [],
+    societe: {
+      tension: 0,
+      coutumes: [],
+      notables: [],
+      factions: [],
+      griefs: [],
+      decisions: [],
+      alliances: [],
+      lieuxInterdits: [],
+      stocksOuverts: false,
+      veillee: null,
+      bannis: [],
+    },
   };
 }
 

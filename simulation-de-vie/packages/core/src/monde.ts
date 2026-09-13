@@ -17,6 +17,7 @@ import type { Troupeau } from "./monde/faune.js";
 import type { Bete } from "./monde/village.js";
 import { betesDe, enclosDe } from "./monde/village.js";
 import type { Rng } from "./rng.js";
+import type { EtatSociete } from "./social/societe.js";
 
 export interface Monde {
   readonly config: SimConfig;
@@ -48,6 +49,8 @@ export interface Monde {
   naitre(mere: Personnage, pere: Personnage): Personnage;
   /** Fait mourir un personnage (cause libre). */
   tuer(p: Personnage, cause: string): void;
+  /** La société (jalon 13) : coutumes, griefs, tension, alliances, lieux interdits. */
+  readonly societe: EtatSociete;
 }
 
 /**
@@ -89,8 +92,20 @@ export function personnagesVivants(monde: Monde): Personnage[] {
 
 /** Le personnage a-t-il le droit d'utiliser ce bâtiment ? (propriétaire, invité, famille, apparenté au propriétaire) */
 export function autorise(monde: Monde, b: Batiment, p: Personnage): boolean {
+  const jour = monde.horloge.moment().jourAbsolu;
+  // Un banni n'a plus accès à rien, sinon aux tombes et aux chantiers communs.
+  if (p.banni !== null && jour < p.banni.jusquaJour) return b.type === "tombe" || b.commun === true;
+  if (b.commun === true) return true;
   if (b.proprietaire === p.id || b.autorises.includes(p.id) || b.famille === p.identite.nomFamille)
     return true;
+  const s = monde.societe;
+  // Les stocks ouverts par décision d'hiver, les abris des familles alliées par mariage.
+  if (b.stock !== null && jour < s.stocksOuvertsJusquaJour) return true;
+  if (PLANS_BATIMENT[b.type].abri) {
+    const a = b.famille;
+    const c = p.identite.nomFamille;
+    if (s.alliances.includes(a < c ? `${a}|${c}` : `${c}|${a}`)) return true;
+  }
   const proprietaire = monde.personnages.find((x) => x.id === b.proprietaire);
   return proprietaire !== undefined && apparentes(p, proprietaire);
 }
@@ -220,6 +235,9 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
   if (!acces.some((b) => b.type === "feu_de_camp" && (b.etat === "chantier" || b.allume)))
     return "feu_de_camp";
   if (feuAAlimenter(monde, p) !== null) return "feu_de_camp";
+  // Un chantier décidé par le village passe avant le confort de la famille.
+  const commun = acces.find((b) => b.commun === true && b.etat === "chantier");
+  if (commun !== undefined) return commun.type;
   if (!acces.some((b) => PLANS_BATIMENT[b.type].capaciteStock > 0)) return "entrepot";
   if (
     (p.savoirs.get("puits_pres_du_village")?.force ?? 0) >= 0.6 &&

@@ -26,6 +26,11 @@ import {
   niveau,
   partenaireDe,
   rayonVision,
+  estBanni,
+  estNotable,
+  notables,
+  adultes,
+  connait,
 } from "@sdv/core";
 import type {
   Evenement,
@@ -46,6 +51,7 @@ import type {
   EvenementEtat,
   GisementEtat,
   MessageEtat,
+  SocieteEtat,
   MessageFiche,
   TroupeauEtat,
   MessageInit,
@@ -102,6 +108,80 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     alerte: p.drapeaux.alerteJusqua > sim.tick,
     malade: p.corps.etat.maladies.length > 0,
     metier: sim.titre(p),
+    notable: estNotable(sim, p),
+    banni: estBanni(sim, p),
+  };
+}
+
+/** La société du village, pour l'onglet « Village » et la carte. */
+export function societeEtat(sim: Simulation): SocieteEtat {
+  const s = sim.societe;
+  const jour = sim.horloge.moment().jourAbsolu;
+  const ad = adultes(sim);
+  return {
+    tension: Math.round(s.tension),
+    coutumes: s.coutumes.map((c) => ({
+      lecon: c.lecon,
+      titre: LECONS[c.lecon].titre,
+      morale: LECONS[c.lecon].morale,
+      depuisJour: c.depuisJour,
+      part:
+        ad.length === 0
+          ? 0
+          : Math.round((ad.filter((p) => connait(p, c.lecon)).length / ad.length) * 100),
+    })),
+    notables: notables(sim).map((p) => ({
+      id: p.id,
+      prenom: p.identite.prenom,
+      nomFamille: p.identite.nomFamille,
+      prestige: Math.round(p.prestige),
+    })),
+    factions: s.factions.map((f) => ({
+      nom: f.nom,
+      familles: [...f.familles],
+      membres: f.membres,
+    })),
+    griefs: [...s.griefs]
+      .slice(-12)
+      .reverse()
+      .map((g) => ({
+        id: g.id,
+        jour: g.jour,
+        motif: g.motif,
+        details: g.details,
+        plaignant: personneCourte(sim, g.plaignant),
+        accuse: personneCourte(sim, g.accuse),
+        etat: g.etat,
+      })),
+    decisions: [...s.decisions].slice(-8).reverse(),
+    alliances: s.alliances.map((a) => {
+      const [x = "", y = ""] = a.split("|");
+      return [x, y] as const;
+    }),
+    lieuxInterdits: s.lieuxInterdits
+      .filter((l) => jour < l.jusquaJour)
+      .map((l) => ({
+        x: l.x,
+        y: l.y,
+        rayon: l.rayon,
+        joursRestants: l.jusquaJour - jour,
+        motif: l.motif,
+      })),
+    stocksOuverts: jour < s.stocksOuvertsJusquaJour,
+    veillee:
+      s.derniereVeillee === null
+        ? null
+        : {
+            tick: s.derniereVeillee.tick,
+            x: s.derniereVeillee.x,
+            y: s.derniereVeillee.y,
+            participants: [...s.derniereVeillee.participants],
+            fete: s.derniereVeillee.fete,
+          },
+    bannis: sim
+      .vivants()
+      .filter((p) => estBanni(sim, p))
+      .map((p) => personneCourte(sim, p.id)),
   };
 }
 
@@ -296,6 +376,11 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     foiMoyenne: foiMoyenne(sim),
     prieres: sim.faveur.prieres,
     exaucees: sim.faveur.exaucees,
+    veillees: sim.societe.compteurs.veillees,
+    fetes: sim.societe.compteurs.fetes,
+    palabres: sim.societe.compteurs.palabres,
+    exils: sim.societe.compteurs.exils,
+    rixes: sim.societe.compteurs.rixes,
   };
 }
 
@@ -471,6 +556,7 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     faveur: sim.etatFaveur(),
     questions: sim.questionsEnAttente(),
     prieres: sim.prieresOuvertes(),
+    societe: societeEtat(sim),
   };
 }
 
@@ -590,6 +676,8 @@ export function pensee(sim: Simulation, p: Personnage): string {
       return "On n'a plus rien ; il va falloir abattre une bête.";
     case "prier":
       return "Que le ciel m'entende.";
+    case "se_recueillir":
+      return "Je vais me recueillir sur la tombe de qui m'a appris ce que je sais.";
   }
 }
 
@@ -702,6 +790,30 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
     humeur: p.humeur
       .filter((m) => m.jusqua > sim.tick)
       .map((m) => ({ cle: m.cle, valeur: Math.round(m.valeur) })),
+    prestige: Math.round(p.prestige),
+    notable: estNotable(sim, p),
+    maitre: p.maitre === null ? null : personneCourte(sim, p.maitre),
+    apprentis: sim.personnages
+      .filter((x) => x.vivant && x.maitre === p.id)
+      .map((x) => personneCourte(sim, x.id)),
+    banni:
+      p.banni !== null && estBanni(sim, p)
+        ? {
+            joursRestants: p.banni.jusquaJour - sim.horloge.moment().jourAbsolu,
+            motif: p.banni.motif,
+          }
+        : null,
+    rancunes: [...p.relations.values()]
+      .filter((r) => r.rancune >= 20 || r.haine)
+      .sort((a, b) => b.rancune - a.rancune)
+      .slice(0, 5)
+      .map((r) => ({
+        id: r.cible,
+        prenom: sim.personnage(r.cible)?.identite.prenom ?? r.cible,
+        rancune: Math.round(r.rancune),
+        haine: r.haine,
+      })),
+    traumatise: p.drapeaux.traumatiseJusqua > sim.tick,
   };
 }
 

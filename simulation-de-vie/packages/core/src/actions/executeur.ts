@@ -31,6 +31,7 @@ import {
 import type { Ressource } from "../monde/ressources.js";
 import { atelierAdjacent, autorise, eauAdjacente, feuProche } from "../monde.js";
 import type { Monde } from "../monde.js";
+import { seRecueillir } from "../social/societe.js";
 import { composerDialogue, transcrire } from "../social/dialogue.js";
 import { accepteDemande, effetsDon, effetsRefus, effetsVol } from "../social/echange.js";
 import { ajusterRelation } from "../social/relations.js";
@@ -154,6 +155,14 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       return tickAbattre(monde, p, action);
     case "prier":
       return tickPrier(monde, p, action);
+    case "se_recueillir": {
+      if (Grille.distance(p.corps.position, action.cible) > 1)
+        return echec("la tombe est trop loin");
+      action.ticksRestants -= 1;
+      if (action.ticksRestants > 0) return ENCOURS;
+      seRecueillir(monde, p, action.cible);
+      return TERMINEE;
+    }
     case "defendre": {
       const cible = monde.personnages.find((x) => x.id === action.cible);
       if (!cible?.vivant) return echec("personne à défendre");

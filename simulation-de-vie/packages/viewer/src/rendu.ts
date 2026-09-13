@@ -88,6 +88,22 @@ export class Rendu {
 
     const nuit = etat?.moment.estNuit ?? false;
     if (etat !== null) {
+      // Lieux interdits : une zone hachurée qu'on évite.
+      for (const l of etat.societe.lieuxInterdits) {
+        if (!visible(l.x, l.y)) continue;
+        this.dessinerLieuInterdit(l.x, l.y, l.rayon);
+      }
+      // La veillée : un cercle de lumière autour du feu, une heure durant.
+      const v = etat.societe.veillee;
+      if (v !== null && etat.tick - v.tick < 6) {
+        ctx.strokeStyle = `rgba(255, 220, 140, ${0.35 + 0.25 * Math.sin(maintenant / 300)})`;
+        ctx.lineWidth = 0.12;
+        ctx.setLineDash([0.3, 0.2]);
+        ctx.beginPath();
+        ctx.arc(v.x + 0.5, v.y + 0.5, 2.6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       // Bâtiments, du haut vers le bas pour les recouvrements.
       const batiments = [...etat.batiments].sort((a, b) => a.y - b.y);
       for (const b of batiments) {
@@ -123,6 +139,8 @@ export class Rendu {
           enceinte: p.enceinte,
           blesse: p.blesse,
           alerte: p.alerte,
+          notable: p.notable,
+          banni: p.banni,
           selection: p.id === magasin.selection,
           survol: p.id === survol,
         });
@@ -290,6 +308,34 @@ export class Rendu {
   }
 
   /** Effet vectoriel d'un miracle, une seconde environ : pluie, éclair, anneau, pousses… */
+  /** Zone hachurée en espace monde : un tabou, un lieu où l'on ne va plus. */
+  private dessinerLieuInterdit(x: number, y: number, rayon: number): void {
+    const { ctx } = this;
+    const x0 = x - rayon;
+    const y0 = y - rayon;
+    const cote = rayon * 2 + 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, y0, cote, cote);
+    ctx.clip();
+    ctx.fillStyle = "rgba(120, 20, 40, 0.18)";
+    ctx.fillRect(x0, y0, cote, cote);
+    ctx.strokeStyle = "rgba(255, 90, 120, 0.55)";
+    ctx.lineWidth = 0.06;
+    ctx.beginPath();
+    for (let d = -cote; d < cote; d += 0.6) {
+      ctx.moveTo(x0 + d, y0);
+      ctx.lineTo(x0 + d + cote, y0 + cote);
+    }
+    ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255, 90, 120, 0.8)";
+    ctx.lineWidth = 0.08;
+    ctx.setLineDash([0.25, 0.15]);
+    ctx.strokeRect(x0, y0, cote, cote);
+    ctx.setLineDash([]);
+  }
+
   private dessinerEffet(
     cam: Camera,
     f: { pouvoir: string; x: number; y: number; rayon: number; debut: number; fin: number },

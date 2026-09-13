@@ -100,6 +100,56 @@ export function decrireEvenement(
           ? `${qui} a obtenu ce qu'${f ? "elle" : "il"} voulait : ${String(d.but)}.`
           : null
         : null;
+    case "veillee":
+    case "decision":
+    case "coutume":
+      return null; // les participants se souviennent déjà, par la société
+    case "palabre": {
+      const plaignant = noms.prenom(String(d.plaignant ?? ""));
+      if (!temoin) return null;
+      return d.issue === "exil"
+        ? `Le village a banni ${qui} après la plainte de ${plaignant}.`
+        : d.issue === "repare"
+          ? `${qui} a réparé son tort envers ${plaignant} devant tous.`
+          : `On a reproché à ${qui} son tort envers ${plaignant}, puis on lui a pardonné.`;
+    }
+    case "justice":
+      if (d.genre === "exil") return temoin ? `${qui} a été banni${e_} du village.` : null;
+      if (d.genre === "retour")
+        return temoin ? `${qui} est revenu${e_} d'exil.` : `Mon exil est fini.`;
+      if (d.genre === "prix_du_sang")
+        return temoin ? `${qui} a payé le prix du sang aux ${String(d.famille)}.` : null;
+      if (d.genre === "haine")
+        return temoin
+          ? `Les ${String(d.famille)} tiennent ${qui} pour responsable d'une mort.`
+          : null;
+      return null;
+    case "rixe": {
+      const cible = noms.prenom(String(d.cible ?? ""));
+      return temoin ? `${qui} et ${cible} se sont battus.` : null;
+    }
+    case "alliance":
+      return temoin
+        ? `Les ${String(d.familles).replace("|", " et les ")} sont désormais alliés.`
+        : null;
+    case "tabou":
+      return d.genre === "lieu_interdit"
+        ? temoin
+          ? `Là où ${qui} est mort${e_} sans raison, on ne va plus.`
+          : null
+        : null;
+    case "recueillement":
+      return temoin ? `${qui} s'est recueilli${e_} sur une tombe.` : null;
+    case "maitre": {
+      const maitre = noms.prenom(String(d.maitre ?? ""));
+      return temoin
+        ? d.genre === "choisi"
+          ? `${qui} apprend auprès de ${maitre}.`
+          : null
+        : d.genre === "choisi"
+          ? `J'ai choisi ${maitre} pour maître.`
+          : `Je n'ai plus besoin de maître.`;
+    }
     case "capture":
       return temoin ? `${qui} a ramené un ${String(d.nom)} vivant.` : null;
     case "abattage":

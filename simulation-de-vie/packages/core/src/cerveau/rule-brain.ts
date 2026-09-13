@@ -3,7 +3,7 @@
  * la personnalité, avec un bruit seedé de ±10 %.
  */
 import { INVENTIONS } from "../savoirs/catalogue.js";
-import type { Invention, Savoir } from "../savoirs/catalogue.js";
+import type { Invention, Lecon, Savoir } from "../savoirs/catalogue.js";
 import { NOURRITURE } from "../agents/inventaire.js";
 import { urgence } from "../agents/besoins.js";
 import type { Personnage } from "../agents/personnage.js";
@@ -130,7 +130,8 @@ export class RuleBrain implements Cerveau {
     }
 
     const saisonFroide = perception.saison === "automne" || perception.saison === "hiver";
-    const sait = (s: Savoir): boolean => perception.moi.savoirs.has(s);
+    const sait = (s: Savoir): boolean =>
+      perception.moi.savoirs.has(s) || perception.coutumes.has(s as Lecon);
     const corps = perception.moi.corps;
 
     // Le corps d'abord : se soigner, se reposer, dormir quand on n'en peut plus.
@@ -635,6 +636,14 @@ export class RuleBrain implements Cerveau {
           (perception.autelConnu ? 0.15 : 0) +
           (sait("le_ciel_ecoute") || sait("le_ciel_frappe") ? 0.2 : 0) -
           (sait("ne_pas_attendre_le_ciel") ? 0.3 : 0),
+      });
+    }
+
+    // Se recueillir : la tombe d'où vient une leçon se visite une fois par saison, de jour.
+    if (adulte && !nuit && perception.tombeARecueillir !== null) {
+      candidats.push({
+        intention: { type: "se_recueillir", cible: perception.tombeARecueillir },
+        score: 0.45 + personnalite.conscience * 0.2 + (besoins.moral < 50 ? 0.15 : 0),
       });
     }
 

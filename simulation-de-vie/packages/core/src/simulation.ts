@@ -134,6 +134,17 @@ import {
   scoreMotifs,
 } from "./cerveau/conseil.js";
 import type { ChoixConseil, Motif } from "./cerveau/conseil.js";
+import {
+  apprentissageDuSoir,
+  aubeSociete,
+  etatSocieteInitial,
+  heureSociete,
+  mortSociete,
+  naissanceSociete,
+  observerEvenement,
+  soireeSociete,
+} from "./social/societe.js";
+import type { EtatSociete } from "./social/societe.js";
 
 export interface Statistiques {
   readonly tick: number;
@@ -174,6 +185,31 @@ export type ResultatConseil =
 /** Rayon, en tuiles, de ce que la colonie connaît de son berceau au premier jour. */
 const RAYON_CONNAISSANCE_INITIALE = 14;
 
+/**
+ * Met à niveau l'état d'une sauvegarde d'une version antérieure : les champs
+ * apparus depuis prennent leur valeur de départ, rien n'est perdu.
+ */
+function migrer(etat: EtatSimulation, version: number): EtatSimulation {
+  if (version >= 2) return etat;
+  const brut = etat as unknown as Record<string, unknown>;
+  if (!("societe" in brut)) brut.societe = etatSocieteInitial();
+  const defauts = (o: Record<string, unknown>, valeurs: Record<string, unknown>): void => {
+    for (const [k, v] of Object.entries(valeurs)) if (!(k in o)) o[k] = v;
+  };
+  for (const p of etat.personnages) {
+    const q = p as unknown as Record<string, unknown>;
+    defauts(q, { prestige: 0, maitre: null, banni: null });
+    defauts(p.drapeaux as unknown as Record<string, unknown>, {
+      traumatiseJusqua: -1,
+      refusePar: null,
+      recueilliJour: -100,
+    });
+    for (const r of p.relations.values())
+      defauts(r as unknown as Record<string, unknown>, { rancune: 0, haine: false });
+  }
+  return etat;
+}
+
 /** Tout ce qu'une simulation possède en propre (sérialisé structurellement). */
 interface EtatSimulation {
   readonly config: SimConfig;
@@ -212,6 +248,7 @@ interface EtatSimulation {
   readonly questionEnCours: QuestionConseil | null;
   readonly fileConseils: { id: string; motifs: Motif[]; score: number }[];
   readonly journal: ReturnType<Journal["etat"]>;
+  readonly societe: EtatSociete;
 }
 
 export class Simulation implements Monde {
@@ -240,6 +277,8 @@ export class Simulation implements Monde {
   private compteurQuestions = 0;
   /** Météo imposée par un miracle (gel précoce, sécheresse), jusqu'à ce jour absolu inclus. */
   meteoForcee: { readonly meteo: Meteo; readonly jusquaJour: number } | null = null;
+  /** La société (jalon 13) : coutumes, griefs, tension, décisions, alliances, factions, tabous. */
+  readonly societe: EtatSociete = etatSocieteInitial();
 
   private constructor(
     readonly config: SimConfig,
@@ -282,6 +321,7 @@ export class Simulation implements Monde {
       this.questionEnCours = etat.questionEnCours;
       this.fileConseils.push(...etat.fileConseils);
       this.journal.restaurer(etat.journal);
+      Object.assign(this.societe, etat.societe);
       for (const p of this.personnages) this.cerveaux.set(p.id, new RuleBrain(p));
     } else {
       this.personnages = genererPopulation(rng, config, grille);
@@ -294,6 +334,7 @@ export class Simulation implements Monde {
     }
     this.journal.ecouter((e) => {
       this.memoriser(e);
+      observerEvenement(this, e);
       const gain = FAVEUR_EVENEMENTS[e.type];
       if (gain !== undefined && this.tick > 0) gagnerFaveur(this.faveur, gain);
       if (e.type === "priere") {
@@ -848,6 +889,7 @@ export class Simulation implements Monde {
       questionEnCours: this.questionEnCours,
       fileConseils: this.fileConseils,
       journal: this.journal.etat(EVENEMENTS_GARDES),
+      societe: this.societe,
     };
     return {
       format: FORMAT_SAUVEGARDE,
@@ -864,11 +906,11 @@ export class Simulation implements Monde {
   /** Restaure un monde sauvegardé ; lève une erreur si le format n'est pas le bon. */
   static restaurer(sauvegarde: unknown): Simulation {
     if (!estSauvegarde(sauvegarde)) throw new Error("Ce n'est pas une sauvegarde de simulation.");
-    if (sauvegarde.version !== VERSION_SAUVEGARDE)
+    if (sauvegarde.version > VERSION_SAUVEGARDE || sauvegarde.version < 1)
       throw new Error(
         `Sauvegarde en version ${String(sauvegarde.version)}, cette simulation lit la version ${String(VERSION_SAUVEGARDE)}.`,
       );
-    const etat = decoder(sauvegarde.etat) as EtatSimulation;
+    const etat = migrer(decoder(sauvegarde.etat) as EtatSimulation, sauvegarde.version);
     const config = etat.config;
     const rng = Rng.depuisEtat(etat.rng);
     const grille = genererGrille(Rng.depuisGraine(config.seed).fork("monde"), {
@@ -1088,6 +1130,7 @@ export class Simulation implements Monde {
     }
     for (const parent of [mere, pere])
       ajouterHumeur(parent, "naissance", 15, 20 * this.horloge.ticksParJour, this.tick);
+    naissanceSociete(enfant, mere, pere);
     if (this.rng.fork(`accouchement/${id}`).chance(risque.probabilite)) {
       mere.corps.dernierAccouchement = this.tick;
       this.mourir(mere, "accouchement");
@@ -1179,6 +1222,7 @@ export class Simulation implements Monde {
       heureContagion(this);
       this.heureDuBetail();
       providence(this, this.faveur);
+      heureSociete(this);
     }
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
@@ -1230,6 +1274,7 @@ export class Simulation implements Monde {
       this.jourDuTemps();
       this.jourDuVillage();
       this.regenererBassins();
+      aubeSociete(this);
     }
     if (this.tick > 0) {
       this.conseilsDuJour = 0;
@@ -1274,7 +1319,11 @@ export class Simulation implements Monde {
 
   /** Soir (21 h) : chacun fait le bilan de sa journée. */
   private soiree(): void {
-    for (const p of this.vivants()) this.reflechirPour(p);
+    for (const p of this.vivants()) {
+      this.reflechirPour(p);
+      apprentissageDuSoir(this, p);
+    }
+    soireeSociete(this);
     this.inscrireCandidats();
   }
 
@@ -1886,6 +1935,7 @@ export class Simulation implements Monde {
     heriter(this, p); // avant le deuil, qui rompt l'union
     deuil(this, p, cause);
     this.tirerLeconsDe(p, cause);
+    mortSociete(this, p, cause);
     for (const enfant of this.personnages) {
       if (enfant.vivant && (enfant.identite.parents?.includes(p.id) ?? false))
         adopter(this, enfant);

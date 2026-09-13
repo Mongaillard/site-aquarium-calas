@@ -54,6 +54,8 @@ import { betesDe } from "../monde/village.js";
 import { prioriteEnCours } from "./conseil.js";
 import type { Priorite } from "./conseil.js";
 import type { Espece, EtatTroupeau } from "../monde/faune.js";
+import { coutumesActives, tombeARecueillir } from "../social/societe.js";
+import type { Lecon } from "../savoirs/catalogue.js";
 
 export interface PersonneVisible {
   readonly id: string;
@@ -275,6 +277,10 @@ export interface Perception {
   };
   /** Un autel terminé à vingt tuiles. */
   readonly autelConnu: boolean;
+  /** Les coutumes du village : des leçons que tout le monde suit, qu'on les ait apprises ou non. */
+  readonly coutumes: ReadonlySet<Lecon>;
+  /** La tombe d'où vient une leçon connue, si l'on ne s'y est pas recueilli depuis une saison. */
+  readonly tombeARecueillir: Position | null;
   readonly moment: Moment;
   readonly meteo: Meteo;
   readonly rayon: number;
@@ -522,6 +528,8 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
         b.etat === "termine" &&
         Grille.distance(b.position, p.corps.position) <= 20,
     ),
+    coutumes: coutumesActives(monde.societe),
+    tombeARecueillir: tombeARecueillir(monde, p),
     moment,
     meteo: monde.meteo,
     rayon,

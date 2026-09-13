@@ -84,6 +84,12 @@ export interface Drapeaux {
   soirsSansIdee: number;
   /** Tick de la dernière question posée à Claude (−1 : jamais). */
   conseilDemandeA: number;
+  /** Deuil violent : traumatisé jusqu'à ce tick (−1 : non). */
+  traumatiseJusqua: number;
+  /** Le dernier à m'avoir refusé de quoi manger (haine héréditaire si j'en meurs). */
+  refusePar: { readonly id: string; readonly tick: number } | null;
+  /** Jour du dernier recueillement sur une tombe (−100 : jamais). */
+  recueilliJour: number;
 }
 
 /**
@@ -183,6 +189,16 @@ export interface Personnage {
   readonly memoire: FluxMemoire;
   /** Réputation -100..100, modifiée par les témoins de ses actes. */
   reputation: number;
+  /** Prestige 0..100 : dons, savoirs, enfants, exploits ; érodé chaque jour. Les notables en ont le plus. */
+  prestige: number;
+  /** Le maître choisi à l'adolescence, s'il y en a un. */
+  maitre: string | null;
+  /** Banni du village jusqu'à ce jour (plus d'accès aux bâtiments). */
+  banni: {
+    readonly depuisJour: number;
+    readonly jusquaJour: number;
+    readonly motif: string;
+  } | null;
   readonly drapeaux: Drapeaux;
   dernierEchec: Echec | null;
   echecsConsecutifs: number;
@@ -277,6 +293,9 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
       maxSouvenirs: options.memoire.maxSouvenirs,
     }),
     reputation: 0,
+    prestige: 0,
+    maitre: null,
+    banni: null,
     drapeaux: {
       prudenceNourritureJusqua: -1,
       chercheAbriJusqua: -1,
@@ -291,6 +310,9 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
       joursMoralBas: 0,
       soirsSansIdee: 0,
       conseilDemandeA: -1,
+      traumatiseJusqua: -1,
+      refusePar: null,
+      recueilliJour: -100,
     },
     dernierEchec: null,
     echecsConsecutifs: 0,

@@ -79,6 +79,12 @@ tire en butée ne recharge plus la page.
 Pour développer le viewer avec rechargement à chaud : lancez le serveur (`pnpm --filter
 @sdv/server start -- --seed 42`) puis `pnpm viewer:dev` (http://localhost:5173).
 
+Village (jalon 13) : l'onglet « Village » montre la tension, les coutumes nées des leçons, les
+notables (étoile sur la carte), les factions, les griefs jugés à la veillée, les décisions prises
+ensemble, les alliances par mariage et les lieux interdits (hachurés sur la carte). Le soir, un
+cercle de lumière marque la veillée autour du feu. La fiche d'un personnage dit son prestige, son
+maître, son exil et ses rancunes.
+
 ### Sans serveur (mobile, page publiée)
 
 ```bash

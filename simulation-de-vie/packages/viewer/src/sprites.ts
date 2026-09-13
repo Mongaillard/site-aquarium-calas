@@ -435,6 +435,10 @@ export interface AspectPersonnage {
   readonly blesse?: boolean;
   /** Alarme : un « ! » au-dessus de la tête. */
   readonly alerte?: boolean;
+  /** Notable du village : une petite étoile dorée au-dessus de la tête. */
+  readonly notable?: boolean;
+  /** Banni : silhouette grisée. */
+  readonly banni?: boolean;
 }
 
 export const TEINTS: Readonly<Record<string, string>> = {
@@ -512,6 +516,21 @@ export function personnage(ctx: Ctx, x: number, y: number, a: AspectPersonnage):
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     ctx.fillText("!", cx, sol - 1.05 * s);
+  } else if (a.notable === true) {
+    ctx.fillStyle = "#ffd479";
+    ctx.beginPath();
+    const r = 0.14 * s;
+    const cy = sol - 1.12 * s;
+    for (let i = 0; i < 10; i++) {
+      const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rr = i % 2 === 0 ? r : r * 0.45;
+      const px = cx + Math.cos(ang) * rr;
+      const py = cy + Math.sin(ang) * rr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
   }
   ctx.strokeStyle = a.contour;
   ctx.lineWidth = 0.035;

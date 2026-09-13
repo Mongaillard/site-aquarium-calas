@@ -75,6 +75,19 @@ function etat(decouvertes: number[]): MessageEtat {
     },
     questions: [],
     prieres: [],
+    societe: {
+      tension: 0,
+      coutumes: [],
+      notables: [],
+      factions: [],
+      griefs: [],
+      decisions: [],
+      alliances: [],
+      lieuxInterdits: [],
+      stocksOuverts: false,
+      veillee: null,
+      bannis: [],
+    },
   };
 }
 

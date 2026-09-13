@@ -912,6 +912,22 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   l'arrière-plan ; la plus récente reprend d'elle-même au chargement si elle a moins de douze
   heures et que l'adresse n'impose pas de graine.
 
+## 8 quinquies. La société telle que réalisée (M19, jalon 13)
+
+- Un module `social/societe.ts` porte l'état social (`Simulation.societe`, sauvegardé) : coutumes,
+  griefs, tension, décisions, lieux interdits, alliances, factions, dernière veillée, compteurs.
+  Il observe le journal (prestige, rancunes, griefs, fêtes à venir), agit à l'aube (érosion du
+  prestige, rancunes, coutumes, maîtres, factions, décisions, fin d'exil, levée des tabous),
+  chaque heure (rixes), le soir (veillée, palabre, prix du sang, amitiés d'enfance), à la
+  naissance (haine héritée) et à la mort (traumatisme, haine, tabou).
+- Le personnage gagne `prestige`, `maitre`, `banni` ; la relation gagne `rancune` et `haine`.
+  Les coutumes entrent dans la perception (`coutumes`) : le cerveau les suit comme des savoirs.
+  Un bâtiment `commun` est accessible et prioritaire pour tous ; `autorise` refuse tout à un
+  banni, ouvre les stocks après décision et les abris aux familles alliées.
+- Intention et action `se_recueillir` (tombe d'origine d'une leçon, une fois par saison).
+- Le protocole expose `MessageEtat.societe` (onglet Village, carte), `notable` et `banni` sur
+  chaque personnage, et la section société de la fiche.
+
 ## 8 ter. Mode Dieu et conseil de Claude tels que réalisés (M13)
 
 - **[DÉCISION]** L'observateur influence, il ne commande pas. Un pouvoir change le monde

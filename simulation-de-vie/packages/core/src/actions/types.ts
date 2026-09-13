@@ -77,7 +77,9 @@ export type Action =
   | { readonly type: "abattre"; readonly bete: string; ticksRestants: number }
   | { readonly type: "se_reposer"; ticksRestants: number }
   /** Prier le ciel, à l'autel s'il y en a un (une offrande de nourriture y est déposée). */
-  | { readonly type: "prier"; readonly autel: string | null; ticksRestants: number };
+  | { readonly type: "prier"; readonly autel: string | null; ticksRestants: number }
+  /** Se recueillir sur la tombe d'où vient une leçon. */
+  | { readonly type: "se_recueillir"; readonly cible: Position; ticksRestants: number };
 
 export type TypeAction = Action["type"];
 
@@ -107,7 +109,8 @@ export type Intention =
   | { readonly type: "veiller" }
   | { readonly type: "reparer"; readonly objet: TypeObjet }
   | { readonly type: "abattre"; readonly bete: string }
-  | { readonly type: "prier" };
+  | { readonly type: "prier" }
+  | { readonly type: "se_recueillir"; readonly cible: Position };
 
 export type TypeIntention = Intention["type"];
 
@@ -200,6 +203,8 @@ export function decrireAction(a: Action): string {
       return `abattre:${a.bete}`;
     case "prier":
       return a.autel === null ? "prier" : `prier:${a.autel}`;
+    case "se_recueillir":
+      return `se_recueillir@(${a.cible.x},${a.cible.y})`;
   }
 }
 

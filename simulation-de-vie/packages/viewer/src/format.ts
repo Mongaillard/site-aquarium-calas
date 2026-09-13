@@ -85,7 +85,24 @@ export const LIBELLES_SAISON: Readonly<Record<string, string>> = {
   hiver: "hiver",
 };
 
+export const LIBELLES_FETE: Readonly<Record<string, string>> = {
+  naissance: "d'une naissance",
+  union: "d'une union",
+  funerailles: "des funérailles",
+  solstice: "du solstice",
+};
+
 export const LIBELLES_TYPE: Readonly<Record<string, string>> = {
+  veillee: "veillée",
+  palabre: "palabre",
+  justice: "justice",
+  rixe: "rixe",
+  coutume: "coutume",
+  decision: "décision du village",
+  alliance: "alliance",
+  tabou: "lieu interdit",
+  recueillement: "recueillement",
+  maitre: "maître et apprenti",
   divin: "miracle",
   conseil: "conseil de Claude",
   ambition: "ambition",
@@ -465,6 +482,42 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
         : d.genre === "recit"
           ? `🧠 On raconte, à propos de ${qui} : « ${String(d.texte)} »`
           : `🧠 Sur la tombe de ${qui}, on grave : « ${String(d.texte)} »`;
+    case "veillee":
+      return d.fete === null || d.fete === undefined
+        ? `🔥 Veillée autour du feu : ${String(d.noms)}${typeof d.transmis === "string" ? ` — on y a transmis « ${d.transmis.replace(/_/g, " ")} »` : ""}.`
+        : `🎉 Fête ${LIBELLES_FETE[String(d.fete)] ?? String(d.fete)}${d.sujet ? ` (${String(d.sujet)})` : ""} : ${String(d.participants)} autour du feu.`;
+    case "palabre":
+      return `⚖️ Palabre : ${qui}, sur la plainte de ${cible("plaignant")} (${String(d.motif)}, ${String(d.details)}) — ${d.issue === "repare" ? `répare (${String(d.rendu)} rendus)` : d.issue === "exil" ? "banni par le vote" : "pardonné"}.`;
+    case "justice":
+      return d.genre === "exil"
+        ? `🚫 ${qui} est banni du village pour ${String(d.jours)} jours (${String(d.motif)}).`
+        : d.genre === "retour"
+          ? `🏡 ${qui} revient d'exil.`
+          : d.genre === "prix_du_sang"
+            ? `🕊️ ${qui} paie le prix du sang aux ${String(d.famille)} (${String(d.donne)} portions) : la haine est levée.`
+            : `💢 Les ${String(d.famille)} tiennent ${qui} pour responsable de la mort de ${cible("defunt")} : une haine qui se transmettra.`;
+    case "rixe":
+      return `👊 ${qui} et ${cible("cible")} en viennent aux mains (${String(d.temoins)} témoin${Number(d.temoins) > 1 ? "s" : ""}).`;
+    case "coutume":
+      return d.genre === "adoptee"
+        ? `📜 « ${String(d.titre)} » devient une coutume du village (${String(d.part)} % des adultes) : ${String(d.morale)}`
+        : d.genre === "abandonnee"
+          ? `📜 La coutume « ${String(d.titre)} » se perd (${String(d.part)} % des adultes).`
+          : `📜 ${qui} enfreint la coutume « ${String(d.titre)} » devant ${String(d.temoins)} témoin${Number(d.temoins) > 1 ? "s" : ""}.`;
+    case "decision":
+      return `🗳️ Le village ${d.adoptee === true ? "décide" : "refuse"} : ${String(d.libelle)} (${String(d.pour)} pour, ${String(d.contre)} contre).`;
+    case "alliance":
+      return `💍 Les ${String(d.familles).replace("|", " et les ")} sont alliés par ce mariage${Number(d.dot) > 0 ? ` ; dot de ${String(d.dot)} portions des ${String(d.de)} aux ${String(d.vers)}` : ""}.`;
+    case "tabou":
+      return d.genre === "lieu_interdit"
+        ? `☠️ Là où ${qui} est mort (${String(d.cause)}), on ne va plus : lieu interdit pour ${String(d.jours)} jours.`
+        : `Le lieu interdit en (${String(d.x)}, ${String(d.y)}) est levé.`;
+    case "recueillement":
+      return `🕯️ ${qui} se recueille sur une tombe. ${String(d.epitaphe)}`;
+    case "maitre":
+      return d.genre === "choisi"
+        ? `🎓 ${qui} choisit ${cible("maitre")} pour maître (${String(d.competence)}).`
+        : `🎓 ${qui} n'a plus besoin de maître.`;
     default:
       return `${qui} ${e.type}`;
   }

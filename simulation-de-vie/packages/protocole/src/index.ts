@@ -63,6 +63,10 @@ export interface PersonnageEtat {
   readonly malade: boolean;
   /** Titre de métier tiré de la pratique (« pêcheuse »), s'il en a un. */
   readonly metier: string | null;
+  /** Notable du village (parmi les trois plus grands prestiges) : une étoile au-dessus de la tête. */
+  readonly notable: boolean;
+  /** Banni : il vit à l'écart le temps de l'exil. */
+  readonly banni: boolean;
 }
 
 export interface BatimentEtat {
@@ -159,6 +163,87 @@ export interface Statistiques {
   readonly foiMoyenne: number;
   readonly prieres: number;
   readonly exaucees: number;
+  /** La société : veillées, fêtes, palabres, exils, rixes depuis le début. */
+  readonly veillees: number;
+  readonly fetes: number;
+  readonly palabres: number;
+  readonly exils: number;
+  readonly rixes: number;
+}
+
+/** Une coutume du village : une leçon que tout adulte suit. */
+export interface CoutumeEtat {
+  readonly lecon: string;
+  readonly titre: string;
+  readonly morale: string;
+  readonly depuisJour: number;
+  /** Part des adultes qui la connaissent, en pour cent. */
+  readonly part: number;
+}
+
+export interface NotableEtat {
+  readonly id: string;
+  readonly prenom: string;
+  readonly nomFamille: string;
+  readonly prestige: number;
+}
+
+export interface GriefEtat {
+  readonly id: string;
+  readonly jour: number;
+  readonly motif: string;
+  readonly details: string;
+  readonly plaignant: PersonneCourte;
+  readonly accuse: PersonneCourte;
+  readonly etat: string;
+}
+
+export interface DecisionEtat {
+  readonly jour: number;
+  readonly sujet: string;
+  readonly libelle: string;
+  readonly pour: number;
+  readonly contre: number;
+  readonly adoptee: boolean;
+}
+
+export interface LieuInterditEtat {
+  readonly x: number;
+  readonly y: number;
+  readonly rayon: number;
+  readonly joursRestants: number;
+  readonly motif: string;
+}
+
+export interface FactionEtat {
+  readonly nom: string;
+  readonly familles: readonly string[];
+  readonly membres: number;
+}
+
+export interface VeilleeEtat {
+  readonly tick: number;
+  readonly x: number;
+  readonly y: number;
+  readonly participants: readonly string[];
+  readonly fete: string | null;
+}
+
+/** La société du village (jalon 13), pour l'onglet « Village » et la carte. */
+export interface SocieteEtat {
+  readonly tension: number;
+  readonly coutumes: readonly CoutumeEtat[];
+  readonly notables: readonly NotableEtat[];
+  readonly factions: readonly FactionEtat[];
+  readonly griefs: readonly GriefEtat[];
+  readonly decisions: readonly DecisionEtat[];
+  /** Familles alliées par mariage, par paires. */
+  readonly alliances: readonly (readonly [string, string])[];
+  readonly lieuxInterdits: readonly LieuInterditEtat[];
+  readonly stocksOuverts: boolean;
+  /** La dernière veillée (le cercle autour du feu se dessine une heure). */
+  readonly veillee: VeilleeEtat | null;
+  readonly bannis: readonly PersonneCourte[];
 }
 
 export interface SavoirStat {
@@ -559,6 +644,8 @@ export interface MessageEtat {
   readonly questions: readonly QuestionConseil[];
   /** Prières en attente (trois jours au plus), les plus récentes d'abord. */
   readonly prieres: readonly PriereEtat[];
+  /** La société du village. */
+  readonly societe: SocieteEtat;
 }
 
 export interface RelationFiche {
@@ -681,6 +768,19 @@ export interface MessageFiche {
     readonly exaucee: boolean;
     readonly autel: boolean;
   } | null;
+  /** La société : prestige, notable, maître, exil, rancunes et haines. */
+  readonly prestige: number;
+  readonly notable: boolean;
+  readonly maitre: PersonneCourte | null;
+  readonly apprentis: readonly PersonneCourte[];
+  readonly banni: { readonly joursRestants: number; readonly motif: string } | null;
+  readonly rancunes: readonly {
+    readonly id: string;
+    readonly prenom: string;
+    readonly rancune: number;
+    readonly haine: boolean;
+  }[];
+  readonly traumatise: boolean;
 }
 
 export interface ConseilFiche {

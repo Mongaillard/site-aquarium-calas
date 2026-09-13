@@ -2,6 +2,55 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M19 – La société (jalon 13, 2026-09-13)
+
+Comment trois familles deviennent un village avec ses règles. Tout est dans `social/societe.ts`,
+branché sur le journal, l'aube, l'heure, la soirée, la naissance et la mort.
+
+- **Prestige** (0..100 par personne) : dons, inventions, bâtiments terminés, chasses, soins,
+  combats gagnés, naissances, adoptions ; −10 pour un vol ; érodé d'un point par jour. Les
+  **notables** sont les trois plus grands prestiges à partir de 15, jamais nommés, toujours
+  destituables ; une étoile au-dessus de la tête, un poids de vote plus lourd.
+- **Coutumes nées des leçons** : une leçon connue de 60 % des adultes depuis trente jours devient
+  coutume (tout adulte la sait, le cerveau la suit qu'il l'ait apprise ou non) ; à 40 % elle se
+  perd. L'enfreindre devant témoins (manger devant un enfant affamé, refuser à manger en hiver)
+  coûte réputation, prestige et affinité.
+- **Veillées et fêtes** : à 21 h, trois adultes éveillés près d'un feu se rassemblent en cercle
+  une heure ; affinités, moral, un savoir transmis. Naissance, union, funérailles et solstices
+  font une fête (humeur, tension −5). Sous tension (≥ 70), chaque faction veille de son côté.
+- **Justice réparatrice et bannissement** : un vol vu ouvre un grief, jugé à la veillée suivante
+  (palabre) : l'accusé rend le double en nourriture s'il le peut ; sinon, mal vu ou récidiviste,
+  le village vote son exil (soixante jours, quarante tuiles, plus d'accès aux bâtiments, retour
+  possible) ; sinon on pardonne.
+- **Rancune et rixe** : une rancune par relation (vols, refus), apaisée d'un point par jour ; à
+  60 (ou 80 si le village est calme), deux voisins éveillés en viennent aux mains ; le perdant
+  est contusionné, les deux y perdent réputation et prestige. Jamais de coups par la seule
+  tension.
+- **Décisions collectives** (une par dix jours, vote pondéré par le prestige) : ouvrir les stocks
+  à tous vingt jours en hiver, creuser un puits commun (chantier `commun`, accessible et
+  prioritaire pour tous), bannir.
+- **Alliances, dot** : un mariage entre familles ouvre leurs abris et fait passer une dot de
+  trois portions à la famille la moins pourvue.
+- **Factions et tension** : chaque semaine, les familles rapprochées par un mariage ou une
+  affinité moyenne ≥ 20 forment une faction. La tension (0..100) monte avec les vols, les refus
+  d'hiver, les rixes, les exils, les votes perdus ; baisse avec les dons entre familles, les
+  fêtes, les mariages, les amitiés d'enfance ; −0,5 par jour.
+- **Deuil violent et haine héréditaire** : une mort par les loups ou une plaie traumatise la
+  famille trente jours ; mourir de faim dans les trois jours d'un refus vaut au refuseur la haine
+  de la famille, transmise aux enfants, effacée par le prix du sang (six portions à la veillée).
+- **Croyances et tabous** : une mort inexpliquée (maladie) rend le lieu interdit trois tuiles
+  autour pour une saison (hachuré sur la carte) ; on n'y récolte plus, sauf famine. Les tombes
+  d'où viennent les leçons se visitent une fois par saison (« se recueillir » : moral, foi).
+- **Éducation et maîtres** : un adolescent choisit pour maître l'adulte qui sait le mieux faire
+  ce qui l'attire (une autre famille de préférence) ; près de lui le soir, il progresse et
+  hérite de ses savoirs. Les enfants de familles différentes qui jouent ensemble se lient.
+- Viewer : onglet **Village** (tension, coutumes, notables, factions, griefs et palabres,
+  décisions, alliances, lieux interdits, dernière veillée), section Village de la fiche
+  (prestige, maître, exil, rancunes), tuiles de statistiques, cercle de veillée et zones
+  hachurées sur la carte, dix nouveaux types d'événements dans le journal.
+- Sauvegarde en version 2 ; une sauvegarde v1 se relit, les champs nouveaux prennent leur valeur
+  de départ. Treize tests (`societe.test.ts`).
+
 ## M18 – La partie ne se perd plus sur mobile (2026-09-13)
 
 - **Le geste vers le bas ne recharge plus la page** : `overscroll-behavior: none` sur la page et

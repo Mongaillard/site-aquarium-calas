@@ -222,6 +222,8 @@ export interface Batiment {
   epitaphe: string | null;
   /** Champs : l'état de la culture. */
   culture: Culture | null;
+  /** Décidé par le village : tout le monde y a accès et y travaille. */
+  commun?: boolean;
 }
 
 export function creerChantier(
