@@ -2,6 +2,38 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M24 – Une grande colonie sans à-coups (2026-09-13)
+
+À cinquante habitants et plus, la page marquait encore des pauses d'une demi-seconde : bâtir
+l'état diffusé à la carte coûtait 30 à 60 ms toutes les 100 ms, et chaque sauvegarde encodait
+le monde d'un bloc, en faisait une chaîne JSON de sept mégaoctets, puis la passait d'un bloc au
+compresseur (`Blob` + gzip : 500 ms de fil principal sur un téléphone lent, sans une ligne de
+JavaScript à montrer du doigt). Sur un téléphone émulé (processeur divisé par quatre), à
+quarante-huit habitants et vitesse ×256, les pires images passent de 600–680 ms à 190–310 ms,
+plus aucune au-delà d'une demi-seconde.
+
+- **Le journal tient en mémoire bornée** : vingt-quatre mille événements au plus (effacés par
+  paquets de six mille), avec un index global qui ne recule jamais (`taille`, `depuisIndex`) ;
+  la page et le serveur lisent « depuis le dernier index » au lieu de parcourir tout le journal.
+  Les statistiques viennent de compteurs tenus au fil de l'eau (par type, et par détail :
+  `chasse:reussie`, `faune:naissances`, `recolte:poisson`…), sauvés et restaurés.
+- **L'état diffusé** ne recalcule la carte (gisements, découvertes) qu'une fois par seconde, par
+  morceau et par index numérique, et la diffusion s'espace à quatre fois son coût (100 ms à 1 s).
+- **Sauvegarde par étapes** (`Simulation.sauvegarderParEtapes`) : tout s'encode d'un coup sauf
+  les personnages (neuf dixièmes du poids, 5 ms chacun), encodés à la demande ; la page les
+  prend par tranches de 8 ms entre deux images, le monde attend le temps de l'encodage (une
+  sauvegarde est d'un seul tick ; une commande entre-temps la fait recommencer), et la
+  cadence automatique se règle sur ce coût. **Compression en flux** : le JSON n'est jamais
+  assemblé en une seule chaîne ; chaque morceau (un personnage, un morceau de carte) est
+  encodé et poussé dans le flux gzip dès qu'il est produit, en rendant la main toutes les
+  8 ms ; une seule compression sert à la sauvegarde locale et à la distante, et le base64 de
+  cette dernière se fait par tranches. La sauvegarde de sortie reste d'un bloc, sans attendre.
+- **Souvenirs et lieux connus** plafonnent à trois cents et cinq cents par personne (six cents
+  et huit cents avant) : une sauvegarde à quarante-huit habitants perd un tiers de son poids.
+- **Dormeurs comptés une fois** pour tout le monde, tant que personne ne s'endort, ne se réveille,
+  ne meurt ni ne grandit (la question revenait pour chaque abri de chacun, à chaque tick).
+- La page saute une image quand la précédente a pris plus de 12 ms à dessiner.
+
 ## M23 – La colonie choisit sa taille, apprivoise, et entre dans l'âge du cuivre (2026-09-13)
 
 - **Habitants au départ** : le formulaire « Nouveau monde » propose 12, 24, 36 ou 48 habitants

@@ -4,6 +4,7 @@
  */
 import {
   BIOMES,
+  Grille,
   COMPETENCES,
   PLANS_BATIMENT,
   TAILLE_MORCEAU,
@@ -343,9 +344,21 @@ export function etatBatiments(sim: Simulation): BatimentEtat[] {
   }));
 }
 
+/** Clé numérique d'une tuile (coordonnées signées, jusqu'à ± 2^20). */
+const DECALAGE = 1 << 20;
+function cleTuile(x: number, y: number): number {
+  return (x + DECALAGE) * (2 * DECALAGE) + (y + DECALAGE);
+}
+function xDeCle(cle: number): number {
+  return Math.floor(cle / (2 * DECALAGE)) - DECALAGE;
+}
+function yDeCle(cle: number): number {
+  return (cle % (2 * DECALAGE)) - DECALAGE;
+}
+
 /** Suivi de ce qu'un client a déjà reçu (gisements, découvertes), pour n'émettre que les changements. */
 export class SuiviClient {
-  private readonly derniers = new Map<string, number>();
+  private readonly derniers = new Map<number, number>();
   /** Par morceau, les tuiles déjà annoncées à ce client. */
   private readonly decouvertesEnvoyees = new Map<number, Uint8Array>();
 
@@ -371,28 +384,35 @@ export class SuiviClient {
     return resultat;
   }
 
-  /** Gisements changés depuis le dernier appel (tous au premier appel). */
+  /**
+   * Gisements changés depuis le dernier appel (tous au premier appel). Parcours
+   * par morceau, sans chaîne par tuile : des dizaines de milliers de tuiles
+   * découvertes se passent en revue à chaque diffusion.
+   */
   differentiel(sim: Simulation): GisementEtat[] {
     const resultat: GisementEtat[] = [];
-    const vus = new Set<string>();
+    const vus = new Set<number>();
     // Seuls les gisements des tuiles découvertes sont annoncés : le viewer ne
     // doit rien savoir de ce que la colonie n'a pas vu.
-    for (const t of sim.grille.tuilesAvecGisement()) {
-      if (t.gisement === null || !sim.grille.estDecouverte(t.x, t.y)) continue;
-      const cle = `${t.x},${t.y}`;
-      vus.add(cle);
-      const q = Math.floor(t.gisement.quantite);
-      if (this.derniers.get(cle) !== q) {
-        this.derniers.set(cle, q);
-        resultat.push([t.x, t.y, t.gisement.type, q, t.gisement.outilRequis ?? ""]);
+    for (const m of sim.grille.morceauxGeneres()) {
+      if (m.nbDecouvertes === 0) continue;
+      for (const t of m.avecGisement) {
+        if (t.gisement === null || m.decouvertes[Grille.indexLocal(t.x, t.y)] !== 1) continue;
+        const cle = cleTuile(t.x, t.y);
+        vus.add(cle);
+        const q = Math.floor(t.gisement.quantite);
+        if (this.derniers.get(cle) !== q) {
+          this.derniers.set(cle, q);
+          resultat.push([t.x, t.y, t.gisement.type, q, t.gisement.outilRequis ?? ""]);
+        }
       }
     }
-    for (const cle of [...this.derniers.keys()]) {
-      if (vus.has(cle)) continue;
-      this.derniers.delete(cle);
-      const [x, y] = cle.split(",").map(Number);
-      resultat.push([x ?? 0, y ?? 0, "", -1, ""]);
-    }
+    if (this.derniers.size !== vus.size)
+      for (const cle of [...this.derniers.keys()]) {
+        if (vus.has(cle)) continue;
+        this.derniers.delete(cle);
+        resultat.push([xDeCle(cle), yDeCle(cle), "", -1, ""]);
+      }
     return resultat;
   }
 }
@@ -406,10 +426,10 @@ export class BilanSaisons {
   private indexTraite = 0;
 
   mettreAJour(sim: Simulation): BilanSaison[] {
-    const evenements = sim.journal.tous();
-    for (; this.indexTraite < evenements.length; this.indexTraite++) {
-      const e = evenements[this.indexTraite];
-      if (e === undefined || (e.type !== "naissance" && e.type !== "deces")) continue;
+    const nouveaux = sim.journal.depuisIndex(this.indexTraite);
+    this.indexTraite = sim.journal.taille;
+    for (const e of nouveaux) {
+      if (e.type !== "naissance" && e.type !== "deces") continue;
       const m = sim.horloge.moment(e.tick);
       const cle = `${m.annee}-${m.saison}`;
       const bilan = this.bilans.get(cle) ?? {
@@ -502,8 +522,8 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     champs: [...sim.batiments.values()].filter((b) => b.type === "champ" && b.etat === "termine")
       .length,
     chasses: {
-      reussies: sim.journal.parType("chasse").filter((e) => e.details.reussie === true).length,
-      ratees: sim.journal.parType("chasse").filter((e) => e.details.reussie !== true).length,
+      reussies: sim.journal.compteDetail("chasse:reussie"),
+      ratees: sim.journal.compteDetail("chasse:ratee"),
     },
     ambitions: ambitionsEnCours(sim),
     miracles: sim.faveur.miracles,
@@ -677,6 +697,8 @@ export interface ContexteEtat {
   readonly suivi: SuiviClient;
   readonly bilan: BilanSaisons;
   readonly indexJournal: number;
+  /** Faux : ni découvertes ni gisements dans ce message (la carte suit à sa propre cadence). */
+  readonly avecCarte?: boolean;
 }
 
 export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
@@ -690,10 +712,10 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     personnages: sim.personnages.map((p) => etatPersonnage(sim, p)),
     batiments: etatBatiments(sim),
     troupeaux: etatTroupeaux(sim),
-    gisements: ctx.suivi.differentiel(sim),
-    evenements: sim.journal.tous().slice(ctx.indexJournal).map(evenementEtat),
+    gisements: ctx.avecCarte === false ? [] : ctx.suivi.differentiel(sim),
+    evenements: sim.journal.depuisIndex(ctx.indexJournal).map(evenementEtat),
     stats: statistiques(sim, ctx.bilan),
-    decouvertes: ctx.suivi.nouvellesDecouvertes(sim),
+    decouvertes: ctx.avecCarte === false ? [] : ctx.suivi.nouvellesDecouvertes(sim),
     rayonVision: rayonVision(sim, sim.horloge.moment()),
     faveur: sim.etatFaveur(),
     questions: sim.questionsEnAttente(),

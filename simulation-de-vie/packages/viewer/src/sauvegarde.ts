@@ -11,7 +11,12 @@
  * sur le même nom l'emporte toujours sur une plus ancienne encore en vol.
  */
 import { estSauvegarde, type Sauvegarde } from "@sdv/core";
-import { COMPRESSION, compresser, compressionDisponible, decompresser } from "./compression.js";
+import {
+  COMPRESSION,
+  compresserParMorceaux,
+  compressionDisponible,
+  decompresser,
+} from "./compression.js";
 
 const BASE = "simulation-de-vie";
 const MAGASIN = "sauvegardes";
@@ -135,9 +140,15 @@ function entete(nom: string, s: Sauvegarde): EntreeSauvegarde {
 /**
  * Écrit une sauvegarde. `immediate` : le JSON part tel quel, et l'écriture
  * démarre dans la foulée si la base est déjà ouverte (sortie de page).
- * Sinon : compressée hors du fil principal quand le navigateur sait le faire.
+ * Sinon : compressée en flux, par tranches, quand le navigateur sait le faire
+ * (`octets` : la compression déjà lancée par ailleurs, pour ne pas la refaire).
  */
-export function ecrireSauvegarde(nom: string, s: Sauvegarde, immediate = false): Promise<void> {
+export function ecrireSauvegarde(
+  nom: string,
+  s: Sauvegarde,
+  immediate = false,
+  octets: Promise<ArrayBuffer | null> | null = null,
+): Promise<void> {
   const sequence = (sequences.get(nom) ?? 0) + 1;
   sequences.set(nom, sequence);
   const perimee = (): boolean => sequences.get(nom) !== sequence;
@@ -149,10 +160,12 @@ export function ecrireSauvegarde(nom: string, s: Sauvegarde, immediate = false):
       : { ...entete(nom, s), sauvegarde: s };
     return baseOuverte !== null ? ecrire(baseOuverte, e) : ouvrir().then((db) => ecrire(db, e));
   }
-  return compresser(JSON.stringify(s)).then((octets) =>
-    perimee()
+  return (octets ?? compresserParMorceaux(s, perimee)).then((o) =>
+    o === null || perimee()
       ? undefined
-      : ouvrir().then((db) => ecrire(db, { ...entete(nom, s), octets, compression: COMPRESSION })),
+      : ouvrir().then((db) =>
+          ecrire(db, { ...entete(nom, s), octets: o, compression: COMPRESSION }),
+        ),
   );
 }
 

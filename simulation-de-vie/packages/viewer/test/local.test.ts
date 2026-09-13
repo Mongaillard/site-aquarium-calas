@@ -46,6 +46,30 @@ describe("LiaisonLocale", () => {
     reprise.fermer();
   });
 
+  it("sauvegarde sans bloquer : le monde attend l'encodage, puis repart", async () => {
+    const messages: MessageServeur[] = [];
+    const liaison = new LiaisonLocale(
+      { seed: 42, joursAvance: 1, ticksParSeconde: 200 },
+      (m) => messages.push(m),
+      () => undefined,
+    );
+    liaison.connecter();
+    await attendre(() => messages.some((m) => m.type === "etat"));
+    const sim = liaison.simulation;
+    if (sim === null) throw new Error("pas de monde");
+    const promesse = liaison.sauvegarderSansBloquer();
+    // Une seconde demande pendant l'encodage reçoit la même sauvegarde.
+    expect(liaison.sauvegarderSansBloquer()).toBe(promesse);
+    const tickDepart = sim.tick;
+    const s = await promesse;
+    expect(s?.tick).toBe(tickDepart);
+    expect(liaison.coutSauvegardeMs).toBeGreaterThan(0);
+    // Le monde repart une fois la sauvegarde encodée.
+    await attendre(() => sim.tick > tickDepart);
+    liaison.fermer();
+    expect(await liaison.sauvegarderSansBloquer()).toBeNull();
+  });
+
   it("prépare le monde, envoie init puis etat, et répond aux commandes comme le serveur", async () => {
     const messages: MessageServeur[] = [];
     const progressions: number[] = [];

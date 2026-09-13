@@ -17,6 +17,12 @@ import type { Liaison } from "./reseau.js";
 
 /** Temps de simulation par intervalle de 50 ms : le reste est laissé à l'affichage et aux gestes. */
 const BUDGET_TICKS_MS = 22;
+/** Encodage d'une sauvegarde par tranches de ce temps, entre lesquelles la page respire. */
+const TRANCHE_SAUVEGARDE_MS = 8;
+/** Un monde qui a bougé pendant l'encodage : on recommence, jusqu'à ce nombre de fois. */
+const ESSAIS_SAUVEGARDE = 3;
+
+const souffler = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
 export interface OptionsLocales {
   readonly seed: number | string;
@@ -43,12 +49,20 @@ export class LiaisonLocale implements Liaison {
   private minuteur: ReturnType<typeof setInterval> | null = null;
   /** Ticks réellement simulés par seconde, mesurés (la vitesse demandée peut être hors de portée). */
   private vitesseEffective = 0;
+  private intervalleDiffusion = 100;
+  private derniereCarte = 0;
   private ticksRecents = 0;
   private mesureDepuis = 0;
   /** Inspirations de Claude appliquées (affiché comme « appels IA »). */
   private appelsIA = 0;
   private preparation: ReturnType<typeof setTimeout> | null = null;
   private ferme = false;
+  /** Sauvegarde en cours d'encodage par tranches : le monde ne bouge pas d'ici sa fin. */
+  private encodage: Promise<Sauvegarde | null> | null = null;
+  /** Compté à chaque commande qui change le monde sans le faire avancer. */
+  private mutations = 0;
+  /** Temps de calcul de la dernière sauvegarde encodée par tranches. */
+  private coutSauvegarde = 0;
 
   constructor(
     private readonly options: OptionsLocales,
@@ -93,6 +107,8 @@ export class LiaisonLocale implements Liaison {
   envoyer(commande: Commande): void {
     const sim = this.sim;
     if (sim === null) return;
+    if (commande.type !== "pause" && commande.type !== "reprendre" && commande.type !== "vitesse")
+      this.mutations += 1;
     switch (commande.type) {
       case "pause":
         this.pause = true;
@@ -157,13 +173,62 @@ export class LiaisonLocale implements Liaison {
     return this.sim === null || this.preparation !== null ? null : this.sim.sauvegarder();
   }
 
+  /**
+   * La même sauvegarde, sans figer la page : les personnages s'encodent par
+   * tranches de quelques millisecondes, la simulation attend entre-temps
+   * (une grande colonie prend plusieurs centaines de millisecondes à encoder).
+   * Une demande pendant qu'une autre est en cours reçoit la même sauvegarde.
+   */
+  sauvegarderSansBloquer(): Promise<Sauvegarde | null> {
+    if (this.sim === null || this.preparation !== null) return Promise.resolve(null);
+    if (this.encodage !== null) return this.encodage;
+    const promesse = this.encoderParTranches().finally(() => {
+      if (this.encodage === promesse) this.encodage = null;
+    });
+    this.encodage = promesse;
+    return promesse;
+  }
+
+  /** Temps de calcul (ms) de la dernière sauvegarde encodée par tranches. */
+  get coutSauvegardeMs(): number {
+    return this.coutSauvegarde;
+  }
+
+  private async encoderParTranches(): Promise<Sauvegarde | null> {
+    const sim = this.sim;
+    if (sim === null) return null;
+    for (let essai = 0; essai < ESSAIS_SAUVEGARDE; essai++) {
+      const mutations = this.mutations;
+      const etapes = sim.sauvegarderParEtapes();
+      let cout = 0;
+      let sauvegarde: Sauvegarde | null = null;
+      for (;;) {
+        const debut = performance.now();
+        while (sauvegarde === null && performance.now() - debut < TRANCHE_SAUVEGARDE_MS)
+          sauvegarde = etapes.suivant(1);
+        cout += performance.now() - debut;
+        if (sauvegarde !== null) break;
+        await souffler();
+        if (this.ferme || this.sim !== sim) return null;
+        // Une commande a touché au monde entre deux tranches : on repart du monde d'à présent.
+        if (sim.tick !== etapes.tick || this.mutations !== mutations) break;
+      }
+      if (sauvegarde !== null) {
+        this.coutSauvegarde = cout;
+        return sauvegarde;
+      }
+    }
+    return sim.sauvegarder();
+  }
+
   private pas(): void {
     const sim = this.sim;
     if (sim === null) return;
     const maintenant = performance.now();
     const dt = (maintenant - this.dernierTemps) / 1000;
     this.dernierTemps = maintenant;
-    if (!this.pause) {
+    // Pendant l'encodage d'une sauvegarde, le monde attend (la sauvegarde doit être d'un seul tick).
+    if (!this.pause && this.encodage === null) {
       this.accumulateur += dt * this.ticksParSeconde;
       // Un budget de temps par intervalle, jamais plus : la page ne gèle pas, et quand la
       // colonie est nombreuse la vitesse effective baisse d'elle-même. Ce qu'on n'a pas pu
@@ -190,14 +255,24 @@ export class LiaisonLocale implements Liaison {
     } else {
       this.accumulateur = 0;
     }
-    if (this.aDiffuser && maintenant - this.derniereDiffusion >= 100) {
-      this.diffuser();
+    // Bâtir l'état coûte d'autant plus que la colonie est grande : on espace la diffusion à
+    // quatre fois son coût (entre 100 ms et 1 s), pour laisser la simulation et l'affichage vivre.
+    if (this.aDiffuser && maintenant - this.derniereDiffusion >= this.intervalleDiffusion) {
       this.derniereDiffusion = maintenant;
       this.aDiffuser = false;
+      // Dans une tâche à part : les ticks et l'état ne font pas un seul long blocage.
+      const avecCarte = maintenant - this.derniereCarte >= 1000;
+      if (avecCarte) this.derniereCarte = maintenant;
+      setTimeout(() => {
+        if (this.ferme) return;
+        const debut = performance.now();
+        this.diffuser(avecCarte);
+        this.intervalleDiffusion = Math.min(1000, Math.max(100, (performance.now() - debut) * 4));
+      }, 0);
     }
   }
 
-  private diffuser(): void {
+  private diffuser(avecCarte = true): void {
     const sim = this.sim;
     if (sim === null) return;
     const brut = messageEtat(sim, {
@@ -206,6 +281,7 @@ export class LiaisonLocale implements Liaison {
       suivi: this.suivi,
       bilan: this.bilan,
       indexJournal: this.indexJournal,
+      avecCarte,
     });
     const etat: MessageEtat = {
       ...brut,

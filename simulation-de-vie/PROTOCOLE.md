@@ -912,7 +912,12 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
 - `Simulation.sauvegarder()` rend un objet JSON versionné ; `Simulation.restaurer()` en refait
   un monde qui continue à l'identique (P1 : même journal à venir). La sérialisation est
   structurelle (chaque champ parcouru), les tuiles se regénèrent de la graine, le journal est
-  tronqué à ses trois mille derniers événements (compteurs conservés).
+  tronqué à ses trois mille derniers événements (compteurs conservés). **[DÉCISION M24]**
+  `Simulation.sauvegarderParEtapes()` rend la même sauvegarde en plusieurs fois : tout est
+  encodé d'un coup sauf les personnages, que `suivant(n)` encode par paquets ; le monde ne doit
+  pas avancer d'ici la fin (`suivant` le refuse). En mémoire, le journal est une fenêtre de
+  vingt-quatre mille événements (effacés par six mille) avec un index global (`taille`,
+  `depuisIndex`) et des compteurs par type et par détail (`compteDetail("chasse:reussie")`).
 - La page range les sauvegardes dans IndexedDB (nommées, plus « auto »), en JSON compressé
   (gzip par `CompressionStream`, à plat si le navigateur ne l'a pas) ; la sauvegarde de sortie
   (page cachée ou fermée) part sans compression, dans une écriture lancée dans la foulée sur
@@ -924,8 +929,11 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   en dernier ; la boîte 💾 liste les deux sources et la plus récente reprend au chargement
   (**[DÉCISION M22]** : le stockage du navigateur ne survit pas toujours à la fermeture de
   l'artefact dans l'application). Le serveur `sim-serve` n'a pas encore de sauvegarde. La sauvegarde automatique suit une cadence adaptative (vingt secondes, allongée pour
-  que l'encodage reste sous un quarantième du temps), plus l'aube, la mise en pause et la mise à
-  l'arrière-plan ; la plus récente reprend d'elle-même au chargement si elle a moins de douze
+  que l'encodage reste sous un centième du temps), plus l'aube, la mise en pause et la mise à
+  l'arrière-plan ; **[DÉCISION M24]** hors sortie de page, la page encode par tranches de 8 ms
+  entre deux images (`LiaisonLocale.sauvegarderSansBloquer`), le monde attendant entre-temps,
+  puis sérialise et compresse en flux, morceau par morceau (`compresserParMorceaux`), sans
+  jamais assembler le JSON entier ; la plus récente reprend d'elle-même au chargement si elle a moins de douze
   heures et que l'adresse n'impose pas de graine.
 
 ## 8 quinquies. La société telle que réalisée (M19, jalon 13)

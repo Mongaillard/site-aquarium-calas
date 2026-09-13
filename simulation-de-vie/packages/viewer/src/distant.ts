@@ -8,7 +8,7 @@
  * null ou une liste vide : la page vit alors avec le seul stockage local.
  */
 import { estSauvegarde, type Sauvegarde } from "@sdv/core";
-import { compresser, compressionDisponible, decompresser } from "./compression.js";
+import { compresserParMorceaux, compressionDisponible, decompresser } from "./compression.js";
 import type { EntreeSauvegarde } from "./sauvegarde.js";
 
 /** Le peu qu'on attend de `claude.use("db")`. */
@@ -72,12 +72,29 @@ export function idDistant(nom: string): string {
   return id === "" || id === "." || id === ".." ? "partie" : id;
 }
 
+/** Octets par tranche de base64 : un multiple de trois, pour que chaque tranche soit entière. */
+const TRANCHE_B64 = 0x7ffe;
+
 /** Octets → base64, par tranches (une chaîne d'un mégaoctet ne passe pas d'un coup). */
 export function versBase64(octets: Uint8Array): string {
   let s = "";
-  for (let i = 0; i < octets.length; i += 0x8000)
-    s += String.fromCharCode(...octets.subarray(i, i + 0x8000));
-  return btoa(s);
+  for (let i = 0; i < octets.length; i += TRANCHE_B64)
+    s += btoa(String.fromCharCode(...octets.subarray(i, i + TRANCHE_B64)));
+  return s;
+}
+
+/** La même chose en rendant la main toutes les quelques millisecondes. */
+async function versBase64ParTranches(octets: Uint8Array): Promise<string> {
+  const morceaux: string[] = [];
+  let debut = performance.now();
+  for (let i = 0; i < octets.length; i += TRANCHE_B64) {
+    morceaux.push(btoa(String.fromCharCode(...octets.subarray(i, i + TRANCHE_B64))));
+    if (performance.now() - debut > 8) {
+      await new Promise((r) => setTimeout(r, 0));
+      debut = performance.now();
+    }
+  }
+  return morceaux.join("");
 }
 
 export function depuisBase64(b64: string): Uint8Array {
@@ -97,16 +114,23 @@ export function decouper(texte: string, taille = TAILLE_MORCEAU): string[] {
 /** Une écriture plus récente sur le même nom l'emporte sur une plus ancienne encore en vol. */
 const sequences = new Map<string, number>();
 
-/** Écrit une sauvegarde dans la base ; faux si la base n'est pas là. */
-export async function ecrireDistante(nom: string, s: Sauvegarde): Promise<boolean> {
+/**
+ * Écrit une sauvegarde dans la base ; faux si la base n'est pas là. `octets` :
+ * la compression déjà lancée par ailleurs (la même que la sauvegarde locale).
+ */
+export async function ecrireDistante(
+  nom: string,
+  s: Sauvegarde,
+  octets: Promise<ArrayBuffer | null> | null = null,
+): Promise<boolean> {
   const db = await baseDistante();
   if (db === null || !compressionDisponible()) return false;
   const sequence = (sequences.get(nom) ?? 0) + 1;
   sequences.set(nom, sequence);
   const perimee = (): boolean => sequences.get(nom) !== sequence;
-  const octets = new Uint8Array(await compresser(JSON.stringify(s)));
-  if (perimee()) return false;
-  const morceaux = decouper(versBase64(octets));
+  const comprimes = await (octets ?? compresserParMorceaux(s, perimee));
+  if (comprimes === null || perimee()) return false;
+  const morceaux = decouper(await versBase64ParTranches(new Uint8Array(comprimes)));
   const ref = db.doc(`${COLLECTION}/${idDistant(nom)}`);
   const ancien = await ref.get();
   const anciensMorceaux = ancien.exists ? Number(ancien.data()?.morceaux ?? 0) : 0;
@@ -125,7 +149,7 @@ export async function ecrireDistante(nom: string, s: Sauvegarde): Promise<boolea
     seed: s.seed,
     jour: s.jour,
     vivants: s.vivants,
-    taille: octets.byteLength,
+    taille: comprimes.byteLength,
     format: FORMAT,
     morceaux: morceaux.length,
   };

@@ -293,9 +293,7 @@ describe("la nuit menace : combat, alarme et défenses", () => {
     async () => {
       const sim = Simulation.creer({ seed: 42 });
       await joursAsync(sim, 120);
-      expect(
-        sim.journal.parType("menace").filter((e) => e.details.genre === "menace").length,
-      ).toBeGreaterThan(1);
+      expect(sim.journal.compteDetail("menace:menace")).toBeGreaterThan(1);
       expect(sim.journal.compte("alarme")).toBeGreaterThan(0);
       expect(
         sim.journal.parType("deces").filter((e) => e.details.cause === "loups").length,

@@ -3,15 +3,42 @@ import { Simulation } from "../src/simulation.js";
 import { decoder, encoder, estSauvegarde } from "../src/sauvegarde.js";
 import { Rng } from "../src/rng.js";
 
-function empreinte(sim: Simulation, depuis: number): string {
+/** Les `n` derniers événements depuis `depuis` (le journal en mémoire est une fenêtre : deux
+ * mondes qui n'ont pas effacé au même moment ne gardent pas le même début). */
+function empreinte(sim: Simulation, depuis: number, n = 20_000): string {
   return sim.journal
     .tous()
     .filter((e) => e.tick >= depuis)
+    .slice(-n)
     .map((e) => `${String(e.tick)} ${e.type} ${e.acteur ?? ""} ${JSON.stringify(e.details)}`)
     .join("\n");
 }
 
 describe("sauvegarde", () => {
+  it("par étapes, la même sauvegarde qu'en une fois, et rien si le monde bouge entre-temps", () => {
+    const sim = Simulation.creer({ seed: 3, population: { initiale: 6, familles: 2 } });
+    sim.avancer(200);
+    const entiere = sim.sauvegarder();
+    const etapes = sim.sauvegarderParEtapes();
+    expect(etapes.total).toBe(sim.personnages.length);
+    let pas = 0;
+    let s = etapes.suivant(2);
+    while (s === null) {
+      pas += 1;
+      s = etapes.suivant(2);
+    }
+    expect(pas).toBe(Math.ceil(sim.personnages.length / 2) - 1);
+    expect(JSON.stringify({ ...s, date: 0 })).toBe(JSON.stringify({ ...entiere, date: 0 }));
+    const copie = Simulation.restaurer(JSON.parse(JSON.stringify(s)));
+    sim.avancer(100);
+    copie.avancer(100);
+    expect(copie.journal.empreinte()).toBe(sim.journal.empreinte());
+    const tardive = sim.sauvegarderParEtapes();
+    tardive.suivant(1);
+    sim.avancer(1);
+    expect(() => tardive.suivant(1)).toThrow(/avancé/);
+  });
+
   it("encode et décode Map, Set, Infinity, Rng et flux de mémoire", () => {
     const rng = Rng.depuisGraine("x");
     rng.suivant();
@@ -78,7 +105,12 @@ describe("sauvegarde", () => {
         copie.avancer(5 * 144);
         await new Promise((r) => setTimeout(r, 0));
       }
-      expect(empreinte(copie, depuis)).toBe(empreinte(sim, depuis));
+      const n = Math.min(
+        sim.journal.tous().filter((e) => e.tick >= depuis).length,
+        copie.journal.tous().filter((e) => e.tick >= depuis).length,
+      );
+      expect(n).toBeGreaterThan(10_000);
+      expect(empreinte(copie, depuis, n)).toBe(empreinte(sim, depuis, n));
       expect(copie.vivants().map((x) => [x.id, x.corps.position, x.besoins.faim])).toEqual(
         sim.vivants().map((x) => [x.id, x.corps.position, x.besoins.faim]),
       );

@@ -61,7 +61,7 @@ import {
   eauSouillee,
   tomberMalade,
 } from "../agents/maladies.js";
-import { RESERVE_BOIS_MAX } from "../monde.js";
+import { RESERVE_BOIS_MAX, sommeilChange } from "../monde.js";
 import {
   BETES_PAR_FAMILLE_MAX,
   DOCILITE,
@@ -1099,6 +1099,7 @@ function tickDormir(
 ): Resultat {
   if (!p.corps.endormi) {
     p.corps.endormi = true;
+    sommeilChange();
     monde.emettre("endormi", p, {}, 1);
   }
   action.ticksDormis += 1;
@@ -1108,6 +1109,7 @@ function tickDormir(
   const reveil = b.sommeil >= 95 || b.soif < 8 || b.faim < 8 || action.ticksDormis >= 12 * 6;
   if (!reveil) return ENCOURS;
   p.corps.endormi = false;
+  sommeilChange();
   monde.emettre("reveil", p, { ticksDormis: action.ticksDormis }, 1);
   return TERMINEE;
 }

@@ -12,7 +12,7 @@ import { clamp } from "./besoins.js";
 import { mettreAJourStade, relationAvec } from "./personnage.js";
 import type { Personnage } from "./personnage.js";
 import { personnaliteDepuisGenome } from "./identite.js";
-import { batimentsAccessibles, membresFamille } from "../monde.js";
+import { batimentsAccessibles, membresFamille, sommeilChange } from "../monde.js";
 import type { Monde } from "../monde.js";
 import { rompre } from "../social/couple.js";
 import { relationFamiliale } from "../social/relations.js";
@@ -84,6 +84,7 @@ export function avancementGrossesse(monde: Monde, p: Personnage): number {
 export function tickVieQuotidien(monde: Monde, p: Personnage): void {
   const { joursParAnnee, ageAdulte, ageAncien } = monde.config.vie;
   const ancien = mettreAJourStade(p, joursParAnnee, ageAdulte, ageAncien);
+  if (ancien !== null) sommeilChange();
   if (ancien !== null) {
     if (p.corps.stade === "adolescent") {
       personnaliteAdolescente(monde, p);

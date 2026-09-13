@@ -54,7 +54,7 @@ export interface LieuConnu {
 }
 
 /** Lieux connus au-delà desquels on oublie les plus anciennement vus (la carte les rend). */
-export const LIEUX_CONNUS_MAX = 800;
+export const LIEUX_CONNUS_MAX = 500;
 
 /** Oublie les lieux vus il y a le plus longtemps quand on en connaît trop. */
 export function elaguerConnaissance(p: Personnage, max = LIEUX_CONNUS_MAX): number {

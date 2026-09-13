@@ -210,7 +210,7 @@ export class Grille {
     return Math.abs(x) <= this.limite && Math.abs(y) <= this.limite;
   }
 
-  private static indexLocal(x: number, y: number): number {
+  static indexLocal(x: number, y: number): number {
     const T = TAILLE_MORCEAU;
     return (y - coordMorceau(y) * T) * T + (x - coordMorceau(x) * T);
   }

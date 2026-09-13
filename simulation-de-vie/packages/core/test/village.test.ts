@@ -314,7 +314,7 @@ describe("le village apprivoise : champs et métiers", () => {
       const sim = Simulation.creer({ seed: 7 });
       await joursAsync(sim, 240);
       expect(sim.journal.compte("semis")).toBeGreaterThan(0);
-      expect(sim.journal.parType("champ").some((e) => e.details.genre === "mur")).toBe(true);
+      expect(sim.journal.compteDetail("champ:mur")).toBeGreaterThan(0);
       expect(sim.journal.compte("chasse")).toBeGreaterThan(0);
       expect(sim.vivants().some((p) => titre(p) !== null)).toBe(true);
       expect(sim.vivants().length).toBeGreaterThanOrEqual(12);

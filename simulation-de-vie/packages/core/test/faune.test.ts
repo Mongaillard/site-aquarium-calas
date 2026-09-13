@@ -304,11 +304,10 @@ describe("la faune : forêt, pêche, calendrier et démographie", () => {
     async () => {
       const sim = Simulation.creer({ seed: 7 });
       await joursAsync(sim, 100);
-      const faune = sim.journal.parType("faune");
-      expect(faune.length).toBeGreaterThan(0);
-      expect(faune.some((e) => e.details.genre === "naissances")).toBe(true);
+      expect(sim.journal.compte("faune")).toBeGreaterThan(0);
+      expect(sim.journal.compteDetail("faune:naissances")).toBeGreaterThan(0);
       expect(sim.journal.compte("chasse")).toBeGreaterThan(5);
-      expect(sim.journal.parType("chasse").some((e) => e.details.reussie === true)).toBe(true);
+      expect(sim.journal.compteDetail("chasse:reussie")).toBeGreaterThan(0);
       expect(recensement(sim).length).toBeGreaterThanOrEqual(3);
       expect(sim.vivants().length).toBeGreaterThanOrEqual(10);
     },

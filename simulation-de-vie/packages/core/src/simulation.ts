@@ -44,7 +44,7 @@ import type { SimConfig, SimConfigPartielle } from "./config.js";
 import { fusionnerConfig, validerConfig } from "./config.js";
 import { Journal } from "./evenements/journal.js";
 import type { Evenement, TypeEvenement } from "./evenements/journal.js";
-import { estEau, feuProche } from "./monde.js";
+import { estEau, feuProche, sommeilChange } from "./monde.js";
 import { decrireEvenement, importancePourTemoin } from "./memoire/descriptions.js";
 import type { Nommeur } from "./memoire/descriptions.js";
 import { reflechir } from "./memoire/reflexion.js";
@@ -253,6 +253,16 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
       defauts(r as unknown as Record<string, unknown>, { rancune: 0, haine: false });
   }
   return etat;
+}
+
+/** Une sauvegarde en cours d'encodage (voir `Simulation.sauvegarderParEtapes`). */
+export interface EtapesSauvegarde {
+  /** Le tick du monde encodé. */
+  readonly tick: number;
+  /** Personnages à encoder en tout. */
+  readonly total: number;
+  /** Encode jusqu'à `n` personnages de plus ; la sauvegarde quand tout y est, null sinon. */
+  suivant(n: number): Sauvegarde | null;
 }
 
 /** Tout ce qu'une simulation possède en propre (sérialisé structurellement). */
@@ -912,7 +922,49 @@ export class Simulation implements Monde {
 
   /** L'état complet du monde, prêt à être rangé (JSON) et restauré à l'identique. */
   sauvegarder(): Sauvegarde {
-    const etat: EtatSimulation = {
+    const etapes = this.sauvegarderParEtapes();
+    let s = etapes.suivant(Infinity);
+    while (s === null) s = etapes.suivant(Infinity);
+    return s;
+  }
+
+  /**
+   * La même sauvegarde, par étapes : tout est encodé d'un coup sauf les
+   * personnages (l'essentiel du poids), qui le sont à la demande, par paquets,
+   * pour qu'une page puisse rendre la main entre deux. Le monde ne doit pas
+   * bouger d'ici la fin : `suivant` refuse de continuer s'il a avancé.
+   */
+  sauvegarderParEtapes(): EtapesSauvegarde {
+    const etat = this.etatBrut();
+    const tick = this.tick;
+    const personnages = etat.personnages;
+    const enveloppe = encoder({ ...etat, personnages: [] }) as { personnages: unknown[] };
+    const encodes = enveloppe.personnages;
+    const entete: Omit<Sauvegarde, "date" | "etat"> = {
+      format: FORMAT_SAUVEGARDE,
+      version: VERSION_SAUVEGARDE,
+      seed: String(this.config.seed),
+      tick,
+      jour: Math.floor(tick / this.horloge.ticksParJour),
+      vivants: this.vivants().length,
+    };
+    return {
+      tick,
+      total: personnages.length,
+      suivant: (n: number): Sauvegarde | null => {
+        if (this.tick !== tick) throw new Error("le monde a avancé pendant la sauvegarde");
+        const fin = Math.min(personnages.length, encodes.length + Math.max(1, n));
+        while (encodes.length < fin) encodes.push(encoder(personnages[encodes.length]));
+        return encodes.length < personnages.length
+          ? null
+          : { ...entete, date: Date.now(), etat: enveloppe };
+      },
+    };
+  }
+
+  /** Tout ce que la sauvegarde contient, tel quel (avant encodage). */
+  private etatBrut(): EtatSimulation {
+    return {
       config: this.config,
       rng: this.rng.etat(),
       tick: this.tick,
@@ -952,16 +1004,6 @@ export class Simulation implements Monde {
       societe: this.societe,
       chronique: this.chronique,
       villages: this.villages,
-    };
-    return {
-      format: FORMAT_SAUVEGARDE,
-      version: VERSION_SAUVEGARDE,
-      date: Date.now(),
-      seed: String(this.config.seed),
-      tick: this.tick,
-      jour: Math.floor(this.tick / this.horloge.ticksParJour),
-      vivants: this.vivants().length,
-      etat: encoder(etat),
     };
   }
 
@@ -1994,6 +2036,7 @@ export class Simulation implements Monde {
       p.plan = [];
       p.intention = null;
       p.corps.endormi = false;
+      sommeilChange();
     }
   }
 
@@ -2014,6 +2057,7 @@ export class Simulation implements Monde {
     p.causeDeces = cause;
     p.tickDeces = this.tick;
     p.corps.endormi = false;
+    sommeilChange();
     p.actionEnCours = null;
     p.plan = [];
     p.intention = null;

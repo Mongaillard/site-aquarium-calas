@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { Simulation, estSauvegarde } from "@sdv/core";
-import { compresser, compressionDisponible, decompresser } from "../src/compression.js";
+import {
+  compresser,
+  compresserParMorceaux,
+  compressionDisponible,
+  decompresser,
+  jsonParMorceaux,
+  stringifyParMorceaux,
+} from "../src/compression.js";
 import { sortDuDefilement } from "../src/gestes.js";
 import { decrireSauvegarde } from "../src/sauvegarde.js";
 import { TAILLE_MORCEAU, decouper, depuisBase64, idDistant, versBase64 } from "../src/distant.js";
@@ -13,6 +20,26 @@ describe("compression des sauvegardes", () => {
     expect(octets.byteLength).toBeLessThan(texte.length / 5);
     expect(await decompresser(octets)).toBe(texte);
   });
+
+  it("le JSON par morceaux est exactement celui de JSON.stringify, et le flux gzip se relit", async () => {
+    const sim = Simulation.creer({ seed: 42 });
+    sim.avancer(150);
+    const source = sim.sauvegarder();
+    const attendu = JSON.stringify(source);
+    const morceaux = [...jsonParMorceaux(source)];
+    expect(morceaux.length).toBeGreaterThan(sim.personnages.length + 10);
+    expect(morceaux.join("")).toBe(attendu);
+    expect(await stringifyParMorceaux(source)).toBe(attendu);
+    expect(
+      [...jsonParMorceaux({ a: [1, { b: undefined, c: null }], d: "x", e: undefined })].join(""),
+    ).toBe(JSON.stringify({ a: [1, { b: undefined, c: null }], d: "x", e: undefined }));
+    const octets = await compresserParMorceaux(source);
+    if (octets === null) throw new Error("abandonné");
+    expect(await decompresser(octets)).toBe(attendu);
+    expect(octets.byteLength).toBeLessThan(attendu.length / 4);
+    // Abandonné entre deux tranches : null, sans rien laisser pendre.
+    expect(await compresserParMorceaux(source, () => true)).toBeNull();
+  }, 30_000);
 
   it("fait passer une vraie sauvegarde par le JSON compressé sans rien perdre", async () => {
     const sim = Simulation.creer({ seed: 42 });

@@ -152,20 +152,34 @@ export function batimentsAccessibles(monde: Monde, p: Personnage, type?: TypeBat
   );
 }
 
+/** Comptage des dormeurs mémorisé ; à refaire dès que quelqu'un s'endort, se réveille, meurt ou grandit. */
+const cacheDormeurs = new WeakMap<
+  Monde,
+  { tick: number; version: number; parTuile: Map<string, number> }
+>();
+let versionSommeil = 0;
+
+/** À appeler quand un `endormi`, un `vivant` ou un `stade` change : le comptage des dormeurs est à refaire. */
+export function sommeilChange(): void {
+  versionSommeil += 1;
+}
+
 /** Nombre d'adultes endormis sur la tuile d'un bâtiment (les enfants se serrent, ils ne comptent pas). */
 export function dormeurs(monde: Monde, b: Batiment): number {
-  let n = 0;
-  for (const p of monde.personnages) {
-    if (
-      p.vivant &&
-      p.corps.endormi &&
-      p.corps.stade !== "enfant" &&
-      p.corps.position.x === b.position.x &&
-      p.corps.position.y === b.position.y
-    )
-      n++;
+  // Comptés une fois pour tout le monde, tant que rien n'a changé (la question revient pour
+  // chaque abri de chacun, à chaque tick).
+  let entree = cacheDormeurs.get(monde);
+  if (entree?.version !== versionSommeil || entree.tick !== monde.horloge.tick) {
+    const parTuile = new Map<string, number>();
+    for (const p of monde.personnages) {
+      if (!p.vivant || !p.corps.endormi || p.corps.stade === "enfant") continue;
+      const cle = `${String(p.corps.position.x)},${String(p.corps.position.y)}`;
+      parTuile.set(cle, (parTuile.get(cle) ?? 0) + 1);
+    }
+    entree = { tick: monde.horloge.tick, version: versionSommeil, parTuile };
+    cacheDormeurs.set(monde, entree);
   }
-  return n;
+  return entree.parTuile.get(`${String(b.position.x)},${String(b.position.y)}`) ?? 0;
 }
 
 /** Abri terminé, accessible, avec une place libre, le plus proche. */

@@ -23,6 +23,7 @@ import {
 } from "./sauvegarde.js";
 import type { EntreeSauvegarde } from "./sauvegarde.js";
 import { ecrireDistante, lireDistante, listerDistantes, supprimerDistante } from "./distant.js";
+import { compresserParMorceaux, compressionDisponible } from "./compression.js";
 import type { Liaison } from "./reseau.js";
 import { Reseau, urlWebSocket } from "./reseau.js";
 
@@ -160,9 +161,13 @@ const INTERVALLE_DISTANT_MS = 60_000;
  * l'automatique).
  */
 async function sauvegarderSous(nom: string, immediate = false, distant = true): Promise<boolean> {
-  const s = liaison instanceof LiaisonLocale ? liaison.sauvegarder() : null;
+  if (!(liaison instanceof LiaisonLocale)) return false;
+  // Une sortie de page n'attend pas ; le reste du temps, la page ne gèle pas.
+  const s = immediate ? liaison.sauvegarder() : await liaison.sauvegarderSansBloquer();
   if (s === null) return false;
-  const locale = ecrireSauvegarde(nom, s, immediate).then(
+  // Une seule compression, en flux, pour les deux destinations.
+  const octets = distant && !immediate && compressionDisponible() ? compresserParMorceaux(s) : null;
+  const locale = ecrireSauvegarde(nom, s, immediate, octets).then(
     () => true,
     (erreur: unknown) => {
       statutSauvegarde(
@@ -172,7 +177,7 @@ async function sauvegarderSous(nom: string, immediate = false, distant = true): 
     },
   );
   const distante = distant
-    ? ecrireDistante(nom, s).then(
+    ? ecrireDistante(nom, s, octets).then(
         (fait) => {
           if (fait) derniereDistanteA = performance.now();
           return fait;
@@ -262,11 +267,11 @@ let dernierJourSauve = -1;
 let pauseVue = false;
 /** Cadence de base de la sauvegarde automatique ; allongée si encoder le monde coûte cher. */
 const INTERVALLE_AUTO_MS = 20_000;
-const INTERVALLE_AUTO_MAX_MS = 120_000;
+const INTERVALLE_AUTO_MAX_MS = 180_000;
 /** À l'aube, on sauvegarde aussi si la dernière date d'au moins cinq secondes. */
 const INTERVALLE_AUBE_MS = 5_000;
-/** Part du temps que l'encodage (synchrone) peut prendre : un quarantième. */
-const PART_ENCODAGE = 40;
+/** Part du temps que l'encodage d'une sauvegarde peut prendre : un centième. */
+const PART_ENCODAGE = 100;
 let intervalleAutoMs = INTERVALLE_AUTO_MS;
 /**
  * Sauvegarde automatique, seulement si le monde a avancé : toutes les vingt
@@ -290,17 +295,21 @@ function sauvegardeAutomatique(maintenant: number, force = false): void {
   if (!force && !miseEnPause && !aube && ecoule < intervalleAutoMs) return;
   derniereSauvegardeAutoA = maintenant;
   dernierJourSauve = jour;
-  const debut = performance.now();
   const distant =
     force || miseEnPause || aube || maintenant - derniereDistanteA >= INTERVALLE_DISTANT_MS;
-  void sauvegarderSous(NOM_AUTO, force, distant).then((fait) => {
+  const debut = performance.now();
+  const promesse = sauvegarderSous(NOM_AUTO, force, distant);
+  // De force, le monde vient d'être encodé d'un coup ; sinon par tranches, on lira son coût.
+  const coutImmediat = performance.now() - debut;
+  void promesse.then((fait) => {
     if (fait) dernierTickSauve = tick;
+    const cout =
+      liaison instanceof LiaisonLocale && !force ? liaison.coutSauvegardeMs : coutImmediat;
+    intervalleAutoMs = Math.min(
+      INTERVALLE_AUTO_MAX_MS,
+      Math.max(INTERVALLE_AUTO_MS, cout * PART_ENCODAGE),
+    );
   });
-  // La part synchrone (encoder le monde) vient de s'exécuter : on en déduit la cadence.
-  intervalleAutoMs = Math.min(
-    INTERVALLE_AUTO_MAX_MS,
-    Math.max(INTERVALLE_AUTO_MS, (performance.now() - debut) * PART_ENCODAGE),
-  );
 }
 
 const btnMenu = element("btn-menu", HTMLButtonElement);
@@ -939,6 +948,7 @@ window.addEventListener("keydown", (ev) => {
 });
 
 let dernierPanneau = 0;
+let sauterImage = false;
 function boucle(maintenant: number): void {
   const init = magasin.init;
   if (init !== null && !camAjustee) {
@@ -970,7 +980,14 @@ function boucle(maintenant: number): void {
     const pos = magasin.positionAffichee(magasin.selection, maintenant);
     if (pos) cam = centrerSur(cam, pos.x, pos.y, canvas.width, canvas.height);
   }
-  rendu.dessiner(cam, maintenant, survol, survolBatiment);
+  // Une image qui coûte cher (grande colonie, petit processeur) : on saute la suivante, la
+  // simulation et les gestes gardent la main.
+  if (sauterImage) sauterImage = false;
+  else {
+    const debutImage = performance.now();
+    rendu.dessiner(cam, maintenant, survol, survolBatiment);
+    sauterImage = performance.now() - debutImage > 12;
+  }
   if (maintenant - dernierPanneau > 250) {
     panneaux.rafraichir();
     rafraichirPouvoirs();

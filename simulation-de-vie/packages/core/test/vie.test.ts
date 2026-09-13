@@ -430,9 +430,7 @@ describe("hiver : chaleur, pêche et provisions", () => {
     expect(sim.horloge.moment().saison).toBe("printemps");
     expect(sim.statistiques().vivants).toBeGreaterThanOrEqual(12);
     expect(sim.journal.compte("naissance")).toBeGreaterThanOrEqual(3);
-    expect(
-      sim.journal.parType("recolte").filter((e) => e.details.ressource === "poisson").length,
-    ).toBeGreaterThan(50);
+    expect(sim.journal.compteDetail("recolte:poisson")).toBeGreaterThan(50);
     expect(
       sim.journal.parType("intention").filter((e) => e.details.intention === "se_rechauffer")
         .length,
