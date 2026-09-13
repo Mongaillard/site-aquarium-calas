@@ -3,6 +3,7 @@
  * la personnalité, avec un bruit seedé de ±10 %.
  */
 import { INVENTIONS } from "../savoirs/catalogue.js";
+import { BETES_PAR_FAMILLE_MAX } from "../monde/village.js";
 import type { Invention, Lecon, Savoir } from "../savoirs/catalogue.js";
 import { NOURRITURE } from "../agents/inventaire.js";
 import { urgence } from "../agents/besoins.js";
@@ -132,6 +133,7 @@ export class RuleBrain implements Cerveau {
       perception.moi.possede("arc") ||
       perception.moi.possede("piege");
     const nuit = perception.moment.estNuit;
+    const placeALEnclos = perception.moi.betesFamille < BETES_PAR_FAMILLE_MAX;
     const froid = urgence(besoins.chaleur);
     const candidats: Candidat[] = [];
 
@@ -454,9 +456,23 @@ export class RuleBrain implements Cerveau {
     // Inventions : réaliser une idée, puis s'équiper de ce qu'on sait faire.
     if (adulte && placeLibre > 0) {
       for (const idee of perception.moi.ideesEnCours) {
+        const scoreIdee = 0.55 + personnalite.ouverture * 0.3 + personnalite.conscience * 0.2;
+        // La fonte demande d'abord une pioche (le minerai est dans la roche), puis un four.
+        if (idee === "fonte") {
+          const pioche =
+            perception.moi.possede("pioche") || perception.moi.possede("pioche_cuivre");
+          if (!pioche) {
+            candidats.push({
+              intention: { type: "fabriquer", recette: "pioche" },
+              score: scoreIdee,
+            });
+            continue;
+          }
+          if (!perception.fourConnu) continue;
+        }
         candidats.push({
           intention: { type: "fabriquer", recette: INVENTIONS[idee].recette },
-          score: 0.55 + personnalite.ouverture * 0.3 + personnalite.conscience * 0.2,
+          score: scoreIdee,
         });
       }
       const equipement: { invention: Invention; utile: boolean }[] = [
@@ -497,6 +513,10 @@ export class RuleBrain implements Cerveau {
             (saisonFroide || sait("vetements_chauds")) &&
             !perception.moi.possede("vetement_cuir") &&
             perception.moi.cuir >= 3,
+        },
+        {
+          invention: "outils_de_cuivre",
+          utile: perception.cuivreAccessible >= 1 && !perception.moi.possede("hache_cuivre"),
         },
       ];
       for (const { invention, utile } of equipement) {
@@ -654,6 +674,67 @@ export class RuleBrain implements Cerveau {
       });
     }
 
+    // Apprivoiser : une corde en poche, pour ramener vivante une bête docile qu'on voit.
+    const troupeauDocile = perception.troupeauxVisibles.find((t) => t.docile);
+    if (
+      adulte &&
+      placeALEnclos &&
+      !perception.moi.possedeCorde &&
+      troupeauDocile !== undefined &&
+      connait("fibres") &&
+      placeLibre > 2
+    ) {
+      candidats.push({
+        intention: { type: "fabriquer", recette: "corde" },
+        score: 0.45 + personnalite.ouverture * 0.2 + (perception.moi.betesFamille === 0 ? 0.2 : 0),
+      });
+    }
+
+    // L'âge du cuivre : une pioche pour le minerai, du minerai pour le four, un lingot pour l'outil.
+    const fonte = sait("fonte") || perception.moi.ideesEnCours.includes("fonte");
+    if (adulte && fonte && perception.connaitMinerai && placeLibre > 0) {
+      const pioche = perception.moi.possede("pioche") || perception.moi.possede("pioche_cuivre");
+      if (!pioche) {
+        candidats.push({
+          intention: { type: "fabriquer", recette: "pioche" },
+          score: 0.4 + personnalite.conscience * 0.2,
+        });
+      } else if (
+        perception.moi.minerai < 3 &&
+        perception.mineraiAccessible < 6 &&
+        perception.cuivreAccessible < 2 &&
+        placeLibre > 3
+      ) {
+        candidats.push({
+          intention: { type: "recolter", ressource: "minerai" },
+          score: 0.4 + personnalite.ouverture * 0.2 + personnalite.conscience * 0.2,
+        });
+      }
+      if (
+        perception.fourConnu &&
+        (perception.moi.minerai >= 3 || (perception.mineraiAccessible >= 3 && placeLibre >= 3))
+      ) {
+        candidats.push({
+          intention: { type: "fabriquer", recette: "cuivre" },
+          score: 0.55 + personnalite.conscience * 0.2,
+        });
+      }
+    }
+    if (
+      adulte &&
+      sait("outils_de_cuivre") &&
+      perception.cuivreAccessible >= 1 &&
+      placeLibre > 0 &&
+      !perception.moi.possede("pioche_cuivre") &&
+      perception.connaitMinerai &&
+      perception.moi.possede("hache_cuivre")
+    ) {
+      candidats.push({
+        intention: { type: "fabriquer", recette: "pioche_cuivre" },
+        score: 0.45 + personnalite.conscience * 0.2,
+      });
+    }
+
     // Fumer le poisson quand on a un fumoir et de quoi le remplir.
     if (
       adulte &&
@@ -743,7 +824,9 @@ export class RuleBrain implements Cerveau {
           (gibierEnVue.taille >= 4 ? 0.1 : 0) +
           personnalite.ouverture * 0.2 -
           gibierEnVue.distance / 30 -
-          gibierEnVue.mefiance * 0.4,
+          gibierEnVue.mefiance * 0.4 +
+          // Une corde en poche et une bête docile : on ramène un jeune vivant.
+          (gibierEnVue.docile && perception.moi.possedeCorde && placeALEnclos ? 0.4 : 0),
       });
     }
 

@@ -23,6 +23,8 @@ export const COULEURS_RESSOURCE: Readonly<Record<string, string>> = {
   argile: "#c46a2b",
   graines: "#f0e68c",
   herbes: "#5fb36a",
+  minerai: "#5e9c8a",
+  cuivre: "#c8742a",
 };
 
 export const LETTRES_BATIMENT: Readonly<Record<string, string>> = {
@@ -223,6 +225,8 @@ const NOMS_RESSOURCES_EV: Readonly<Record<string, string>> = {
   corde: "de la corde",
   repas_cuit: "un repas cuit",
   cuir: "du cuir",
+  minerai: "du minerai",
+  cuivre: "du cuivre",
 };
 
 export const NOMS_ESPECE: Readonly<Record<string, string>> = {

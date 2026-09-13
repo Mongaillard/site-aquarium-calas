@@ -70,7 +70,8 @@ export const LECONS = {
 } as const satisfies Record<string, FicheLecon>;
 export type Lecon = keyof typeof LECONS;
 
-export type Domaine = "peche" | "chasse" | "deplacement" | "jeu" | "conservation" | "confort";
+export type Domaine =
+  "peche" | "chasse" | "deplacement" | "jeu" | "conservation" | "confort" | "outillage";
 
 export interface FicheInvention {
   readonly nom: string;
@@ -152,6 +153,21 @@ export const INVENTIONS = {
     recette: "vetement_cuir",
     idee: "Les peaux du gibier tiennent chaud aux bêtes. Cousues avec de la corde, elles nous tiendraient chaud aussi.",
     confidence: "Un vêtement de cuir cousu tient chaud tout l'hiver.",
+  },
+  fonte: {
+    nom: "fonte du cuivre",
+    domaine: "outillage",
+    recette: "cuivre",
+    idee: "Cette pierre verte de la montagne a pleuré des gouttes rouges dans le feu. Chauffée assez fort, elle ferait un métal.",
+    confidence:
+      "Trois pierres vertes de la montagne et du bois au four donnent un lingot de cuivre.",
+  },
+  outils_de_cuivre: {
+    nom: "outils de cuivre",
+    domaine: "outillage",
+    recette: "hache_cuivre",
+    idee: "Une hache de pierre s'ébrèche en quarante coups. Une lame de cuivre tiendrait bien plus longtemps, et couperait mieux.",
+    confidence: "Une hache ou une pioche de cuivre dure quatre fois plus et abat deux fois plus.",
   },
 } as const satisfies Record<string, FicheInvention>;
 export type Invention = keyof typeof INVENTIONS;

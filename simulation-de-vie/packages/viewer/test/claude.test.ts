@@ -159,6 +159,7 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
       malades: 0,
       betail: 0,
       champs: 0,
+      age: "pierre",
       ambitions: [],
       miracles: 0,
       foiMoyenne: 2,

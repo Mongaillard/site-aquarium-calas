@@ -20,6 +20,9 @@ import type { Position } from "./grille.js";
 // ---------------------------------------------------------------- bétail
 
 /** Docilité par espèce : le mouflon s'apprivoise, le cerf jamais. */
+/** Bêtes par famille au-delà desquelles on ne capture plus (l'enclos et le fourrage ont leurs limites). */
+export const BETES_PAR_FAMILLE_MAX = 4;
+
 export const DOCILITE: Readonly<Record<Espece, number>> = {
   mouflon: 0.7,
   aurochs: 0.4,

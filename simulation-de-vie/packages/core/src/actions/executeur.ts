@@ -62,7 +62,13 @@ import {
   tomberMalade,
 } from "../agents/maladies.js";
 import { RESERVE_BOIS_MAX } from "../monde.js";
-import { semer, tenterCapture } from "../monde/village.js";
+import {
+  BETES_PAR_FAMILLE_MAX,
+  DOCILITE,
+  betesDe,
+  semer,
+  tenterCapture,
+} from "../monde/village.js";
 import type { Action } from "./types.js";
 import { INVENTIONS, LECONS, estLecon } from "../savoirs/catalogue.js";
 import { apprendre, connait } from "../savoirs/lecons.js";
@@ -707,10 +713,16 @@ function tickRecolter(
     monde.config.vie.joursParAnnee,
     monde.horloge.tick,
   ).manipulation;
+  // Un outil de cuivre abat et extrait bien plus qu'un outil de pierre.
+  const outilDeCuivre =
+    (outil === "hache_pierre" && possede(p.corps.inventaire, "hache_cuivre")) ||
+    (outil === "pioche" && possede(p.corps.inventaire, "pioche_cuivre"));
   const parAction = Math.max(
     1,
     Math.floor(
-      (1 + Math.floor(niv / 2)) * (outil === "hache_pierre" || auFilet ? 2 : 1) * manipulation,
+      (1 + Math.floor(niv / 2)) *
+        (outilDeCuivre ? 3 : outil === "hache_pierre" || auFilet ? 2 : 1) *
+        manipulation,
     ),
   );
   const rendement = Math.min(
@@ -736,15 +748,19 @@ function tickRecolter(
   const outilUse =
     outil === null
       ? null
-      : possede(p.corps.inventaire, outil)
-        ? outil
-        : outil === "canne_a_peche"
-          ? "filet"
-          : outil === "lance"
-            ? possede(p.corps.inventaire, "arc")
-              ? "arc"
-              : "piege"
-            : outil;
+      : outilDeCuivre
+        ? outil === "hache_pierre"
+          ? "hache_cuivre"
+          : "pioche_cuivre"
+        : possede(p.corps.inventaire, outil)
+          ? outil
+          : outil === "canne_a_peche"
+            ? "filet"
+            : outil === "lance"
+              ? possede(p.corps.inventaire, "arc")
+                ? "arc"
+                : "piege"
+              : outil;
   if (outilUse !== null && userObjet(p.corps.inventaire, outilUse)) {
     monde.emettre("outil_casse", p, { outil }, 3);
   }
@@ -819,6 +835,35 @@ function tickChasser(
         (t.etat === "fuite" ? 0.1 : 0),
     ),
   );
+  // Une corde, une espèce docile, de la place à l'enclos : on tente de ramener la bête vivante.
+  if (
+    DOCILITE[t.espece] > 0 &&
+    quantite(inv, "corde") >= 1 &&
+    betesDe(monde, p.identite.nomFamille).length < BETES_PAR_FAMILLE_MAX
+  ) {
+    const bete = tenterCapture(p, t.espece, p.rng, () => monde.prochainIdBete());
+    if (bete !== null) {
+      monde.ajouterBete(bete);
+      t.taille -= 1;
+      t.mefiance = Math.min(1, t.mefiance + 0.2);
+      gagnerExperience(p.experience, "chasse", 6);
+      monde.emettre(
+        "capture",
+        p,
+        { espece: t.espece, nom: profil.nom, bete: bete.id },
+        7,
+        t.position,
+      );
+      p.memoire.ajouter(
+        monde.horloge.tick,
+        "action",
+        `J'ai ramené un jeune ${profil.nom} vivant, au bout d'une corde.`,
+        8,
+        [],
+      );
+      return TERMINEE;
+    }
+  }
   const reussie = p.rng.chance(probabilite);
   if (reussie) {
     const betes = arc && niv >= 3 && t.taille >= 2 && p.rng.chance(0.3) ? 2 : 1;
@@ -826,28 +871,6 @@ function tickChasser(
     const quantite = ajouter(inv, "gibier", profil.viande * betes);
     const cuir = profil.cuir > 0 ? ajouter(inv, "cuir", profil.cuir * betes) : 0;
     gagnerExperience(p.experience, "chasse", 6);
-    // Un jeune isolé, une corde, une espèce docile : on le ramène vivant.
-    if (t.taille > 0) {
-      const bete = tenterCapture(p, t.espece, p.rng, () => monde.prochainIdBete());
-      if (bete !== null) {
-        monde.ajouterBete(bete);
-        t.taille -= 1;
-        monde.emettre(
-          "capture",
-          p,
-          { espece: t.espece, nom: profil.nom, bete: bete.id },
-          7,
-          t.position,
-        );
-        p.memoire.ajouter(
-          monde.horloge.tick,
-          "action",
-          `J'ai ramené un jeune ${profil.nom} vivant, au bout d'une corde.`,
-          8,
-          [],
-        );
-      }
-    }
     monde.emettre(
       "chasse",
       p,

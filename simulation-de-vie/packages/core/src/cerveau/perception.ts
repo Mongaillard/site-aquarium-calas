@@ -51,7 +51,7 @@ import { meilleureNourritureConnue, stockVolable } from "../actions/planificateu
 import { eligibles, partenaireDe, veutCourtiser } from "../social/couple.js";
 import { avancementGrossesse, grandEnfant, peutConcevoir } from "../agents/vie.js";
 import { PROFILS, troupeauxVisiblesDepuis } from "../monde/faune.js";
-import { betesDe } from "../monde/village.js";
+import { DOCILITE, betesDe } from "../monde/village.js";
 import { prioriteEnCours } from "./conseil.js";
 import type { Priorite } from "./conseil.js";
 import type { Espece, EtatTroupeau } from "../monde/faune.js";
@@ -204,6 +204,8 @@ export interface TroupeauVisible {
   readonly position: Position;
   readonly mefiance: number;
   readonly etat: EtatTroupeau;
+  /** Espèce qu'on peut apprivoiser (mouflon, aurochs, lièvre, sanglier). */
+  readonly docile: boolean;
 }
 
 export interface Perception {
@@ -218,6 +220,10 @@ export interface Perception {
     readonly personnalite: Personnalite;
     readonly endormi: boolean;
     readonly placeLibre: number;
+    /** Une corde en poche (pour ramener une bête vivante), et les bêtes de la famille. */
+    readonly possedeCorde: boolean;
+    readonly betesFamille: number;
+    readonly minerai: number;
     readonly nourritureEnPoche: boolean;
     readonly ressourceNourriture: Ressource | null;
     readonly nourritureCrue: number;
@@ -309,6 +315,11 @@ export interface Perception {
   /** Un fumoir terminé existe dans la famille. */
   readonly fumoirConnu: boolean;
   readonly stockAccessible: boolean;
+  /** L'âge du cuivre : minerai vu, four de la famille, lingots et minerai à portée. */
+  readonly connaitMinerai: boolean;
+  readonly fourConnu: boolean;
+  readonly cuivreAccessible: number;
+  readonly mineraiAccessible: number;
   /** Nourriture des stocks accessibles, en unités par membre de la famille. */
   readonly reserveJours: number;
   readonly besoinConstruction: TypeBatiment | null;
@@ -469,6 +480,9 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
       personnalite: p.identite.personnalite,
       endormi: p.corps.endormi,
       placeLibre: placeLibre(inv),
+      possedeCorde: quantite(inv, "corde") >= 1,
+      betesFamille: betesDe(monde, p.identite.nomFamille).length,
+      minerai: quantite(inv, "minerai"),
       nourritureEnPoche: nourritureDisponible(inv) !== null,
       ressourceNourriture: nourritureDisponible(inv),
       nourritureCrue: quantite(inv, "baies") + quantite(inv, "poisson") + quantite(inv, "gibier"),
@@ -572,6 +586,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
       position: t.position,
       mefiance: t.mefiance,
       etat: t.etat,
+      docile: DOCILITE[t.espece] > 0,
     })),
     personnesVisibles,
     abriDisponible: abriDisponible(monde, p) !== null,
@@ -581,6 +596,18 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
     feuFamilialEteint: feuEteint(monde, p) !== null,
     fumoirConnu: acces.some((b) => b.etat === "termine" && b.type === "fumoir"),
     stockAccessible: acces.some((b) => b.etat === "termine" && b.stock !== null),
+    connaitMinerai: [...p.connaissance.values()].some(
+      (l) => l.type === "minerai" && l.quantiteVue >= 1,
+    ),
+    fourConnu: acces.some((b) => b.etat === "termine" && b.type === "four"),
+    cuivreAccessible: acces.reduce(
+      (t, b) => t + (b.etat === "termine" && b.stock !== null ? quantite(b.stock, "cuivre") : 0),
+      quantite(inv, "cuivre"),
+    ),
+    mineraiAccessible: acces.reduce(
+      (t, b) => t + (b.etat === "termine" && b.stock !== null ? quantite(b.stock, "minerai") : 0),
+      quantite(inv, "minerai"),
+    ),
     reserveJours:
       acces.reduce(
         (t, b) => t + (b.etat === "termine" && b.stock !== null ? quantiteNourriture(b.stock) : 0),

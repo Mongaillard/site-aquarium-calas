@@ -60,7 +60,10 @@ export const LIEUX_CONNUS_MAX = 800;
 export function elaguerConnaissance(p: Personnage, max = LIEUX_CONNUS_MAX): number {
   const surplus = p.connaissance.size - max;
   if (surplus <= 0) return 0;
-  const parAnciennete = [...p.connaissance.entries()].sort((a, b) => a[1].tickVu - b[1].tickVu);
+  // Le minerai est rare et loin : on ne l'oublie pas.
+  const parAnciennete = [...p.connaissance.entries()]
+    .filter(([, l]) => l.type !== "minerai")
+    .sort((a, b) => a[1].tickVu - b[1].tickVu);
   for (let i = 0; i < surplus; i++) {
     const e = parAnciennete[i];
     if (e !== undefined) p.connaissance.delete(e[0]);

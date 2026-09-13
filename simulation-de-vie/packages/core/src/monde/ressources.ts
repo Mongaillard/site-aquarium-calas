@@ -17,6 +17,8 @@ export const RESSOURCES = [
   "poisson_fume",
   "herbes",
   "lait",
+  "minerai",
+  "cuivre",
 ] as const;
 export type Ressource = (typeof RESSOURCES)[number];
 
@@ -81,9 +83,13 @@ export const GISEMENTS_PAR_BIOME: Record<Biome, readonly ProfilGisement[]> = {
     { type: "baies", probabilite: 0.25, min: 3, max: 8, tauxRegen: 0.5, outilRequis: null },
     { type: "herbes", probabilite: 0.05, min: 2, max: 5, tauxRegen: 0.5, outilRequis: null },
   ],
-  colline: [{ type: "pierre", probabilite: 0.4, min: 8, max: 25, tauxRegen: 0, outilRequis: null }],
+  colline: [
+    { type: "pierre", probabilite: 0.4, min: 8, max: 25, tauxRegen: 0, outilRequis: null },
+    { type: "minerai", probabilite: 0.05, min: 3, max: 8, tauxRegen: 0, outilRequis: "pioche" },
+  ],
   montagne: [
     { type: "pierre", probabilite: 0.7, min: 15, max: 40, tauxRegen: 0, outilRequis: "pioche" },
+    { type: "minerai", probabilite: 0.2, min: 6, max: 18, tauxRegen: 0, outilRequis: "pioche" },
   ],
   marais: [
     { type: "fibres", probabilite: 0.4, min: 4, max: 10, tauxRegen: 1.5, outilRequis: null },
@@ -102,6 +108,8 @@ export const ASCII_RESSOURCE: Record<Ressource, string> = {
   fibres: '"',
   argile: "a",
   graines: "s",
+  minerai: "m",
+  cuivre: "c",
   cuir: "c",
   corde: "r",
   repas_cuit: "p",

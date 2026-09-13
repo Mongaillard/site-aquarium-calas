@@ -153,6 +153,25 @@ export function gisement(
     case "fibres":
       herbe(ctx, x, y, "#d6e04b");
       break;
+    case "minerai":
+      // Une roche veinée de vert : le cuivre affleure.
+      ctx.fillStyle = "#8a8f8c";
+      ctx.beginPath();
+      ctx.moveTo(x + 0.25, y + 0.8);
+      ctx.lineTo(x + 0.4, y + 0.45);
+      ctx.lineTo(x + 0.62, y + 0.38);
+      ctx.lineTo(x + 0.8, y + 0.8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#5e9c8a";
+      ctx.lineWidth = Math.max(1, 0.06 * t);
+      ctx.beginPath();
+      ctx.moveTo(x + 0.42, y + 0.72);
+      ctx.lineTo(x + 0.58, y + 0.5);
+      ctx.moveTo(x + 0.55, y + 0.75);
+      ctx.lineTo(x + 0.68, y + 0.58);
+      ctx.stroke();
+      break;
     case "argile":
       ctx.fillStyle = "#c46a2b";
       ctx.beginPath();

@@ -5,6 +5,8 @@ import type { Ressource } from "./ressources.js";
 export const TYPES_OBJET = [
   "hache_pierre",
   "pioche",
+  "hache_cuivre",
+  "pioche_cuivre",
   "lance",
   "canne_a_peche",
   "filet",
@@ -61,7 +63,9 @@ export interface Recette {
     | "couche"
     | "traineau"
     | "flute"
-    | "vetement";
+    | "vetement"
+    | "fonte"
+    | "outils_de_cuivre";
 }
 
 /** L'invention qu'exige une recette, s'il y en a une. */
@@ -97,6 +101,36 @@ export const RECETTES = {
     niveauRequis: 0,
     atelier: null,
     duree: 4,
+  },
+  cuivre: {
+    nom: "lingot de cuivre",
+    produit: { ressource: "cuivre", quantite: 1 },
+    ingredients: { minerai: 3, bois: 2 },
+    competence: "artisanat",
+    niveauRequis: 1,
+    atelier: "four",
+    duree: 8,
+    invention: "fonte",
+  },
+  hache_cuivre: {
+    nom: "hache de cuivre",
+    produit: { objet: "hache_cuivre" },
+    ingredients: { cuivre: 1, bois: 2 },
+    competence: "artisanat",
+    niveauRequis: 1,
+    atelier: null,
+    duree: 5,
+    invention: "outils_de_cuivre",
+  },
+  pioche_cuivre: {
+    nom: "pioche de cuivre",
+    produit: { objet: "pioche_cuivre" },
+    ingredients: { cuivre: 1, bois: 2 },
+    competence: "artisanat",
+    niveauRequis: 1,
+    atelier: null,
+    duree: 5,
+    invention: "outils_de_cuivre",
   },
   canne_a_peche: {
     nom: "canne à pêche",
@@ -274,6 +308,8 @@ export function recette(nom: NomRecette): Recette {
 export const SOLIDITE_INITIALE: Record<TypeObjet, number> = {
   hache_pierre: 40,
   pioche: 40,
+  hache_cuivre: 160,
+  pioche_cuivre: 160,
   lance: 30,
   canne_a_peche: 30,
   filet: 50,

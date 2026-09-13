@@ -157,6 +157,8 @@ export interface Statistiques {
   /** Bêtes apprivoisées et champs. */
   readonly betail: number;
   readonly champs: number;
+  /** L'âge technique du village : pierre, ou cuivre dès le premier lingot ou outil de cuivre. */
+  readonly age: "pierre" | "cuivre";
   /** Où ils vont : les ambitions en cours, nées des conseils de Claude. */
   readonly ambitions: readonly AmbitionStat[];
   /** Miracles exercés par l'observateur. */

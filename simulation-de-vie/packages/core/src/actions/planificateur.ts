@@ -991,7 +991,8 @@ function planifierStockage(monde: Monde, p: Personnage): ResultatPlan {
   if (aller) plan.push(aller);
   let depose = 0;
   for (const [r, n] of Object.entries(inv.ressources) as [Ressource, number][]) {
-    const garder = NOURRITURE[r] !== undefined ? 2 : 0;
+    // Un peu de nourriture, et la corde qu'on garde pour ramener une bête vivante.
+    const garder = NOURRITURE[r] !== undefined ? 2 : r === "corde" ? 1 : 0;
     const surplus = n - garder;
     if (surplus > 0) {
       plan.push({ type: "deposer", batimentId: stock.id, ressource: r, quantite: surplus });

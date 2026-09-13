@@ -36,6 +36,7 @@ const zone = element("zone-carte", HTMLDivElement);
 const survolEl = element("survol", HTMLDivElement);
 const formulaireLocal = element("local", HTMLFormElement);
 const graineEntree = element("graine-entree", HTMLInputElement);
+const populationEntree = element("population-entree", HTMLSelectElement);
 const magasin = new Magasin();
 const rendu = new Rendu(canvas, magasin);
 let cam: Camera = { echelle: 8, dx: 0, dy: 0 };
@@ -49,6 +50,15 @@ const modeLocal = import.meta.env.VITE_MODE_LOCAL === "1" || parametres.has("loc
 const graineInitiale = parametres.get("seed") ?? "42";
 // Quelques jours d'avance seulement : on assiste ainsi à l'exploration du monde.
 const joursAvance = Number.parseInt(parametres.get("jours") ?? "5", 10);
+/** Habitants au départ (`?population=`, ou le choix du formulaire) : 12 par défaut, 3 familles. */
+const POPULATIONS = [12, 24, 36, 48];
+const populationInitiale = Number.parseInt(parametres.get("population") ?? "12", 10);
+function population(): { initiale: number; familles: number } {
+  const n = Number.parseInt(populationEntree.value, 10);
+  const initiale = POPULATIONS.includes(n) ? n : 12;
+  return { initiale, familles: Math.max(3, Math.round(initiale / 4)) };
+}
+if (POPULATIONS.includes(populationInitiale)) populationEntree.value = String(populationInitiale);
 
 let derniereDemandeFiche = 0;
 const recevoir = (m: MessageServeur): void => {
@@ -84,6 +94,7 @@ function creerLiaison(graine: string, sauvegarde?: unknown): Liaison {
       seed,
       joursAvance: Number.isFinite(joursAvance) ? joursAvance : 20,
       ticksParSeconde: 4,
+      config: { population: population() },
       ...(sauvegarde !== undefined ? { sauvegarde } : {}),
     },
     recevoir,

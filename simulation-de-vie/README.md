@@ -106,9 +106,9 @@ pnpm --filter @sdv/viewer build:local   # fichiers autonomes dans packages/viewe
 ```
 
 Dans ce mode la simulation tourne dans la page elle-même : la même interface, les mêmes
-messages, aucun serveur. Ajoutez `?seed=123&jours=40` à l'URL pour choisir la graine et le
-nombre de jours simulés avant l'affichage, ou changez la graine directement dans la barre
-(« Nouveau monde »). Sur un écran tactile : un doigt pour déplacer la carte, deux pour zoomer,
+messages, aucun serveur. Ajoutez `?seed=123&jours=40&population=24` à l'URL pour choisir la
+graine, le nombre de jours simulés avant l'affichage et les habitants au départ (12, 24, 36 ou
+48), ou changez la graine et les habitants directement dans la barre (« Nouveau monde »). Sur un écran tactile : un doigt pour déplacer la carte, deux pour zoomer,
 toucher un personnage ou un bâtiment pour l'inspecter, bouton « ? » pour la légende, « ⋯ » pour
 la graine et les sauvegardes, poignée « ▾ » pour replier ou agrandir le panneau du bas. La page
 servie par `pnpm serve` accepte aussi `?local` pour basculer dans ce mode.

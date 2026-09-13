@@ -75,14 +75,14 @@ Ce qui rend l'hiver vraiment difficile, sans tuer par surprise.
 
 Ce qu'on verra : des barres de fraîcheur sur les stocks, la hauteur des flammes qui dit la réserve de bois, des teints pâles et des courbes de malades par saison.
 
-### Jalon 12 — Le village apprivoise — livré en partie (M12 : capture, enclos, champs, métiers ; sans les chaînes de production, la rouille, la propriété commune et le troc)
+### Jalon 12 — Le village apprivoise — livré en partie (M12 : capture, enclos, champs, métiers ; M23 : capture qui marche, cuivre de montagne ; sans le reste des chaînes de production, la rouille, la propriété commune et le troc)
 
 L'élevage, les champs et les métiers, en trois générations.
 
 - **Capture et apprivoisement** (L) : un jeune isolé après une chasse, une corde, une docilité par espèce (le mouflon oui, le cerf jamais), des bêtes nées en captivité plus dociles.
 - **Enclos et élevage** (L) : lait qui périt en deux jours, fromage au pot, laine au printemps, viande et cuir, bœuf qui tire le traîneau ; fourrage l'hiver.
 - **Semis, champs, greniers, sols** (L + S) : graines des baies, semis au printemps, quatre stades de pousse, récolte à l'automne, gel qui perd tout, troupeaux qui ravagent, fertilité qui s'épuise et jachère.
-- **Chaînes de production** (M) : peau → cuir tanné → vêtement ; argile → pot cru → pot cuit ; fibres → fil → tissu ; un cuivre rare en montagne, sans fer ni fonte.
+- **Chaînes de production** (M) : peau → cuir tanné → vêtement ; argile → pot cru → pot cuit ; fibres → fil → tissu ; un cuivre rare en montagne (M23 : minerai → four → lingot → hache et pioche de cuivre), sans fer.
 - **Métiers, apprentissage, rouille** (L) : aucun métier déclaré, un penchant qui s'auto-renforce, un titre affiché, une compétence qui rouille sans pratique, un maître qui double l'apprentissage de l'apprenti.
 - **Propriété et communs** (M) : individuel, familial, commun ; l'emprunt d'un outil crée une dette ; le puits est à tout le monde.
 - **Troc** (L) : une valeur implicite par rareté et par saison, des échanges acceptés selon l'affinité et la dette, jamais de monnaie ni de prix affiché en chiffres.

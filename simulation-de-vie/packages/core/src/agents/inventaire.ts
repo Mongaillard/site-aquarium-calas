@@ -145,6 +145,8 @@ export function outilSatisfait(inv: Inventaire, outil: Outil | null): boolean {
   if (possede(inv, outil)) return true;
   if (outil === "canne_a_peche") return possede(inv, "filet");
   if (outil === "lance") return possede(inv, "piege") || possede(inv, "arc");
+  if (outil === "hache_pierre") return possede(inv, "hache_cuivre");
+  if (outil === "pioche") return possede(inv, "pioche_cuivre");
   return false;
 }
 

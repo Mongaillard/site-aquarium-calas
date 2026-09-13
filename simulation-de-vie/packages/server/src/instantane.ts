@@ -498,6 +498,7 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     attaques: sim.danger.attaques,
     malades: sim.vivants().filter((p) => p.corps.etat.maladies.length > 0).length,
     betail: sim.betail.size,
+    age: ageTechnique(sim),
     champs: [...sim.batiments.values()].filter((b) => b.type === "champ" && b.etat === "termine")
       .length,
     chasses: {
@@ -703,6 +704,21 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
   };
 }
 
+/** L'âge du cuivre commence au premier lingot ou au premier outil de cuivre. */
+function ageTechnique(sim: Simulation): "pierre" | "cuivre" {
+  for (const p of sim.personnages) {
+    if (!p.vivant) continue;
+    if ((p.corps.inventaire.ressources.cuivre ?? 0) > 0) return "cuivre";
+    if (
+      p.corps.inventaire.objets.some((o) => o.type === "hache_cuivre" || o.type === "pioche_cuivre")
+    )
+      return "cuivre";
+  }
+  for (const b of sim.batiments.values())
+    if (b.stock !== null && (b.stock.ressources.cuivre ?? 0) > 0) return "cuivre";
+  return "pierre";
+}
+
 const NOMS_RESSOURCES: Record<string, string> = {
   bois: "du bois",
   pierre: "de la pierre",
@@ -715,6 +731,8 @@ const NOMS_RESSOURCES: Record<string, string> = {
   repas_cuit: "un repas cuit",
   poisson_fume: "du poisson fumé",
   cuir: "du cuir",
+  minerai: "du minerai",
+  cuivre: "du cuivre",
 };
 
 /**

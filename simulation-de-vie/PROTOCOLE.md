@@ -208,8 +208,11 @@ de moins). Les maladies entrent dans `sourcesDegats`, donc dans la cause de déc
 grise. Les tombes sont creusées à l'écart de l'eau (rayon de souillure + 1) quand une tuile
 libre existe à huit tuiles.
 
-**Le village apprivoise (M12).** `monde/village.ts` : `DOCILITE` par espèce, `tenterCapture`
-(après une chasse réussie, corde consommée, chance docilité × 0,8), `Bete` dans
+**Le village apprivoise (M12, M23).** `monde/village.ts` : `DOCILITE` par espèce, `tenterCapture`
+(à la chasse, avant la mise à mort, corde consommée, chance docilité × 0,8 ; au plus
+`BETES_PAR_FAMILLE_MAX` = 4 bêtes par famille ; le cerveau tresse une corde devant un troupeau
+docile et la garde en poche au rangement, **[DÉCISION M23]** sans quoi personne
+n'apprivoisait), `Bete` dans
 `Simulation.betail` (`ajouterBete`, `retirerBete`, `prochainIdBete`), `heureBete` (à l'enclos,
 sinon derrière le maître, sinon fuite), `jourBete` (fuite d'une bête peu docile sans enclos,
 fourrage d'hiver : fibres à six tuiles ou stock de l'enclos, famine en dix jours, lait tous les
@@ -1022,8 +1025,14 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   retiennent ; une tombe porte l'épitaphe. Chaque leçon a un effet précis sur le cerveau
   (seuils, scores, bâtiment nécessaire).
 - **Invention** : catalogue fermé d'inventions que le moteur sait appliquer (`filet`, `piege`,
-  `arc`, `pirogue`, `traineau`, `fumoir`, `couche`, `vetement`, `osselets`, `flute`), chacune
-  avec un besoin déclencheur, une recette et un effet.
+  `arc`, `pirogue`, `traineau`, `fumoir`, `couche`, `vetement`, `osselets`, `flute`, et, dans
+  le domaine `outillage`, `fonte` et `outils_de_cuivre`), chacune avec un besoin déclencheur,
+  une recette et un effet. **[DÉCISION M23]** L'âge du cuivre : minerai (`montagne`, un peu en
+  `colline`, à la pioche) → idée de la fonte (minerai vu, ouverture > 0,45, jour ≥ 60) → four
+  (un par village) → lingot (`cuivre` : 3 minerais + 2 bois au four) → idée des outils de cuivre
+  (au premier lingot) → `hache_cuivre` et `pioche_cuivre` (1 lingot + 2 bois ; solidité 160
+  contre 40 ; rendement 3 contre 2 ; satisfont `hache_pierre` et `pioche` requis). Une idée
+  d'outillage attend soixante jours avant de s'effacer, vingt pour les autres.
   Le soir, un adulte qui ressent le besoin peut avoir l'idée (curiosité = ouverture) ; il
   fabrique un prototype qui peut rater ; la réussite fait de l'idée un savoir de la famille.
 - **Transmission** : par le dialogue (sujet `savoir`, avec l'origine), aux adolescents par

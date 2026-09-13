@@ -2,6 +2,26 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M23 – La colonie choisit sa taille, apprivoise, et entre dans l'âge du cuivre (2026-09-13)
+
+- **Habitants au départ** : le formulaire « Nouveau monde » propose 12, 24, 36 ou 48 habitants
+  (`?population=` dans l'adresse) ; trois familles au moins, une par quatre habitants.
+- **Apprivoiser, enfin** : personne n'apprivoisait parce que la capture n'arrivait qu'après une
+  chasse réussie, par un chasseur qui portait une corde par hasard, et que les cordes partaient
+  au stock. Désormais, devant un troupeau docile (mouflon, aurochs, lièvre, sanglier), un adulte
+  tresse une corde et la garde en poche ; à la chasse, la corde sert d'abord à ramener la bête
+  vivante (chance docilité × 0,8), sans avoir à la tuer ; quatre bêtes par famille au plus. Sur
+  la graine 42, douze bêtes et deux enclos en six cents jours, contre une bête auparavant.
+- **L'âge du cuivre** (domaine d'invention `outillage`) : du minerai affleure dans la montagne
+  (et un peu dans les collines), à la pioche. L'idée de la **fonte** vient à un esprit curieux
+  qui a vu du minerai, après soixante jours ; elle fait bâtir un four (un par village, argile et
+  pierre) ; trois minerais et deux bûches au four donnent un lingot ; l'idée des **outils de
+  cuivre** vient au premier lingot : hache et pioche de cuivre (un lingot, deux bûches), quatre
+  fois plus solides, qui abattent et extraient trois unités là où la pierre en fait deux, et
+  remplacent l'outil de pierre partout où il est requis. Le cerveau enchaîne pioche, minerai,
+  four, lingot, outil ; une idée d'outillage attend soixante jours au lieu de vingt. Tuile « âge »
+  dans Statistiques (pierre, puis cuivre au premier lingot), minerai dessiné sur la carte.
+
 ## M22 – La partie ne se perd plus à la sortie (2026-09-13)
 
 Sur mobile, quitter l'artefact pouvait perdre la partie : la sauvegarde de sortie était

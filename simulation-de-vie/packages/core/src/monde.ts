@@ -263,6 +263,13 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
     acces.some((b) => b.stock !== null && (b.stock.ressources.poisson ?? 0) >= 15)
   )
     return "fumoir";
+  // L'idée de la fonte est venue : il faut un four (argile et pierre) pour la réaliser ; un seul
+  // par village, il sert à tous.
+  if (
+    (p.savoirs.get("fonte")?.force ?? 0) >= SEUIL_SAVOIR &&
+    ![...monde.batiments.values()].some((b) => b.type === "four")
+  )
+    return "four";
   // Des bêtes et pas d'enclos : on en bâtit un.
   if (
     betesDe(monde, p.identite.nomFamille).length > 0 &&
