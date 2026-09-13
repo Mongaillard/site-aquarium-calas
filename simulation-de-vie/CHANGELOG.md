@@ -2,6 +2,26 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M18 – La partie ne se perd plus sur mobile (2026-09-13)
+
+- **Le geste vers le bas ne recharge plus la page** : `overscroll-behavior: none` sur la page et
+  les onglets, plus une garde tactile (`gestes.ts`) qui retient tout geste vertical qui sortirait
+  de ce qui peut défiler (haut d'une liste, zones fixes), sans gêner le défilement intérieur ni
+  les gestes horizontaux.
+- **Sauvegarde automatique plus serrée** : toutes les vingt secondes au lieu d'une minute, à
+  chaque aube (au moins cinq secondes après la précédente), dès la mise en pause, et toujours de
+  force quand la page se cache ou se ferme. La cadence s'allonge d'elle-même (jusqu'à deux
+  minutes) pour que l'encodage synchrone du monde reste sous un quarantième du temps.
+- **Reprise automatique** : au chargement, la sauvegarde la plus récente reprend sans clic si
+  elle a moins de douze heures et que l'adresse n'impose pas de `?seed=` ; sinon le bouton
+  « ↩ Reprendre » se propose comme avant.
+- **Sauvegardes compressées** : le JSON de la sauvegarde passe par gzip (`CompressionStream`,
+  hors du fil principal) avant IndexedDB, environ vingt fois plus petit ; les anciennes
+  sauvegardes à plat se relisent toujours, la liste affiche la taille.
+- Tests : aller-retour d'une vraie sauvegarde par le JSON compressé (même état après deux cents
+  ticks de plus), garde tactile, libellé de taille. Vérifié dans Chromium 400 × 800 tactile :
+  geste retenu, reprise au même instant après rechargement, bouton seul avec `?seed=`.
+
 ## M17 – Mode Dieu v3 et carte plein écran (2026-09-12)
 
 - **Épreuves lourdes** : Gel précoce (18 ✦, trois jours de neige quelle que soit la saison), Sécheresse

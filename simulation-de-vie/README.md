@@ -69,10 +69,12 @@ touche `b` (ou la case de la légende) l'enlève ; l'onglet Statistiques indique
 découverte.
 
 Sauvegarde (mode local et page publiée) : le bouton « 💾 » sauve la partie sous un nom, la
-reprend ou la supprime ; la page sauvegarde toute seule chaque minute et quand elle passe à
-l'arrière-plan, et propose « ↩ Reprendre la partie » au chargement suivant. Tout est rangé dans
-le navigateur (IndexedDB), propre à l'appareil. Un monde restauré continue exactement comme
-l'original.
+reprend ou la supprime ; la page sauvegarde toute seule toutes les vingt secondes, à chaque aube,
+dès qu'on met en pause et quand elle passe à l'arrière-plan, puis reprend la partie d'elle-même au
+chargement suivant (sauf si l'adresse impose une graine, ou après douze heures : elle propose
+alors « ↩ Reprendre la partie »). Tout est rangé compressé dans le navigateur (IndexedDB), propre
+à l'appareil. Un monde restauré continue exactement comme l'original. Sur mobile, un doigt qui
+tire en butée ne recharge plus la page.
 
 Pour développer le viewer avec rechargement à chaud : lancez le serveur (`pnpm --filter
 @sdv/server start -- --seed 42`) puis `pnpm viewer:dev` (http://localhost:5173).

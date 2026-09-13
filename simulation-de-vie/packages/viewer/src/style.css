@@ -16,6 +16,8 @@ html,
 body {
   margin: 0;
   height: 100%;
+  /* Un doigt qui tire en butée ne doit pas recharger la page (mobile). */
+  overscroll-behavior: none;
   background: var(--fond);
   color: var(--texte);
   font-family: var(--police);
@@ -207,6 +209,7 @@ a.lien,
 .onglet {
   display: none;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 10px 12px;
   min-height: 0;
   -webkit-overflow-scrolling: touch;

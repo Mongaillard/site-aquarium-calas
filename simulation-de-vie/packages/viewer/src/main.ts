@@ -10,6 +10,7 @@ import { LiaisonLocale } from "./local.js";
 import { CerveauClaude, sampleDeLaPage } from "./claude.js";
 import { Panneaux } from "./panneaux.js";
 import { Rendu } from "./rendu.js";
+import { retenirLeTirer } from "./gestes.js";
 import {
   NOM_AUTO,
   decrireSauvegarde,
@@ -201,17 +202,44 @@ async function chargerSauvegarde(nom: string): Promise<void> {
 }
 let derniereSauvegardeAutoA = 0;
 let dernierTickSauve = -1;
-const INTERVALLE_AUTO_MS = 60_000;
-/** Sauvegarde automatique : au plus une par minute, seulement si le monde a avancé. */
+let dernierJourSauve = -1;
+let pauseVue = false;
+/** Cadence de base de la sauvegarde automatique ; allongée si encoder le monde coûte cher. */
+const INTERVALLE_AUTO_MS = 20_000;
+const INTERVALLE_AUTO_MAX_MS = 120_000;
+/** À l'aube, on sauvegarde aussi si la dernière date d'au moins cinq secondes. */
+const INTERVALLE_AUBE_MS = 5_000;
+/** Part du temps que l'encodage (synchrone) peut prendre : un quarantième. */
+const PART_ENCODAGE = 40;
+let intervalleAutoMs = INTERVALLE_AUTO_MS;
+/**
+ * Sauvegarde automatique, seulement si le monde a avancé : toutes les vingt
+ * secondes, à chaque aube, dès qu'on met en pause, et de force quand la page
+ * se cache ou se ferme.
+ */
 function sauvegardeAutomatique(maintenant: number, force = false): void {
   if (!modeLocal) return;
-  const tick = magasin.etat?.tick ?? -1;
+  const etat = magasin.etat;
+  if (etat === null) return;
+  const miseEnPause = etat.pause && !pauseVue;
+  pauseVue = etat.pause;
+  const tick = etat.tick;
   if (tick < 0 || tick === dernierTickSauve) return;
-  if (!force && maintenant - derniereSauvegardeAutoA < INTERVALLE_AUTO_MS) return;
+  const jour = etat.moment.jourAbsolu;
+  const ecoule = maintenant - derniereSauvegardeAutoA;
+  const aube = jour !== dernierJourSauve && ecoule >= INTERVALLE_AUBE_MS;
+  if (!force && !miseEnPause && !aube && ecoule < intervalleAutoMs) return;
   derniereSauvegardeAutoA = maintenant;
+  dernierJourSauve = jour;
+  const debut = performance.now();
   void sauvegarderSous(NOM_AUTO).then((fait) => {
     if (fait) dernierTickSauve = tick;
   });
+  // La part synchrone (encoder le monde) vient de s'exécuter : on en déduit la cadence.
+  intervalleAutoMs = Math.min(
+    INTERVALLE_AUTO_MAX_MS,
+    Math.max(INTERVALLE_AUTO_MS, (performance.now() - debut) * PART_ENCODAGE),
+  );
 }
 
 const btnMenu = element("btn-menu", HTMLButtonElement);
@@ -285,16 +313,6 @@ if (modeLocal) {
     const nom = btnReprendre.dataset.nom;
     if (nom !== undefined) void chargerSauvegarde(nom);
   });
-  // Au chargement : la sauvegarde la plus récente (automatique ou nommée) se propose d'un clic.
-  void listerSauvegardes()
-    .then((entrees) => {
-      const derniere = entrees[0];
-      if (derniere === undefined) return;
-      btnReprendre.hidden = false;
-      btnReprendre.dataset.nom = derniere.nom;
-      btnReprendre.textContent = `↩ Reprendre ${derniere.nom === NOM_AUTO ? "la partie" : `« ${derniere.nom} »`} (jour ${String(derniere.jour)}, ${String(derniere.vivants)} vivants)`;
-    })
-    .catch(() => undefined);
   // Quand la page passe à l'arrière-plan ou se ferme (mobile), on sauvegarde tout de suite.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") sauvegardeAutomatique(performance.now(), true);
@@ -302,6 +320,31 @@ if (modeLocal) {
   window.addEventListener("pagehide", () => {
     sauvegardeAutomatique(performance.now(), true);
   });
+  // Un doigt qui tire en butée ne doit pas recharger la page.
+  retenirLeTirer(document);
+}
+
+/** Une sauvegarde plus vieille que cela ne reprend plus toute seule : elle se propose d'un clic. */
+const REPRISE_AUTO_MS = 12 * 3_600_000;
+/**
+ * Au chargement : la sauvegarde la plus récente (automatique ou nommée) reprend
+ * toute seule si elle est fraîche et que l'adresse n'impose pas de graine ;
+ * sinon elle se propose d'un clic. Vrai si la partie a repris.
+ */
+async function reprendreAuChargement(): Promise<boolean> {
+  const derniere = (await listerSauvegardes())[0];
+  if (derniere === undefined) return false;
+  btnReprendre.hidden = false;
+  btnReprendre.dataset.nom = derniere.nom;
+  btnReprendre.textContent = `↩ Reprendre ${derniere.nom === NOM_AUTO ? "la partie" : `« ${derniere.nom} »`} (jour ${String(derniere.jour)}, ${String(derniere.vivants)} vivants)`;
+  if (parametres.has("seed") || Date.now() - derniere.date > REPRISE_AUTO_MS) return false;
+  const s = await lireSauvegarde(derniere.nom);
+  if (s === null) return false;
+  btnReprendre.hidden = true;
+  relancer(s.seed, s);
+  graineEntree.value = s.seed;
+  statutSauvegarde(`Partie reprise au jour ${String(s.jour)}.`);
+  return true;
 }
 
 function redimensionner(): void {
@@ -863,4 +906,12 @@ function boucle(maintenant: number): void {
   requestAnimationFrame(boucle);
 }
 requestAnimationFrame(boucle);
-liaison.connecter();
+if (modeLocal) {
+  void reprendreAuChargement()
+    .catch(() => false)
+    .then((reprise) => {
+      if (!reprise) liaison.connecter();
+    });
+} else {
+  liaison.connecter();
+}

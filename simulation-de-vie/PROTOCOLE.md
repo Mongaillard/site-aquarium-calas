@@ -905,8 +905,12 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   un monde qui continue à l'identique (P1 : même journal à venir). La sérialisation est
   structurelle (chaque champ parcouru), les tuiles se regénèrent de la graine, le journal est
   tronqué à ses trois mille derniers événements (compteurs conservés).
-- La page range les sauvegardes dans IndexedDB (nommées, plus « auto ») ; le serveur n'en a pas
-  encore.
+- La page range les sauvegardes dans IndexedDB (nommées, plus « auto »), en JSON compressé
+  (gzip par `CompressionStream`, à plat si le navigateur ne l'a pas) ; le serveur n'en a pas
+  encore. La sauvegarde automatique suit une cadence adaptative (vingt secondes, allongée pour
+  que l'encodage reste sous un quarantième du temps), plus l'aube, la mise en pause et la mise à
+  l'arrière-plan ; la plus récente reprend d'elle-même au chargement si elle a moins de douze
+  heures et que l'adresse n'impose pas de graine.
 
 ## 8 ter. Mode Dieu et conseil de Claude tels que réalisés (M13)
 

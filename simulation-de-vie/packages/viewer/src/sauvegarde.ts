@@ -4,7 +4,8 @@
  * sauvegarde a un nom ; « auto » est celle que la page tient à jour toute
  * seule. Le contenu (`Sauvegarde` du moteur) est opaque pour la page.
  */
-import type { Sauvegarde } from "@sdv/core";
+import { estSauvegarde, type Sauvegarde } from "@sdv/core";
+import { COMPRESSION, compresser, compressionDisponible, decompresser } from "./compression.js";
 
 const BASE = "simulation-de-vie";
 const MAGASIN = "sauvegardes";
@@ -16,10 +17,16 @@ export interface EntreeSauvegarde {
   readonly seed: string;
   readonly jour: number;
   readonly vivants: number;
+  /** Taille sur le disque en octets (connue pour les sauvegardes compressées). */
+  readonly taille?: number;
 }
 
 interface Enregistrement extends EntreeSauvegarde {
-  readonly sauvegarde: Sauvegarde;
+  /** Contenu à plat (anciennes sauvegardes, ou navigateur sans compression)… */
+  readonly sauvegarde?: Sauvegarde;
+  /** …ou compressé : le JSON de la sauvegarde en gzip. */
+  readonly octets?: ArrayBuffer;
+  readonly compression?: typeof COMPRESSION;
 }
 
 function ouvrir(): Promise<IDBDatabase> {
@@ -68,19 +75,28 @@ function transaction<T>(
 export async function listerSauvegardes(): Promise<EntreeSauvegarde[]> {
   const tout = await transaction("readonly", (m) => m.getAll() as IDBRequest<Enregistrement[]>);
   return tout
-    .map(({ nom, date, seed, jour, vivants }) => ({ nom, date, seed, jour, vivants }))
+    .map(({ nom, date, seed, jour, vivants, octets }) => ({
+      nom,
+      date,
+      seed,
+      jour,
+      vivants,
+      ...(octets !== undefined ? { taille: octets.byteLength } : {}),
+    }))
     .sort((a, b) => b.date - a.date);
 }
 
 export async function ecrireSauvegarde(nom: string, sauvegarde: Sauvegarde): Promise<void> {
-  const enregistrement: Enregistrement = {
+  const entete = {
     nom,
     date: sauvegarde.date,
     seed: sauvegarde.seed,
     jour: sauvegarde.jour,
     vivants: sauvegarde.vivants,
-    sauvegarde,
   };
+  const enregistrement: Enregistrement = compressionDisponible()
+    ? { ...entete, octets: await compresser(JSON.stringify(sauvegarde)), compression: COMPRESSION }
+    : { ...entete, sauvegarde };
   await transaction("readwrite", (m) => m.put(enregistrement));
 }
 
@@ -89,7 +105,13 @@ export async function lireSauvegarde(nom: string): Promise<Sauvegarde | null> {
     "readonly",
     (m) => m.get(nom) as IDBRequest<Enregistrement | undefined>,
   );
-  return e?.sauvegarde ?? null;
+  if (e === undefined) return null;
+  if (e.octets === undefined) return e.sauvegarde ?? null;
+  if (e.compression !== COMPRESSION || !compressionDisponible())
+    throw new Error("cette sauvegarde est compressée d'une façon que ce navigateur ne lit pas");
+  const contenu: unknown = JSON.parse(await decompresser(e.octets));
+  if (!estSauvegarde(contenu)) throw new Error("sauvegarde illisible");
+  return contenu;
 }
 
 export async function supprimerSauvegarde(nom: string): Promise<void> {
@@ -104,5 +126,9 @@ export function decrireSauvegarde(e: EntreeSauvegarde): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-  return `${e.nom === NOM_AUTO ? "Sauvegarde automatique" : e.nom} — jour ${String(e.jour)}, ${String(e.vivants)} vivants, graine ${e.seed} (${quand})`;
+  const taille =
+    e.taille === undefined
+      ? ""
+      : `, ${(e.taille / 1_048_576).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Mo`;
+  return `${e.nom === NOM_AUTO ? "Sauvegarde automatique" : e.nom} — jour ${String(e.jour)}, ${String(e.vivants)} vivants, graine ${e.seed}${taille} (${quand})`;
 }
