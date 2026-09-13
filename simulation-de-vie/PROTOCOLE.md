@@ -914,8 +914,13 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   (gzip par `CompressionStream`, à plat si le navigateur ne l'a pas) ; la sauvegarde de sortie
   (page cachée ou fermée) part sans compression, dans une écriture lancée dans la foulée sur
   une connexion gardée ouverte, et une partie d'au moins vingt jours est copiée sous son nom
-  avant qu'un nouveau monde ne remplace « auto » (**[DÉCISION M22]**) ; le serveur n'en a pas
-  encore. La sauvegarde automatique suit une cadence adaptative (vingt secondes, allongée pour
+  avant qu'un nouveau monde ne remplace « auto » (**[DÉCISION M22]**). Sur claude.ai, chaque
+  sauvegarde part aussi dans la base de documents de l'artefact (capacité `db`), en gzip +
+  base64 découpé en morceaux de 180 000 caractères sous `sauvegardes/<id>/morceaux/<n>`, l'en-
+  tête `sauvegardes/<id>` (nom, date, graine, jour, vivants, taille, nombre de morceaux) écrit
+  en dernier ; la boîte 💾 liste les deux sources et la plus récente reprend au chargement
+  (**[DÉCISION M22]** : le stockage du navigateur ne survit pas toujours à la fermeture de
+  l'artefact dans l'application). Le serveur `sim-serve` n'a pas encore de sauvegarde. La sauvegarde automatique suit une cadence adaptative (vingt secondes, allongée pour
   que l'encodage reste sous un quarantième du temps), plus l'aube, la mise en pause et la mise à
   l'arrière-plan ; la plus récente reprend d'elle-même au chargement si elle a moins de douze
   heures et que l'adresse n'impose pas de graine.

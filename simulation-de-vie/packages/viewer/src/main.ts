@@ -21,6 +21,8 @@ import {
   preparerStockage,
   supprimerSauvegarde,
 } from "./sauvegarde.js";
+import type { EntreeSauvegarde } from "./sauvegarde.js";
+import { ecrireDistante, lireDistante, listerDistantes, supprimerDistante } from "./distant.js";
 import type { Liaison } from "./reseau.js";
 import { Reseau, urlWebSocket } from "./reseau.js";
 
@@ -132,49 +134,87 @@ const statutSauvegarde = (texte: string): void => {
   const el = document.getElementById("connexion");
   if (el && !dlgSauvegardes.open) el.textContent = texte;
 };
+/** Où vit une sauvegarde : dans ce navigateur, ou dans la base de l'artefact (serveur). */
+type Source = "local" | "distant";
+const SOURCE_TEXTE: Readonly<Record<Source, string>> = { local: "📱", distant: "☁" };
+let derniereDistanteA = 0;
+/** Cadence de la sauvegarde distante (une écriture réseau, par morceaux). */
+const INTERVALLE_DISTANT_MS = 60_000;
+
 /**
- * Sauvegarde le monde courant sous ce nom ; vrai si c'est fait. `immediate` :
- * sans compression et sans attendre, pour une page qui se cache ou se ferme.
+ * Sauvegarde le monde courant sous ce nom ; vrai si c'est fait quelque part.
+ * `immediate` : sans compression et sans attendre, pour une page qui se cache
+ * ou se ferme. `distant` : aussi dans la base de l'artefact, qui survit au
+ * navigateur (toujours pour une sauvegarde nommée ; à sa propre cadence pour
+ * l'automatique).
  */
-async function sauvegarderSous(nom: string, immediate = false): Promise<boolean> {
+async function sauvegarderSous(nom: string, immediate = false, distant = true): Promise<boolean> {
   const s = liaison instanceof LiaisonLocale ? liaison.sauvegarder() : null;
   if (s === null) return false;
-  try {
-    await ecrireSauvegarde(nom, s, immediate);
-    return true;
-  } catch (erreur: unknown) {
-    statutSauvegarde(
-      `Sauvegarde impossible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
-    );
-    return false;
-  }
+  const locale = ecrireSauvegarde(nom, s, immediate).then(
+    () => true,
+    (erreur: unknown) => {
+      statutSauvegarde(
+        `Sauvegarde impossible ici : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+      );
+      return false;
+    },
+  );
+  const distante = distant
+    ? ecrireDistante(nom, s).then(
+        (fait) => {
+          if (fait) derniereDistanteA = performance.now();
+          return fait;
+        },
+        (erreur: unknown) => {
+          statutSauvegarde(
+            `Sauvegarde serveur impossible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+          );
+          return false;
+        },
+      )
+    : Promise.resolve(false);
+  const [l, d] = await Promise.all([locale, distante]);
+  return l || d;
+}
+/** Toutes les sauvegardes, d'ici et du serveur, les plus récentes d'abord. */
+async function toutesLesSauvegardes(): Promise<(EntreeSauvegarde & { source: Source })[]> {
+  const [locales, distantes] = await Promise.all([
+    listerSauvegardes().catch((erreur: unknown) => {
+      statutSauvegarde(
+        `Stockage indisponible ici : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+      );
+      return [] as EntreeSauvegarde[];
+    }),
+    listerDistantes().catch(() => [] as EntreeSauvegarde[]),
+  ]);
+  return [
+    ...locales.map((e) => ({ ...e, source: "local" as const })),
+    ...distantes.map((e) => ({ ...e, source: "distant" as const })),
+  ].sort((a, b) => b.date - a.date);
 }
 async function rafraichirListeSauvegardes(): Promise<void> {
-  let entrees: Awaited<ReturnType<typeof listerSauvegardes>> = [];
-  try {
-    entrees = await listerSauvegardes();
-  } catch (erreur: unknown) {
-    statutSauvegarde(
-      `Stockage indisponible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
-    );
-  }
+  const entrees = await toutesLesSauvegardes();
   listeSauvegardes.replaceChildren(
     ...entrees.map((e) => {
       const li = document.createElement("li");
       const texte = document.createElement("span");
-      texte.textContent = decrireSauvegarde(e);
+      texte.textContent = `${SOURCE_TEXTE[e.source]} ${decrireSauvegarde(e)}`;
+      texte.title = e.source === "distant" ? "sur le serveur" : "dans ce navigateur";
       const charger = document.createElement("button");
       charger.type = "button";
       charger.textContent = "📂 Reprendre";
       charger.addEventListener("click", () => {
-        void chargerSauvegarde(e.nom);
+        void chargerSauvegarde(e.nom, e.source);
       });
       const supprimer = document.createElement("button");
       supprimer.type = "button";
       supprimer.textContent = "🗑";
       supprimer.title = "Supprimer cette sauvegarde";
       supprimer.addEventListener("click", () => {
-        void supprimerSauvegarde(e.nom).then(rafraichirListeSauvegardes);
+        void (e.source === "distant" ? supprimerDistante(e.nom) : supprimerSauvegarde(e.nom)).then(
+          rafraichirListeSauvegardes,
+        );
       });
       li.append(texte, charger, supprimer);
       return li;
@@ -187,9 +227,9 @@ async function rafraichirListeSauvegardes(): Promise<void> {
     listeSauvegardes.append(li);
   }
 }
-async function chargerSauvegarde(nom: string): Promise<void> {
+async function chargerSauvegarde(nom: string, source: Source = "local"): Promise<void> {
   try {
-    const s = await lireSauvegarde(nom);
+    const s = source === "distant" ? await lireDistante(nom) : await lireSauvegarde(nom);
     if (s === null) {
       statutSauvegarde("Cette sauvegarde n'existe plus.");
       return;
@@ -237,7 +277,9 @@ function sauvegardeAutomatique(maintenant: number, force = false): void {
   derniereSauvegardeAutoA = maintenant;
   dernierJourSauve = jour;
   const debut = performance.now();
-  void sauvegarderSous(NOM_AUTO, force).then((fait) => {
+  const distant =
+    force || miseEnPause || aube || maintenant - derniereDistanteA >= INTERVALLE_DISTANT_MS;
+  void sauvegarderSous(NOM_AUTO, force, distant).then((fait) => {
     if (fait) dernierTickSauve = tick;
   });
   // La part synchrone (encoder le monde) vient de s'exécuter : on en déduit la cadence.
@@ -316,7 +358,8 @@ if (modeLocal) {
   });
   btnReprendre.addEventListener("click", () => {
     const nom = btnReprendre.dataset.nom;
-    if (nom !== undefined) void chargerSauvegarde(nom);
+    if (nom !== undefined)
+      void chargerSauvegarde(nom, btnReprendre.dataset.source === "distant" ? "distant" : "local");
   });
   // Quand la page passe à l'arrière-plan ou se ferme (mobile), on sauvegarde tout de suite.
   document.addEventListener("visibilitychange", () => {
@@ -339,15 +382,18 @@ const JOUR_PARTIE_PRECIEUSE = 20;
  * sinon elle se propose d'un clic. Vrai si la partie a repris.
  */
 async function reprendreAuChargement(): Promise<boolean> {
-  const sauvegardes = await listerSauvegardes();
+  statutSauvegarde("recherche d'une partie à reprendre…");
+  const sauvegardes = await toutesLesSauvegardes();
   const derniere = sauvegardes[0];
   if (derniere === undefined) return false;
   btnReprendre.hidden = false;
   btnReprendre.dataset.nom = derniere.nom;
+  btnReprendre.dataset.source = derniere.source;
   btnReprendre.textContent = `↩ Reprendre ${derniere.nom === NOM_AUTO ? "la partie" : `« ${derniere.nom} »`} (jour ${String(derniere.jour)}, ${String(derniere.vivants)} vivants)`;
   // Un nouveau monde va écraser la sauvegarde automatique : une partie avancée y est d'abord
-  // mise à l'abri sous son propre nom.
-  const auto = sauvegardes.find((e) => e.nom === NOM_AUTO);
+  // mise à l'abri sous son propre nom (dans ce navigateur ; la copie serveur se fait à la
+  // prochaine sauvegarde nommée).
+  const auto = sauvegardes.find((e) => e.nom === NOM_AUTO && e.source === "local");
   const proteger = async (): Promise<void> => {
     if (auto === undefined || auto.jour < JOUR_PARTIE_PRECIEUSE) return;
     const nom = `Partie du jour ${String(auto.jour)} (graine ${auto.seed})`;
@@ -359,7 +405,10 @@ async function reprendreAuChargement(): Promise<boolean> {
     return false;
   }
   try {
-    const s = await lireSauvegarde(derniere.nom);
+    const s =
+      derniere.source === "distant"
+        ? await lireDistante(derniere.nom)
+        : await lireSauvegarde(derniere.nom);
     if (s === null) return false;
     btnReprendre.hidden = true;
     relancer(s.seed, s);

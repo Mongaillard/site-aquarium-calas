@@ -19,8 +19,18 @@ au chargement suivant, un monde neuf écrasait la sauvegarde automatique.
 - **Sauvegardes plus légères** : les souvenirs plafonnent à six cents par personne (deux mille
   avant ; au-delà, l'oubli monte en importance), les lieux connus à huit cents (les plus
   anciennement vus s'effacent, la carte les rend), et un mort perd sa carte mentale. Une
-  sauvegarde de quatre cents jours passe de 13 Mo à quelques mégaoctets avant compression, ce
-  qui allège aussi chaque sauvegarde automatique sur mobile.
+  sauvegarde de quatre cents jours passe de 13 Mo à 5,4 Mo avant compression, ce qui allège
+  aussi chaque sauvegarde automatique sur mobile.
+- **Sauvegardes sur le serveur** (module `distant.ts`) : dans l'application, le stockage du
+  navigateur ne survit pas toujours à la fermeture de l'artefact. La page range donc aussi ses
+  sauvegardes dans la base de documents de l'artefact (capacité `db` de claude.ai), qui survit
+  au navigateur, à l'application et à l'appareil : gzip puis base64, découpé en morceaux sous
+  `sauvegardes/<id>/morceaux/<n>` (un document ne dépasse pas 256 Kio), l'en-tête écrit en
+  dernier. Toute sauvegarde nommée y part ; l'automatique toutes les minutes, à l'aube, à la
+  pause et à la sortie. La boîte 💾 liste les deux sources (📱 ce navigateur, ☁ le serveur) ;
+  au chargement, la plus récente des deux reprend. Hors de claude.ai, la page vit avec le seul
+  stockage local. Déclarer `db` rend l'artefact interne à l'organisation (plus de partage
+  public).
 
 ## M21 – Le monde s'élargit (jalon 15, 2026-09-13)
 

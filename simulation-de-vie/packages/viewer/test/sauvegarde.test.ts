@@ -3,6 +3,7 @@ import { Simulation, estSauvegarde } from "@sdv/core";
 import { compresser, compressionDisponible, decompresser } from "../src/compression.js";
 import { sortDuDefilement } from "../src/gestes.js";
 import { decrireSauvegarde } from "../src/sauvegarde.js";
+import { TAILLE_MORCEAU, decouper, depuisBase64, idDistant, versBase64 } from "../src/distant.js";
 
 describe("compression des sauvegardes", () => {
   it("compresse et relit un texte à l'identique, en bien moins d'octets", async () => {
@@ -50,4 +51,39 @@ describe("garde contre le tirer-pour-rafraîchir", () => {
     expect(sortDuDefilement(null, 10)).toBe(true);
     expect(sortDuDefilement(null, -10)).toBe(true);
   });
+});
+
+describe("sauvegardes distantes (base de l'artefact)", () => {
+  it("nomme un document avec les seuls caractères permis", () => {
+    expect(idDistant("auto")).toBe("auto");
+    expect(idDistant("Partie du jour 312 (graine 42)")).toBe("Partie_du_jour_312_graine_42_");
+    expect(idDistant("été à l'abri")).toBe("ete_a_l_abri");
+    expect(idDistant("..")).toBe("partie");
+    expect(idDistant("")).toBe("partie");
+  });
+
+  it("fait l'aller-retour base64 sur plus d'une tranche et découpe en morceaux", () => {
+    const octets = new Uint8Array(100_000);
+    for (let i = 0; i < octets.length; i++) octets[i] = (i * 31) & 255;
+    const b64 = versBase64(octets);
+    expect(depuisBase64(b64)).toEqual(octets);
+    const morceaux = decouper(b64, 50_000);
+    expect(morceaux.length).toBe(Math.ceil(b64.length / 50_000));
+    expect(morceaux.join("")).toBe(b64);
+    expect(decouper("")).toEqual([""]);
+    expect(TAILLE_MORCEAU * 1).toBeLessThan(256 * 1024);
+  });
+
+  it("une vraie sauvegarde compressée passe en morceaux et revient intacte", async () => {
+    const sim = Simulation.creer({ seed: 7 });
+    sim.avancer(300);
+    const source = sim.sauvegarder();
+    const octets = new Uint8Array(await compresser(JSON.stringify(source)));
+    const morceaux = decouper(versBase64(octets));
+    const relu: unknown = JSON.parse(
+      await decompresser(depuisBase64(morceaux.join("")).buffer as ArrayBuffer),
+    );
+    expect(estSauvegarde(relu)).toBe(true);
+    expect(JSON.stringify(relu)).toBe(JSON.stringify(source));
+  }, 30_000);
 });

@@ -74,7 +74,9 @@ dès qu'on met en pause et quand elle passe à l'arrière-plan, puis reprend la 
 chargement suivant (sauf si l'adresse impose une graine, ou après douze heures : elle propose
 alors « ↩ Reprendre la partie »). Tout est rangé compressé dans le navigateur (IndexedDB), propre
 à l'appareil ; la sauvegarde de sortie part sans attendre, et une partie avancée est mise à
-l'abri sous son nom avant qu'un nouveau monde ne remplace la sauvegarde automatique. Un monde restauré continue exactement comme l'original. Sur mobile, un doigt qui
+l'abri sous son nom avant qu'un nouveau monde ne remplace la sauvegarde automatique. Sur
+claude.ai, les sauvegardes partent aussi dans la base de l'artefact (☁), qui survit au
+navigateur et à l'appareil : la boîte 💾 liste les deux sources et la plus récente reprend. Un monde restauré continue exactement comme l'original. Sur mobile, un doigt qui
 tire en butée ne recharge plus la page.
 
 Pour développer le viewer avec rechargement à chaud : lancez le serveur (`pnpm --filter
