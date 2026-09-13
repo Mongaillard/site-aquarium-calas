@@ -1011,3 +1011,16 @@ table.saisons td:first-child {
     padding: 6px 8px;
   }
 }
+
+/* Jalon 14 : rêves et souvenirs altérés. */
+.liste li.reve {
+  font-style: italic;
+  color: #c9d6ff;
+}
+.liste li.altere {
+  font-style: italic;
+}
+.pensee.reve {
+  border-left-color: #c9a7ff;
+  font-size: 13px;
+}

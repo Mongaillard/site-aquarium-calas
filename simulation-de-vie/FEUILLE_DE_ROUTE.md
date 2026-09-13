@@ -129,7 +129,7 @@ Comment trois familles deviennent un village avec ses règles.
 
 Ce qu'on verra : un cercle autour du feu le soir, une palabre après un vol, un badge de notable, une zone hachurée qu'on évite, un onglet « Coutumes du village ».
 
-### Jalon 14 — La psyché et la mémoire
+### Jalon 14 — La psyché et la mémoire — livré (M20 : les cinq briques)
 
 Ce qui fait que deux personnages ne vivent pas le même drame de la même façon. C'est aussi le jalon où Claude a le plus à écrire.
 

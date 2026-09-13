@@ -63,7 +63,8 @@ describe("demander à Claude : déclencheurs, file et anti-spam", () => {
     expect(scoreMotifs(motifs)).toBeGreaterThanOrEqual(2);
     const options = optionsConseil(sim, p);
     expect(options.some((o) => o.id === "priorite:provisions")).toBe(true);
-    expect(options.length).toBeLessThanOrEqual(9);
+    // Trois inventions, trois bâtiments, deux leçons, deux priorités, deux directions au plus.
+    expect(options.length).toBeLessThanOrEqual(12);
     for (const o of options) expect(o.id).toMatch(/^(invention|batiment|lecon|priorite|explorer):/);
     attendreQuestionDe(sim, p.id);
     const q = sim.questionsEnAttente()[0];
@@ -216,6 +217,8 @@ describe("demander à Claude : application déterministe", () => {
         .ok,
     ).toBe(true);
     expect(prochainBatimentNecessaire(sim, p)).toBe("puits");
+    // Libre de tout autre chantier : le conseil doit se traduire par une fondation.
+    p.projet = null;
     sim.avancer(3 * 144);
     expect([...sim.batiments.values()].some((b) => b.type === "puits")).toBe(true);
   });

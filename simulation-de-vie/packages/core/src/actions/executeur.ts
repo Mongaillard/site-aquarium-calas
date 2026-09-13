@@ -32,6 +32,8 @@ import type { Ressource } from "../monde/ressources.js";
 import { atelierAdjacent, autorise, eauAdjacente, feuProche } from "../monde.js";
 import type { Monde } from "../monde.js";
 import { seRecueillir } from "../social/societe.js";
+import { rever } from "../memoire/psyche.js";
+import { nommerLaPeche } from "../memoire/legendes.js";
 import { composerDialogue, transcrire } from "../social/dialogue.js";
 import { accepteDemande, effetsDon, effetsRefus, effetsVol } from "../social/echange.js";
 import { ajusterRelation } from "../social/relations.js";
@@ -732,6 +734,7 @@ function tickRecolter(
   const connu = p.connaissance.get(cleLieu(action.cible.x, action.cible.y));
   if (connu) connu.quantiteVue = gisement.quantite;
   monde.emettre("recolte", p, { ressource: gisement.type, quantite: pris }, 2, action.cible);
+  if (gisement.type === "poisson") nommerLaPeche(monde, p, action.cible);
   if (gisement.quantite < 1) {
     monde.emettre("gisement_epuise", p, { ressource: gisement.type }, 3, action.cible);
     if (gisement.tauxRegen === 0 && tuile) tuile.gisement = null;
@@ -1059,6 +1062,8 @@ function tickDormir(
     monde.emettre("endormi", p, {}, 1);
   }
   action.ticksDormis += 1;
+  // Au cœur de la nuit, on rêve : deux souvenirs se mêlent.
+  if (action.ticksDormis === 18) rever(monde, p);
   const b = p.besoins;
   const reveil = b.sommeil >= 95 || b.soif < 8 || b.faim < 8 || action.ticksDormis >= 12 * 6;
   if (!reveil) return ENCOURS;

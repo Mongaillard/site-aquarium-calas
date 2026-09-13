@@ -31,6 +31,7 @@ import {
   notables,
   adultes,
   connait,
+  nomDuLieu,
 } from "@sdv/core";
 import type {
   Evenement,
@@ -52,6 +53,8 @@ import type {
   GisementEtat,
   MessageEtat,
   SocieteEtat,
+  ChroniqueEtat,
+  PsycheFiche,
   MessageFiche,
   TroupeauEtat,
   MessageInit,
@@ -110,6 +113,72 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     metier: sim.titre(p),
     notable: estNotable(sim, p),
     banni: estBanni(sim, p),
+    abattu: p.psyche.abattu,
+  };
+}
+
+/** La mémoire collective, pour la page « Légendes » et la carte. */
+export function chroniqueEtat(sim: Simulation): ChroniqueEtat {
+  const c = sim.chronique;
+  return {
+    recits: [...c.recits]
+      .sort((a, b) => Number(b.legende) - Number(a.legende) || b.fois - a.fois || b.tick - a.tick)
+      .slice(0, 20)
+      .map((r) => ({
+        id: r.id,
+        tick: r.tick,
+        genre: r.genre,
+        texte: r.texte,
+        origine: r.origine,
+        fois: r.fois,
+        legende: r.legende,
+      })),
+    lieuxNommes: c.lieuxNommes.map((l) => ({ x: l.x, y: l.y, nom: l.nom, origine: l.origine })),
+    proverbes: c.proverbes.map((p) => ({
+      lecon: p.lecon,
+      titre: LECONS[p.lecon].titre,
+      texte: p.texte,
+    })),
+  };
+}
+
+function ficheSpyche(sim: Simulation, p: Personnage): PsycheFiche {
+  const ps = p.psyche;
+  const T = sim.horloge.ticksParJour;
+  const derive: Record<string, number> = {};
+  for (const cle of Object.keys(ps.personnaliteBase) as (keyof typeof ps.personnaliteBase)[])
+    derive[cle] = Math.round((p.identite.personnalite[cle] - ps.personnaliteBase[cle]) * 100);
+  return {
+    stress: Math.round(ps.stress),
+    abattu: ps.abattu,
+    ennui: Math.round(ps.ennui),
+    sens: Math.round(ps.sens),
+    objectif:
+      ps.objectif === null
+        ? null
+        : {
+            but: ps.objectif.but,
+            joursRestants: Math.max(0, Math.ceil((ps.objectif.jusqua - sim.tick) / T)),
+            progres: ps.objectif.cible <= ps.objectif.depart ? 100 : 0,
+            issue: ps.objectif.issue,
+          },
+    reve: ps.reve,
+    attachement: {
+      lieu:
+        ps.attachement.lieu === null
+          ? null
+          : (nomDuLieu(sim, ps.attachement.lieu) ??
+            `(${String(ps.attachement.lieu.x)}, ${String(ps.attachement.lieu.y)})`),
+      objet: ps.attachement.objet,
+    },
+    lieuxEvites: ps.lieuxEvites
+      .filter((l) => l.jusqua > sim.tick)
+      .map((l) => ({ motif: l.motif, joursRestants: Math.ceil((l.jusqua - sim.tick) / T) })),
+    deuils: ps.deuils.map((d) => ({
+      prenom: d.prenom,
+      jours: Math.floor((sim.tick - d.tick) / T),
+    })),
+    derive,
   };
 }
 
@@ -381,6 +450,10 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     palabres: sim.societe.compteurs.palabres,
     exils: sim.societe.compteurs.exils,
     rixes: sim.societe.compteurs.rixes,
+    legendes: sim.chronique.recits.filter((r) => r.legende).length,
+    lieuxNommes: sim.chronique.lieuxNommes.length,
+    proverbes: sim.chronique.proverbes.length,
+    abattus: sim.vivants().filter((p) => p.psyche.abattu).length,
   };
 }
 
@@ -557,6 +630,7 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     questions: sim.questionsEnAttente(),
     prieres: sim.prieresOuvertes(),
     societe: societeEtat(sim),
+    chronique: chroniqueEtat(sim),
   };
 }
 
@@ -708,11 +782,18 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
         interactions: r.interactions,
       };
     });
-  const souvenir = (s: { tick: number; type: string; texte: string; importance: number }) => ({
+  const souvenir = (s: {
+    tick: number;
+    type: string;
+    texte: string;
+    importance: number;
+    altere?: boolean;
+  }) => ({
     tick: s.tick,
     type: s.type,
     texte: s.texte,
     importance: s.importance,
+    ...(s.altere === true ? { altere: true } : {}),
   });
   const partenaire = partenaireDe(sim, p);
   const enfants = sim.personnages.filter((x) => x.identite.parents?.includes(p.id) ?? false);
@@ -814,6 +895,7 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
         haine: r.haine,
       })),
     traumatise: p.drapeaux.traumatiseJusqua > sim.tick,
+    psyche: ficheSpyche(sim, p),
   };
 }
 

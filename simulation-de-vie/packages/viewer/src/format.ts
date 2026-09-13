@@ -68,6 +68,7 @@ export const NOMS_BATIMENT: Readonly<Record<string, string>> = {
   enclos: "enclos",
   champ: "champ",
   autel: "autel",
+  stele: "stèle",
 };
 
 export const LIBELLES_METEO: Readonly<Record<string, string>> = {
@@ -103,6 +104,9 @@ export const LIBELLES_TYPE: Readonly<Record<string, string>> = {
   tabou: "lieu interdit",
   recueillement: "recueillement",
   maitre: "maître et apprenti",
+  psyche: "psyché",
+  gravure: "gravure",
+  legende: "légende",
   divin: "miracle",
   conseil: "conseil de Claude",
   ambition: "ambition",
@@ -518,6 +522,33 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       return d.genre === "choisi"
         ? `🎓 ${qui} choisit ${cible("maitre")} pour maître (${String(d.competence)}).`
         : `🎓 ${qui} n'a plus besoin de maître.`;
+    case "psyche":
+      switch (d.genre) {
+        case "abattement":
+          return `🌧️ ${qui} sombre dans l'abattement : plus goût à rien.`;
+        case "sortie":
+          return `🌤️ ${qui} sort de l'abattement après ${String(d.jours)} jours, porté par les siens.`;
+        case "objectif":
+          return `🎯 ${qui} se donne un but pour la saison : ${String(d.but)}.`;
+        case "accompli":
+          return `🎉 ${qui} a réussi : ${String(d.but)}. Quelle joie !`;
+        case "manque":
+          return `${qui} n'a pas pu ${String(d.but)} cette saison.`;
+        case "anniversaire":
+          return `🕯️ ${qui} pense à ${cible("defunt")}, ${Number(d.ans) === 1 ? "un an" : `${String(d.ans)} ans`} après sa mort.`;
+        default:
+          return `${qui} : ${String(d.genre)}`;
+      }
+    case "gravure":
+      return `🪨 ${qui} grave une pierre : ${String(d.inscription)}`;
+    case "legende":
+      return d.genre === "legende"
+        ? `📖 Une légende est née (racontée ${String(d.fois)} fois) : ${String(d.texte)}`
+        : d.genre === "recit"
+          ? `📖 ${qui} raconte à la veillée : ${String(d.texte)}`
+          : d.genre === "lieu"
+            ? `🗺️ Un lieu prend un nom : ${String(d.nom)} (${String(d.origine)}).`
+            : `💬 Un proverbe naît de la coutume « ${String(d.titre)} » : « ${String(d.texte)} »`;
     default:
       return `${qui} ${e.type}`;
   }

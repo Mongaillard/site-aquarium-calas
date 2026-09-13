@@ -85,6 +85,12 @@ ensemble, les alliances par mariage et les lieux interdits (hachurés sur la car
 cercle de lumière marque la veillée autour du feu. La fiche d'un personnage dit son prestige, son
 maître, son exil et ses rancunes.
 
+Psyché et mémoire (jalon 14) : la fiche montre le stress, le sens, l'ennui, l'objectif de la
+saison, les attachements, les lieux évités, les deuils, la dérive du caractère et le dernier
+rêve ; les souvenirs de rêve et les souvenirs que la mémoire a réécrits sont marqués. L'onglet
+« Légendes » rassemble ce que le village se raconte aux veillées (avec les faits d'origine), les
+lieux nommés (aussi écrits sur la carte) et les proverbes nés des coutumes.
+
 ### Sans serveur (mobile, page publiée)
 
 ```bash

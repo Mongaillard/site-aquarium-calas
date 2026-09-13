@@ -34,6 +34,7 @@ import {
 } from "../monde.js";
 import type { Monde } from "../monde.js";
 import { eviteLeLieu } from "../social/societe.js";
+import { lieuEvite } from "../memoire/psyche.js";
 import { partenaireDe } from "../social/couple.js";
 import { relationAvec } from "../agents/personnage.js";
 import { trouverChemin } from "./chemin.js";
@@ -504,7 +505,11 @@ function planifierRecolte(
   if (ressource === "gibier") return planifierChasse(monde, p, puisManger);
   const inv = p.corps.inventaire;
   const lieux = lieuxConnusTries(p, ressource).filter(
-    (l) => l.quantiteVue >= 1 && outilSatisfait(inv, l.outilRequis) && !eviteLeLieu(monde, p, l),
+    (l) =>
+      l.quantiteVue >= 1 &&
+      outilSatisfait(inv, l.outilRequis) &&
+      !eviteLeLieu(monde, p, l) &&
+      !lieuEvite(p, l, monde.horloge.tick),
   );
   if (lieux.length === 0) return echec(`aucun gisement de ${ressource} exploitable connu`);
   const liberation = placeLibre(inv) <= 0 ? libererPlace(monde, p, [ressource]) : [];

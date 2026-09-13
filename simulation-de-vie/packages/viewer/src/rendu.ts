@@ -185,6 +185,21 @@ export class Rendu {
         this.dessinerHalo(cam, magasin.pouvoirArme, magasin.reticule, maintenant);
     }
 
+    // Les lieux nommés : leur nom en italique sur la carte.
+    if (etat !== null && cam.echelle >= 4) {
+      ctx.font = `italic ${String(Math.max(10, Math.min(14, cam.echelle * 1.6)))}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      for (const l of etat.chronique.lieuxNommes) {
+        if (!visible(l.x, l.y) || magasin.biomeEn(l.x, l.y) < 0) continue;
+        const e = versEcran(cam, l.x + 0.5, l.y);
+        ctx.fillStyle = "rgba(0,0,0,0.75)";
+        ctx.fillText(l.nom, e.x + 1, e.y - 1);
+        ctx.fillStyle = "#ffe9a8";
+        ctx.fillText(l.nom, e.x, e.y - 2);
+      }
+    }
+
     // Une question ouverte à Claude : un « ? » au-dessus de la tête.
     if (etat !== null && cam.echelle >= 7) {
       const questionnes = magasin.questionnes;
@@ -519,6 +534,9 @@ export class Rendu {
         break;
       case "tombe":
         sprites.tombe(ctx, b.x, b.y);
+        break;
+      case "stele":
+        sprites.stele(ctx, b.x, b.y);
         break;
       case "autel":
         sprites.autel(ctx, b.x, b.y, maintenant);

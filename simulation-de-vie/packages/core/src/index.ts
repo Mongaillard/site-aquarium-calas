@@ -376,3 +376,29 @@ export type {
   MotifGrief,
   IssueGrief,
 } from "./social/societe.js";
+export {
+  psycheInitiale,
+  stresser,
+  lieuEvite,
+  flechirPersonnalite,
+  rever,
+  deformerUnSouvenir,
+  aubePsyche,
+  intentionDominante,
+  SEUIL_ABATTEMENT,
+  SEUIL_ENNUI,
+  BORNE_PERSONNALITE,
+} from "./memoire/psyche.js";
+export type { Psyche, Objectif, GenreObjectif, LieuEvite, Deuil } from "./memoire/psyche.js";
+export {
+  etatChroniqueInitial,
+  observerChronique,
+  raconter,
+  embellir,
+  nomDuLieu,
+  legendes,
+  proverbeDeCoutume,
+  PROVERBES,
+  FOIS_LEGENDE,
+} from "./memoire/legendes.js";
+export type { EtatChronique, Recit, LieuNomme, Proverbe } from "./memoire/legendes.js";

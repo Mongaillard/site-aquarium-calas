@@ -31,6 +31,17 @@ interface Candidat {
   readonly score: number;
 }
 
+/** Ce qu'un abattu fait encore : boire, manger, dormir, se réchauffer, fuir, se soigner. */
+const NECESSAIRE = new Set<Intention["type"]>([
+  "boire",
+  "manger",
+  "dormir",
+  "se_rechauffer",
+  "fuir",
+  "soigner",
+  "se_reposer",
+]);
+
 export class RuleBrain implements Cerveau {
   constructor(private readonly personnage: Personnage) {}
 
@@ -66,9 +77,13 @@ export class RuleBrain implements Cerveau {
   decider(perception: Perception): Intention {
     const candidats = this.candidats(perception);
     let meilleur: Candidat | null = null;
+    const dominante = perception.moi.intentionDominante;
     for (const c of candidats) {
       const bruit = 0.9 + 0.2 * this.personnage.rng.suivant();
-      const score = this.ponderer(c.intention, c.score, perception.moi.corps.mobilite) * bruit;
+      let score = this.ponderer(c.intention, c.score, perception.moi.corps.mobilite) * bruit;
+      // Abattu : seul le nécessaire garde son poids ; l'ennui pousse vers autre chose.
+      if (perception.moi.abattu && !NECESSAIRE.has(c.intention.type)) score *= 0.6;
+      if (dominante !== null && c.intention.type !== dominante) score += 0.15;
       if (meilleur === null || score > meilleur.score) meilleur = { intention: c.intention, score };
     }
     return meilleur?.intention ?? { type: "attendre", ticks: 3 };
@@ -564,6 +579,8 @@ export class RuleBrain implements Cerveau {
           0.3 +
           personnalite.conscience * 0.4 +
           (projet !== null ? 0.15 : 0) +
+          // Le bâtiment qu'un conseil nous a fait vouloir passe devant.
+          (perception.moi.ambitionBatiment === type ? 0.35 : 0) +
           (perception.reparationNecessaire && projet === null ? 0.5 : 0) +
           (besoinAbri ? 0.5 + urgence(besoins.securite) + froid : 0) +
           (perception.moi.chercheAbri && (type === "abri" || type === "maison") ? 0.4 : 0) +

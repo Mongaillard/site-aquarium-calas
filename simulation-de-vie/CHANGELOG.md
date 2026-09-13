@@ -2,6 +2,50 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M20 – La psyché et la mémoire (jalon 14, 2026-09-13)
+
+Ce qui fait que deux personnages ne vivent pas le même drame de la même façon. Deux modules :
+`memoire/psyche.ts` (chacun) et `memoire/legendes.ts` (le village).
+
+- **Stress, traumatisme, abattement** : un stress (0..100) nourri par les blessures, les
+  combats (témoins compris), les alarmes, les vols subis, les rixes, les maladies, l'exil, la
+  faim et le froid qui durent ; apaisé de trois points par jour, par les jeux, les dialogues avec
+  les proches, les naissances. Cinq jours au-dessus de 70 : l'**abattement** (humeur −15, seul
+  le nécessaire garde son poids dans les décisions) ; on en sort sous 40. Après un combat ou la
+  mort violente d'un proche, on **évite le lieu** soixante jours (sauf famine).
+- **Joie, ambition, ennui, sens** : au premier jour de chaque saison, un **objectif personnel**
+  selon ses valeurs (trente portions en réserve, un enfant, trente lieux, du prestige, être
+  notable, cinq dons, une maison, transmettre un savoir, jouer cinq fois, aller à trente tuiles) ;
+  l'atteindre donne dix jours de joie et du sens (0..100), le manquer en retire. L'**ennui**
+  monte quand la même intention revient sept fois sur dix ; il pèse sur l'humeur et pousse vers
+  autre chose. Un ancien qui s'ennuie **grave une pierre** (`stele`, deux pierres) de son motto.
+- **Rêves et mémoire qui déforme** : au cœur de la nuit, un rêve mêle deux souvenirs (type
+  `reve`, visible dans la fiche) ; chaque semaine, un souvenir ancien, important et peu consulté
+  se réécrit (les nombres grossissent, la certitude s'effrite, marqué « altéré »). Les faits du
+  journal ne bougent jamais.
+- **Personnalité qui évolue, attachements, deuil long** : le caractère plie (névrosisme après
+  un deuil ou l'abattement, conscience après un objectif atteint, extraversion après une sortie
+  d'abattement, agréabilité après une naissance), dans une borne de ±0,2 autour du départ. Chaque
+  mois, le lieu des bons souvenirs et l'outil qu'on porte deviennent des attachements (moral le
+  soir près du lieu ; perte quand l'outil casse). Un proche mort laisse un deuil d'un an, avec
+  son anniversaire (humeur, souvenir, événement).
+- **Mémoire collective** : les événements marquants (morts, combats, miracles, inventions, exils,
+  grandes chasses, alliances, gravures) deviennent des **récits** ; à chaque veillée quelqu'un en
+  raconte un, les enfants écoutent ; raconté, il s'**embellit** (nombres +50 %, épithètes) ; trois
+  fois raconté, c'est une **légende**. Les lieux prennent un **nom** (« la crique de Timéo » pour
+  qui y pêche le premier loin du village, « le bois de X » où X est mort, « le pré des loups »,
+  « la clairière du miracle ») et les dialogues les emploient à la place des directions. Chaque
+  coutume engendre un **proverbe**, repris dans les salutations.
+- Viewer : section Psyché de la fiche (stress, sens, ennui, objectif, attachements, lieux évités,
+  deuils, dérive du caractère, dernier rêve), souvenirs de rêve et souvenirs altérés marqués,
+  onglet **Légendes** (légendes, récits en cours avec les faits d'origine, lieux nommés,
+  proverbes), noms de lieux sur la carte, stèles, nouveaux événements dans le journal.
+- Sauvegarde en version 3 ; les sauvegardes v1 et v2 se relisent. Onze tests (`psyche.test.ts`).
+- Calibration après M19 : une coutume n'enseigne plus la leçon à tout le monde (treize
+  palissades et des abris jamais réparés sur la graine 42), un chantier commun ne passe qu'après
+  le confort de la famille, le vote d'un puits exige de la pierre en stock, on ne vient pas à la
+  veillée le ventre vide, une infraction par personne et par jour au plus.
+
 ## M19 – La société (jalon 13, 2026-09-13)
 
 Comment trois familles deviennent un village avec ses règles. Tout est dans `social/societe.ts`,

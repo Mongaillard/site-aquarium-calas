@@ -26,6 +26,7 @@ import { LECONS } from "../savoirs/catalogue.js";
 import type { Lecon } from "../savoirs/catalogue.js";
 import { apprendre, connait } from "../savoirs/lecons.js";
 import { ajusterRelation, borner } from "./relations.js";
+import { proverbeDeCoutume, raconter } from "../memoire/legendes.js";
 
 // ------------------------------------------------------------------ état
 
@@ -105,6 +106,8 @@ export interface EtatSociete {
   factions: Faction[];
   /** Dernière rixe par paire (« a|b »), en tick. */
   rixes: Map<string, number>;
+  /** Dernière infraction par personne, en tick (une par jour au plus). */
+  infractionsRecentes: Map<string, number>;
   compteurs: {
     veillees: number;
     fetes: number;
@@ -131,6 +134,7 @@ export function etatSocieteInitial(): EtatSociete {
     derniereVeillee: null,
     factions: [],
     rixes: new Map(),
+    infractionsRecentes: new Map(),
     compteurs: {
       veillees: 0,
       fetes: 0,
@@ -430,15 +434,19 @@ export function observerEvenement(monde: MondeSocial, e: Evenement): void {
       // Manger devant un enfant affamé enfreint « les enfants d'abord ».
       if (acteur === undefined || acteur.corps.stade === "enfant") break;
       if (!estCoutume(s, "enfants_dabord")) break;
+      // Il faut avoir encore de quoi donner : manger sa dernière portion n'est pas une faute.
+      let reste = 0;
+      for (const r of Object.keys(NOURRITURE) as (keyof typeof NOURRITURE)[])
+        reste += quantite(acteur.corps.inventaire, r);
+      if (reste < 2) break;
       const enfant = monde.personnages.find(
         (p) =>
           p.vivant &&
           p.corps.stade === "enfant" &&
           p.besoins.faim < 30 &&
-          Grille.distance(p.corps.position, acteur.corps.position) <= 4,
+          Grille.distance(p.corps.position, acteur.corps.position) <= 2,
       );
-      if (enfant !== undefined && quantite(acteur.corps.inventaire, "baies") + 1 > 0)
-        infraction(monde, acteur, "enfants_dabord", enfant);
+      if (enfant !== undefined) infraction(monde, acteur, "enfants_dabord", enfant);
       break;
     }
     default:
@@ -463,8 +471,12 @@ function infraction(
       Grille.distance(t.corps.position, coupable.corps.position) <= 6,
   );
   if (temoins.length === 0) return;
-  coupable.reputation = borner(coupable.reputation - 5, -100, 100);
-  coupable.prestige = borner(coupable.prestige - 3, 0, 100);
+  // Une infraction par personne et par jour au plus : on ne condamne pas dix fois le même repas.
+  const dernier = s.infractionsRecentes.get(coupable.id) ?? -Infinity;
+  if (tick - dernier < monde.horloge.ticksParJour) return;
+  s.infractionsRecentes.set(coupable.id, tick);
+  coupable.reputation = borner(coupable.reputation - 3, -100, 100);
+  coupable.prestige = borner(coupable.prestige - 2, 0, 100);
   for (const t of temoins)
     ajusterRelation(
       relationAvec(t, coupable.id),
@@ -584,8 +596,9 @@ function mettreAJourCoutumes(monde: MondeSocial): void {
     const active = estCoutume(s, lecon);
     if (!active && partAncienne >= PART_COUTUME) {
       s.coutumes.push({ lecon, depuisJour: jour });
-      // Ce qui est coutume, tout adulte le sait désormais.
-      for (const p of ad) apprendre(p, lecon, 1, "la coutume", tick);
+      proverbeDeCoutume(monde, lecon);
+      // Ce qui est coutume, on le suit sans l'avoir appris (par la perception) ; on n'apprend
+      // pas la leçon pour autant : bâtir des murs reste l'affaire de qui a vu les loups.
       monde.emettre(
         "coutume",
         null,
@@ -761,11 +774,16 @@ function deciderEnsemble(monde: MondeSocial): void {
       return;
     }
   }
-  // Un puits commun : la leçon est connue, personne n'en a bâti, le village est assez grand.
+  // Un puits commun : la leçon est connue, personne n'en a bâti, le village est assez grand,
+  // et il y a déjà de la pierre dans les stocks (on ne vote pas un chantier impossible).
   const puits = [...monde.batiments.values()].some((b) => b.type === "puits");
+  let pierre = 0;
+  for (const b of monde.batiments.values())
+    if (b.etat === "termine" && b.stock !== null) pierre += quantite(b.stock, "pierre");
   if (
     !puits &&
     ad.length >= 6 &&
+    pierre >= 8 &&
     (estCoutume(s, "puits_pres_du_village") || ad.some((p) => connait(p, "puits_pres_du_village")))
   ) {
     const centre = centreVillage(monde);
@@ -864,7 +882,16 @@ export function soireeSociete(monde: MondeSocial): void {
   amitiesDEnfance(monde);
   const fete = s.feteDuSoir;
   s.feteDuSoir = null;
-  const eveilles = adultes(monde).filter((p) => !p.corps.endormi && !estBanni(monde, p));
+  // Qui a faim, froid ou sommeil ne vient pas à la veillée : les besoins passent avant.
+  const eveilles = adultes(monde).filter(
+    (p) =>
+      !p.corps.endormi &&
+      !estBanni(monde, p) &&
+      p.besoins.faim >= 35 &&
+      p.besoins.chaleur >= 45 &&
+      p.besoins.sommeil >= 25 &&
+      p.besoins.soif >= 30,
+  );
   // Le feu le plus fréquenté.
   let feu: Batiment | null = null;
   let autour: Personnage[] = [];
@@ -991,6 +1018,19 @@ export function soireeSociete(monde: MondeSocial): void {
   // La palabre : les griefs ouverts se jugent devant tous.
   jugerLesGriefs(monde, autour, feu.position);
   prixDuSang(monde, autour);
+  // Puis quelqu'un raconte : les enfants éveillés à portée écoutent aussi.
+  const auditeurs = [
+    ...autour,
+    ...monde.personnages.filter(
+      (p) =>
+        p.vivant &&
+        !p.corps.endormi &&
+        p.corps.stade !== "adulte" &&
+        p.corps.stade !== "ancien" &&
+        Grille.distance(p.corps.position, feu.position) <= RAYON_VEILLEE,
+    ),
+  ];
+  raconter(monde, auditeurs, rng);
 }
 
 export function libelleFete(genre: string, sujet: string | null): string {

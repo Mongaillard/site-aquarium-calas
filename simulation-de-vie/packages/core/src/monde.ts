@@ -18,6 +18,7 @@ import type { Bete } from "./monde/village.js";
 import { betesDe, enclosDe } from "./monde/village.js";
 import type { Rng } from "./rng.js";
 import type { EtatSociete } from "./social/societe.js";
+import type { EtatChronique } from "./memoire/legendes.js";
 
 export interface Monde {
   readonly config: SimConfig;
@@ -51,6 +52,8 @@ export interface Monde {
   tuer(p: Personnage, cause: string): void;
   /** La société (jalon 13) : coutumes, griefs, tension, alliances, lieux interdits. */
   readonly societe: EtatSociete;
+  /** La mémoire collective (jalon 14) : récits, légendes, noms de lieux, proverbes. */
+  readonly chronique: EtatChronique;
 }
 
 /**
@@ -235,9 +238,6 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
   if (!acces.some((b) => b.type === "feu_de_camp" && (b.etat === "chantier" || b.allume)))
     return "feu_de_camp";
   if (feuAAlimenter(monde, p) !== null) return "feu_de_camp";
-  // Un chantier décidé par le village passe avant le confort de la famille.
-  const commun = acces.find((b) => b.commun === true && b.etat === "chantier");
-  if (commun !== undefined) return commun.type;
   if (!acces.some((b) => PLANS_BATIMENT[b.type].capaciteStock > 0)) return "entrepot";
   if (
     (p.savoirs.get("puits_pres_du_village")?.force ?? 0) >= 0.6 &&
@@ -245,6 +245,9 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
   )
     return "puits";
   if (famille >= 3 && !acces.some((b) => b.type === "maison")) return "maison";
+  // Un chantier décidé par le village : on y contribue une fois la famille logée, nourrie et au sec.
+  const commun = acces.find((b) => b.commun === true && b.etat === "chantier");
+  if (commun !== undefined && p.besoins.faim >= 50 && p.besoins.chaleur >= 50) return commun.type;
   // Une famille qui croit bâtit un autel (un seul par village).
   const membres = membresFamille(monde, p);
   const foiMoyenne = membres.reduce((t, m) => t + m.foi, 0) / Math.max(1, membres.length);

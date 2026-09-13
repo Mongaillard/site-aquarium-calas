@@ -361,6 +361,22 @@ export function tombe(ctx: Ctx, x: number, y: number): void {
   ctx.fillRect(x + 0.38, y + 0.55, 0.24, 0.06);
 }
 
+/** Une stèle : une pierre dressée, gravée d'un trait. */
+export function stele(ctx: Ctx, x: number, y: number): void {
+  ctx.fillStyle = "#8d8d8d";
+  ctx.beginPath();
+  ctx.moveTo(x + 0.36, y + 0.92);
+  ctx.lineTo(x + 0.4, y + 0.3);
+  ctx.lineTo(x + 0.6, y + 0.3);
+  ctx.lineTo(x + 0.64, y + 0.92);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#3a3a3a";
+  ctx.fillRect(x + 0.45, y + 0.42, 0.1, 0.04);
+  ctx.fillRect(x + 0.45, y + 0.52, 0.1, 0.04);
+  ctx.fillRect(x + 0.45, y + 0.62, 0.1, 0.04);
+}
+
 export function feu(ctx: Ctx, x: number, y: number, allume: boolean, temps: number): void {
   ctx.fillStyle = "#5a3a1a";
   ctx.save();

@@ -145,6 +145,16 @@ import {
   soireeSociete,
 } from "./social/societe.js";
 import type { EtatSociete } from "./social/societe.js";
+import {
+  aubePsyche,
+  mortPsyche,
+  noterIntention,
+  observerPsyche,
+  psycheInitiale,
+  soirPsyche,
+} from "./memoire/psyche.js";
+import { etatChroniqueInitial, observerChronique } from "./memoire/legendes.js";
+import type { EtatChronique } from "./memoire/legendes.js";
 
 export interface Statistiques {
   readonly tick: number;
@@ -190,15 +200,22 @@ const RAYON_CONNAISSANCE_INITIALE = 14;
  * apparus depuis prennent leur valeur de départ, rien n'est perdu.
  */
 function migrer(etat: EtatSimulation, version: number): EtatSimulation {
-  if (version >= 2) return etat;
+  if (version >= VERSION_SAUVEGARDE) return etat;
   const brut = etat as unknown as Record<string, unknown>;
-  if (!("societe" in brut)) brut.societe = etatSocieteInitial();
   const defauts = (o: Record<string, unknown>, valeurs: Record<string, unknown>): void => {
     for (const [k, v] of Object.entries(valeurs)) if (!(k in o)) o[k] = v;
   };
+  // Version 2 (M19) : la société.
+  if (!("societe" in brut)) brut.societe = etatSocieteInitial();
+  defauts(brut.societe as Record<string, unknown>, {
+    infractionsRecentes: new Map<string, number>(),
+  });
+  // Version 3 (M20) : la psyché et la chronique.
+  if (!("chronique" in brut)) brut.chronique = etatChroniqueInitial();
   for (const p of etat.personnages) {
     const q = p as unknown as Record<string, unknown>;
     defauts(q, { prestige: 0, maitre: null, banni: null });
+    if (!("psyche" in q)) q.psyche = psycheInitiale(p.identite.personnalite);
     defauts(p.drapeaux as unknown as Record<string, unknown>, {
       traumatiseJusqua: -1,
       refusePar: null,
@@ -249,6 +266,7 @@ interface EtatSimulation {
   readonly fileConseils: { id: string; motifs: Motif[]; score: number }[];
   readonly journal: ReturnType<Journal["etat"]>;
   readonly societe: EtatSociete;
+  readonly chronique: EtatChronique;
 }
 
 export class Simulation implements Monde {
@@ -279,6 +297,8 @@ export class Simulation implements Monde {
   meteoForcee: { readonly meteo: Meteo; readonly jusquaJour: number } | null = null;
   /** La société (jalon 13) : coutumes, griefs, tension, décisions, alliances, factions, tabous. */
   readonly societe: EtatSociete = etatSocieteInitial();
+  /** La mémoire collective (jalon 14) : récits, légendes, noms de lieux, proverbes. */
+  readonly chronique: EtatChronique = etatChroniqueInitial();
 
   private constructor(
     readonly config: SimConfig,
@@ -322,6 +342,7 @@ export class Simulation implements Monde {
       this.fileConseils.push(...etat.fileConseils);
       this.journal.restaurer(etat.journal);
       Object.assign(this.societe, etat.societe);
+      Object.assign(this.chronique, etat.chronique);
       for (const p of this.personnages) this.cerveaux.set(p.id, new RuleBrain(p));
     } else {
       this.personnages = genererPopulation(rng, config, grille);
@@ -335,6 +356,8 @@ export class Simulation implements Monde {
     this.journal.ecouter((e) => {
       this.memoriser(e);
       observerEvenement(this, e);
+      observerPsyche(this, e);
+      observerChronique(this, e);
       const gain = FAVEUR_EVENEMENTS[e.type];
       if (gain !== undefined && this.tick > 0) gagnerFaveur(this.faveur, gain);
       if (e.type === "priere") {
@@ -890,6 +913,7 @@ export class Simulation implements Monde {
       fileConseils: this.fileConseils,
       journal: this.journal.etat(EVENEMENTS_GARDES),
       societe: this.societe,
+      chronique: this.chronique,
     };
     return {
       format: FORMAT_SAUVEGARDE,
@@ -1275,6 +1299,7 @@ export class Simulation implements Monde {
       this.jourDuVillage();
       this.regenererBassins();
       aubeSociete(this);
+      for (const p of this.vivants()) aubePsyche(this, p);
     }
     if (this.tick > 0) {
       this.conseilsDuJour = 0;
@@ -1322,6 +1347,7 @@ export class Simulation implements Monde {
     for (const p of this.vivants()) {
       this.reflechirPour(p);
       apprentissageDuSoir(this, p);
+      soirPsyche(p);
     }
     soireeSociete(this);
     this.inscrireCandidats();
@@ -1913,6 +1939,7 @@ export class Simulation implements Monde {
 
   private definirIntention(p: Personnage, intention: Intention): void {
     p.intention = intention;
+    noterIntention(p, intention.type);
     this.emettre("intention", p, { intention: decrireIntention(intention) }, 1);
   }
 
@@ -1936,6 +1963,7 @@ export class Simulation implements Monde {
     deuil(this, p, cause);
     this.tirerLeconsDe(p, cause);
     mortSociete(this, p, cause);
+    mortPsyche(this, p, cause);
     for (const enfant of this.personnages) {
       if (enfant.vivant && (enfant.identite.parents?.includes(p.id) ?? false))
         adopter(this, enfant);

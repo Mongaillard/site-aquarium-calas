@@ -17,6 +17,7 @@ import { Grille } from "../monde/grille.js";
 import type { Position } from "../monde/grille.js";
 import type { Ressource } from "../monde/ressources.js";
 import { compatibilite, tutoie } from "./relations.js";
+import { nomDuLieu, proverbeAuHasard } from "../memoire/legendes.js";
 
 export interface Replique {
   readonly locuteur: string;
@@ -134,11 +135,14 @@ function reponseSalutation(b: Personnage, tu: boolean): string {
   return tu ? "Ça va, on fait aller." : "Ça va, on fait aller.";
 }
 
-function phraseInformation(vers: Personnage, lieu: LieuConnu, tu: boolean): string {
+function phraseInformation(monde: Monde, vers: Personnage, lieu: LieuConnu, tu: boolean): string {
   const distance = Grille.distance(vers.corps.position, lieu);
   const nom = NOMS_LIEUX[lieu.type] ?? lieu.type;
   const ou = directionVers(vers.corps.position, lieu);
-  const pas = distance <= 1 ? "juste là" : `à ${distance} pas ${ou}`;
+  // Un lieu qui a un nom se dit par son nom : « à la crique de Timéo ».
+  const lieuNomme = nomDuLieu(monde, lieu);
+  const pas =
+    lieuNomme !== null ? `à ${lieuNomme}` : distance <= 1 ? "juste là" : `à ${distance} pas ${ou}`;
   return tu ? `Tu sais qu'il y a ${nom} ${pas} ?` : `Savez-vous qu'il y a ${nom} ${pas} ?`;
 }
 
@@ -157,7 +161,12 @@ export function composerDialogue(monde: Monde, a: Personnage, b: Personnage): Di
   };
 
   dire(a, salutation(b, tu, estNuit));
-  dire(b, reponseSalutation(b, tu));
+  // Un proverbe du village, parfois, en guise de réponse.
+  const proverbe = a.rng.chance(0.15) ? proverbeAuHasard(monde, a.rng) : null;
+  dire(
+    b,
+    proverbe === null ? reponseSalutation(b, tu) : `Comme on dit chez nous : « ${proverbe} »`,
+  );
 
   // Dispute : mésentente installée ou personnalités incompatibles et à vif.
   const aVif = a.identite.personnalite.nevrosisme > 0.6 && compat < -0.3;
@@ -205,11 +214,11 @@ export function composerDialogue(monde: Monde, a: Personnage, b: Personnage): Di
   const deAversB = lieuxAPartager(a, b, maxLieux);
   const deBversA = lieuxAPartager(b, a, maxLieux);
   for (const lieu of deAversB) {
-    dire(a, phraseInformation(b, lieu, tu));
+    dire(a, phraseInformation(monde, b, lieu, tu));
     effets.push({ type: "information", de: a.id, vers: b.id, lieu });
   }
   for (const lieu of deBversA) {
-    dire(b, phraseInformation(a, lieu, tu));
+    dire(b, phraseInformation(monde, a, lieu, tu));
     effets.push({ type: "information", de: b.id, vers: a.id, lieu });
   }
   if (deAversB.length + deBversA.length > 0) {

@@ -67,6 +67,8 @@ export interface PersonnageEtat {
   readonly notable: boolean;
   /** Banni : il vit à l'écart le temps de l'exil. */
   readonly banni: boolean;
+  /** Abattu (jalon 14) : ne fait plus que le nécessaire. */
+  readonly abattu: boolean;
 }
 
 export interface BatimentEtat {
@@ -169,6 +171,42 @@ export interface Statistiques {
   readonly palabres: number;
   readonly exils: number;
   readonly rixes: number;
+  /** La mémoire collective : légendes nées, lieux nommés, proverbes ; abattus en ce moment. */
+  readonly legendes: number;
+  readonly lieuxNommes: number;
+  readonly proverbes: number;
+  readonly abattus: number;
+}
+
+/** Un récit du village, tel qu'on le raconte aujourd'hui. */
+export interface RecitEtat {
+  readonly id: string;
+  readonly tick: number;
+  readonly genre: string;
+  readonly texte: string;
+  readonly origine: string;
+  readonly fois: number;
+  readonly legende: boolean;
+}
+
+export interface LieuNommeEtat {
+  readonly x: number;
+  readonly y: number;
+  readonly nom: string;
+  readonly origine: string;
+}
+
+export interface ProverbeEtat {
+  readonly lecon: string;
+  readonly titre: string;
+  readonly texte: string;
+}
+
+/** La mémoire collective (jalon 14), pour la page « Légendes » et les noms sur la carte. */
+export interface ChroniqueEtat {
+  readonly recits: readonly RecitEtat[];
+  readonly lieuxNommes: readonly LieuNommeEtat[];
+  readonly proverbes: readonly ProverbeEtat[];
 }
 
 /** Une coutume du village : une leçon que tout adulte suit. */
@@ -646,6 +684,8 @@ export interface MessageEtat {
   readonly prieres: readonly PriereEtat[];
   /** La société du village. */
   readonly societe: SocieteEtat;
+  /** La mémoire collective : légendes, lieux nommés, proverbes. */
+  readonly chronique: ChroniqueEtat;
 }
 
 export interface RelationFiche {
@@ -666,6 +706,8 @@ export interface SouvenirFiche {
   readonly type: string;
   readonly texte: string;
   readonly importance: number;
+  /** Réécrit par la mémoire qui déforme (jalon 14). */
+  readonly altere?: boolean;
 }
 
 export interface PersonneCourte {
@@ -781,6 +823,27 @@ export interface MessageFiche {
     readonly haine: boolean;
   }[];
   readonly traumatise: boolean;
+  /** La psyché (jalon 14). */
+  readonly psyche: PsycheFiche;
+}
+
+export interface PsycheFiche {
+  readonly stress: number;
+  readonly abattu: boolean;
+  readonly ennui: number;
+  readonly sens: number;
+  readonly objectif: {
+    readonly but: string;
+    readonly joursRestants: number;
+    readonly progres: number;
+    readonly issue: "en_cours" | "accompli" | "manque";
+  } | null;
+  readonly reve: { readonly tick: number; readonly texte: string } | null;
+  readonly attachement: { readonly lieu: string | null; readonly objet: string | null };
+  readonly lieuxEvites: readonly { readonly motif: string; readonly joursRestants: number }[];
+  readonly deuils: readonly { readonly prenom: string; readonly jours: number }[];
+  /** Ce que la personnalité a bougé depuis le départ (par trait, en centièmes). */
+  readonly derive: Readonly<Record<string, number>>;
 }
 
 export interface ConseilFiche {

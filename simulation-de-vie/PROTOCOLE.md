@@ -928,6 +928,25 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
 - Le protocole expose `MessageEtat.societe` (onglet Village, carte), `notable` et `banni` sur
   chaque personnage, et la section société de la fiche.
 
+## 8 sexies. La psyché et la mémoire telles que réalisées (M20, jalon 14)
+
+- `memoire/psyche.ts` : `Personnage.psyche` (stress, abattement, lieux évités, objectif, sens,
+  ennui, dernières intentions, rêve, attachements, deuils, personnalité de base, dons,
+  gravures). Observe le journal (stress), agit à l'aube (décroissance, abattement, ennui,
+  objectifs, anniversaires, attachements mensuels, un souvenir réécrit par semaine), le soir
+  (lieu d'attachement), à la mort (deuil, évitement, personnalité). Le rêve se fait dans
+  l'action `dormir` (dix-huitième tick). La perception porte `abattu` et
+  `intentionDominante` ; le cerveau réduit tout sauf le nécessaire quand on est abattu et
+  récompense la variété quand on s'ennuie. Le planificateur évite les lieux évités.
+- `memoire/legendes.ts` : `Simulation.chronique` (récits, lieux nommés, proverbes). Les récits
+  naissent des événements marquants, se racontent à la veillée (`raconter`), s'embellissent,
+  deviennent légendes ; les lieux se nomment ; les dialogues emploient les noms de lieux et les
+  proverbes. Le journal, lui, reste la vérité.
+- Bâtiment `stele` (gravure d'un ancien). Souvenir : `texte` réécrivable, `altere`, type
+  `reve`. Sauvegarde en version 3 (migration depuis 1 et 2).
+- Protocole : `MessageFiche.psyche`, `SouvenirFiche.altere`, `PersonnageEtat.abattu`,
+  `MessageEtat.chronique`, statistiques (légendes, lieux nommés, proverbes, abattus).
+
 ## 8 ter. Mode Dieu et conseil de Claude tels que réalisés (M13)
 
 - **[DÉCISION]** L'observateur influence, il ne commande pas. Un pouvoir change le monde

@@ -55,6 +55,7 @@ import { prioriteEnCours } from "./conseil.js";
 import type { Priorite } from "./conseil.js";
 import type { Espece, EtatTroupeau } from "../monde/faune.js";
 import { coutumesActives, tombeARecueillir } from "../social/societe.js";
+import { intentionDominante } from "../memoire/psyche.js";
 import type { Lecon } from "../savoirs/catalogue.js";
 
 export interface PersonneVisible {
@@ -269,11 +270,17 @@ export interface Perception {
     readonly explorerPlusLoin: boolean;
     /** Priorité choisie sur les conseils de Claude (ambition en cours), s'il y en a une. */
     readonly priorite: Priorite | null;
+    /** Le bâtiment qu'un conseil de Claude nous a fait vouloir, s'il en est un. */
+    readonly ambitionBatiment: string | null;
     /** Foi 0..10, et si l'on n'a pas encore prié aujourd'hui. */
     readonly foi: number;
     readonly peutPrier: boolean;
     /** Jours consécutifs de faim, de froid ou de moral bas (le plus long des trois). */
     readonly joursDeGene: number;
+    /** Abattu (jalon 14) : on ne fait plus que le nécessaire. */
+    readonly abattu: boolean;
+    /** L'intention qu'on refait sans cesse, quand l'ennui est là (on cherche autre chose). */
+    readonly intentionDominante: string | null;
   };
   /** Un autel terminé à vingt tuiles. */
   readonly autelConnu: boolean;
@@ -517,10 +524,16 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
       },
       explorerPlusLoin: p.drapeaux.explorerPlusLoinJusqua > monde.horloge.tick,
       priorite: prioriteEnCours(p),
+      ambitionBatiment:
+        p.ambition?.issue === "en_cours" && p.ambition.genre === "batiment"
+          ? p.ambition.cible
+          : null,
       foi: p.foi,
       joursDeGene: Math.max(p.drapeaux.joursFaim, p.drapeaux.joursFroid, p.drapeaux.joursMoralBas),
       peutPrier:
         p.dernierePriere < 0 || monde.horloge.tick - p.dernierePriere >= monde.horloge.ticksParJour,
+      abattu: p.psyche.abattu,
+      intentionDominante: intentionDominante(p),
     },
     autelConnu: [...monde.batiments.values()].some(
       (b) =>

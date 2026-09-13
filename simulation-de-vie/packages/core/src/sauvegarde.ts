@@ -11,7 +11,7 @@ import { Rng } from "./rng.js";
 import { FluxMemoire } from "./memoire/souvenir.js";
 
 /** Version du format ; on refuse une sauvegarde d'un autre format. */
-export const VERSION_SAUVEGARDE = 2;
+export const VERSION_SAUVEGARDE = 3;
 export const FORMAT_SAUVEGARDE = "simulation-de-vie";
 /** Événements gardés dans une sauvegarde (le journal complet serait énorme). */
 export const EVENEMENTS_GARDES = 3000;

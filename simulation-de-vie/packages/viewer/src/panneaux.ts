@@ -43,6 +43,7 @@ export class Panneaux {
   private derniereVersionStats = -1;
   private derniereVersionConversations = -1;
   private derniereVersionVillage = -1;
+  private derniereVersionLegendes = -1;
   private derniereVersionBatiment = -1;
   private dernierRenduLent = 0;
   private ficheAffichee: MessageFiche | null = null;
@@ -192,6 +193,12 @@ export class Panneaux {
         if (force || version !== this.derniereVersionVillage) {
           this.village();
           this.derniereVersionVillage = version;
+        }
+        break;
+      case "legendes":
+        if (force || version !== this.derniereVersionLegendes) {
+          this.legendes();
+          this.derniereVersionLegendes = version;
         }
         break;
       case "population":
@@ -468,7 +475,7 @@ export class Panneaux {
         : "<span class='discret'>rien de particulier</span>";
     const souvenirs = (l: MessageFiche["souvenirsRecents"]): string =>
       l.length > 0
-        ? `<ol class="liste">${l.map((s) => `<li class="${s.importance >= 6 ? "majeur" : s.importance >= 3 ? "important" : ""}"><span class="quand">${e(tick(s.tick))}</span>${e(s.texte)}</li>`).join("")}</ol>`
+        ? `<ol class="liste">${l.map((s) => `<li class="${s.importance >= 6 ? "majeur" : s.importance >= 3 ? "important" : ""}${s.type === "reve" ? " reve" : ""}${s.altere === true ? " altere" : ""}"><span class="quand">${e(tick(s.tick))}</span>${s.type === "reve" ? "💤 " : ""}${e(s.texte)}${s.altere === true ? ' <span class="discret">(altéré)</span>' : ""}</li>`).join("")}</ol>`
         : "<p class='discret'>rien encore</p>";
     const perso = Object.entries(f.personnalite)
       .map(
@@ -504,6 +511,15 @@ export class Panneaux {
       <h3>Village</h3>
       <div class="jauges"><span>prestige</span><div class="jauge"><i style="width:${f.prestige}%;background:#c9a7ff"></i></div><span class="num">${f.prestige}</span></div>
       <div class="discret">${f.notable ? "⭐ notable du village · " : ""}${f.banni ? `🚫 banni${f.sexe === "F" ? "e" : ""} encore ${f.banni.joursRestants} jour${f.banni.joursRestants > 1 ? "s" : ""} (${e(f.banni.motif)}) · ` : ""}${f.traumatise ? "💔 marqué par une mort violente · " : ""}${f.maitre ? `apprend auprès de ${personne(f.maitre)} · ` : ""}${f.apprentis.length > 0 ? `maître de ${liste(f.apprentis)} · ` : ""}${f.rancunes.length > 0 ? `rancunes : ${f.rancunes.map((r) => `<span class="lien" data-id="${e(r.id)}">${e(r.prenom)}</span> ${r.haine ? "(haine)" : String(r.rancune)}`).join(", ")}` : "sans rancune"}</div>
+      <h3>Psyché</h3>
+      <div class="jauges"><span>stress</span><div class="jauge ${f.psyche.stress >= 70 ? "critique" : f.psyche.stress >= 40 ? "bas" : ""}"><i style="width:${f.psyche.stress}%"></i></div><span class="num">${f.psyche.stress}</span><span>sens</span><div class="jauge"><i style="width:${f.psyche.sens}%;background:#c9a7ff"></i></div><span class="num">${f.psyche.sens}</span><span>ennui</span><div class="jauge"><i style="width:${f.psyche.ennui}%;background:#9aa3ad"></i></div><span class="num">${f.psyche.ennui}</span></div>
+      <div class="discret">${f.psyche.abattu ? "🌧️ abattu : ne fait plus que le nécessaire · " : ""}${f.psyche.objectif ? `${f.psyche.objectif.issue === "en_cours" ? "🎯 veut" : f.psyche.objectif.issue === "accompli" ? "🎉 a réussi à" : "n'a pas pu"} ${e(f.psyche.objectif.but)}${f.psyche.objectif.issue === "en_cours" ? ` (${f.psyche.objectif.joursRestants} j)` : ""} · ` : ""}${f.psyche.attachement.lieu ? `tient à un lieu : ${e(f.psyche.attachement.lieu)} · ` : ""}${f.psyche.attachement.objet ? `tient à sa ${e(f.psyche.attachement.objet.replace(/_/g, " "))} · ` : ""}${f.psyche.lieuxEvites.length > 0 ? `évite : ${f.psyche.lieuxEvites.map((l) => `${e(l.motif)} (${l.joursRestants} j)`).join(", ")} · ` : ""}${f.psyche.deuils.length > 0 ? `porte le deuil de ${f.psyche.deuils.map((d) => e(d.prenom)).join(", ")} · ` : ""}${
+        Object.entries(f.psyche.derive)
+          .filter(([, v]) => v !== 0)
+          .map(([k, v]) => `${e(k)} ${v > 0 ? "+" : ""}${v}`)
+          .join(", ") || "caractère inchangé"
+      }</div>
+      ${f.psyche.reve ? `<div class="pensee reve">💤 ${e(f.psyche.reve.texte)}</div>` : ""}
       <h3>Famille</h3>
       <div>Parents : ${liste(f.famille.parents)} · Partenaire : ${f.famille.partenaire ? personne(f.famille.partenaire) : "—"}</div>
       <div>Enfants : ${liste(f.famille.enfants)} · Fratrie : ${liste(f.famille.fratrie)}</div>
@@ -633,7 +649,7 @@ export class Panneaux {
         ${tuile(s.vivants, "vivants")}${tuile(s.enfants, "enfants")}${tuile(s.population, "population totale")}${tuile(s.morts, "morts")}
         ${tuile(s.naissances, "naissances")}${tuile(s.unions, "unions")}${tuile(s.generations, "générations")}${tuile(s.dialogues, "dialogues")}
         ${tuile(s.batiments, "bâtiments")}${tuile(s.chantiers, "chantiers")}${tuile(s.evenements, "événements")}${tuile(s.tick, "ticks")}
-        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}${tuile(s.foiMoyenne, "foi moyenne /10")}${tuile(`${s.prieres} · ${s.exaucees}`, "prières · exaucées")}${tuile(`${s.veillees} · ${s.fetes}`, "veillées · fêtes")}${tuile(`${s.palabres} · ${s.exils}`, "palabres · exils")}${tuile(s.rixes, "rixes")}
+        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}${tuile(s.foiMoyenne, "foi moyenne /10")}${tuile(`${s.prieres} · ${s.exaucees}`, "prières · exaucées")}${tuile(`${s.veillees} · ${s.fetes}`, "veillées · fêtes")}${tuile(`${s.palabres} · ${s.exils}`, "palabres · exils")}${tuile(s.rixes, "rixes")}${tuile(`${s.legendes} · ${s.lieuxNommes}`, "légendes · lieux nommés")}${tuile(s.abattus, "abattus")}
       </div>
       <h3>Où ils vont</h3>
       ${
@@ -748,6 +764,33 @@ export class Panneaux {
         this.afficherOnglet("inspecteur");
       });
     }
+  }
+
+  /** Onglet Légendes : les récits du village, les lieux nommés, les proverbes. */
+  private legendes(): void {
+    const etat = this.magasin.etat;
+    if (etat === null) return;
+    const init = this.magasin.init;
+    const c = etat.chronique;
+    const quand = (t: number): string =>
+      init
+        ? formaterTick(t, init.ticksParJour, init.joursParSaison).replace(/,.*$/, "")
+        : String(t);
+    const legendes = c.recits.filter((r) => r.legende);
+    const recits = c.recits.filter((r) => !r.legende);
+    const bloc = (r: (typeof c.recits)[number]): string =>
+      `<li class="${r.legende ? "majeur" : "important"}"><span class="quand">${e(quand(r.tick))}</span>${r.legende ? "📖 " : ""}${e(r.texte)}<div class="discret">racont${r.fois > 1 ? "ée" : "ée"} ${r.fois} fois${r.texte !== r.origine ? ` · les faits : « ${e(r.origine)} »` : ""}</div></li>`;
+    $("legendes").innerHTML = `
+      <h2>Ce que le village se raconte</h2>
+      <p class="discret">Aux veillées, quelqu'un raconte ; les nombres grossissent, les épithètes s'ajoutent. Trois fois racontée, une histoire est une légende. Les faits du journal, eux, ne bougent pas.</p>
+      <h3>Légendes</h3>
+      ${legendes.length ? `<ol class="liste">${legendes.map(bloc).join("")}</ol>` : "<p class='discret'>aucune légende encore</p>"}
+      <h3>Récits en cours</h3>
+      ${recits.length ? `<ol class="liste">${recits.map(bloc).join("")}</ol>` : "<p class='discret'>rien de marquant à raconter pour l'instant</p>"}
+      <h3>Lieux nommés</h3>
+      ${c.lieuxNommes.length ? `<ul class="liste">${c.lieuxNommes.map((l) => `<li>🗺️ <b>${e(l.nom)}</b> <span class="discret">(${l.x}, ${l.y}) · ${e(l.origine)}</span></li>`).join("")}</ul>` : "<p class='discret'>aucun lieu n'a encore de nom : une grande pêche, une mort, un combat, un miracle en donnent</p>"}
+      <h3>Proverbes</h3>
+      ${c.proverbes.length ? `<ul class="liste">${c.proverbes.map((p) => `<li>💬 « ${e(p.texte)} » <span class="discret">— de la coutume « ${e(p.titre)} »</span></li>`).join("")}</ul>` : "<p class='discret'>aucun proverbe : chaque coutume en engendre un</p>"}`;
   }
 
   private population(): void {

@@ -5,15 +5,24 @@
  */
 import type { Position } from "../monde/grille.js";
 
-export const TYPES_SOUVENIR = ["observation", "action", "dialogue", "reflexion", "plan"] as const;
+export const TYPES_SOUVENIR = [
+  "observation",
+  "action",
+  "dialogue",
+  "reflexion",
+  "plan",
+  "reve",
+] as const;
 export type TypeSouvenir = (typeof TYPES_SOUVENIR)[number];
 
 export interface Souvenir {
   readonly id: number;
   readonly tick: number;
   readonly type: TypeSouvenir;
-  /** Phrase en langage naturel, à la première personne. */
-  readonly texte: string;
+  /** Phrase en langage naturel, à la première personne (la mémoire peut la réécrire). */
+  texte: string;
+  /** Réécrit par la mémoire qui déforme (jalon 14) : les faits du journal, eux, ne bougent pas. */
+  altere?: boolean;
   importance: number; // 1..10
   readonly sujets: readonly string[]; // ids d'entités concernées
   readonly position: Position | null;

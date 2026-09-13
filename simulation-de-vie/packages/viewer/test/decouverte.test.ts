@@ -88,6 +88,7 @@ function etat(decouvertes: number[]): MessageEtat {
       veillee: null,
       bannis: [],
     },
+    chronique: { recits: [], lieuxNommes: [], proverbes: [] },
   };
 }
 

@@ -6,6 +6,8 @@ import type { Outil, Ressource } from "../monde/ressources.js";
 import { FluxMemoire } from "../memoire/souvenir.js";
 import type { Rng } from "../rng.js";
 import { relationVierge } from "../social/relations.js";
+import { psycheInitiale } from "../memoire/psyche.js";
+import type { Psyche } from "../memoire/psyche.js";
 import type { Relation } from "../social/relations.js";
 import { besoinsInitiaux } from "./besoins.js";
 import { etatCorpsInitial } from "./corps.js";
@@ -193,6 +195,8 @@ export interface Personnage {
   prestige: number;
   /** Le maître choisi à l'adolescence, s'il y en a un. */
   maitre: string | null;
+  /** La psyché (jalon 14) : stress, abattement, objectif, ennui, rêves, attachements, deuils. */
+  readonly psyche: Psyche;
   /** Banni du village jusqu'à ce jour (plus d'accès aux bâtiments). */
   banni: {
     readonly depuisJour: number;
@@ -296,6 +300,7 @@ export function creerPersonnage(rngMonde: Rng, options: OptionsPersonnage): Pers
     prestige: 0,
     maitre: null,
     banni: null,
+    psyche: psycheInitiale(identite.personnalite),
     drapeaux: {
       prudenceNourritureJusqua: -1,
       chercheAbriJusqua: -1,

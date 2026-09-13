@@ -61,6 +61,9 @@ function veilleeForcee(
     p.corps.position = { x: feu.position.x + 1, y: feu.position.y + 1 };
     p.corps.endormi = false;
     p.besoins.sommeil = 90;
+    p.besoins.faim = 80;
+    p.besoins.chaleur = 80;
+    p.besoins.soif = 80;
     p.plan = [];
     p.actionEnCours = null;
   }
@@ -86,7 +89,7 @@ describe("la société (jalon 13)", () => {
     expect(notables(sim).map((p) => p.id)).toContain(a.id);
     const avant = a.prestige;
     sim.avancerJusquaAube();
-    expect(a.prestige).toBeLessThanOrEqual(avant + 5);
+    expect(a.prestige).toBeLessThanOrEqual(avant + 12);
     expect(a.prestige).toBeGreaterThanOrEqual(avant - 1);
   });
 
@@ -111,11 +114,12 @@ describe("la société (jalon 13)", () => {
     enfant.corps.position = { ...coupable.corps.position };
     temoin.corps.position = { ...coupable.corps.position };
     temoin.corps.endormi = false;
+    ajouter(coupable.corps.inventaire, "baies", 3);
     const reputation = coupable.reputation;
     sim.emettre("repas", coupable, { ressource: "baies" }, 2, coupable.corps.position);
     const infraction = sim.journal.parType("coutume").find((e) => e.details.genre === "infraction");
     expect(infraction?.acteur).toBe(coupable.id);
-    expect(coupable.reputation).toBe(reputation - 5);
+    expect(coupable.reputation).toBe(reputation - 3);
     expect(sim.societe.compteurs.infractions).toBe(1);
   });
 
@@ -313,6 +317,16 @@ describe("la société (jalon 13)", () => {
       p.corps.stade = "adulte";
     }
     for (const p of sim.vivants()) if (p.corps.stade !== "adulte") p.corps.stade = "adulte";
+    // Il faut déjà de la pierre dans un stock pour que le village vote un puits.
+    const chef = ad[0];
+    if (chef === undefined) throw new Error("personne");
+    const entrepot = sim.fonderChantier(
+      "entrepot",
+      { x: chef.corps.position.x + 2, y: chef.corps.position.y + 2 },
+      chef,
+    );
+    entrepot.etat = "termine";
+    if (entrepot.stock !== null) ajouter(entrepot.stock, "pierre", 10);
     sim.avancerJusquaAube();
     const decision = sim.societe.decisions.find((d) => d.sujet === "puits");
     expect(decision).toBeDefined();

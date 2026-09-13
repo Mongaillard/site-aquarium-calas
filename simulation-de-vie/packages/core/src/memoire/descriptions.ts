@@ -35,6 +35,7 @@ const NOMS_BATIMENTS: Record<string, string> = {
   puits: "un puits",
   palissade: "une palissade",
   tombe: "une tombe",
+  stele: "une stèle",
 };
 
 function ressource(details: Evenement["details"]): string {
@@ -150,6 +151,17 @@ export function decrireEvenement(
           ? `J'ai choisi ${maitre} pour maître.`
           : `Je n'ai plus besoin de maître.`;
     }
+    case "psyche":
+      if (!temoin) return null;
+      return d.genre === "abattement"
+        ? `${qui} n'a plus goût à rien, ces jours-ci.`
+        : d.genre === "sortie"
+          ? `${qui} va mieux ; on le voit sourire de nouveau.`
+          : null;
+    case "gravure":
+      return temoin ? `${qui} a gravé une pierre : ${String(d.inscription)}` : null;
+    case "legende":
+      return null; // les auditeurs se souviennent déjà, par la chronique
     case "capture":
       return temoin ? `${qui} a ramené un ${String(d.nom)} vivant.` : null;
     case "abattage":
