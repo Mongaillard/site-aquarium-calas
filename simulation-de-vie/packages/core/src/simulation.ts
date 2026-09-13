@@ -57,7 +57,7 @@ import type { Lecon } from "./savoirs/catalogue.js";
 import { apprenants, apprendre, tirerLecons } from "./savoirs/lecons.js";
 import { inventer } from "./savoirs/inventions.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
-import { genererGrille } from "./monde/generation.js";
+import { abondanceDuBerceau, genererGrille } from "./monde/generation.js";
 import { Grille, cleMorceau } from "./monde/grille.js";
 import {
   COTE_BASSIN,
@@ -903,6 +903,7 @@ export class Simulation implements Monde {
       echelleRelief: config.monde.echelleRelief,
       echelleContinents: config.monde.echelleContinents,
       berceau: config.monde.berceau,
+      abondance: abondanceDuBerceau(config.population.initiale),
     });
     return Simulation.creerAvecGrille(config, grille);
   }
@@ -978,6 +979,7 @@ export class Simulation implements Monde {
       echelleRelief: config.monde.echelleRelief,
       echelleContinents: config.monde.echelleContinents,
       berceau: config.monde.berceau,
+      abondance: abondanceDuBerceau(config.population.initiale),
     });
     grille.restaurer(etat.grille);
     const horloge = new Horloge(
@@ -1275,7 +1277,8 @@ export class Simulation implements Monde {
   /** Avance la simulation d'un tick. */
   tick1(): void {
     if (this.horloge.estAube() && this.tick > 0) this.nouveauJour();
-    this.regenererGisements();
+    // La repousse se calcule à l'heure (six ticks), pas au tick : mêmes quantités, six fois moins de parcours.
+    if (this.tick % 6 === 0) this.regenererGisements();
     this.peuplerFaune();
     if (this.tick % 6 === 0) {
       for (const t of this.troupeaux.values()) heureTroupeau(this, t);
@@ -1789,7 +1792,7 @@ export class Simulation implements Monde {
     const moment = this.horloge.moment();
     const facteurBaies =
       EFFETS_SAISON[moment.saison].regenBaies * EFFETS_METEO[this.meteo].regenBaies;
-    const parTick = 1 / this.horloge.ticksParJour;
+    const parTick = 6 / this.horloge.ticksParJour;
     for (const tuile of this.grille.tuilesAvecGisement()) {
       const gisement = tuile.gisement;
       if (gisement === null || gisement.tauxRegen <= 0 || gisement.quantite >= gisement.max)
@@ -1903,9 +1906,19 @@ export class Simulation implements Monde {
       if (b === undefined || b.etat === "termine") p.projet = null;
     }
 
-    // Observation à chaque tick (connaissance des lieux) ; perception complète seulement pour décider.
-    const vue = capacites(p, this.config.vie.joursParAnnee, this.tick).vue;
-    observer(this, p, Math.max(1, Math.round(rayonVision(this, moment) * vue)));
+    // Observation (connaissance des lieux) dès qu'on a bougé, sinon toutes les quatre heures de
+    // veille ou une fois par nuit de sommeil : rien ne change autour de qui ne bouge pas.
+    const d = p.drapeaux;
+    const { x, y } = p.corps.position;
+    const aBouge = d.observeX !== x || d.observeY !== y;
+    const delai = p.corps.endormi ? 24 : 4;
+    if (aBouge || d.observeTick === undefined || this.tick - d.observeTick >= delai) {
+      const vue = capacites(p, this.config.vie.joursParAnnee, this.tick).vue;
+      observer(this, p, Math.max(1, Math.round(rayonVision(this, moment) * vue)));
+      d.observeTick = this.tick;
+      d.observeX = x;
+      d.observeY = y;
+    }
     const legere = percevoirLeger(this, p);
     const cerveau = this.cerveaux.get(p.id);
     if (cerveau === undefined) return;

@@ -6,6 +6,25 @@ Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`,
 
 - **Habitants au départ** : le formulaire « Nouveau monde » propose 12, 24, 36 ou 48 habitants
   (`?population=` dans l'adresse) ; trois familles au moins, une par quatre habitants.
+- **Un berceau à la mesure de la colonie** : une part d'abondance pour douze habitants (quatre au
+  plus) ajoute des mares à quatorze tuiles de l'origine (une par part au-delà de la première, à
+  l'opposé du rivage) et rend les gisements du berceau plus denses (probabilité × 1,5 par part)
+  et plus riches (quantités × √abondance). À douze, rien ne change : mêmes tirages, mêmes mondes.
+  Le berceau se regénère à l'identique à la reprise d'une sauvegarde (la population de départ est
+  dans la configuration sauvée).
+- **Plus de cinquante habitants sans geler** : la page simulait jusqu'à vingt-quatre ticks par
+  intervalle de 50 ms quoi qu'il en coûte ; à soixante habitants (4,4 ms par tick) elle ne
+  rendait plus la main. Désormais un budget de 22 ms par intervalle, jamais plus, et le retard ne
+  s'accumule pas au-delà d'une seconde de jeu : la vitesse effective baisse d'elle-même et
+  s'affiche à côté de l'horloge (« ×110 effectif »). Côté moteur, à soixante habitants le tick
+  passe de 4,4 à 2,9 ms : les bâtiments accessibles d'un personnage sont mémorisés une heure
+  (la question revenait trente fois par tick et cherchait le propriétaire par parcours), le
+  propriétaire se trouve par index, on n'observe les alentours qu'en bougeant (sinon toutes les
+  quatre heures, une fois par nuit endormi ; la dernière observation est dans les drapeaux
+  sauvés, pour rester déterministe), et la repousse des gisements se calcule à l'heure.
+- Correction : un village né d'un schisme ne se recentre plus sur les abris que ses familles
+  ont laissés dans l'ancien village (pas de recentrage tant que des migrants sont en route, et
+  seulement sur les abris à moins de trente tuiles).
 - **Apprivoiser, enfin** : personne n'apprivoisait parce que la capture n'arrivait qu'après une
   chasse réussie, par un chasseur qui portait une corde par hasard, et que les cordes partaient
   au stock. Désormais, devant un troupeau docile (mouflon, aurochs, lièvre, sanglier), un adulte

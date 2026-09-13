@@ -720,6 +720,8 @@ export interface MessageEtat {
   readonly moment: MomentEtat;
   readonly meteo: string;
   readonly ticksParSeconde: number;
+  /** Ticks réellement simulés par seconde quand la page n'arrive pas à suivre (mode local). */
+  readonly vitesseEffective?: number;
   readonly pause: boolean;
   readonly personnages: readonly PersonnageEtat[];
   readonly batiments: readonly BatimentEtat[];

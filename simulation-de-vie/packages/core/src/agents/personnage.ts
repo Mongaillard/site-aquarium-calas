@@ -84,6 +84,10 @@ export interface Projet {
 
 /** Indicateurs issus des réflexions, valables jusqu'au tick indiqué. */
 export interface Drapeaux {
+  /** Dernière observation des alentours : tick et position (on n'observe qu'en bougeant, ou de temps en temps). */
+  observeTick?: number;
+  observeX?: number;
+  observeY?: number;
   prudenceNourritureJusqua: number;
   chercheAbriJusqua: number;
   explorerPlusLoinJusqua: number;

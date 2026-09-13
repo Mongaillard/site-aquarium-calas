@@ -1033,6 +1033,15 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   (au premier lingot) → `hache_cuivre` et `pioche_cuivre` (1 lingot + 2 bois ; solidité 160
   contre 40 ; rendement 3 contre 2 ; satisfont `hache_pierre` et `pioche` requis). Une idée
   d'outillage attend soixante jours avant de s'effacer, vingt pour les autres.
+- **Berceau abondant** (**[DÉCISION M23]**) : `abondanceDuBerceau(population.initiale)` = une
+  part pour douze habitants, quatre au plus ; `genererGrille` ajoute autant de mares (rayon 2,5,
+  à quatorze tuiles, à l'opposé du rivage) que de parts au-delà de la première, et dans le rayon
+  du berceau tire les gisements avec une probabilité × (1 + 0,5 × (parts − 1)) (plafond 0,9) et
+  des quantités × √parts, avec le même nombre de tirages qu'à douze (les mondes à douze ne
+  changent pas). Performance : bâtiments accessibles mémorisés une heure par personnage,
+  observation des alentours seulement en bougeant (drapeaux `observeTick/X/Y`), repousse des
+  gisements à l'heure ; la page borne la simulation à 22 ms par intervalle de 50 ms et affiche
+  la vitesse effective quand elle est sous la vitesse demandée.
   Le soir, un adulte qui ressent le besoin peut avoir l'idée (curiosité = ouverture) ; il
   fabrique un prototype qui peut rater ; la réussite fait de l'idée un savoir de la famille.
 - **Transmission** : par le dialogue (sujet `savoir`, avec l'origine), aux adolescents par

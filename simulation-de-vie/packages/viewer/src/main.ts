@@ -283,7 +283,10 @@ function sauvegardeAutomatique(maintenant: number, force = false): void {
   if (tick < 0 || tick === dernierTickSauve) return;
   const jour = etat.moment.jourAbsolu;
   const ecoule = maintenant - derniereSauvegardeAutoA;
-  const aube = jour !== dernierJourSauve && ecoule >= INTERVALLE_AUBE_MS;
+  // À grande vitesse les aubes défilent : on ne sauvegarde pas plus souvent que la moitié de la
+  // cadence adaptative (encoder un gros monde bloque la page le temps de l'encodage).
+  const aube =
+    jour !== dernierJourSauve && ecoule >= Math.max(INTERVALLE_AUBE_MS, intervalleAutoMs / 2);
   if (!force && !miseEnPause && !aube && ecoule < intervalleAutoMs) return;
   derniereSauvegardeAutoA = maintenant;
   dernierJourSauve = jour;

@@ -292,15 +292,20 @@ export function fonderPremierVillage(
   return v;
 }
 
-/** Recale le centre d'un village sur ses abris. */
+/**
+ * Recale le centre d'un village sur ses abris proches. Pas tant que des migrants
+ * sont en route : ses familles ont encore leurs abris dans l'ancien village, et le
+ * centre est le site choisi, pas la moyenne de ce qu'elles quittent.
+ */
 function recentrer(monde: MondeVillages, v: Village): void {
+  if (v.enRoute.length > 0) return;
   let sx = 0;
   let sy = 0;
   let n = 0;
   for (const b of monde.batiments.values()) {
     if (b.etat !== "termine" || !PLANS_BATIMENT[b.type].abri || !v.familles.includes(b.famille))
       continue;
-    if (Grille.distance(b.position, v.centre) > 40) continue;
+    if (Grille.distance(b.position, v.centre) > DISTANCE_SCHISME / 2) continue;
     sx += b.position.x;
     sy += b.position.y;
     n += 1;

@@ -222,7 +222,13 @@ export class Panneaux {
     connexion.textContent = this.magasin.connecte ? "connecté" : "déconnecté, nouvelle tentative…";
     connexion.className = `connexion ${this.magasin.connecte ? "ok" : "ko"}`;
     if (etat === null) return;
-    $("horloge").textContent = formaterMoment(etat.moment);
+    // La vitesse demandée est hors de portée (colonie nombreuse) : on le dit, plutôt que de geler.
+    const effective = etat.vitesseEffective;
+    const bride =
+      effective !== undefined && !etat.pause && effective < etat.ticksParSeconde * 0.8
+        ? ` · ×${String(effective)} effectif`
+        : "";
+    $("horloge").textContent = formaterMoment(etat.moment) + bride;
     $("meteo").textContent = LIBELLES_METEO[etat.meteo] ?? etat.meteo;
     $("btn-pause").textContent = etat.pause ? "▶" : "⏸";
     $("flot-pause").textContent = etat.pause ? "▶" : "⏸";

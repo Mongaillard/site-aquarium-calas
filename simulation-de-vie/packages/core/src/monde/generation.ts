@@ -20,7 +20,23 @@ export interface OptionsGeneration {
   readonly echelleContinents?: number;
   /** Rayon du berceau (terre garantie autour de l'origine), en tuiles. */
   readonly berceau?: number;
+  /**
+   * Abondance du berceau (1 = normal, jusqu'à 4) : des mares supplémentaires à
+   * quatorze tuiles de l'origine et des gisements plus denses et plus riches
+   * dans le berceau, pour une colonie qui démarre nombreuse.
+   */
+  readonly abondance?: number;
 }
+
+/** Abondance du berceau pour une population de départ : une part pour douze habitants, quatre au plus. */
+export function abondanceDuBerceau(populationInitiale: number): number {
+  return Math.min(4, Math.max(1, populationInitiale / 12));
+}
+
+/** Distance des mares supplémentaires à l'origine, en tuiles. */
+const DISTANCE_MARES = 14;
+/** Rayon d'une mare supplémentaire, en tuiles. */
+const RAYON_MARE = 2.5;
 
 /** Seuils d'altitude / d'humidité qui délimitent les biomes. */
 export const SEUILS = {
@@ -45,10 +61,16 @@ export function choisirBiome(altitude: number, humidite: number): Biome {
   return "prairie";
 }
 
-function tirerGisement(rng: Rng, biome: Biome): Gisement | null {
+function tirerGisement(rng: Rng, biome: Biome, abondance = 1): Gisement | null {
+  // Même nombre de tirages quelle que soit l'abondance : les mondes à douze ne changent pas.
+  const facteur = 1 + 0.5 * (abondance - 1);
+  const richesse = Math.sqrt(abondance);
   for (const profil of GISEMENTS_PAR_BIOME[biome]) {
-    if (rng.chance(profil.probabilite)) {
-      const max = rng.entier(profil.min, profil.max);
+    if (rng.chance(Math.min(0.9, profil.probabilite * facteur))) {
+      const max = rng.entier(
+        Math.round(profil.min * richesse),
+        Math.max(Math.round(profil.min * richesse), Math.round(profil.max * richesse)),
+      );
       return {
         type: profil.type,
         quantite: max,
@@ -71,6 +93,7 @@ export function genererGrille(rng: Rng, options: OptionsGeneration = {}): Grille
   const echelle = options.echelleRelief ?? 40;
   const echelleContinents = options.echelleContinents ?? 220;
   const berceau = options.berceau ?? 28;
+  const abondance = Math.min(4, Math.max(1, options.abondance ?? 1));
 
   const bruitContinents = new BruitSimplex2D(rng.fork("continents"));
   const bruitRelief = new BruitSimplex2D(rng.fork("relief"));
@@ -80,6 +103,12 @@ export function genererGrille(rng: Rng, options: OptionsGeneration = {}): Grille
   // dans une direction tirée de la graine (eau à boire, poisson, argile).
   const angle = rng.fork("berceau").suivant() * Math.PI * 2;
   const rivage = { x: Math.cos(angle), y: Math.sin(angle) };
+  // Une colonie nombreuse : des mares de plus, à l'opposé du rivage et de part et d'autre.
+  const nombreMares = Math.round(abondance) - 1;
+  const mares = Array.from({ length: nombreMares }, (_, k) => {
+    const a = angle + (Math.PI * 2 * (k + 1)) / (nombreMares + 1);
+    return { x: Math.cos(a) * DISTANCE_MARES, y: Math.sin(a) * DISTANCE_MARES };
+  });
   const T = TAILLE_MORCEAU;
 
   return new Grille((cx, cy) => {
@@ -95,7 +124,8 @@ export function genererGrille(rng: Rng, options: OptionsGeneration = {}): Grille
         const poids = Math.exp(-d * d);
         const cote = clamp((x * rivage.x + y * rivage.y - 5) / 8, 0, 1);
         const cible = 0.22 - 0.5 * cote;
-        const altitude = clamp(brute + (cible - brute) * poids, -1, 1);
+        let altitude = clamp(brute + (cible - brute) * poids, -1, 1);
+        if (mares.some((m) => Math.hypot(x - m.x, y - m.y) < RAYON_MARE)) altitude = -0.05;
         const humidite = clamp(bruitHumidite.fbm(x, y, 1 / (echelle * 0.7), 3, 0.55, 2), -1, 1);
         tuiles.push({
           x,
@@ -110,7 +140,12 @@ export function genererGrille(rng: Rng, options: OptionsGeneration = {}): Grille
     }
     // Gisements dans un second passage, avec un flux propre au morceau (reproductible).
     const rngGisements = rngMonde.fork(`morceau:${String(cx)}:${String(cy)}`);
-    for (const t of tuiles) t.gisement = tirerGisement(rngGisements, t.biome);
+    for (const t of tuiles)
+      t.gisement = tirerGisement(
+        rngGisements,
+        t.biome,
+        abondance > 1 && Math.hypot(t.x, t.y) <= berceau ? abondance : 1,
+      );
     return tuiles;
   });
 }

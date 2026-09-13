@@ -15,6 +15,9 @@ import {
 } from "@sdv/server/instantane";
 import type { Liaison } from "./reseau.js";
 
+/** Temps de simulation par intervalle de 50 ms : le reste est laissé à l'affichage et aux gestes. */
+const BUDGET_TICKS_MS = 22;
+
 export interface OptionsLocales {
   readonly seed: number | string;
   /** Jours simulés avant d'afficher le monde (colonie déjà installée). */
@@ -38,6 +41,10 @@ export class LiaisonLocale implements Liaison {
   private derniereDiffusion = 0;
   private aDiffuser = false;
   private minuteur: ReturnType<typeof setInterval> | null = null;
+  /** Ticks réellement simulés par seconde, mesurés (la vitesse demandée peut être hors de portée). */
+  private vitesseEffective = 0;
+  private ticksRecents = 0;
+  private mesureDepuis = 0;
   /** Inspirations de Claude appliquées (affiché comme « appels IA »). */
   private appelsIA = 0;
   private preparation: ReturnType<typeof setTimeout> | null = null;
@@ -74,6 +81,7 @@ export class LiaisonLocale implements Liaison {
       }
       this.preparation = null;
       this.dernierTemps = performance.now();
+      this.mesureDepuis = this.dernierTemps;
       this.diffuser();
       this.minuteur = setInterval(() => {
         this.pas();
@@ -157,12 +165,27 @@ export class LiaisonLocale implements Liaison {
     this.dernierTemps = maintenant;
     if (!this.pause) {
       this.accumulateur += dt * this.ticksParSeconde;
-      // Plafond par intervalle pour laisser respirer l'affichage, surtout sur mobile.
-      const n = Math.min(24, Math.floor(this.accumulateur));
+      // Un budget de temps par intervalle, jamais plus : la page ne gèle pas, et quand la
+      // colonie est nombreuse la vitesse effective baisse d'elle-même. Ce qu'on n'a pas pu
+      // simuler ne s'accumule pas au-delà d'une seconde de jeu.
+      const n = Math.floor(this.accumulateur);
       if (n > 0) {
-        this.accumulateur -= n;
-        sim.avancer(n);
+        const debut = performance.now();
+        let faits = 0;
+        while (faits < n && (faits === 0 || performance.now() - debut < BUDGET_TICKS_MS)) {
+          sim.avancer(1);
+          faits += 1;
+        }
+        this.accumulateur = Math.min(this.accumulateur - faits, this.ticksParSeconde);
+        this.ticksRecents += faits;
         this.aDiffuser = true;
+      }
+      if (maintenant - this.mesureDepuis >= 1000) {
+        this.vitesseEffective = Math.round(
+          (this.ticksRecents * 1000) / (maintenant - this.mesureDepuis),
+        );
+        this.ticksRecents = 0;
+        this.mesureDepuis = maintenant;
       }
     } else {
       this.accumulateur = 0;
@@ -184,7 +207,11 @@ export class LiaisonLocale implements Liaison {
       bilan: this.bilan,
       indexJournal: this.indexJournal,
     });
-    const etat: MessageEtat = { ...brut, stats: { ...brut.stats, appelsLLM: this.appelsIA } };
+    const etat: MessageEtat = {
+      ...brut,
+      vitesseEffective: this.vitesseEffective,
+      stats: { ...brut.stats, appelsLLM: this.appelsIA },
+    };
     this.indexJournal = sim.journal.taille;
     this.onMessage(etat);
     if (this.ficheId !== null) {

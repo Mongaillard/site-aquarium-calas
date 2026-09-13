@@ -27,6 +27,8 @@ export interface Monde {
   readonly horloge: Horloge;
   readonly rng: Rng;
   readonly personnages: readonly Personnage[];
+  /** Un personnage par identifiant, vivant ou mort (index, pas un parcours). */
+  personnage(id: string): Personnage | undefined;
   readonly batiments: ReadonlyMap<string, Batiment>;
   /** La faune : un objet par troupeau ou meute (jalon « la faune vit »). */
   readonly troupeaux: ReadonlyMap<string, Troupeau>;
@@ -112,9 +114,15 @@ export function autorise(monde: Monde, b: Batiment, p: Personnage): boolean {
     const c = p.identite.nomFamille;
     if (s.alliances.includes(a < c ? `${a}|${c}` : `${c}|${a}`)) return true;
   }
-  const proprietaire = monde.personnages.find((x) => x.id === b.proprietaire);
+  const proprietaire = monde.personnage(b.proprietaire);
   return proprietaire !== undefined && apparentes(p, proprietaire);
 }
+
+/**
+ * Bâtiments accessibles, mémorisés une heure (six ticks) par personnage : la question
+ * revient trente fois par tick, et les droits ne changent qu'aux événements rares.
+ */
+const cacheAcces = new WeakMap<Personnage, { heure: number; nombre: number; liste: Batiment[] }>();
 
 export function batimentEn(monde: Monde, pos: Position): Batiment | null {
   return monde.grille.tuileOuNull(pos.x, pos.y)?.batiment ?? null;
@@ -122,14 +130,26 @@ export function batimentEn(monde: Monde, pos: Position): Batiment | null {
 
 /** Bâtiments (terminés ou non) auxquels le personnage a accès, triés par distance. */
 export function batimentsAccessibles(monde: Monde, p: Personnage, type?: TypeBatiment): Batiment[] {
+  const heure = Math.floor(monde.horloge.tick / 6);
+  const nombre = monde.batiments.size;
+  let entree = cacheAcces.get(p);
+  if (entree?.heure !== heure || entree.nombre !== nombre) {
+    entree = {
+      heure,
+      nombre,
+      liste: [...monde.batiments.values()].filter((b) => autorise(monde, b, p)),
+    };
+    cacheAcces.set(p, entree);
+  }
+  // Le tri par distance, lui, suit le personnage à chaque appel.
   const pos = p.corps.position;
-  return [...monde.batiments.values()]
-    .filter((b) => (type === undefined || b.type === type) && autorise(monde, b, p))
-    .sort(
-      (a, b) =>
-        Grille.distance(pos, a.position) - Grille.distance(pos, b.position) ||
-        a.id.localeCompare(b.id),
-    );
+  return (
+    type === undefined ? [...entree.liste] : entree.liste.filter((b) => b.type === type)
+  ).sort(
+    (a, b) =>
+      Grille.distance(pos, a.position) - Grille.distance(pos, b.position) ||
+      a.id.localeCompare(b.id),
+  );
 }
 
 /** Nombre d'adultes endormis sur la tuile d'un bâtiment (les enfants se serrent, ils ne comptent pas). */
