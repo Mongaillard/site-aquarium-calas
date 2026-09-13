@@ -19,6 +19,7 @@ import { betesDe, enclosDe } from "./monde/village.js";
 import type { Rng } from "./rng.js";
 import type { EtatSociete } from "./social/societe.js";
 import type { EtatChronique } from "./memoire/legendes.js";
+import type { EtatVillages } from "./monde/villages.js";
 
 export interface Monde {
   readonly config: SimConfig;
@@ -54,6 +55,8 @@ export interface Monde {
   readonly societe: EtatSociete;
   /** La mémoire collective (jalon 14) : récits, légendes, noms de lieux, proverbes. */
   readonly chronique: EtatChronique;
+  /** Les villages (jalon 15) : schismes, bandes, caravanes, diplomatie. */
+  readonly villages: EtatVillages;
 }
 
 /**
@@ -319,6 +322,7 @@ export function tuileEnceinteManquante(monde: Monde, p: Personnage): Position | 
       const t = monde.grille.tuileOuNull(x, y);
       if (t === null || !INFO_BIOME[t.biome].praticable) continue; // l'eau et la montagne ferment
       if (t.batiment !== null) continue; // déjà bâti (palissade ou autre)
+      if (t.gisement !== null) continue; // un gisement ferme la tuile : on ne bâtit pas dessus
       if (!INFO_BIOME[t.biome].constructible) continue;
       const d = Grille.distance(p.corps.position, { x, y });
       if (d < distance) {

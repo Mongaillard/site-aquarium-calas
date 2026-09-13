@@ -33,6 +33,7 @@ import {
   feuAAlimenter,
   feuEteint,
   feuProche,
+  membresFamille,
   prochainBatimentNecessaire,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
@@ -272,6 +273,8 @@ export interface Perception {
     readonly priorite: Priorite | null;
     /** Le bâtiment qu'un conseil de Claude nous a fait vouloir, s'il en est un. */
     readonly ambitionBatiment: string | null;
+    /** Le site du nouveau village vers lequel on marche (schisme), tant qu'on en est à plus de six tuiles. */
+    readonly destination: Position | null;
     /** Foi 0..10, et si l'on n'a pas encore prié aujourd'hui. */
     readonly foi: number;
     readonly peutPrier: boolean;
@@ -304,6 +307,8 @@ export interface Perception {
   /** Un fumoir terminé existe dans la famille. */
   readonly fumoirConnu: boolean;
   readonly stockAccessible: boolean;
+  /** Nourriture des stocks accessibles, en unités par membre de la famille. */
+  readonly reserveJours: number;
   readonly besoinConstruction: TypeBatiment | null;
   readonly reparationNecessaire: boolean;
   readonly connaitArbres: boolean;
@@ -528,6 +533,13 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
         p.ambition?.issue === "en_cours" && p.ambition.genre === "batiment"
           ? p.ambition.cible
           : null,
+      destination:
+        p.ambition?.issue === "en_cours" &&
+        p.ambition.genre === "migrer" &&
+        p.ambition.destination !== undefined &&
+        Grille.distance(p.corps.position, p.ambition.destination) > 6
+          ? { ...p.ambition.destination }
+          : null,
       foi: p.foi,
       joursDeGene: Math.max(p.drapeaux.joursFaim, p.drapeaux.joursFroid, p.drapeaux.joursMoralBas),
       peutPrier:
@@ -566,6 +578,11 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
     feuFamilialEteint: feuEteint(monde, p) !== null,
     fumoirConnu: acces.some((b) => b.etat === "termine" && b.type === "fumoir"),
     stockAccessible: acces.some((b) => b.etat === "termine" && b.stock !== null),
+    reserveJours:
+      acces.reduce(
+        (t, b) => t + (b.etat === "termine" && b.stock !== null ? quantiteNourriture(b.stock) : 0),
+        0,
+      ) / Math.max(1, membresFamille(monde, p).length),
     besoinConstruction: prochainBatimentNecessaire(monde, p),
     reparationNecessaire: batimentAReparer(monde, p) !== null,
     connaitArbres: [...p.connaissance.values()].some(

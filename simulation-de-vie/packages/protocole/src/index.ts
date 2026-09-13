@@ -176,6 +176,11 @@ export interface Statistiques {
   readonly lieuxNommes: number;
   readonly proverbes: number;
   readonly abattus: number;
+  /** Le monde qui s'élargit : villages, raids subis, caravanes, batailles. */
+  readonly villages: number;
+  readonly raids: number;
+  readonly caravanes: number;
+  readonly batailles: number;
 }
 
 /** Un récit du village, tel qu'on le raconte aujourd'hui. */
@@ -207,6 +212,59 @@ export interface ChroniqueEtat {
   readonly recits: readonly RecitEtat[];
   readonly lieuxNommes: readonly LieuNommeEtat[];
   readonly proverbes: readonly ProverbeEtat[];
+}
+
+export interface VillageEtat {
+  readonly id: string;
+  readonly nom: string;
+  readonly x: number;
+  readonly y: number;
+  readonly familles: readonly string[];
+  readonly habitants: number;
+  readonly fondeJour: number;
+  readonly origine: "fondation" | "schisme";
+  readonly enRoute: number;
+  readonly nourriture: number;
+  readonly force: number;
+}
+
+export interface DiplomatieEtat {
+  readonly a: string;
+  readonly b: string;
+  readonly attitude: number;
+  readonly etat: "paix" | "alliance" | "guerre";
+  readonly casusBelli: string | null;
+  readonly batailles: number;
+}
+
+export interface BandeEtat {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly taille: number;
+  readonly etat: string;
+  readonly cible: string;
+}
+
+export interface CaravaneEtat {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly de: string;
+  readonly vers: string;
+  readonly etat: string;
+  readonly quantite: number;
+  readonly invention: string | null;
+}
+
+/** Les villages (jalon 15) : grappes nommées, routes, bandes, caravanes, relations. */
+export interface VillagesEtat {
+  readonly villages: readonly VillageEtat[];
+  readonly relations: readonly DiplomatieEtat[];
+  readonly bandes: readonly BandeEtat[];
+  readonly caravanes: readonly CaravaneEtat[];
+  /** Routes empruntées, par paires de positions [x1, y1, x2, y2]. */
+  readonly routes: readonly (readonly [number, number, number, number])[];
 }
 
 /** Une coutume du village : une leçon que tout adulte suit. */
@@ -686,6 +744,8 @@ export interface MessageEtat {
   readonly societe: SocieteEtat;
   /** La mémoire collective : légendes, lieux nommés, proverbes. */
   readonly chronique: ChroniqueEtat;
+  /** Les villages : schismes, bandes, caravanes, diplomatie. */
+  readonly villages: VillagesEtat;
 }
 
 export interface RelationFiche {

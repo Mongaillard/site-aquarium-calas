@@ -2,6 +2,54 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M21 – Le monde s'élargit (jalon 15, 2026-09-13)
+
+Le monde sans limite prend son sens : plusieurs villages. Module `monde/villages.ts`, état
+`Simulation.villages` (sauvegarde en version 4, migrations depuis les précédentes).
+
+- **Villages** : le premier existe dès la fondation (toutes les familles) ; chaque famille
+  appartient à un village, chaque village a un centre recalé sur ses abris, un nom, des
+  familles, des vivres et une force (adultes, armes, palissades). La veillée se tient par village.
+- **Schisme et second village** : au printemps (dix premiers jours), une faction minoritaire sous
+  tension (≥ 70) ou, en cas de surpeuplement (≥ 24), la famille la moins prestigieuse part fonder
+  un village à soixante tuiles, avec quatre portions par personne prises au stock familial ; site
+  praticable, constructible, avec de l'eau à douze tuiles. Chacun reçoit une ambition `migrer`
+  avec une destination : une intention `migrer` les fait marcher (par étapes de vingt tuiles),
+  puis l'abri se bâtit sur place. Le village est fondé quand tous sont arrivés.
+- **Bandes, raids et tribut** : une bande par an au plus, après la première année, attirée par
+  un village dont les stocks dépassent quatre-vingts portions ; elle approche à quatre tuiles par
+  heure ; devant un village fort (force ≥ deux fois sa taille) elle négocie un tribut d'un
+  dixième ; sinon elle pille un quart des vivres, ébranle un bâtiment et laisse la peur.
+- **Commerce et caravanes** : tous les vingt jours, un village avec surplus (≥ 30) envoie douze
+  portions à un village qui manque (< 15) ou à un allié, avec une invention connue ici et pas
+  là-bas ; à l'arrivée, un adulte l'apprend, l'attitude monte, la route se trace sur la carte ;
+  une bande sur la route peut la perdre.
+- **Diplomatie et guerre bornée** : une attitude par paire de villages (mariages +20, caravanes
+  +6, parenté, dérive vers zéro ; vols −25 avec casus belli, rixes −8). Alliance à 60 ; guerre
+  seulement sous −60 avec un casus belli ; au plus deux batailles à dix jours d'écart (forces
+  mesurées, blessés, rarement un mort, un cinquième des vivres, bâtiments ébranlés) ; puis la paix
+  par le prix du sang (dix portions du plus faible), attitude remise à −10.
+- Viewer : noms des villages sur la carte, routes en pointillé, bandes (silhouettes grises),
+  caravanes (chargements qui roulent) ; section « Villages » de l'onglet Village (familles,
+  habitants, vivres, force, relations, mouvements) ; tuiles de statistiques ; événements
+  `village`, `raid`, `caravane` dans le journal.
+- Calibration : bandes limitées à une par an après la première année ; l'abattement garde les
+  outils et le rangement ; un lieu évité n'est jamais le foyer.
+- **La faim de l'an quatre** (les colonies mouraient toutes vers la quatrième année, de faim,
+  avec des gisements intacts autour d'elles) : la cause n'était pas le manque de ressources mais
+  le travail. À la belle saison, personne ne remplissait le garde-manger tant qu'il restait
+  quelques baies en poche ; la dernière canne cassée n'était jamais remplacée (la fabrication
+  attendait du bois que personne ne coupait, derrière un chantier de palissade qui échouait
+  sans fin sur une tuile à gisement) ; les poches s'encombraient d'outils hérités en double et
+  de graines. Corrections : règle du garde-manger (on récolte, en toute saison, quand le stock
+  familial descend sous quatre portions par bouche, d'autant plus qu'on a des enfants) ; canne
+  à pêche prioritaire quand la réserve baisse ; l'enceinte ignore les tuiles à gisement et un
+  chantier qui échoue à se fonder attend six heures ; on n'hérite pas d'un outil qu'on a déjà ;
+  plus de graines ramassées au-delà de trente en réserve ; réparer un foyer les mains vides
+  répare au lieu d'échouer. Enfants adultes à quatorze ans (adolescents dès dix). Sur cinq
+  graines et six cents jours, plus aucune mort de faim ; la graine 42 passe de zéro survivant
+  en l'an cinq à vingt-deux.
+
 ## M20 – La psyché et la mémoire (jalon 14, 2026-09-13)
 
 Ce qui fait que deux personnages ne vivent pas le même drame de la même façon. Deux modules :

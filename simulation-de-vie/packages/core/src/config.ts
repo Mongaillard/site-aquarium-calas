@@ -77,7 +77,7 @@ export const CONFIG_PAR_DEFAUT: SimConfig = {
     joursParAnnee: 120,
     gestationJours: 30,
     probabiliteGrossesse: 0.15,
-    ageAdulte: 16,
+    ageAdulte: 14,
     ageAncien: 55,
   },
   brain: {

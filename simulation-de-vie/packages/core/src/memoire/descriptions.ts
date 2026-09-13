@@ -162,6 +162,38 @@ export function decrireEvenement(
       return temoin ? `${qui} a gravé une pierre : ${String(d.inscription)}` : null;
     case "legende":
       return null; // les auditeurs se souviennent déjà, par la chronique
+    case "village":
+      if (!temoin) return null;
+      switch (d.genre) {
+        case "schisme":
+          return `Une partie du village est partie fonder ${String(d.nom)}.`;
+        case "fonde":
+          return `${String(d.nom)} est fondé.`;
+        case "guerre":
+          return `La guerre est déclarée entre ${String(d.aNom)} et ${String(d.bNom)}.`;
+        case "bataille":
+          return `Bataille entre ${String(d.aNom)} et ${String(d.bNom)} : ${String(d.gagnantNom)} l'emporte.`;
+        case "paix":
+          return `La paix est faite entre ${String(d.aNom)} et ${String(d.bNom)}.`;
+        case "alliance":
+          return `${String(d.aNom)} et ${String(d.bNom)} sont alliés.`;
+        default:
+          return null;
+      }
+    case "raid":
+      if (!temoin) return null;
+      return d.genre === "approche"
+        ? `Une bande de ${String(d.taille)} approche du village.`
+        : d.genre === "tribut"
+          ? `Le village a payé un tribut de ${String(d.quantite)} portions à une bande.`
+          : d.genre === "pillage"
+            ? `Une bande a pillé le village : ${String(d.quantite)} portions emportées.`
+            : null;
+    case "caravane":
+      if (!temoin) return null;
+      return d.genre === "arrivee"
+        ? `Une caravane de ${String(d.deNom)} est arrivée avec ${String(d.quantite)} portions.`
+        : null;
     case "capture":
       return temoin ? `${qui} a ramené un ${String(d.nom)} vivant.` : null;
     case "abattage":

@@ -155,6 +155,14 @@ import {
 } from "./memoire/psyche.js";
 import { etatChroniqueInitial, observerChronique } from "./memoire/legendes.js";
 import type { EtatChronique } from "./memoire/legendes.js";
+import {
+  aubeVillages,
+  etatVillagesInitial,
+  fonderPremierVillage,
+  heureVillages,
+  observerVillages,
+} from "./monde/villages.js";
+import type { EtatVillages } from "./monde/villages.js";
 
 export interface Statistiques {
   readonly tick: number;
@@ -212,6 +220,26 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
   });
   // Version 3 (M20) : la psyché et la chronique.
   if (!("chronique" in brut)) brut.chronique = etatChroniqueInitial();
+  // Version 4 (M21) : les villages ; le premier se fonde sur les abris existants.
+  if (!("villages" in brut)) {
+    const villages = etatVillagesInitial();
+    const familles = [
+      ...new Set(etat.personnages.filter((p) => p.vivant).map((p) => p.identite.nomFamille)),
+    ];
+    const abris = etat.batiments.filter((b) => b.etat === "termine" && b.type === "abri");
+    const centre = abris[0]?.position ?? etat.personnages[0]?.corps.position ?? { x: 0, y: 0 };
+    villages.compteurs.villages = 1;
+    villages.villages.push({
+      id: "v-1",
+      nom: familles[0] === undefined ? "le village" : `le village des ${familles[0]}`,
+      familles,
+      centre: { ...centre },
+      fondeJour: 0,
+      origine: "fondation",
+      enRoute: [],
+    });
+    brut.villages = villages;
+  }
   for (const p of etat.personnages) {
     const q = p as unknown as Record<string, unknown>;
     defauts(q, { prestige: 0, maitre: null, banni: null });
@@ -267,6 +295,7 @@ interface EtatSimulation {
   readonly journal: ReturnType<Journal["etat"]>;
   readonly societe: EtatSociete;
   readonly chronique: EtatChronique;
+  readonly villages: EtatVillages;
 }
 
 export class Simulation implements Monde {
@@ -299,6 +328,8 @@ export class Simulation implements Monde {
   readonly societe: EtatSociete = etatSocieteInitial();
   /** La mémoire collective (jalon 14) : récits, légendes, noms de lieux, proverbes. */
   readonly chronique: EtatChronique = etatChroniqueInitial();
+  /** Les villages (jalon 15) : schismes, bandes, caravanes, diplomatie. */
+  readonly villages: EtatVillages = etatVillagesInitial();
 
   private constructor(
     readonly config: SimConfig,
@@ -343,10 +374,14 @@ export class Simulation implements Monde {
       this.journal.restaurer(etat.journal);
       Object.assign(this.societe, etat.societe);
       Object.assign(this.chronique, etat.chronique);
+      Object.assign(this.villages, etat.villages);
       for (const p of this.personnages) this.cerveaux.set(p.id, new RuleBrain(p));
     } else {
       this.personnages = genererPopulation(rng, config, grille);
       this.compteurPersonnages = this.personnages.length;
+      fonderPremierVillage(this, this.personnages[0]?.corps.position ?? { x: 0, y: 0 }, [
+        ...new Set(this.personnages.map((p) => p.identite.nomFamille)),
+      ]);
       this.danger = etatDangerInitial(horloge.ticksParJour);
       this.peuplerFaune();
       // La colonie s'installe en terrain reconnu : chacun connaît déjà les environs
@@ -358,6 +393,7 @@ export class Simulation implements Monde {
       observerEvenement(this, e);
       observerPsyche(this, e);
       observerChronique(this, e);
+      observerVillages(this, e);
       const gain = FAVEUR_EVENEMENTS[e.type];
       if (gain !== undefined && this.tick > 0) gagnerFaveur(this.faveur, gain);
       if (e.type === "priere") {
@@ -914,6 +950,7 @@ export class Simulation implements Monde {
       journal: this.journal.etat(EVENEMENTS_GARDES),
       societe: this.societe,
       chronique: this.chronique,
+      villages: this.villages,
     };
     return {
       format: FORMAT_SAUVEGARDE,
@@ -1247,6 +1284,7 @@ export class Simulation implements Monde {
       this.heureDuBetail();
       providence(this, this.faveur);
       heureSociete(this);
+      heureVillages(this, this.rng.fork(`villages/${String(this.tick)}`));
     }
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
@@ -1300,6 +1338,12 @@ export class Simulation implements Monde {
       this.regenererBassins();
       aubeSociete(this);
       for (const p of this.vivants()) aubePsyche(this, p);
+      aubeVillages(
+        this,
+        this.rng.fork(`villages/aube/${String(this.tick)}`),
+        this.societe.tension,
+        this.societe.factions,
+      );
     }
     if (this.tick > 0) {
       this.conseilsDuJour = 0;

@@ -130,6 +130,25 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       return planifierReparationOutil(monde, p, intention.objet);
     case "prier":
       return planifierPriere(monde, p);
+    case "migrer": {
+      const aller = allerPresDe(monde, p, intention.cible);
+      if (aller === null) {
+        // Trop loin pour un chemin d'un coup : on avance de vingt tuiles dans la direction.
+        const pos = p.corps.position;
+        const dx = intention.cible.x - pos.x;
+        const dy = intention.cible.y - pos.y;
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
+        if (d <= 2) return ok([{ type: "attendre", ticksRestants: 3 }]);
+        const etape = {
+          x: pos.x + Math.round((dx / d) * Math.min(20, d)),
+          y: pos.y + Math.round((dy / d) * Math.min(20, d)),
+        };
+        const pas = allerPresDe(monde, p, etape);
+        if (pas === null) return echec("aucun chemin vers le nouveau village");
+        return ok([pas]);
+      }
+      return ok([aller]);
+    }
     case "se_recueillir": {
       const aller = allerPresDe(monde, p, intention.cible);
       const recueil: Action = { type: "se_recueillir", cible: intention.cible, ticksRestants: 3 };

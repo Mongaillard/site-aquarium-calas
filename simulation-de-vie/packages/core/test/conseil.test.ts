@@ -58,6 +58,8 @@ describe("demander à Claude : déclencheurs, file et anti-spam", () => {
       sim.avancer(1);
     }
     expect(p.drapeaux.joursFaim).toBe(3);
+    // Une question qu'on lui aurait déjà posée pendant ces trois jours ne compte pas.
+    p.drapeaux.conseilDemandeA = -1;
     const motifs = motifsDeConseil(sim, p);
     expect(motifs).toContain("inconfort_chronique");
     expect(scoreMotifs(motifs)).toBeGreaterThanOrEqual(2);

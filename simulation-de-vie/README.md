@@ -91,6 +91,11 @@ rêve ; les souvenirs de rêve et les souvenirs que la mémoire a réécrits son
 « Légendes » rassemble ce que le village se raconte aux veillées (avec les faits d'origine), les
 lieux nommés (aussi écrits sur la carte) et les proverbes nés des coutumes.
 
+Le monde s'élargit (jalon 15) : un schisme fonde un second village à soixante tuiles (son nom
+sur la carte), des bandes rôdent autour des stocks pleins, des caravanes tracent des routes en
+pointillé et font voyager les inventions, et les villages s'allient ou se font une guerre bornée
+à deux batailles. Tout cela se lit dans l'onglet « Village », section « Villages ».
+
 ### Sans serveur (mobile, page publiée)
 
 ```bash

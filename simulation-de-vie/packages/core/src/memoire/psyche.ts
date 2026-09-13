@@ -113,9 +113,9 @@ export function psycheInitiale(personnalite: Personnalite): Psyche {
 
 // ------------------------------------------------------------ constantes
 
-export const SEUIL_ABATTEMENT = 70;
-export const JOURS_AVANT_ABATTEMENT = 5;
-export const SEUIL_SORTIE_ABATTEMENT = 40;
+export const SEUIL_ABATTEMENT = 75;
+export const JOURS_AVANT_ABATTEMENT = 7;
+export const SEUIL_SORTIE_ABATTEMENT = 45;
 export const SEUIL_ENNUI = 60;
 /** Une personnalité ne s'éloigne jamais de plus de cela de son point de départ. */
 export const BORNE_PERSONNALITE = 0.2;
@@ -151,6 +151,15 @@ export function lieuEvite(p: Personnage, pos: Position, tick: number): boolean {
 function eviterLeLieu(monde: Monde, p: Personnage, pos: Position, motif: string): void {
   const tick = monde.horloge.tick;
   if (p.psyche.lieuxEvites.some((l) => tick < l.jusqua && Grille.distance(pos, l) <= 2)) return;
+  // On ne peut pas éviter son propre village : le foyer, on y revient toujours (une tombe ne fait pas un foyer).
+  for (const b of monde.batiments.values())
+    if (
+      b.etat === "termine" &&
+      b.type !== "tombe" &&
+      b.type !== "stele" &&
+      Grille.distance(b.position, pos) <= 6
+    )
+      return;
   p.psyche.lieuxEvites.push({
     x: pos.x,
     y: pos.y,
@@ -309,9 +318,9 @@ export function aubePsyche(monde: Monde, p: Personnage): void {
   const moment = monde.horloge.moment();
   const ps = p.psyche;
   // Le stress retombe ; la faim qui dure le nourrit.
-  stresser(p, -3);
-  if (p.drapeaux.joursFaim > 0) stresser(p, 2);
-  if (p.drapeaux.joursFroid > 0) stresser(p, 2);
+  stresser(p, -4);
+  if (p.drapeaux.joursFaim > 0) stresser(p, 1);
+  if (p.drapeaux.joursFroid > 0) stresser(p, 1);
   // Les lieux évités s'oublient.
   ps.lieuxEvites = ps.lieuxEvites.filter((l) => tick < l.jusqua);
   // L'abattement : cinq jours de stress haut ; on en sort quand il est retombé.
@@ -342,8 +351,8 @@ export function aubePsyche(monde: Monde, p: Personnage): void {
     const compte = new Map<string, number>();
     for (const i of ps.dernieresIntentions) compte.set(i, (compte.get(i) ?? 0) + 1);
     const max = Math.max(...compte.values());
-    if (max / ps.dernieresIntentions.length >= 0.7) ps.ennui = Math.min(100, ps.ennui + 12);
-    else ps.ennui = Math.max(0, ps.ennui - 8);
+    if (max / ps.dernieresIntentions.length >= 0.7) ps.ennui = Math.min(100, ps.ennui + 8);
+    else ps.ennui = Math.max(0, ps.ennui - 10);
   }
   if (ps.ennui >= SEUIL_ENNUI) ajouterHumeur(p, "ennui", -5, 2 * T, tick);
   // Un ancien qui s'ennuie grave une pierre.

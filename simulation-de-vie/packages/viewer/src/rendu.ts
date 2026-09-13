@@ -88,6 +88,52 @@ export class Rendu {
 
     const nuit = etat?.moment.estNuit ?? false;
     if (etat !== null) {
+      // Les routes entre villages : un trait pointillé.
+      if (etat.villages.routes.length > 0) {
+        ctx.strokeStyle = "rgba(255, 233, 168, 0.5)";
+        ctx.lineWidth = 0.12;
+        ctx.setLineDash([0.6, 0.5]);
+        ctx.beginPath();
+        for (const [x1, y1, x2, y2] of etat.villages.routes) {
+          ctx.moveTo(x1 + 0.5, y1 + 0.5);
+          ctx.lineTo(x2 + 0.5, y2 + 0.5);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      // Les caravanes : un chargement qui roule.
+      for (const c of etat.villages.caravanes) {
+        if (!visible(c.x, c.y)) continue;
+        ctx.fillStyle = "#8a5a2b";
+        ctx.fillRect(c.x + 0.15, c.y + 0.35, 0.7, 0.35);
+        ctx.fillStyle = "#e0c090";
+        ctx.fillRect(c.x + 0.25, c.y + 0.2, 0.5, 0.2);
+        ctx.fillStyle = "#3a3a3a";
+        ctx.beginPath();
+        ctx.arc(c.x + 0.3, c.y + 0.78, 0.12, 0, Math.PI * 2);
+        ctx.arc(c.x + 0.7, c.y + 0.78, 0.12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Les bandes : des silhouettes grises, en groupe.
+      for (const b of etat.villages.bandes) {
+        if (!visible(b.x, b.y)) continue;
+        for (let i = 0; i < Math.min(4, b.taille); i++) {
+          sprites.personnage(ctx, b.x + (i % 2) * 0.6 - 0.3, b.y + Math.floor(i / 2) * 0.5, {
+            couleur: "#4a4a4a",
+            contour: "#222222",
+            teint: "#b8a898",
+            cheveux: "#2a2a2a",
+            sexe: "M",
+            echelle: 0.9,
+            endormi: false,
+            marche: b.etat === "approche" || b.etat === "parti",
+            phase: (maintenant / 350 + i * 0.25) % 1,
+            enceinte: false,
+            selection: false,
+            survol: false,
+          });
+        }
+      }
       // Lieux interdits : une zone hachurée qu'on évite.
       for (const l of etat.societe.lieuxInterdits) {
         if (!visible(l.x, l.y)) continue;
@@ -183,6 +229,21 @@ export class Rendu {
       for (const f of magasin.effets) this.dessinerEffet(cam, f, maintenant);
       if (magasin.modeDieu && magasin.pouvoirArme !== null && magasin.reticule !== null)
         this.dessinerHalo(cam, magasin.pouvoirArme, magasin.reticule, maintenant);
+    }
+
+    // Les villages : leur nom au-dessus de leur centre.
+    if (etat !== null && etat.villages.villages.length > 1 && cam.echelle >= 2) {
+      ctx.font = `bold ${String(Math.max(11, Math.min(16, cam.echelle * 2)))}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      for (const v of etat.villages.villages) {
+        if (!visible(v.x, v.y)) continue;
+        const e = versEcran(cam, v.x + 0.5, v.y - 1);
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.fillText(v.nom, e.x + 1, e.y + 1);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(v.nom, e.x, e.y);
+      }
     }
 
     // Les lieux nommés : leur nom en italique sur la carte.

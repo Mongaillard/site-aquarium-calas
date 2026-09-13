@@ -107,6 +107,9 @@ export const LIBELLES_TYPE: Readonly<Record<string, string>> = {
   psyche: "psyché",
   gravure: "gravure",
   legende: "légende",
+  village: "villages",
+  raid: "bande",
+  caravane: "caravane",
   divin: "miracle",
   conseil: "conseil de Claude",
   ambition: "ambition",
@@ -541,6 +544,42 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       }
     case "gravure":
       return `🪨 ${qui} grave une pierre : ${String(d.inscription)}`;
+    case "village":
+      switch (d.genre) {
+        case "schisme":
+          return `🏕️ Schisme : ${String(d.partants)} personnes (${String(d.familles).replace(/,/g, ", ")}) quittent le village pour fonder ${String(d.nom)} à soixante tuiles, poussées par ${String(d.motif)}.`;
+        case "fonde":
+          return `🏘️ ${String(d.nom)} est fondé : tous les partants sont arrivés.`;
+        case "alliance":
+          return `🤝 ${String(d.aNom)} et ${String(d.bNom)} concluent une alliance.`;
+        case "fin_alliance":
+          return `L'alliance entre ${String(d.aNom)} et ${String(d.bNom)} se défait.`;
+        case "guerre":
+          return `⚔️ ${String(d.aNom)} et ${String(d.bNom)} entrent en guerre : ${String(d.casusBelli)}.`;
+        case "bataille":
+          return `⚔️ Bataille ${String(d.numero)} entre ${String(d.aNom)} et ${String(d.bNom)} : ${String(d.gagnantNom)} l'emporte (${String(d.blesses)} blessé${Number(d.blesses) > 1 ? "s" : ""}${Number(d.morts) > 0 ? `, ${String(d.morts)} mort` : ""}, ${String(d.butin)} portions prises).`;
+        case "paix":
+          return `🕊️ Paix entre ${String(d.aNom)} et ${String(d.bNom)} après ${String(d.batailles)} bataille${Number(d.batailles) > 1 ? "s" : ""} : le prix du sang, ${String(d.donne)} portions.`;
+        default:
+          return `villages : ${String(d.genre)}`;
+      }
+    case "raid":
+      switch (d.genre) {
+        case "approche":
+          return `🏴 Une bande de ${String(d.taille)} approche de ${String(d.nom)}, attirée par les stocks.`;
+        case "tribut":
+          return `🏴 ${String(d.nom)} (force ${String(d.force)}) négocie : la bande de ${String(d.taille)} repart avec un tribut de ${String(d.quantite)} portions.`;
+        case "pillage":
+          return `🔥 Pillage de ${String(d.nom)} par une bande de ${String(d.taille)} : ${String(d.quantite)} portions emportées${d.batiment ? `, ${String(d.batiment)} ébranlé` : ""}.`;
+        default:
+          return `La bande s'éloigne.`;
+      }
+    case "caravane":
+      return d.genre === "depart"
+        ? `🐐 Une caravane part de ${String(d.deNom)} vers ${String(d.versNom)} avec ${String(d.quantite)} portions${d.invention ? ` et le secret du ${String(d.invention)}` : ""}.`
+        : d.genre === "arrivee"
+          ? `🐐 La caravane de ${String(d.deNom)} arrive à ${String(d.versNom)} : ${String(d.quantite)} portions${d.invention ? `, et ${cible("apprenant")} apprend le ${String(d.invention)}` : ""}.`
+          : `🐐 Une caravane s'est perdue en route entre ${String(d.de)} et ${String(d.vers)}.`;
     case "legende":
       return d.genre === "legende"
         ? `📖 Une légende est née (racontée ${String(d.fois)} fois) : ${String(d.texte)}`

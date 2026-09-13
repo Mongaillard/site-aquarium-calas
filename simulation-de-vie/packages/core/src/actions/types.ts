@@ -110,7 +110,9 @@ export type Intention =
   | { readonly type: "reparer"; readonly objet: TypeObjet }
   | { readonly type: "abattre"; readonly bete: string }
   | { readonly type: "prier" }
-  | { readonly type: "se_recueillir"; readonly cible: Position };
+  | { readonly type: "se_recueillir"; readonly cible: Position }
+  /** Schisme : marcher vers le site du nouveau village (ambition `migrer` avec destination). */
+  | { readonly type: "migrer"; readonly cible: Position };
 
 export type TypeIntention = Intention["type"];
 

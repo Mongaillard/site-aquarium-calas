@@ -649,7 +649,7 @@ export class Panneaux {
         ${tuile(s.vivants, "vivants")}${tuile(s.enfants, "enfants")}${tuile(s.population, "population totale")}${tuile(s.morts, "morts")}
         ${tuile(s.naissances, "naissances")}${tuile(s.unions, "unions")}${tuile(s.generations, "générations")}${tuile(s.dialogues, "dialogues")}
         ${tuile(s.batiments, "bâtiments")}${tuile(s.chantiers, "chantiers")}${tuile(s.evenements, "événements")}${tuile(s.tick, "ticks")}
-        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}${tuile(s.foiMoyenne, "foi moyenne /10")}${tuile(`${s.prieres} · ${s.exaucees}`, "prières · exaucées")}${tuile(`${s.veillees} · ${s.fetes}`, "veillées · fêtes")}${tuile(`${s.palabres} · ${s.exils}`, "palabres · exils")}${tuile(s.rixes, "rixes")}${tuile(`${s.legendes} · ${s.lieuxNommes}`, "légendes · lieux nommés")}${tuile(s.abattus, "abattus")}
+        ${tuile(s.malades, "malades")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}${tuile(s.foiMoyenne, "foi moyenne /10")}${tuile(`${s.prieres} · ${s.exaucees}`, "prières · exaucées")}${tuile(`${s.veillees} · ${s.fetes}`, "veillées · fêtes")}${tuile(`${s.palabres} · ${s.exils}`, "palabres · exils")}${tuile(s.rixes, "rixes")}${tuile(`${s.legendes} · ${s.lieuxNommes}`, "légendes · lieux nommés")}${tuile(s.abattus, "abattus")}${tuile(`${s.villages} · ${s.raids}`, "villages · raids")}${tuile(`${s.caravanes} · ${s.batailles}`, "caravanes · batailles")}
       </div>
       <h3>Où ils vont</h3>
       ${
@@ -746,8 +746,29 @@ export class Panneaux {
     const veillee = s.veillee
       ? `<div class="discret">Dernière veillée : ${s.veillee.fete ? `fête ${e(LIBELLES_FETE[s.veillee.fete] ?? s.veillee.fete)}, ` : ""}${s.veillee.participants.length} autour du feu en (${s.veillee.x}, ${s.veillee.y})${etat.tick - s.veillee.tick < 6 ? " — en ce moment" : ""}</div>`
       : "<div class='discret'>pas encore de veillée : il faut trois adultes éveillés près d'un feu à 21 h</div>";
+    const vv = etat.villages;
+    const nomVillage = (id: string): string => vv.villages.find((v) => v.id === id)?.nom ?? id;
+    const villages = vv.villages.length
+      ? `<table class="saisons"><tr><th>village</th><th>familles</th><th>habitants</th><th>vivres</th><th>force</th></tr>${vv.villages.map((v) => `<tr><td>${e(v.nom)}${v.origine === "schisme" ? ` <span class="discret">(schisme, ${e(quand(v.fondeJour))})</span>` : ""}${v.enRoute > 0 ? ` <span class="discret">· ${v.enRoute} en route</span>` : ""}</td><td>${e(v.familles.join(", "))}</td><td>${v.habitants}</td><td>${v.nourriture}</td><td>${v.force}</td></tr>`).join("")}</table>`
+      : "";
+    const relationsV = vv.relations.length
+      ? `<ul class="liste">${vv.relations.map((r) => `<li>${r.etat === "guerre" ? "⚔️" : r.etat === "alliance" ? "🤝" : "☮️"} <b>${e(nomVillage(r.a))}</b> et <b>${e(nomVillage(r.b))}</b> : ${e(r.etat)}, attitude ${r.attitude}${r.casusBelli ? ` · casus belli : ${e(r.casusBelli)}` : ""}${r.batailles > 0 ? ` · ${r.batailles} bataille${r.batailles > 1 ? "s" : ""}` : ""}</li>`).join("")}</ul>`
+      : vv.villages.length > 1
+        ? ""
+        : "<p class='discret'>un seul village pour l'instant : un schisme (tension, surpeuplement) en fondera un second à soixante tuiles</p>";
+    const mouvements = [
+      ...vv.bandes.map(
+        (b) =>
+          `<span class="puce">🏴 bande de ${b.taille} (${e(b.etat)}) vers ${e(nomVillage(b.cible))}</span>`,
+      ),
+      ...vv.caravanes.map(
+        (c) =>
+          `<span class="puce">🐐 caravane ${e(nomVillage(c.de))} → ${e(nomVillage(c.vers))}, ${c.quantite} portions${c.invention ? `, ${e(c.invention)}` : ""}</span>`,
+      ),
+    ].join("");
     $("village").innerHTML = `
       <h2>Le village au ${e(quand(jour))}</h2>
+      <h3>Villages</h3>${villages}${relationsV}${mouvements ? `<div class="puces">${mouvements}</div>` : ""}
       <div class="jauges"><span>tension</span><div class="jauge ${tensionClasse}"><i style="width:${s.tension}%"></i></div><span class="num">${s.tension}</span></div>
       <div class="discret">${tensionTexte}${s.stocksOuverts ? " · les stocks sont ouverts à tous" : ""}${s.bannis.length ? ` · banni${s.bannis.length > 1 ? "s" : ""} : ${s.bannis.map(personne).join(", ")}` : ""}</div>
       ${veillee}

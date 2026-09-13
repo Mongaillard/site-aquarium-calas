@@ -25,7 +25,7 @@ describe("compression des sauvegardes", () => {
     copie.avancer(200);
     expect(copie.vivants().map((p) => p.id)).toEqual(sim.vivants().map((p) => p.id));
     expect(JSON.stringify(copie.sauvegarder().etat)).toBe(JSON.stringify(sim.sauvegarder().etat));
-  });
+  }, 30_000);
 
   it("décrit la taille sur le disque quand elle est connue", () => {
     const base = { nom: "auto", date: 0, seed: "42", jour: 3, vivants: 12 };

@@ -32,6 +32,9 @@ import {
   adultes,
   connait,
   nomDuLieu,
+  habitants,
+  nourritureDe,
+  forceDe,
 } from "@sdv/core";
 import type {
   Evenement,
@@ -55,6 +58,7 @@ import type {
   SocieteEtat,
   ChroniqueEtat,
   PsycheFiche,
+  VillagesEtat,
   MessageFiche,
   TroupeauEtat,
   MessageInit,
@@ -114,6 +118,66 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     notable: estNotable(sim, p),
     banni: estBanni(sim, p),
     abattu: p.psyche.abattu,
+  };
+}
+
+/** Les villages, pour l'onglet Village et la carte. */
+export function villagesEtat(sim: Simulation): VillagesEtat {
+  const e = sim.villages;
+  const centre = (id: string): { x: number; y: number } | null =>
+    e.villages.find((v) => v.id === id)?.centre ?? null;
+  return {
+    villages: e.villages.map((v) => ({
+      id: v.id,
+      nom: v.nom,
+      x: v.centre.x,
+      y: v.centre.y,
+      familles: [...v.familles],
+      habitants: habitants(sim, v).length,
+      fondeJour: v.fondeJour,
+      origine: v.origine,
+      enRoute: v.enRoute.length,
+      nourriture: nourritureDe(sim, v),
+      force: Math.round(forceDe(sim, v)),
+    })),
+    relations: e.relations.map((r) => ({
+      a: r.a,
+      b: r.b,
+      attitude: Math.round(r.attitude),
+      etat: r.etat,
+      casusBelli: r.casusBelli,
+      batailles: r.batailles,
+    })),
+    bandes: e.bandes
+      .filter((b) => b.etat !== "parti")
+      .map((b) => ({
+        id: b.id,
+        x: b.position.x,
+        y: b.position.y,
+        taille: b.taille,
+        etat: b.etat,
+        cible: b.cible,
+      })),
+    caravanes: e.caravanes
+      .filter((c) => c.etat === "route")
+      .map((c) => ({
+        id: c.id,
+        x: c.position.x,
+        y: c.position.y,
+        de: c.de,
+        vers: c.vers,
+        etat: c.etat,
+        quantite: Object.values(c.cargaison).reduce((t, n) => t + n, 0),
+        invention: c.invention,
+      })),
+    routes: e.routes
+      .map((cle) => {
+        const [a = "", b = ""] = cle.split("|");
+        const ca = centre(a);
+        const cb = centre(b);
+        return ca === null || cb === null ? null : ([ca.x, ca.y, cb.x, cb.y] as const);
+      })
+      .filter((r): r is readonly [number, number, number, number] => r !== null),
   };
 }
 
@@ -454,6 +518,10 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     lieuxNommes: sim.chronique.lieuxNommes.length,
     proverbes: sim.chronique.proverbes.length,
     abattus: sim.vivants().filter((p) => p.psyche.abattu).length,
+    villages: sim.villages.villages.length,
+    raids: sim.villages.compteurs.tributs + sim.villages.compteurs.pillages,
+    caravanes: sim.villages.compteurs.caravanes,
+    batailles: sim.villages.compteurs.batailles,
   };
 }
 
@@ -631,6 +699,7 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     prieres: sim.prieresOuvertes(),
     societe: societeEtat(sim),
     chronique: chroniqueEtat(sim),
+    villages: villagesEtat(sim),
   };
 }
 
@@ -752,6 +821,8 @@ export function pensee(sim: Simulation, p: Personnage): string {
       return "Que le ciel m'entende.";
     case "se_recueillir":
       return "Je vais me recueillir sur la tombe de qui m'a appris ce que je sais.";
+    case "migrer":
+      return "Nous partons fonder notre village, là-bas. Encore quelques jours de marche.";
   }
 }
 

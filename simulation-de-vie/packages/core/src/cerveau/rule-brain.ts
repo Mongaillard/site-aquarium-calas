@@ -14,6 +14,9 @@ import type { Cerveau } from "./types.js";
 import { bonusPriorite } from "./conseil.js";
 
 /** En dessous de ces valeurs, boire / manger deviennent des candidats. */
+/** Réserve visée par le garde-manger : unités de nourriture en stock par bouche. */
+export const RESERVE_VISEE = 4;
+
 export const SEUILS_ENVIE = {
   soif: 80,
   faim: 70,
@@ -31,10 +34,18 @@ interface Candidat {
   readonly score: number;
 }
 
-/** Ce qu'un abattu fait encore : boire, manger, dormir, se réchauffer, fuir, se soigner. */
+/**
+ * Ce qu'un abattu fait encore : boire, manger, récolter, fabriquer et réparer ses outils,
+ * ranger, dormir, se réchauffer, fuir, se soigner. Le reste (bâtir, explorer, parler,
+ * courtiser, jouer, prier) pèse moins.
+ */
 const NECESSAIRE = new Set<Intention["type"]>([
   "boire",
   "manger",
+  "recolter",
+  "fabriquer",
+  "reparer",
+  "stocker",
   "dormir",
   "se_rechauffer",
   "fuir",
@@ -82,8 +93,15 @@ export class RuleBrain implements Cerveau {
       const bruit = 0.9 + 0.2 * this.personnage.rng.suivant();
       let score = this.ponderer(c.intention, c.score, perception.moi.corps.mobilite) * bruit;
       // Abattu : seul le nécessaire garde son poids ; l'ennui pousse vers autre chose.
-      if (perception.moi.abattu && !NECESSAIRE.has(c.intention.type)) score *= 0.6;
-      if (dominante !== null && c.intention.type !== dominante) score += 0.15;
+      if (perception.moi.abattu && !NECESSAIRE.has(c.intention.type)) score *= 0.7;
+      // La variété ne tente que le ventre plein et au chaud : la répétition, c'est aussi la survie.
+      if (
+        dominante !== null &&
+        c.intention.type !== dominante &&
+        perception.moi.besoins.faim >= 60 &&
+        perception.moi.besoins.chaleur >= 60
+      )
+        score += 0.08;
       if (meilleur === null || score > meilleur.score) meilleur = { intention: c.intention, score };
     }
     return meilleur?.intention ?? { type: "attendre", ticks: 3 };
@@ -269,6 +287,26 @@ export class RuleBrain implements Cerveau {
           (prevoyant ? 0.4 : 0),
       });
     }
+    // Le garde-manger : quand la réserve de la famille descend sous quelques jours
+    // de nourriture par bouche, on part en chercher, quelle que soit la saison.
+    if (
+      adulte &&
+      nourriture !== null &&
+      perception.stockAccessible &&
+      placeLibre > 3 &&
+      perception.reserveJours < RESERVE_VISEE &&
+      // Qui part fonder un autre village ne remplit plus le garde-manger de l'ancien.
+      perception.moi.destination === null
+    ) {
+      candidats.push({
+        intention: { type: "recolter", ressource: nourriture },
+        score:
+          0.45 +
+          personnalite.conscience * 0.4 +
+          (RESERVE_VISEE - perception.reserveJours) * 0.12 +
+          Math.min(3, perception.moi.enfantsACharge) * 0.1,
+      });
+    }
     if (adulte && perception.stockAccessible && perception.nourritureEnPocheQuantite >= 6) {
       candidats.push({
         intention: { type: "stocker" },
@@ -302,10 +340,11 @@ export class RuleBrain implements Cerveau {
       candidats.push({
         intention: { type: "fabriquer", recette: "canne_a_peche" },
         score:
-          0.35 +
+          0.5 +
           personnalite.conscience * 0.3 +
           urgence(besoins.faim) * 0.5 +
-          (saisonFroide ? 0.3 : 0),
+          (saisonFroide ? 0.3 : 0) +
+          (perception.stockAccessible && perception.reserveJours < RESERVE_VISEE ? 0.3 : 0),
       });
     }
 
@@ -560,7 +599,8 @@ export class RuleBrain implements Cerveau {
     // attend six heures avant d'être retentée : on ne tourne pas en rond.
     const constructionEnPanne =
       perception.moi.dernierEchec !== null &&
-      perception.moi.dernierEchec.action === "construire" &&
+      (perception.moi.dernierEchec.action.startsWith("construire") ||
+        perception.moi.dernierEchec.action.startsWith("fonder")) &&
       perception.moment.tick - perception.moi.dernierEchec.tick < 36;
     if (
       adulte &&
@@ -653,6 +693,15 @@ export class RuleBrain implements Cerveau {
           (perception.autelConnu ? 0.15 : 0) +
           (sait("le_ciel_ecoute") || sait("le_ciel_frappe") ? 0.2 : 0) -
           (sait("ne_pas_attendre_le_ciel") ? 0.3 : 0),
+      });
+    }
+
+    // Le schisme : on marche vers le site du nouveau village, de jour, tant qu'on n'y est pas.
+    const destination = perception.moi.destination;
+    if (destination !== null && !nuit) {
+      candidats.push({
+        intention: { type: "migrer", cible: destination },
+        score: 1.1 + (besoins.faim < 50 ? -0.4 : 0),
       });
     }
 

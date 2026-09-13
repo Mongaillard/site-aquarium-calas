@@ -103,6 +103,8 @@ export interface Ambition {
   readonly cible: string;
   /** Migration : le foyer qu'on quitte (le nouvel abri doit en être loin). */
   readonly origine?: Position | undefined;
+  /** Schisme : le site du nouveau village, vers lequel on marche avant de bâtir. */
+  readonly destination?: Position | undefined;
   readonly but: string;
   readonly pensee: string;
   readonly depuis: number;
@@ -229,7 +231,7 @@ export function stadeDepuisAge(
   ageAncien: number,
 ): Stade {
   const ans = ageJours / joursParAnnee;
-  if (ans < 12) return "enfant";
+  if (ans < 10) return "enfant";
   if (ans < ageAdulte) return "adolescent";
   if (ans < ageAncien) return "adulte";
   return "ancien";

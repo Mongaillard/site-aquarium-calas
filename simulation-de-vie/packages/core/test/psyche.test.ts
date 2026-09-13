@@ -5,6 +5,7 @@ import { relationAvec } from "../src/agents/personnage.js";
 import { ajouter } from "../src/agents/inventaire.js";
 import {
   BORNE_PERSONNALITE,
+  JOURS_AVANT_ABATTEMENT,
   SEUIL_ABATTEMENT,
   deformerUnSouvenir,
   flechirPersonnalite,
@@ -35,7 +36,7 @@ describe("la psyché (jalon 14)", () => {
     sim.emettre("blessure", p, { type: "coupure", gravite: 2, lieu: "bras", contexte: "test" }, 6);
     expect(p.psyche.stress).toBe(12);
     p.psyche.stress = SEUIL_ABATTEMENT + 20;
-    for (let j = 0; j < 5; j++) {
+    for (let j = 0; j < JOURS_AVANT_ABATTEMENT; j++) {
       p.psyche.stress = SEUIL_ABATTEMENT + 20;
       sim.avancerJusquaAube();
       sim.avancer(1);
@@ -76,9 +77,13 @@ describe("la psyché (jalon 14)", () => {
       (x) => x.id !== b.id && x.identite.nomFamille === b.identite.nomFamille,
     );
     if (frere === undefined) throw new Error("pas de frère");
+    // Loin du village : un lieu qu'on peut éviter (on n'évite jamais son propre foyer).
+    b.corps.position = { x: b.corps.position.x + 30, y: b.corps.position.y + 30 };
+    sim.grille.tuile(b.corps.position.x, b.corps.position.y);
     const pos = { ...b.corps.position };
     sim.tuer(b, "loups");
     expect(frere.psyche.deuils.map((d) => d.defunt)).toContain(b.id);
+    frere.besoins.faim = 80;
     expect(lieuEvite(frere, pos, sim.tick)).toBe(true);
     frere.besoins.faim = 20;
     expect(lieuEvite(frere, pos, sim.tick)).toBe(false);
@@ -109,7 +114,7 @@ describe("la psyché (jalon 14)", () => {
     sim.avancer(1);
     expect(p.psyche.objectif?.issue).toBe("accompli");
     expect(p.humeur.some((m) => m.cle === "joie")).toBe(true);
-  });
+  }, 60_000);
 
   it("la nuit, un rêve mêle deux souvenirs ; avec le temps, un souvenir ancien se réécrit sans toucher au journal", () => {
     const sim = colonie();

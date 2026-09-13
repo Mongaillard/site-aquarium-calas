@@ -141,7 +141,7 @@ Ce qui fait que deux personnages ne vivent pas le même drame de la même façon
 
 Ce qu'on verra : des souvenirs en italique « altéré », un rêve dans la fiche, des noms sur la carte, une page « Légendes ».
 
-### Jalon 15 — Le monde s'élargit
+### Jalon 15 — Le monde s'élargit — livré (M21 : schisme, bandes et tribut, caravanes, diplomatie et guerre bornée ; sans coutumes divergentes ni messagers)
 
 Le monde sans limite prend son sens.
 

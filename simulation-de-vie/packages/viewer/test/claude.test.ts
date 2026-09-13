@@ -173,6 +173,10 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
       lieuxNommes: 0,
       proverbes: 0,
       abattus: 0,
+      villages: 1,
+      raids: 0,
+      caravanes: 0,
+      batailles: 0,
     },
     decouvertes: [],
     rayonVision: 6,
@@ -204,6 +208,7 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
       bannis: [],
     },
     chronique: { recits: [], lieuxNommes: [], proverbes: [] },
+    villages: { villages: [], relations: [], bandes: [], caravanes: [], routes: [] },
   };
 }
 

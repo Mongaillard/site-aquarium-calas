@@ -530,10 +530,10 @@ interface Genome {
 
 ### 8.3 Enfance et apprentissage
 
-- Enfant (0–12 ans) : ne peut pas récolter de ressources lourdes, ni construire, ni se
+- Enfant (0–10 ans, adolescent de 10 à 14, adulte à 14 : **[DÉCISION M21]** la relève doit arriver avant que les fondateurs ne s'éteignent) : ne peut pas récolter de ressources lourdes, ni construire, ni se
   battre ; mange à partir des stocks familiaux ; suit un parent ou joue ; apprend par
   observation (5.3).
-- Adolescent (12–16) : actions d'adulte avec rendement ×0,6 ; commence à avoir son propre
+- Adolescent (10–14) : actions d'adulte avec rendement ×0,6 ; commence à avoir son propre
   cerveau LLM (avant : `RuleBrain` uniquement, pour limiter le coût **[DÉCISION]**).
 - Un enfant dont les deux parents meurent est pris en charge par un adulte ayant la
   meilleure affinité (événement « adoption »).
@@ -946,6 +946,19 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   `reve`. Sauvegarde en version 3 (migration depuis 1 et 2).
 - Protocole : `MessageFiche.psyche`, `SouvenirFiche.altere`, `PersonnageEtat.abattu`,
   `MessageEtat.chronique`, statistiques (légendes, lieux nommés, proverbes, abattus).
+
+## 8 septies. Le monde qui s'élargit tel que réalisé (M21, jalon 15)
+
+- `monde/villages.ts` : `Simulation.villages` (villages, relations, bandes, caravanes, routes,
+  compteurs). Aube : recentrage, schisme, arrivées, bandes, caravanes, diplomatie et batailles ;
+  heure : bandes et caravanes qui avancent ; journal : vols entre villages (casus belli),
+  mariages (rapprochement), rixes. La veillée se tient par village.
+- Ambition `migrer` avec `destination`, intention et perception `migrer` : la marche par étapes
+  vers le site, puis l'abri sur place (mécanique de migration de M17).
+- Protocole : `MessageEtat.villages` (villages, relations, bandes, caravanes, routes) et
+  statistiques (villages, raids, caravanes, batailles).
+- Restent hors du jalon : des coutumes propres à chaque village (elles sont communes), les
+  messagers comme personnages (les caravanes portent les nouvelles), les nomades étrangers.
 
 ## 8 ter. Mode Dieu et conseil de Claude tels que réalisés (M13)
 

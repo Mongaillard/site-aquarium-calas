@@ -402,3 +402,26 @@ export {
   FOIS_LEGENDE,
 } from "./memoire/legendes.js";
 export type { EtatChronique, Recit, LieuNomme, Proverbe } from "./memoire/legendes.js";
+export {
+  etatVillagesInitial,
+  villageDe,
+  villageDeFamille,
+  villageEn,
+  habitants,
+  nourritureDe,
+  forceDe,
+  relationEntre,
+  allies as villagesAllies,
+  DISTANCE_SCHISME,
+  SURPEUPLEMENT,
+  TENSION_SCHISME,
+  STOCK_QUI_ATTIRE,
+} from "./monde/villages.js";
+export type {
+  EtatVillages,
+  Village,
+  Diplomatie,
+  EtatDiplomatie,
+  Bande,
+  Caravane,
+} from "./monde/villages.js";

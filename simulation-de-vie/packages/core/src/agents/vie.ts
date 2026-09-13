@@ -158,6 +158,8 @@ export function heriter(monde: Monde, defunt: Personnage): Personnage | null {
   }
   for (const o of inv.objets.splice(0)) {
     if (enfant || placeLibre(heritier.corps.inventaire) <= 0) continue;
+    // On n'hérite pas d'un outil qu'on a déjà : il reste avec le défunt.
+    if (heritier.corps.inventaire.objets.some((x) => x.type === o.type)) continue;
     heritier.corps.inventaire.objets.push(o);
     if (o.type === "traineau") heritier.corps.inventaire.capacite += 6;
   }

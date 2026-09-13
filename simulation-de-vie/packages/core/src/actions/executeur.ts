@@ -29,7 +29,13 @@ import {
   REPARATIONS_MAX,
 } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
-import { atelierAdjacent, autorise, eauAdjacente, feuProche } from "../monde.js";
+import {
+  atelierAdjacent,
+  autorise,
+  eauAdjacente,
+  feuProche,
+  grainesAccessibles,
+} from "../monde.js";
 import type { Monde } from "../monde.js";
 import { seRecueillir } from "../social/societe.js";
 import { rever } from "../memoire/psyche.js";
@@ -73,6 +79,8 @@ const echec = (raison: string): Resultat => ({ statut: "echec", raison });
 
 /** Durée maximale d'une session de travail continue sur un chantier. */
 const SESSION_TRAVAIL_MAX = 36;
+/** Au-delà de ce nombre de graines à portée, on ne ramasse plus de graines en cueillant. */
+const GRAINES_MAX = 30;
 
 /** Vitesse de déplacement (tuiles de coût 1 par tick). */
 export function vitesse(p: Personnage, monde?: Monde): number {
@@ -713,7 +721,14 @@ function tickRecolter(
   gagnerExperience(p.experience, "recolte", 2);
   // Des baies donnent parfois des graines ; un champ récolté forme le paysan.
   const champ = tuile?.batiment?.type === "champ" ? tuile.batiment : null;
-  if (gisement.type === "baies" && pris > 0 && champ === null && p.rng.chance(0.1))
+  // Des graines, tant que la famille n'en a pas déjà de quoi semer plusieurs champs.
+  if (
+    gisement.type === "baies" &&
+    pris > 0 &&
+    champ === null &&
+    grainesAccessibles(monde, p) < GRAINES_MAX &&
+    p.rng.chance(0.1)
+  )
     ajouter(p.corps.inventaire, "graines", 1);
   if (champ !== null) gagnerExperience(p.experience, "agriculture", 4);
   const outilUse =
@@ -1237,10 +1252,16 @@ function tickConstruire(
   }
 
   // Bâtiment terminé : alimenter ou rallumer un feu, ou réparer.
-  if (plan.atelier === "feu" && (!b.allume || b.reserveBois < RESERVE_BOIS_MAX)) {
-    const buches = Math.min(quantite(p.corps.inventaire, "bois"), RESERVE_BOIS_MAX - b.reserveBois);
-    // Un feu éteint qui a encore des bûches se rallume sans rien apporter.
-    if (buches < 1 && (b.allume || b.reserveBois < 1)) return echec("il manque bois");
+  const buches = Math.min(quantite(p.corps.inventaire, "bois"), RESERVE_BOIS_MAX - b.reserveBois);
+  // Un feu éteint qui a encore des bûches se rallume sans rien apporter.
+  const rallumageSimple = !b.allume && b.reserveBois >= 1;
+  if (
+    plan.atelier === "feu" &&
+    (!b.allume || b.reserveBois < RESERVE_BOIS_MAX) &&
+    // Venu les mains vides réparer le foyer, on répare : le bois attendra.
+    (buches >= 1 || rallumageSimple || b.solidite >= 100)
+  ) {
+    if (buches < 1 && !rallumageSimple) return echec("il manque bois");
     retirer(p.corps.inventaire, "bois", buches);
     b.reserveBois += buches;
     const etaitEteint = !b.allume;

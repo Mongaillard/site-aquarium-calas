@@ -27,6 +27,7 @@ import type { Lecon } from "../savoirs/catalogue.js";
 import { apprendre, connait } from "../savoirs/lecons.js";
 import { ajusterRelation, borner } from "./relations.js";
 import { proverbeDeCoutume, raconter } from "../memoire/legendes.js";
+import { villageDe } from "../monde/villages.js";
 
 // ------------------------------------------------------------------ état
 
@@ -892,11 +893,35 @@ export function soireeSociete(monde: MondeSocial): void {
       p.besoins.sommeil >= 25 &&
       p.besoins.soif >= 30,
   );
+  // Une veillée par village, autour du feu le plus fréquenté de chacun.
+  const villages = monde.villages.villages;
+  if (villages.length === 0) return;
+  for (const village of villages)
+    tenirVeillee(
+      monde,
+      village.id,
+      eveilles.filter((p) => villageDe(monde, p)?.id === village.id),
+      fete,
+      tick,
+    );
+}
+
+function tenirVeillee(
+  monde: MondeSocial,
+  villageId: string,
+  eveilles: Personnage[],
+  fete: { readonly genre: string; readonly sujet: string | null } | null,
+  tick: number,
+): void {
+  const s = monde.societe;
+  const village = monde.villages.villages.find((v) => v.id === villageId);
+  if (village === undefined) return;
   // Le feu le plus fréquenté.
   let feu: Batiment | null = null;
   let autour: Personnage[] = [];
   for (const b of monde.batiments.values()) {
     if (b.etat !== "termine" || !b.allume || PLANS_BATIMENT[b.type].atelier !== "feu") continue;
+    if (Grille.distance(b.position, village.centre) > 40) continue;
     const proches = eveilles.filter(
       (p) => Grille.distance(p.corps.position, b.position) <= RAYON_VEILLEE,
     );
@@ -922,7 +947,7 @@ export function soireeSociete(monde: MondeSocial): void {
     autour = autour.filter((p) => factionDe(s, p.identite.nomFamille) === majoritaire);
     if (autour.length < ADULTES_VEILLEE) return;
   }
-  const rng = monde.rng.fork(`veillee/${String(tick)}`);
+  const rng = monde.rng.fork(`veillee/${villageId}/${String(tick)}`);
   // On se rassemble en cercle autour du feu, et on y reste une heure.
   placerEnCercle(monde, feu.position, autour);
   const gainAffinite = fete === null ? 2 : 4;
