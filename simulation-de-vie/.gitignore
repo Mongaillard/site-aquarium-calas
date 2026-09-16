@@ -7,3 +7,4 @@ journal/
 coverage/
 dist-types/
 dist-local/
+*-itch.zip

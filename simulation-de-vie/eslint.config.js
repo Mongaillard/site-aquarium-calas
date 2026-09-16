@@ -8,6 +8,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/dist-types/**",
       "**/dist-local/**",
+      "packages/viewer/public/**",
       "**/node_modules/**",
       "saves/**",
       "journal/**",

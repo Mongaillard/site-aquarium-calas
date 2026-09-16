@@ -2,6 +2,57 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M26 – Un monde plus réaliste, des buts, deux cents habitants, une application (2026-09-16)
+
+Les points 6 à 8 de l'analyse « en faire un jeu », et une refonte du rendu demandée en premier.
+
+- **Un monde plus réaliste à l'écran.** Le fond de carte se dessine par couches de blobs
+  arrondis (eau profonde, eau peu profonde, marais, plage, prairie, colline, forêt,
+  montagne) : rivages, lisières et crêtes ondulent au lieu de suivre la grille, la terre se
+  détache de l'eau par un liseré d'écume, et une marge prise aux morceaux voisins fait
+  continuer les formes d'un morceau à l'autre (le cache d'un morceau tient compte des versions
+  de ses voisins). Textures de bruit (mouchetures, fleurs, galets, vaguelettes, roseaux),
+  arbres à couronnes ombrées qui se chevauchent, pics à deux faces et calotte de neige, palette
+  plus naturelle, fond à 24 px par tuile lissé. Bâtiments redessinés (hutte de peaux sur
+  perches, maison à colombage et toit de chaume, grange de planches, ombres portées),
+  personnages cernés d'un trait avec ceinture et col, crépuscule chaud avant le bleu de la
+  nuit, halos des feux plus doux, six bulles de dialogue à la fois au plus. Aucune image
+  externe : les banques d'images libres de droits n'étaient pas joignables depuis
+  l'environnement, tout reste dessiné en vectoriel, sans licence à porter.
+- **Des buts** (point 6). Vingt succès qui se débloquent à l'aube (un toit, le premier feu,
+  dix berceaux, l'an deux, cinq et dix, vingt, cinquante et cent âmes, la troisième
+  génération, l'âge du cuivre, une légende, une coutume, le second village, une alliance, une
+  prière exaucée, la main du ciel, la créature, face aux loups, la bande repart). Cinq
+  scénarios au formulaire (« but ») avec une année limite : passez l'an dix, le cuivre avant
+  l'an cinq, faites naître une légende, trois villages en paix, cent âmes ; progrès, texte,
+  gagné ou perdu (limite ou extinction). Des prophéties que le ciel formule une fois sur deux
+  au premier jour d'une saison (une naissance chez une famille, tant d'âmes, un bâtiment, une
+  prière exaucée, une légende, personne ne mourra) ; accomplies, elles rapportent huit de
+  faveur. Onglet « Buts », événements `but` (dans le fil même sans position).
+- **Deux cents habitants** (point 7). La simulation tourne dans un **Web Worker** (`?sansworker`
+  pour l'ancien mode) : la page ne fait qu'afficher, une grande colonie ne fait plus attendre
+  ni l'image ni les gestes (à 192 habitants et ×256, la pire image passe de plusieurs secondes
+  à 130 ms, la vitesse effective s'affiche). La sauvegarde s'encode dans le travailleur et
+  voyage par copie structurée ; la sauvegarde de sortie est la dernière reçue (moins d'une
+  minute), la suivante est demandée dans la foulée. Les **peuples rivaux ont leur propre
+  berceau** (terre garantie, rivage, mares, gisements abondants) : à quatre peuples de
+  quarante-huit, 2 morts en vingt jours au lieu de 20. Moteur : les droits d'accès aux
+  bâtiments se recalculent en un passage par personne (ce qui ne dépend que d'elle calculé une
+  fois), l'observation parcourt les tuiles morceau par morceau (même ordre, mêmes cartes
+  mentales), une distance par bâtiment au tri ; 11 → 15 ms par tick à 192 habitants _vivants
+  et actifs_ (la version d'avant en perdait un quart en vingt jours). Formulaire jusqu'à 64
+  habitants par peuple. Le niveau de détail par distance a été écarté : un cerveau allégé pour
+  les personnages hors champ rendrait le monde dépendant de la caméra, contre le principe de
+  reproductibilité du protocole.
+- **Distribution** (point 8). La page autonome est une **application installable** :
+  manifeste, icône, service worker qui la garde hors ligne quand elle est servie en https hors
+  de claude.ai. `pnpm --filter @sdv/viewer dist:itch` produit `simulation-de-vie-itch.zip`,
+  prêt pour itch.io (projet HTML, `index.html` à la racine). Steam (Tauri ou Electron) reste à
+  faire : l'application est un seul dossier statique, l'emballage est direct.
+- Les noms de famille de renfort (vingt-deux de plus) servent aux peuples posés quand les
+  premiers sont tous portés, sans jamais se répéter et sans changer le tirage des mondes
+  existants. Sauvegarde en version 6 (les mondes d'avant gardent leur terrain).
+
 ## M25 – Le jeu du ciel : sculpter, lire, légiférer, incarner, raconter (2026-09-16)
 
 La simulation devient un jeu de dieu, dans l'esprit de WorldBox pour la main sur le monde et

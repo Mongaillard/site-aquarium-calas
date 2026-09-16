@@ -72,6 +72,12 @@ journal mènent sur place ; l'onglet Population dessine les **arbres des famille
 **conteur** (pastille 🎭) rythme le monde — calme, montée, crise, répit — et lit au joueur la
 **chronique** de chaque année passée.
 
+**Des buts (M26).** L'onglet « Buts » suit vingt **succès**, le **scénario** choisi au
+formulaire (« but » : passez l'an dix, le cuivre avant l'an cinq, faites naître une légende,
+trois villages en paix, cent âmes) et les **prophéties** que le ciel formule pour la saison
+(accomplies, elles rapportent de la faveur). La simulation tourne dans un **Web Worker** : la
+page reste fluide à deux cents habitants (quatre peuples de quarante-huit, chacun son berceau).
+
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la
 curiosité donnent des idées, puis des inventions (filet, piège, arc, pirogue, traîneau, fumoir,
@@ -133,11 +139,19 @@ toucher un personnage ou un bâtiment pour l'inspecter, bouton « ? » pour la l
 la graine et les sauvegardes, poignée « ▾ » pour replier ou agrandir le panneau du bas. La page
 servie par `pnpm serve` accepte aussi `?local` pour basculer dans ce mode.
 
+### Application installable, itch.io
+
+La page autonome (`build:local`) est une application web installable : manifeste, icône et
+service worker (hors ligne, quand elle est servie en https). `pnpm --filter @sdv/viewer dist:itch`
+produit `packages/viewer/simulation-de-vie-itch.zip`, à téléverser tel quel sur itch.io
+(projet HTML, `index.html` à la racine, « mobile friendly » coché, plein écran conseillé).
+Pour Steam, le même dossier s'emballe avec Tauri ou Electron.
+
 ## Structure
 
 ```
 packages/core/src
-  monde/        grille, génération, biomes, ressources, horloge, météo, recettes, bâtiments, faune, danger, village, divin (mode Dieu), terrain (pinceaux), creatures, conteur
+  monde/        grille, génération, biomes, ressources, horloge, météo, recettes, bâtiments, faune, danger, village, divin (mode Dieu), terrain (pinceaux), creatures, conteur, objectifs (buts)
   agents/       identité, génome et héritage, besoins, inventaire, compétences, population, cycle de vie
   actions/      types d'actions et d'intentions, A*, planificateur, exécuteur
   cerveau/      interface Cerveau, perception, RuleBrain (règles), conseil (demander à Claude)

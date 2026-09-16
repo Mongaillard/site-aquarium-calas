@@ -1057,6 +1057,26 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   Au répit et au calme, le directeur de danger garde ses propres règles (jours de grâce,
   budget par saison) : le conteur ajoute, il ne remplace pas.
 
+
+## 8 quinquies. Buts, échelle et distribution tels que réalisés (M26)
+
+- **Buts** (`objectifs.ts`) : succès à conditions pures sur l'état et les compteurs du journal
+  (`compter`, `generations`, `creaturesInvoquees`), scénarios (`FICHES_SCENARIO`, progrès 0..1
+  et texte, perdu à l'année limite ou à l'extinction), prophéties formulées au premier jour
+  d'une saison (une chance sur deux, jamais deux ouvertes) et jugées chaque aube ; tout dans
+  `EtatObjectifs`, sauvé et migré. Le viewer n'évalue rien : `ButsEtat` arrive tout jugé.
+- **Échelle** : la simulation tourne dans un Web Worker (`travailleur.ts`, inclus dans le
+  paquet pour la page à fichier unique) et parle le protocole du serveur par `postMessage` ;
+  la page garde la même `Liaison`. **[DÉCISION]** Pas de niveau de détail par distance : un
+  cerveau allégé hors champ rendrait le monde dépendant de la caméra ; l'échelle se gagne par
+  le travailleur et par le coût du tick (droits d'accès en un passage, parcours par morceau
+  dans l'ordre d'avant, distances calculées une fois). Les peuples rivaux ont chacun un
+  berceau (`OptionsGeneration.foyers`, sites tirés de la graine par `sitesDesPeuples`) ;
+  `monde.foyers` vaut faux dans les sauvegardes d'avant (version 6), pour leur garder leur
+  terrain.
+- **Distribution** : manifeste, icône SVG et service worker dans `public/` (enregistré seulement
+  en https hors de claude.ai) ; `dist:itch` fait le zip d'itch.io.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

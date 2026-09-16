@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "build:local": "tsc -b && VITE_MODE_LOCAL=1 vite build --base ./ --outDir dist-local"
+    "build:local": "tsc -b && VITE_MODE_LOCAL=1 vite build --base ./ --outDir dist-local",
+    "dist:itch": "pnpm run build:local && rm -f simulation-de-vie-itch.zip && cd dist-local && zip -qr ../simulation-de-vie-itch.zip ."
   },
   "dependencies": {
     "@sdv/core": "workspace:*",
