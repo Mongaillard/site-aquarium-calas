@@ -305,7 +305,9 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
   defauts(brut.villages as Record<string, unknown>, { batailles: [] });
   defauts((brut.villages as { compteurs: Record<string, unknown> }).compteurs, {
     raidsRepousses: 0,
+    conquetes: 0,
   });
+  defauts(brut.villages as Record<string, unknown>, { derniereConqueteJour: -1000 });
   // Version 5 (M25) : les peuples rivaux du départ (un seul dans les mondes d'avant), les lois.
   defauts(etat.config.population, { peuples: 1 });
   if (!("lois" in brut)) brut.lois = loisParDefaut();

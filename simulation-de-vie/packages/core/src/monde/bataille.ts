@@ -15,7 +15,15 @@ import { SANTE_FUITE, bonusArme, defenseursAutour } from "../agents/combat.js";
 import { blesser } from "../agents/corps.js";
 import type { Gravite, LieuBlessure } from "../agents/corps.js";
 import { phenotype } from "../agents/genetique.js";
-import { ajouter, possede } from "../agents/inventaire.js";
+import {
+  NOURRITURE,
+  ajouter,
+  ajouterObjet,
+  possede,
+  quantite,
+  retirer,
+} from "../agents/inventaire.js";
+import type { Ressource } from "./ressources.js";
 import { niveau } from "../agents/competences.js";
 import { clamp } from "../agents/besoins.js";
 import type { Personnage } from "../agents/personnage.js";
@@ -38,6 +46,7 @@ import {
   nourritureDe,
   prelever,
   relationEntre,
+  siteLibre,
   stocksDe,
   villageDe,
 } from "./villages.js";
@@ -125,6 +134,12 @@ export const SANTE_PILLARD = 60;
 export const SANTE_LOUP = 30;
 /** Une bataille finie reste lisible ce temps-là, puis s'efface. */
 const REMANENCE = 144;
+/** Part des vivres qu'un village pris perd (M35) ; une razzia sans prise, un cinquième. */
+export const PART_PILLAGE_PRIS = 0.5;
+export const PART_RAZZIA = 0.2;
+/** Conquête (M35) : le vaincu deux fois plus faible, une conquête par an au plus. */
+export const RAPPORT_CONQUETE = 2;
+export const JOURS_ENTRE_CONQUETES = 360;
 
 export function batailleDe(monde: Monde, id: string | null | undefined): Bataille | undefined {
   if (id === null || id === undefined) return undefined;
@@ -800,14 +815,16 @@ function conclureGuerre(monde: Monde, b: Bataille, issue: IssueBataille): void {
   e.derniereBatailleJour = jourDe(monde);
   const gagnant = issue === "attaquant" ? att : issue === "defenseur" ? def : null;
   const perdant = gagnant === att ? def : gagnant === def ? att : null;
-  let butin = 0;
+  // Le village est pris quand la troupe l'emporte chez l'autre : pillage complet, et
+  // conquête si le vaincu ne peut plus tenir tête (M35).
+  const pris = issue === "attaquant";
+  let butin = { vivres: 0, outils: 0 };
   if (gagnant !== null && perdant !== null) {
-    butin = prelever(stocksDe(monde, perdant), Math.floor(nourritureDe(monde, perdant) * 0.2));
-    const stock = stocksDe(monde, gagnant)[0]?.stock ?? null;
-    if (stock !== null) ajouter(stock, "poisson_fume", Math.min(butin, 20));
+    const camp = gagnant === att ? b.attaquant : b.defenseur;
+    butin = piller(monde, camp, gagnant, perdant, pris ? PART_PILLAGE_PRIS : PART_RAZZIA, pris);
     for (const x of monde.batiments.values())
       if (x.etat === "termine" && Grille.distance(x.position, perdant.centre) <= 8)
-        x.solidite = Math.max(5, x.solidite - 20);
+        x.solidite = Math.max(5, x.solidite - (pris ? 30 : 20));
   }
   for (const p of [...habitants(monde, att), ...habitants(monde, def)]) {
     stresser(p, 15);
@@ -829,12 +846,143 @@ function conclureGuerre(monde: Monde, b: Bataille, issue: IssueBataille): void {
       gagnantNom: gagnant?.nom ?? null,
       blesses: b.attaquant.blesses + b.defenseur.blesses,
       morts: b.attaquant.morts + b.defenseur.morts,
-      butin,
+      butin: butin.vivres,
+      outils: butin.outils,
+      pris,
       numero: r.batailles,
       duree: tick - (b.combatTick ?? b.debutTick),
     },
     10,
     b.lieu,
+  );
+  if (pris && gagnant !== null && perdant !== null && peutConquerir(monde, gagnant, perdant))
+    conquerir(monde, gagnant, perdant);
+}
+
+/**
+ * Le butin (M35) : une part des vivres du perdant, et tous ses outils en stock si le village
+ * est pris. Les vainqueurs encore debout l'emportent dans leurs poches, le reste va au premier
+ * stock du vainqueur — rien n'est plafonné, rien ne se perd.
+ */
+function piller(
+  monde: Monde,
+  camp: Camp,
+  gagnant: Village,
+  perdant: Village,
+  part: number,
+  outilsAussi: boolean,
+): { vivres: number; outils: number } {
+  const porteurs = camp.guerriers
+    .map((id) => monde.personnage(id))
+    .filter((p): p is Personnage => p?.vivant === true);
+  const stockGagnant = stocksDe(monde, gagnant)[0]?.stock ?? null;
+  let vivres = 0;
+  let outils = 0;
+  const deposer = (r: Ressource, n: number): void => {
+    let reste = n;
+    for (const p of porteurs) {
+      if (reste <= 0) break;
+      reste -= ajouter(p.corps.inventaire, r, reste);
+    }
+    if (reste > 0 && stockGagnant !== null) ajouter(stockGagnant, r, reste);
+  };
+  for (const b of stocksDe(monde, perdant)) {
+    if (b.stock === null) continue;
+    for (const r of Object.keys(NOURRITURE) as Ressource[]) {
+      const q = Math.floor(quantite(b.stock, r) * part);
+      if (q <= 0) continue;
+      const pris = retirer(b.stock, r, q);
+      vivres += pris;
+      deposer(r, pris);
+    }
+    if (outilsAussi) {
+      const objets = b.stock.objets.splice(0, b.stock.objets.length);
+      for (const o of objets) {
+        outils += 1;
+        const porteur = porteurs.find((p) => ajouterObjet(p.corps.inventaire, o));
+        if (porteur === undefined && stockGagnant !== null) stockGagnant.objets.push(o);
+      }
+    }
+  }
+  return { vivres, outils };
+}
+
+/** Une conquête se fait sur un vaincu deux fois plus faible, une fois par an au plus. */
+export function peutConquerir(monde: Monde, gagnant: Village, perdant: Village): boolean {
+  const e = monde.villages;
+  if (e.villages.length < 2) return false;
+  if (jourDe(monde) - (e.derniereConqueteJour ?? -1000) < JOURS_ENTRE_CONQUETES) return false;
+  return forceDe(monde, perdant) * RAPPORT_CONQUETE <= forceDe(monde, gagnant);
+}
+
+/**
+ * La conquête (M35) : le village vaincu n'est plus ; ses familles rejoignent le vainqueur en
+ * marchant vers un site à côté de son centre (la migration de M17), sans prestige, la peur au
+ * ventre, et la tension du village monte.
+ */
+export function conquerir(monde: Monde, gagnant: Village, perdant: Village): void {
+  const e = monde.villages;
+  const tick = monde.horloge.tick;
+  const T = monde.horloge.ticksParJour;
+  const gens = habitants(monde, perdant);
+  const site = siteLibre(monde, gagnant.centre, 6) ?? { ...gagnant.centre };
+  for (const p of gens) {
+    p.prestige = 0;
+    stresser(p, 20);
+    p.besoins.securite = clamp(p.besoins.securite - 30);
+    if (p.ambition !== null && p.ambition.issue === "en_cours") p.ambition.issue = "abandonnee";
+    p.ambition = {
+      genre: "migrer",
+      cible: gagnant.id,
+      origine: { ...perdant.centre },
+      destination: { ...site },
+      but: `rejoindre ${gagnant.nom}, vaincus`,
+      pensee: "Notre village n'est plus. Nous suivons les leurs, la tête basse.",
+      depuis: tick,
+      jusqua: tick + 60 * T,
+      issue: "en_cours",
+      lieuxAuDepart: p.connaissance.size,
+    };
+    p.projet = null;
+    p.plan = [];
+    p.actionEnCours = null;
+    p.intention = null;
+    p.memoire.ajouter(
+      tick,
+      "plan",
+      `${gagnant.nom} nous a vaincus. ${perdant.nom} n'est plus ; nous allons vivre chez eux.`,
+      9,
+      [],
+      perdant.centre,
+    );
+    gagnant.enRoute.push(p.id);
+  }
+  gagnant.familles.push(...perdant.familles.filter((f) => !gagnant.familles.includes(f)));
+  e.villages = e.villages.filter((v) => v.id !== perdant.id);
+  e.relations = e.relations.filter((r) => r.a !== perdant.id && r.b !== perdant.id);
+  for (const bande of e.bandes)
+    if (bande.cible === perdant.id && bande.etat !== "parti") bande.etat = "parti";
+  for (const c of e.caravanes)
+    if ((c.de === perdant.id || c.vers === perdant.id) && c.etat === "route") c.etat = "perdue";
+  e.derniereConqueteJour = jourDe(monde);
+  e.compteurs.conquetes = (e.compteurs.conquetes ?? 0) + 1;
+  monde.societe.tension = Math.min(100, monde.societe.tension + 15);
+  monde.emettre(
+    "village",
+    null,
+    {
+      genre: "conquete",
+      a: gagnant.id,
+      b: perdant.id,
+      aNom: gagnant.nom,
+      bNom: perdant.nom,
+      familles: perdant.familles.join(","),
+      habitants: gens.length,
+      x: site.x,
+      y: site.y,
+    },
+    10,
+    perdant.centre,
   );
 }
 

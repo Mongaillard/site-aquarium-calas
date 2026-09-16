@@ -2,6 +2,25 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M35 – Pillage complet et conquête (2026-09-16)
+
+Battre un village ne rapportait qu'une razzia (un cinquième des vivres, plafonné à vingt, et
+dix portions à la paix). Désormais une victoire sert.
+
+- **Le village pris** (la troupe l'emporte chez l'autre) perd **la moitié de ses vivres** et
+  **tous les outils de ses stocks** ; une victoire défensive reste une razzia (un cinquième).
+  Plus de plafond : les vainqueurs encore debout emportent le butin dans leurs poches (on les
+  voit rentrer chargés), le reste va au premier stock du vainqueur. Bâtiments du village pris
+  ébranlés de trente.
+- **La conquête** : si le vaincu est **deux fois plus faible** que le vainqueur (`forceDe`)
+  et qu'aucune conquête n'a eu lieu depuis un an, son village **disparaît** : ses familles
+  passent au vainqueur, ses habitants marchent vers un site à côté du centre du vainqueur (la
+  migration de M17 ; ils y bâtissent leur abri), prestige à zéro, stress et peur, tension du
+  village +15 ; relations, bandes et caravanes du vaincu s'effacent. Événement
+  `village/conquete` (🏴 dans le fil), compteur `conquetes`.
+- Garde-fous : jamais sur une trêve ni une défense victorieuse, une par an, et il faut deux
+  villages.
+
 ## M34 – Écussons et fanfare (2026-09-16)
 
 Du relief pour lire les camps d'un coup d'œil, et ne pas rater une bataille.

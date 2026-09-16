@@ -634,8 +634,10 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
           const bilan = `${String(d.blesses)} coup${Number(d.blesses) > 1 ? "s" : ""} porté${Number(d.blesses) > 1 ? "s" : ""}${Number(d.morts) > 0 ? `, ${String(d.morts)} mort${Number(d.morts) > 1 ? "s" : ""}` : ""}`;
           if (d.issue === "treve" || d.gagnantNom === null || d.gagnantNom === undefined)
             return `⚔️ Bataille ${String(d.numero)} entre ${String(d.aNom)} et ${String(d.bNom)} : chacun rentre chez soi (${bilan}).`;
-          return `⚔️ Bataille ${String(d.numero)} entre ${String(d.aNom)} et ${String(d.bNom)} : ${String(d.gagnantNom)} l'emporte (${bilan}, ${String(d.butin)} portions prises).`;
+          return `⚔️ Bataille ${String(d.numero)} entre ${String(d.aNom)} et ${String(d.bNom)} : ${String(d.gagnantNom)} l'emporte (${bilan}, ${String(d.butin)} portions${Number(d.outils) > 0 ? ` et ${String(d.outils)} outil${Number(d.outils) > 1 ? "s" : ""}` : ""} pris${d.pris === true ? ", le village est pris" : ""}).`;
         }
+        case "conquete":
+          return `🏴 ${String(d.aNom)} conquiert ${String(d.bNom)} : ${String(d.habitants)} personnes (${String(d.familles).replace(/,/g, ", ")}) rejoignent le vainqueur, la tête basse.`;
         case "paix":
           return `🕊️ Paix entre ${String(d.aNom)} et ${String(d.bNom)} après ${String(d.batailles)} bataille${Number(d.batailles) > 1 ? "s" : ""} : le prix du sang, ${String(d.donne)} portions.`;
         default:

@@ -1357,6 +1357,33 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   une seconde plus tard. Case `#fanfare-case` dans le menu, persistée sous `sdv.fanfare`.
 - Pas de test (rendu et câblage DOM) ; vérifié par captures.
 
+## 8 quindecies. Pillage complet et conquête tels que réalisés (M35)
+
+- `conclureGuerre` : `pris = issue === "attaquant"` ; `piller(monde, camp, gagnant, perdant, part,
+  outilsAussi)` retire de chaque stock du perdant `part` de chaque nourriture
+  (`PART_PILLAGE_PRIS = 0,5` pris, `PART_RAZZIA = 0,2` sinon) et, si pris, tous ses `objets` ;
+  le butin va d'abord dans les inventaires des guerriers vainqueurs vivants (`ajouter`,
+  `ajouterObjet`, dans l'ordre du camp), le reste au premier stock du vainqueur ; l'événement
+  `bataille` porte `butin`, `outils`, `pris`. **[DÉCISION]** Plus de plafond à vingt ni de
+  conversion en poisson fumé : on rapporte ce qu'on a pris.
+- `peutConquerir(monde, gagnant, perdant)` : au moins deux villages, `jour −
+  derniereConqueteJour ≥ JOURS_ENTRE_CONQUETES = 360`, `forceDe(perdant) × RAPPORT_CONQUETE (2)
+  ≤ forceDe(gagnant)`, appelé seulement quand le village est pris. `conquerir` : pour chaque
+  habitant du vaincu, prestige 0, stress 20, sécurité −30, ambition `migrer` (cible le
+  vainqueur, destination `siteLibre(centre, 6)` ou le centre), plan et projet remis à zéro, un
+  souvenir ; `gagnant.enRoute` reçoit leurs identifiants (le recentrage attend leur arrivée,
+  `arriveeDesMigrants` émet `fonde` quand tous sont là) ; familles ajoutées au vainqueur,
+  village retiré de `villages`, relations qui le nomment retirées, bandes qui le visent
+  parties, caravanes qui le touchent perdues ; `derniereConqueteJour`, `compteurs.conquetes`,
+  `societe.tension + 15` ; événement `village/conquete` (`familles`, `habitants`, site).
+  Sauvegarde : valeurs par défaut sur les mondes d'avant. Les anciens bâtiments restent aux
+  familles (loin du nouveau centre, hors des stocks du village) et s'usent.
+- Viewer : textes `bataille` (outils, « le village est pris ») et `conquete`.
+- Tests (`bataille.test.ts`) : village pris → moitié des vivres et les outils dans les poches
+  des vainqueurs ou leur stock, conquête (village disparu, familles passées, migrants en
+  route, ambitions, événement, compteur) ; `peutConquerir` refuse une seconde conquête dans
+  l'année et un vaincu trop fort.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

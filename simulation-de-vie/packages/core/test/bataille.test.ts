@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { Simulation, lancerBatailleMeute, lancerRaid, relationEntre } from "../src/index.js";
+import {
+  Simulation,
+  lancerBatailleMeute,
+  lancerRaid,
+  peutConquerir,
+  relationEntre,
+} from "../src/index.js";
 import type { Troupeau } from "../src/index.js";
 import type { Personnage } from "../src/index.js";
-import { ajouterObjet } from "../src/agents/inventaire.js";
+import { ajouter, ajouterObjet, quantite } from "../src/agents/inventaire.js";
 import { SEUILS } from "../src/monde/generation.js";
 
 /**
@@ -86,10 +92,14 @@ describe("M32 : la bataille tick par tick", () => {
     const fin = sim.journal.parType("village").find((e) => e.details.genre === "bataille");
     expect(fin).toBeDefined();
     expect(fin?.details.issue).toBe(b.issue);
-    expect(relationEntre(sim.villages, "v-2", sim.villages.villages[0]?.id ?? "").batailles).toBe(
-      1,
-    );
     expect(sim.villages.compteurs.batailles).toBe(1);
+    // Le vaincu tient encore debout : la relation compte la bataille ; sinon il a été conquis (M35).
+    if (sim.villages.villages.some((v) => v.id === "v-2"))
+      expect(relationEntre(sim.villages, "v-2", sim.villages.villages[0]?.id ?? "").batailles).toBe(
+        1,
+      );
+    else
+      expect(sim.journal.parType("village").some((e) => e.details.genre === "conquete")).toBe(true);
     // Les défenseurs ont pris les armes en voyant venir la troupe.
     expect(b.defenseur.forceInitiale).toBeGreaterThan(0);
     expect(b.defenseur.forceInitiale).toBeLessThanOrEqual(defenseurs.length);
@@ -196,4 +206,66 @@ describe("M32 : la bataille tick par tick", () => {
     expect(loups.taille).toBe(b.attaquant.membres.length);
     for (const p of sim.personnages) expect(p.drapeaux.bataille ?? null).toBeNull();
   }, 60_000);
+
+  it("un village pris est pillé de moitié et de ses outils, puis conquis s'il est deux fois plus faible (M35)", () => {
+    const { sim, a, b, defenseurs } = deuxVillagesEnGuerre(11);
+    const perdant = sim.villages.villages.find((v) => v.id === b);
+    const gagnant = sim.villages.villages.find((v) => v.id === a);
+    if (perdant === undefined || gagnant === undefined) throw new Error("villages");
+    // Les vaincus n'ont pas d'armes et sont trop mal en point pour se battre ; leur stock est plein.
+    const chef = defenseurs[0];
+    if (chef === undefined) throw new Error("personne");
+    for (const p of defenseurs) {
+      p.corps.inventaire.objets = [];
+      p.corps.sante = 30;
+    }
+    const entrepot = sim.fonderChantier(
+      "entrepot",
+      { x: perdant.centre.x + 1, y: perdant.centre.y + 1 },
+      chef,
+    );
+    entrepot.etat = "termine";
+    entrepot.travailRestant = 0;
+    if (entrepot.stock === null) throw new Error("stock");
+    ajouter(entrepot.stock, "poisson_fume", 40);
+    entrepot.stock.objets.push({ type: "hache_pierre", solidite: 20 });
+    expect(peutConquerir(sim, gagnant, perdant)).toBe(true);
+    sim.avancer(1);
+    const bataille = sim.villages.batailles[0];
+    for (let t = 0; t < 600 && bataille?.phase !== "finie"; t++) sim.avancer(1);
+    expect(bataille?.issue).toBe("attaquant");
+    const fin = sim.journal.parType("village").find((e) => e.details.genre === "bataille");
+    expect(fin?.details.pris).toBe(true);
+    // La famille a mangé et pris dans son stock entre-temps : on vérifie la moitié de ce qui restait.
+    const butin = Number(fin?.details.butin);
+    expect(butin).toBeGreaterThan(0);
+    expect(quantite(entrepot.stock, "poisson_fume")).toBeLessThanOrEqual(40 - butin);
+    expect(entrepot.stock.objets).toHaveLength(0);
+    // Le butin est dans les poches des vainqueurs (ou leur stock), pas perdu.
+    const porteurs = (bataille?.attaquant.guerriers ?? [])
+      .map((id) => sim.personnage(id))
+      .filter((p) => p !== undefined);
+    const rapporte = porteurs.reduce((n, p) => n + quantite(p.corps.inventaire, "poisson_fume"), 0);
+    expect(rapporte).toBeGreaterThan(0);
+    if (Number(fin?.details.outils) > 0)
+      expect(
+        porteurs.some((p) => p.corps.inventaire.objets.some((o) => o.type === "hache_pierre")),
+      ).toBe(true);
+    // La conquête : le village vaincu n'est plus, ses familles et ses gens passent au vainqueur.
+    const conquete = sim.journal.parType("village").find((e) => e.details.genre === "conquete");
+    expect(conquete).toBeDefined();
+    expect(sim.villages.villages.map((v) => v.id)).toEqual([a]);
+    expect(gagnant.familles).toContain(chef.identite.nomFamille);
+    for (const p of defenseurs.filter((x) => x.vivant)) {
+      expect(gagnant.enRoute).toContain(p.id);
+      expect(p.ambition?.genre).toBe("migrer");
+      expect(p.ambition?.cible).toBe(a);
+      expect(p.prestige).toBe(0);
+    }
+    expect(sim.villages.compteurs.conquetes).toBe(1);
+    expect(sim.villages.relations.some((r) => r.a === b || r.b === b)).toBe(false);
+    // Une seule conquête par an : un second village trop faible ne serait pas conquis tout de suite.
+    const autre = { ...perdant, id: "v-3", familles: [] as string[] };
+    expect(peutConquerir(sim, gagnant, autre)).toBe(false);
+  }, 120_000);
 });

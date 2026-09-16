@@ -96,6 +96,8 @@ export interface EtatVillages {
   derniereBandeSaison: string;
   derniereCaravaneJour: number;
   derniereBatailleJour: number;
+  /** Jour de la dernière conquête (M35) ; absent des sauvegardes d'avant. */
+  derniereConqueteJour?: number;
   compteurs: {
     villages: number;
     bandes: number;
@@ -107,6 +109,8 @@ export interface EtatVillages {
     paix: number;
     /** Raids repoussés par les armes (M32c) ; absent des sauvegardes d'avant. */
     raidsRepousses?: number;
+    /** Villages conquis (M35) ; absent des sauvegardes d'avant. */
+    conquetes?: number;
   };
 }
 
@@ -121,6 +125,7 @@ export function etatVillagesInitial(): EtatVillages {
     derniereBandeSaison: "",
     derniereCaravaneJour: -100,
     derniereBatailleJour: -100,
+    derniereConqueteJour: -1000,
     compteurs: {
       villages: 0,
       bandes: 0,
@@ -131,6 +136,7 @@ export function etatVillagesInitial(): EtatVillages {
       guerres: 0,
       paix: 0,
       raidsRepousses: 0,
+      conquetes: 0,
     },
   };
 }
@@ -261,7 +267,7 @@ function ajusterAttitude(monde: MondeVillages, a: string, b: string, delta: numb
   return r;
 }
 
-function siteLibre(monde: Monde, centre: Position, rayon: number): Position | null {
+export function siteLibre(monde: Monde, centre: Position, rayon: number): Position | null {
   for (let r = 0; r <= rayon; r++)
     for (let dy = -r; dy <= r; dy++)
       for (let dx = -r; dx <= r; dx++) {

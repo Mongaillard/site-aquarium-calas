@@ -109,7 +109,10 @@ son pire voisin, **🕊️ Apaiser** arrête la bataille en cours ou fait la pai
 les combattants sur le champ, un **Gardien** repousse pillards et loups, et la loi « Les
 guerres » suspend tout cela. Chaque village porte un **écusson** (couleur et emblème : devant
 son nom, en bannière à son centre, en fanion sur ses maisons), et quand une bataille commence la
-caméra y file avec une seconde de pause (M34, case « caméra sur les batailles » du menu).
+caméra y file avec une seconde de pause (M34, case « caméra sur les batailles » du menu). Une
+victoire compte (M35) : le village pris perd la moitié de ses vivres et ses outils, que les
+vainqueurs rapportent ; s'il est deux fois plus faible, il est **conquis** — ses familles
+rejoignent le vainqueur et son village disparaît (une conquête par an au plus).
 
 **Bâtiments et personnages en sprites (M31).** Deux planches CC0 de Kenney de plus : tente,
 maisons, grange, four, fumoir, puits et sanctuaire viennent de _Medieval RTS_ ; chaque personnage
