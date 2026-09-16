@@ -561,6 +561,9 @@ table.saisons td:first-child {
   background: var(--accent);
   color: #10141a;
 }
+.btn-dieu.suspendue {
+  color: #ff9c5f;
+}
 .btn-claude .badge {
   display: inline-block;
   min-width: 16px;
@@ -691,6 +694,46 @@ table.saisons td:first-child {
 .calques button[aria-pressed="true"] {
   background: var(--accent);
   color: #fff;
+}
+/* Les lois du monde (M25) : un panneau flottant sous la barre. */
+.lois {
+  position: absolute;
+  left: 8px;
+  top: 44px;
+  z-index: 3;
+  width: min(360px, calc(100% - 16px));
+  padding: 10px 12px;
+  background: rgba(20, 23, 28, 0.96);
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.lois h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.lois p {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.lois label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid var(--bord);
+  font-size: 13px;
+  cursor: pointer;
+}
+.lois label input {
+  margin-top: 3px;
+}
+.lois label .discret {
+  display: block;
+  font-size: 12px;
+}
+.lois label.suspendue {
+  color: #ff9c5f;
 }
 /* Le fil des grands événements, sous les calques : « aller voir » d'un clic. */
 .fil {

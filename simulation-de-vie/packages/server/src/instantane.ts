@@ -735,6 +735,7 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     societe: societeEtat(sim),
     chronique: chroniqueEtat(sim),
     villages: villagesEtat(sim),
+    lois: { ...sim.lois },
   };
 }
 

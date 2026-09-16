@@ -120,7 +120,11 @@ export function tickVieQuotidien(monde: Monde, p: Personnage): void {
   }
 
   const ageAnnees = p.corps.ageJours / joursParAnnee;
-  if (p.rng.chance(probabiliteMortNaturelle(ageAnnees, p.identite.genome, ageAncien))) {
+  // Le tirage a lieu même loi suspendue : les flux aléatoires restent alignés.
+  if (
+    p.rng.chance(probabiliteMortNaturelle(ageAnnees, p.identite.genome, ageAncien)) &&
+    monde.lois.vieillesse
+  ) {
     monde.tuer(p, "vieillesse");
     return;
   }

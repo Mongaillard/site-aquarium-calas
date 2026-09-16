@@ -279,6 +279,15 @@ function res(d: EvenementEtat["details"]): string {
 }
 
 /** Résumé d'une ligne pour le journal. `nom(id)` rend « Prénom Nom ». */
+const LIBELLES_LOI: Readonly<Record<string, string>> = {
+  faim: "la faim tue",
+  maladies: "les maladies",
+  betes: "les bêtes attaquent",
+  raids: "les raids",
+  schismes: "les schismes",
+  vieillesse: "la mort de vieillesse",
+};
+
 const LIBELLES_PINCEAU: Readonly<Record<string, string>> = {
   terre: "terre",
   eau: "eau",
@@ -494,6 +503,8 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
     case "divin":
       if (d.pouvoir === "sculpture")
         return `🪄 Le ciel sculpte le monde : ${String(d.tuiles)} tuile${Number(d.tuiles) > 1 ? "s" : ""} de ${LIBELLES_PINCEAU[String(d.pinceau)] ?? String(d.pinceau)} autour de (${String(d.x)}, ${String(d.y)}).`;
+      if (d.pouvoir === "loi")
+        return `⚖️ Le ciel ${d.actif === true ? "rétablit" : "suspend"} une loi du monde : ${LIBELLES_LOI[String(d.loi)] ?? String(d.loi)}.`;
       if (d.pouvoir === "peuple")
         return `🪄 Un peuple de ${String(d.taille)} arrive par la volonté du ciel et fonde ${String(d.village)}${Number(d.cout) > 0 ? ` (${String(d.cout)} ✦)` : ""}.`;
       return `${d.auto === true ? "🙏✨ Providence : " : "✨ "}${String(d.nom)} en (${String(d.x)}, ${String(d.y)}) : ${String(d.effet)}${d.reaction !== null && d.reaction !== undefined && qui ? ` — ${qui} : « ${String(d.reaction)} »` : ""}${typeof d.exauces === "string" && d.exauces !== "" ? ` — prière exaucée : ${d.exauces}` : ""}`;

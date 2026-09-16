@@ -196,6 +196,9 @@ export class Serveur {
       case "peupler":
         this.sim.peupler(commande);
         break;
+      case "loi":
+        this.sim.definirLoi(commande.loi, commande.actif);
+        break;
     }
     this.diffuser();
   }

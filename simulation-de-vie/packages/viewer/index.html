@@ -68,6 +68,14 @@
           ✨ Dieu
         </button>
         <button
+          id="btn-lois"
+          class="btn-dieu"
+          type="button"
+          title="Les lois du monde : suspendre la faim, les maladies, les bêtes, les raids, les schismes, la vieillesse (l)"
+        >
+          ⚖️ Lois
+        </button>
+        <button
           id="btn-claude"
           class="btn-claude"
           type="button"
@@ -92,6 +100,14 @@
         <div id="zone-carte">
           <canvas id="carte"></canvas>
           <div id="calques" class="calques" title="Calques de lecture (c)"></div>
+          <div id="lois" class="lois" hidden>
+            <h3>Les lois du monde</h3>
+            <p class="discret">
+              Décochez pour suspendre une loi ; le monde s'en souvient (sauvegardé). Les vitesses
+              sont dans la barre du haut.
+            </p>
+            <div id="liste-lois"></div>
+          </div>
           <ol id="fil" class="fil" hidden></ol>
           <div id="legende" class="legende"></div>
           <button id="btn-legende" class="btn-legende" title="Légende">?</button>

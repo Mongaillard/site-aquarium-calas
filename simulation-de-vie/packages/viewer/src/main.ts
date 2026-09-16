@@ -1,8 +1,10 @@
 /** Point d'entrée du viewer : liaison (serveur ou locale), rendu, interactions souris et tactiles. */
 import "./style.css";
-import type { Commande, MessageServeur, Pouvoir } from "@sdv/protocole";
+import type { Commande, Loi, MessageServeur, Pouvoir } from "@sdv/protocole";
 import {
   COUT_PEUPLE,
+  FICHES_LOI,
+  LOIS,
   FICHES_PINCEAU,
   FICHES_POUVOIR,
   NOMS_CULTE,
@@ -164,6 +166,50 @@ const allerVoir = (x: number, y: number): void => {
   magasin.repere = { x, y, fin: performance.now() + 3000 };
 };
 const panneaux = new Panneaux(magasin, { envoyer, selectionner, basculerSuivi, allerVoir });
+
+// Les lois du monde (M25) : un panneau de cases à cocher, l'état vient du monde.
+const btnLois = element("btn-lois", HTMLButtonElement);
+const panneauLois = element("lois", HTMLDivElement);
+const listeLois = element("liste-lois", HTMLDivElement);
+const casesLoi = new Map<Loi, HTMLInputElement>();
+for (const loi of LOIS) {
+  const fiche = FICHES_LOI[loi];
+  const label = document.createElement("label");
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.id = `loi-${loi}`;
+  input.checked = true;
+  input.addEventListener("change", () => {
+    envoyer({ type: "loi", loi, actif: input.checked });
+  });
+  const texte = document.createElement("span");
+  texte.innerHTML = `${fiche.emoji} ${fiche.nom}<span class="discret">${fiche.description}</span>`;
+  label.append(input, texte);
+  listeLois.append(label);
+  casesLoi.set(loi, input);
+}
+function basculerLois(valeur = panneauLois.hidden): void {
+  panneauLois.hidden = !valeur;
+  btnLois.classList.toggle("actif", valeur);
+}
+btnLois.addEventListener("click", () => {
+  basculerLois();
+});
+/** Reflète les lois du monde dans le panneau et le bouton (une loi suspendue le colore). */
+function rafraichirLois(): void {
+  const lois = magasin.etat?.lois;
+  if (lois === undefined) return;
+  let suspendues = 0;
+  for (const [loi, input] of casesLoi) {
+    const actif = lois[loi];
+    if (input.checked !== actif) input.checked = actif;
+    input.parentElement?.classList.toggle("suspendue", !actif);
+    if (!actif) suspendues += 1;
+  }
+  const texte = suspendues > 0 ? `⚖️ Lois · ${String(suspendues)}` : "⚖️ Lois";
+  if (btnLois.textContent !== texte) btnLois.textContent = texte;
+  btnLois.classList.toggle("suspendue", suspendues > 0);
+}
 
 // Calques de lecture (M25) : villages, familles, foi, vivres.
 const calquesEl = element("calques", HTMLDivElement);
@@ -1154,6 +1200,9 @@ window.addEventListener("keydown", (ev) => {
     case "c":
       choisirCalque(CALQUES[(CALQUES.indexOf(magasin.calque) + 1) % CALQUES.length] ?? "aucun");
       break;
+    case "l":
+      basculerLois();
+      break;
     default: {
       const i = TOUCHES_POUVOIR.indexOf(ev.key);
       const pouvoir = i >= 0 ? POUVOIRS[i] : undefined;
@@ -1209,6 +1258,7 @@ function boucle(maintenant: number): void {
   if (maintenant - dernierPanneau > 250) {
     panneaux.rafraichir();
     rafraichirPouvoirs();
+    rafraichirLois();
     sauvegardeAutomatique(maintenant);
     const questions = magasin.etat?.questions.length ?? 0;
     badgeConseils.hidden = questions === 0;

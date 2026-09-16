@@ -752,6 +752,8 @@ export interface MessageEtat {
   readonly chronique: ChroniqueEtat;
   /** Les villages : schismes, bandes, caravanes, diplomatie. */
   readonly villages: VillagesEtat;
+  /** Les lois du monde en vigueur (M25). */
+  readonly lois: LoisEtat;
 }
 
 export interface RelationFiche {
@@ -978,7 +980,59 @@ export type Commande =
       readonly rayon: number;
     }
   /** Poser un peuple (M25) : de nouvelles familles fondent leur village au point choisi. */
-  | { readonly type: "peupler"; readonly x: number; readonly y: number; readonly taille: number };
+  | { readonly type: "peupler"; readonly x: number; readonly y: number; readonly taille: number }
+  /** Une loi du monde (M25) : la suspendre ou la rétablir. */
+  | { readonly type: "loi"; readonly loi: Loi; readonly actif: boolean };
+
+/** Les lois du monde (M25) : ce que l'observateur peut suspendre. */
+export const LOIS = ["faim", "maladies", "betes", "raids", "schismes", "vieillesse"] as const;
+export type Loi = (typeof LOIS)[number];
+export type LoisEtat = Readonly<Record<Loi, boolean>>;
+
+export interface FicheLoi {
+  readonly nom: string;
+  readonly emoji: string;
+  readonly description: string;
+}
+
+export const FICHES_LOI: Readonly<Record<Loi, FicheLoi>> = {
+  faim: {
+    nom: "La faim tue",
+    emoji: "🍖",
+    description: "Sans elle, un ventre vide n'entame plus la santé (la soif et le froid, si).",
+  },
+  maladies: {
+    nom: "Les maladies",
+    emoji: "🤒",
+    description:
+      "Sans elles, personne ne tombe plus malade ; les malades guérissent à leur rythme.",
+  },
+  betes: {
+    nom: "Les bêtes attaquent",
+    emoji: "🐺",
+    description: "Sans elle, les meutes rôdent mais n'attaquent plus le village.",
+  },
+  raids: {
+    nom: "Les raids",
+    emoji: "⚔️",
+    description: "Sans eux, aucune bande ne vient piller les réserves.",
+  },
+  schismes: {
+    nom: "Les schismes",
+    emoji: "🏕️",
+    description: "Sans eux, aucune faction ne part fonder son village ailleurs.",
+  },
+  vieillesse: {
+    nom: "La mort de vieillesse",
+    emoji: "🕯️",
+    description: "Sans elle, les anciens ne meurent plus de leur âge.",
+  },
+};
+
+/** Les lois telles qu'un monde naît : toutes en vigueur. */
+export function loisParDefaut(): Record<Loi, boolean> {
+  return { faim: true, maladies: true, betes: true, raids: true, schismes: true, vieillesse: true };
+}
 
 /** Les pinceaux du ciel (M25) : ce qu'ils posent, dans l'ordre de la palette. */
 export const PINCEAUX = ["terre", "eau", "foret", "montagne", "sable"] as const;
@@ -1049,6 +1103,7 @@ export function analyserCommande(texte: string): Commande | null {
     pinceau?: unknown;
     rayon?: unknown;
     taille?: unknown;
+    loi?: unknown;
   };
   const coordonnees = Number.isInteger(c.x) && Number.isInteger(c.y);
   const dansLeMonde =
@@ -1097,6 +1152,12 @@ export function analyserCommande(texte: string): Commande | null {
         y: c.y as number,
         rayon,
       };
+    }
+    case "loi": {
+      const loi = c.loi;
+      if (typeof loi !== "string" || !(LOIS as readonly string[]).includes(loi)) return null;
+      if (typeof c.actif !== "boolean") return null;
+      return { type: "loi", loi: loi as Loi, actif: c.actif };
     }
     case "peupler": {
       if (!dansLeMonde || !Number.isInteger(c.taille)) return null;

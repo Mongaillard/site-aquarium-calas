@@ -321,6 +321,7 @@ export function aubeVillages(
   rng: Rng,
   tension: number,
   factions: readonly { nom: string; familles: readonly string[] }[],
+  lois: { readonly raids: boolean; readonly schismes: boolean } = { raids: true, schismes: true },
 ): void {
   const e = monde.villages;
   for (const v of e.villages) recentrer(monde, v);
@@ -328,9 +329,9 @@ export function aubeVillages(
   e.villages = e.villages.filter(
     (v) => habitants(monde, v).length > 0 || v.enRoute.length > 0 || v.origine === "fondation",
   );
-  schisme(monde, rng, tension, factions);
+  if (lois.schismes) schisme(monde, rng, tension, factions);
   arriveeDesMigrants(monde);
-  bandes(monde, rng);
+  if (lois.raids) bandes(monde, rng);
   caravanes(monde, rng);
   diplomatie(monde, rng);
 }

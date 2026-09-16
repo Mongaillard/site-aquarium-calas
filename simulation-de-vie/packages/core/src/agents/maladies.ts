@@ -102,6 +102,7 @@ export function tomberMalade(
   origine: string,
 ): MaladieEnCours | null {
   if (!p.vivant || estMalade(p, type) || estImmunise(p, type)) return null;
+  if (!monde.lois.maladies) return null;
   const T = monde.horloge.ticksParJour;
   const tick = monde.horloge.tick;
   const profil = PROFILS_MALADIE[type];

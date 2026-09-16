@@ -4,6 +4,7 @@
  */
 import type { Personnage } from "./agents/personnage.js";
 import type { SimConfig } from "./config.js";
+import type { Loi } from "@sdv/protocole";
 import type { Evenement, TypeEvenement } from "./evenements/journal.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
 import { PLANS_BATIMENT } from "./monde/batiments.js";
@@ -23,6 +24,8 @@ import type { EtatVillages } from "./monde/villages.js";
 
 export interface Monde {
   readonly config: SimConfig;
+  /** Les lois du monde (M25) : ce que l'observateur a suspendu. */
+  readonly lois: Readonly<Record<Loi, boolean>>;
   readonly grille: Grille;
   readonly horloge: Horloge;
   readonly rng: Rng;

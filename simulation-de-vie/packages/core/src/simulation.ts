@@ -93,7 +93,8 @@ import { EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
 import type { Meteo } from "./monde/meteo.js";
 import { Rng } from "./rng.js";
 import type { FaveurEtat, Pouvoir, QuestionConseil } from "@sdv/protocole";
-import { COUT_PEUPLE } from "@sdv/protocole";
+import { COUT_PEUPLE, loisParDefaut } from "@sdv/protocole";
+import type { Loi } from "@sdv/protocole";
 import {
   FAVEUR_EVENEMENTS,
   FAVEUR_OFFRANDE,
@@ -266,8 +267,10 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
     });
     brut.villages = villages;
   }
-  // Version 5 (M25) : les peuples rivaux du départ (un seul dans les mondes d'avant).
+  // Version 5 (M25) : les peuples rivaux du départ (un seul dans les mondes d'avant), les lois.
   defauts(etat.config.population, { peuples: 1 });
+  if (!("lois" in brut)) brut.lois = loisParDefaut();
+  defauts(brut.lois as Record<string, unknown>, loisParDefaut());
   for (const p of etat.personnages) {
     const q = p as unknown as Record<string, unknown>;
     defauts(q, { prestige: 0, maitre: null, banni: null });
@@ -334,6 +337,7 @@ interface EtatSimulation {
   readonly societe: EtatSociete;
   readonly chronique: EtatChronique;
   readonly villages: EtatVillages;
+  readonly lois: Record<Loi, boolean>;
 }
 
 export class Simulation implements Monde {
@@ -368,6 +372,8 @@ export class Simulation implements Monde {
   readonly chronique: EtatChronique = etatChroniqueInitial();
   /** Les villages (jalon 15) : schismes, bandes, caravanes, diplomatie. */
   readonly villages: EtatVillages = etatVillagesInitial();
+  /** Les lois du monde (M25) : ce que l'observateur a suspendu. */
+  readonly lois: Record<Loi, boolean> = loisParDefaut();
 
   private constructor(
     readonly config: SimConfig,
@@ -413,6 +419,7 @@ export class Simulation implements Monde {
       Object.assign(this.societe, etat.societe);
       Object.assign(this.chronique, etat.chronique);
       Object.assign(this.villages, etat.villages);
+      Object.assign(this.lois, etat.lois);
       for (const p of this.personnages) this.cerveaux.set(p.id, new RuleBrain(p));
     } else {
       this.personnages = genererPopulation(rng, config, grille);
@@ -665,6 +672,14 @@ export class Simulation implements Monde {
         ...new Set(nouveaux.map((p) => p.identite.nomFamille)),
       ]);
     return nouveaux;
+  }
+
+  /** Suspend ou rétablit une loi du monde (commande `loi`). */
+  definirLoi(loi: Loi, actif: boolean): void {
+    if (this.lois[loi] === actif) return;
+    this.lois[loi] = actif;
+    if (!actif && loi === "betes") this.danger.menace = null;
+    this.emettre("divin", null, { pouvoir: "loi", loi, actif }, 5);
   }
 
   // ------------------------------------------------------------ mode Dieu
@@ -1156,6 +1171,7 @@ export class Simulation implements Monde {
       societe: this.societe,
       chronique: this.chronique,
       villages: this.villages,
+      lois: this.lois,
     };
   }
 
@@ -1476,8 +1492,8 @@ export class Simulation implements Monde {
     this.peuplerFaune();
     if (this.tick % 6 === 0) {
       for (const t of this.troupeaux.values()) heureTroupeau(this, t);
-      this.heureDeDanger();
-      heureContagion(this);
+      if (this.lois.betes) this.heureDeDanger();
+      if (this.lois.maladies) heureContagion(this);
       this.heureDuBetail();
       providence(this, this.faveur);
       heureSociete(this);
@@ -1543,6 +1559,7 @@ export class Simulation implements Monde {
         this.rng.fork(`villages/aube/${String(this.tick)}`),
         this.societe.tension,
         this.societe.factions,
+        { raids: this.lois.raids, schismes: this.lois.schismes },
       );
     }
     if (this.tick > 0) {
@@ -1780,6 +1797,7 @@ export class Simulation implements Monde {
       jourMaladies(this, p);
     }
     if (
+      this.lois.maladies &&
       moment.saison === "hiver" &&
       moment.jourDeSaison === 1 &&
       moment.annee - this.derniereEpidemieAnnee >= ANNEES_ENTRE_EPIDEMIES &&
@@ -2061,6 +2079,9 @@ export class Simulation implements Monde {
     const T = this.horloge.ticksParJour;
     const sources = sourcesDegats(p, this.tick);
     let deltaSante = effet.deltaSante;
+    // Loi suspendue : la faim ne tue pas (elle ronge le moral, pas la santé).
+    const causes = this.lois.faim ? effet.causes : effet.causes.filter((c) => c !== "faim");
+    if (causes.length !== effet.causes.length) deltaSante += 10 / T;
     const blesse = p.corps.etat.blessures.length > 0;
     if (deltaSante > 0 && blesse) {
       // Convalescence : on ne se répare qu'au repos, au chaud, sans saigner.
@@ -2077,7 +2098,7 @@ export class Simulation implements Monde {
       const vitales: Record<string, number> = { soif: 25, froid: 15, faim: 10 };
       let cause = "inconnue";
       let pire = 0;
-      for (const c of effet.causes) {
+      for (const c of causes) {
         const perte = vitales[c] ?? 0;
         if (perte > pire) {
           pire = perte;

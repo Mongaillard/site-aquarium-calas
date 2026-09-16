@@ -157,6 +157,9 @@ export class LiaisonLocale implements Liaison {
       case "peupler":
         sim.peupler(commande);
         break;
+      case "loi":
+        sim.definirLoi(commande.loi, commande.actif);
+        break;
     }
     if (this.minuteur !== null) this.diffuser();
   }
