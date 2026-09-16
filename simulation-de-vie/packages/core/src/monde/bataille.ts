@@ -124,8 +124,12 @@ export const TICKS_SANS_CONTACT = 24;
 export const DUREE_COMBAT_MAX = 72;
 export const DUREE_MARCHE_MAX = 288;
 export const GUERRIERS_MAX = 12;
-/** La défense ne dégarnit pas le village : une fois et demie la troupe adverse au plus. */
-export const RATIO_DEFENSE = 1.2;
+/**
+ * La défense ne dégarnit pas le village : une fois et demie la troupe adverse au plus contre
+ * les pillards et les loups ; à la guerre, 1,2 fois seulement, pour que l'attaque ait sa chance.
+ */
+export const RATIO_DEFENSE = 1.5;
+export const RATIO_DEFENSE_GUERRE = 1.2;
 /** Ticks entre deux coups d'un même combattant. */
 export const CADENCE_FRAPPE = 3;
 export const FRAPPES_GARDEES = 40;
@@ -469,7 +473,8 @@ function enroler(monde: Monde, b: Bataille, p: Personnage): void {
 function leverLaDefense(monde: Monde, b: Bataille, rayon: number): number {
   const village = villageDId(monde, b.defenseur.village);
   if (village === null) return 0;
-  const plafond = Math.max(2, Math.ceil(b.attaquant.forceInitiale * RATIO_DEFENSE));
+  const ratio = b.genre === "guerre" ? RATIO_DEFENSE_GUERRE : RATIO_DEFENSE;
+  const plafond = Math.max(2, Math.ceil(b.attaquant.forceInitiale * ratio));
   const candidats = adultesDe(monde, village)
     .filter(
       (p) =>

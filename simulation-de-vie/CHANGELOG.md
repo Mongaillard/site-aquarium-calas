@@ -10,7 +10,9 @@ Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`,
 - **Bulles sobres** : trois bulles au plus pendant une bataille (six sinon), jamais sur un
   combattant ; la légende décrit les sprites (tunique, outil, anneau et barre de vie).
 - **Guerre moins timide** : la guerre se déclare dès −50 d'attitude (−60 avant), la troupe
-  prend 70 % des adultes valides (60 %), la défense se plafonne à 1,2 fois la troupe (1,5).
+  prend 70 % des adultes valides (60 %), la défense se plafonne à 1,2 fois la troupe (1,5)
+  à la guerre seulement — contre pillards et loups, le village garde 1,5 (la calibration à
+  240 jours y tenait).
 - **Statistiques** : tuile « conquêtes · raids repoussés ».
 - **Le fil de la canne à pêche** part de la pointe du bâton quand on pêche.
 

@@ -250,6 +250,7 @@ export {
   CADENCE_FRAPPE,
   GUERRIERS_MAX,
   RATIO_DEFENSE,
+  RATIO_DEFENSE_GUERRE,
 } from "./monde/bataille.js";
 export type {
   Bataille,
