@@ -108,24 +108,6 @@
         >
           ⚖️ Lois
         </button>
-        <button
-          id="btn-claude"
-          class="btn-claude"
-          type="button"
-          hidden
-          title="Laisser Claude écrire les pensées, épitaphes et récits (sur votre compte claude.ai)"
-        >
-          🧠 Claude
-        </button>
-        <button
-          id="btn-conseils"
-          class="btn-claude"
-          type="button"
-          hidden
-          title="Quand un personnage est à court d'idées, il demande conseil à Claude (sur votre compte claude.ai)"
-        >
-          💬 Conseils<span id="badge-conseils" class="badge" hidden></span>
-        </button>
         <button id="btn-question" class="btn-question" type="button" hidden></button>
         <div id="connexion" class="connexion">connexion…</div>
       </header>
@@ -279,6 +261,14 @@
         <button type="button" id="btn-lire-chronique" title="Lire à voix haute">🔊 Écouter</button>
         <button type="button" id="btn-fermer-chronique">Fermer</button>
       </div>
+    </dialog>
+    <dialog id="dlg-conseil" class="dialogue conseil-dlg">
+      <h2 id="conseil-titre">Conseil</h2>
+      <p id="conseil-sous-titre" class="discret"></p>
+      <ol id="conseil-options" class="liste conseil-options"></ol>
+      <p class="discret">
+        Sans réponse, un choix est tiré au sort dans <span id="conseil-compte">5</span> s.
+      </p>
     </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>

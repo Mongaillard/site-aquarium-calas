@@ -434,7 +434,7 @@ export class Rendu {
       }
     }
 
-    // Une question ouverte à Claude : un « ? » au-dessus de la tête.
+    // Une question de conseil ouverte : un « ? » au-dessus de la tête.
     if (etat !== null && cam.echelle >= 7) {
       const questionnes = magasin.questionnes;
       ctx.font = "bold 13px system-ui, sans-serif";

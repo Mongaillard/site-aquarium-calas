@@ -1,10 +1,12 @@
 /**
- * « Demander à Claude » : quand le cerveau à règles est à court (besoin
+ * « Demander conseil » : quand le cerveau à règles est à court (besoin
  * ressenti sans idée, inconfort chronique, échecs répétés, aucun projet), un
  * personnage pose une question. Le moteur construit le contexte et un
- * catalogue fermé d'options ; Claude choisit ; le moteur applique, journalise
- * (`conseil`) et suit l'ambition qui en naît (`ambition`). Tout est mesurable
- * et déterministe ici : la page ne fait que mettre la question en mots.
+ * catalogue fermé d'options ; quelque chose hors du moteur choisit (jusqu'à
+ * M27, Claude ; depuis M28, l'observateur ou un tirage au sort côté page) ;
+ * le moteur applique, journalise (`conseil`) et suit l'ambition qui en naît
+ * (`ambition`). Tout est mesurable et déterministe ici : la page ne fait que
+ * mettre la question en mots et transmettre un choix du catalogue.
  */
 import type { ContexteConseil, OptionConseil, QuestionConseil } from "@sdv/protocole";
 import type { Ambition, Personnage } from "../agents/personnage.js";

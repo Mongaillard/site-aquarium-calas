@@ -2,6 +2,23 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M28 – Demander conseil sans Claude (2026-09-16)
+
+Chaque question posée à Claude (bouton 💬 Conseils, pensées, épitaphes, récits) coûtait du
+crédit sur le compte de la personne qui regarde la page ; à l'usage, ça en consommait trop.
+
+- **Plus aucun appel à Claude** : `claude.ts` (cerveau Claude, boutons 🧠 Claude et 💬 Conseils)
+  est retiré du viewer. Les pensées, épitaphes et récits automatiques disparaissent avec lui ;
+  chaque personnage garde sa pensée par défaut, écrite par le moteur (inchangée).
+- **Demander conseil se répond localement** : dès qu'une question s'ouvre, un dialogue liste les
+  options du catalogue que le moteur a proposé (`nouveau fichier conseilLocal.ts`) ; l'observateur
+  clique une option, ou n'en choisit aucune ("Rien de tout ça"). **Sans réponse en cinq
+  secondes**, une option est tirée au sort dans le même catalogue (ou « aucun » s'il est vide) et
+  envoyée comme si l'observateur l'avait choisie. Le moteur ne change pas : il validait déjà tout
+  choix contre les options de la question, qu'il vienne de Claude ou d'ailleurs.
+- Les textes de l'interface qui mentionnaient Claude pour les conseils sont reformulés (fiche
+  personnage, journal, onglet Statistiques).
+
 ## M27 – De vraies tuiles libres de droits (2026-09-16)
 
 M26 notait que les banques d'images libres de droits n'étaient pas joignables depuis

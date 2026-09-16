@@ -115,7 +115,7 @@ export const LIBELLES_TYPE: Readonly<Record<string, string>> = {
   conteur: "le conteur",
   but: "buts",
   divin: "miracle",
-  conseil: "conseil de Claude",
+  conseil: "conseil",
   ambition: "ambition",
   priere: "prière",
   arrivee: "arrivée",
@@ -522,7 +522,7 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       return `🙏 ${qui} prie pour ${LIBELLES_SUJET[String(d.sujet)] ?? String(d.sujet)}${d.autel === true ? " à l'autel" : ""}${typeof d.offrande === "string" ? ` et offre ${d.offrande}` : ""}.`;
     case "conseil":
       if (d.etape === "question")
-        return `💬 ${qui} demande conseil à Claude : ${String(d.motifs)
+        return `💬 ${qui} demande conseil : ${String(d.motifs)
           .split(",")
           .map((m) => LIBELLES_MOTIF[m] ?? m)
           .join(", ")} (cliquez pour voir la question).`;

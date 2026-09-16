@@ -556,25 +556,12 @@ table.saisons td:first-child {
     grid-template-columns: 60px 1fr 30px;
   }
 }
-.btn-claude.actif,
 .btn-dieu.actif {
   background: var(--accent);
   color: #10141a;
 }
 .btn-dieu.suspendue {
   color: #ff9c5f;
-}
-.btn-claude .badge {
-  display: inline-block;
-  min-width: 16px;
-  padding: 0 4px;
-  margin-left: 4px;
-  border-radius: 8px;
-  background: #ffd479;
-  color: #10141a;
-  font-size: 11px;
-  text-align: center;
-  vertical-align: middle;
 }
 /* Mode Dieu : barre de pouvoirs flottante en bas de la carte. */
 .pouvoirs {
@@ -1057,6 +1044,21 @@ table.saisons td:first-child {
 .dialogue .liste li span {
   flex: 1;
   min-width: 160px;
+}
+.conseil-options li {
+  display: block;
+  padding: 0;
+  border-bottom: none;
+  margin: 6px 0;
+}
+.conseil-options button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+}
+.conseil-options button:hover {
+  background: #343b47;
 }
 .btn-question {
   background: #ffd479;

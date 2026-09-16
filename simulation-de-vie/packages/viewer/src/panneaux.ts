@@ -364,13 +364,13 @@ export class Panneaux {
       : autre !== undefined
         ? `Une question est déjà ouverte pour ${this.magasin.nom(autre.personnageId)} ; une seule à la fois`
         : f.conseilPossible
-          ? "Ce personnage pose sa question à Claude (bouton 💬 Conseils actif, sur claude.ai)"
+          ? "Ce personnage pose sa question : répondez dans le dialogue, ou le hasard choisira dans cinq secondes"
           : "Pas avant demain : il a déjà demandé conseil";
     const bouton = f.vivant
       ? `<button id="btn-conseil" ${f.conseilPossible && !enQuestion ? "" : "disabled"} title="${e(titre)}">💬 Demander conseil</button>`
       : "";
     const question = enQuestion
-      ? `<div class="question">❓ Question ouverte à Claude… (activez 💬 Conseils pour qu'il réponde)</div>`
+      ? `<div class="question">❓ Question ouverte : répondez dans le dialogue, ou le hasard choisira dans cinq secondes.</div>`
       : "";
     const conseil = this.htmlConseil(f);
     if (a === null)
@@ -386,7 +386,7 @@ export class Panneaux {
       <div>${bouton}</div>`;
   }
 
-  /** La question posée à Claude (motifs, options) et sa réponse, telles que le moteur les a vues. */
+  /** La question posée (motifs, options) et sa réponse, telles que le moteur les a vues. */
   private htmlConseil(f: MessageFiche): string {
     const c = f.conseil;
     if (c === null) return "";
@@ -403,19 +403,19 @@ export class Panneaux {
       .join("");
     const entete =
       c.etat === "ouverte"
-        ? `❓ <b>Question posée à Claude</b> (${e(quand)}) — ${e(motifs)}.`
+        ? `❓ <b>Question posée</b> (${e(quand)}) — ${e(motifs)}.`
         : c.etat === "repondue"
-          ? `💬 <b>Claude a conseillé</b> (${e(quand)}) : <b>${e(c.libelle ?? c.choix ?? "")}</b>${c.pensee ? ` — « ${e(c.pensee)} »` : ""}${c.but ? `<div class="discret">But : ${e(c.but)}</div>` : ""}`
+          ? `💬 <b>Réponse donnée</b> (${e(quand)}) : <b>${e(c.libelle ?? c.choix ?? "")}</b>${c.pensee ? ` — « ${e(c.pensee)} »` : ""}${c.but ? `<div class="discret">But : ${e(c.but)}</div>` : ""}`
           : `💬 <b>Question sans suite</b> (${e(quand)}) : ${e(
               c.raison === "expiree"
-                ? "personne n'a répondu (activez 💬 Conseils)"
+                ? "personne n'a répondu à temps"
                 : c.raison === "aucun"
-                  ? "Claude n'a rien trouvé qui convienne"
+                  ? "rien n'a semblé convenir"
                   : c.raison === "remplacee"
                     ? "une autre question l'a remplacée"
                     : "la réponse n'était pas au catalogue",
             )}`;
-    return `<div class="conseil">${entete}<div class="discret" style="margin-top:4px">Options proposées${c.etat === "ouverte" ? " (Claude choisira l'une d'elles)" : ""} :</div><ul>${options}</ul></div>`;
+    return `<div class="conseil">${entete}<div class="discret" style="margin-top:4px">Options proposées${c.etat === "ouverte" ? " (cinq secondes pour répondre, sinon le hasard choisit)" : ""} :</div><ul>${options}</ul></div>`;
   }
 
   private htmlFiche(f: MessageFiche): string {
@@ -762,7 +762,7 @@ export class Panneaux {
       ${
         s.ambitions.length > 0
           ? `<table class="saisons"><tr><th>qui</th><th>quoi</th><th>jours</th></tr>${s.ambitions.map((a) => `<tr><td><span class="lien" data-id="${e(a.personnageId)}">${e(a.prenom)}</span></td><td title="${e(a.but)}">${e(a.cible)}<div class="discret">${e(a.but)}</div></td><td>${a.joursRestants}</td></tr>`).join("")}</table>`
-          : "<p class='discret'>aucune ambition en cours (les conseils de Claude en donnent : bouton 💬 Conseils, ou « Demander conseil » dans une fiche)</p>"
+          : "<p class='discret'>aucune ambition en cours (une réponse à une demande de conseil en donne une : bouton « Demander conseil » dans une fiche)</p>"
       }
       <h3>Bâtiments</h3><div class="puces">${batiments}</div>
       <h3>Stocks</h3><div class="puces">${stocks}</div>

@@ -358,7 +358,7 @@ export class Magasin {
     });
   }
 
-  /** Personnages ayant une question ouverte à Claude. */
+  /** Personnages ayant une question de conseil ouverte. */
   get questionnes(): ReadonlySet<string> {
     return new Set((this.etat?.questions ?? []).map((q) => q.personnageId));
   }

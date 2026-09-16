@@ -35,7 +35,7 @@ import { cadrer, centrerSur, deplacer, versMonde, zoomer } from "./camera.js";
 import { Magasin } from "./etat.js";
 import { LiaisonLocale, estSimulee } from "./local.js";
 import { LiaisonTravailleur } from "./travailleur-liaison.js";
-import { CerveauClaude, sampleDeLaPage } from "./claude.js";
+import { ConseilLocal } from "./conseilLocal.js";
 import { Panneaux } from "./panneaux.js";
 import { Rendu } from "./rendu.js";
 import { retenirLeTirer } from "./gestes.js";
@@ -1280,42 +1280,16 @@ element("btn-legende", HTMLButtonElement).addEventListener("click", () => {
   legende.classList.toggle("ouverte");
 });
 
-// Cerveau Claude (M5) : seulement dans la page publiée sur claude.ai, sur demande.
-const btnClaude = element("btn-claude", HTMLButtonElement);
-const btnConseils = element("btn-conseils", HTMLButtonElement);
-const badgeConseils = element("badge-conseils", HTMLSpanElement);
-const cerveauClaude = new CerveauClaude(
-  magasin,
-  (commande) => {
-    liaison.envoyer(commande);
-  },
-  sampleDeLaPage,
-  (texte) => {
-    const el = document.getElementById("connexion");
-    if (el) el.textContent = texte;
-  },
+// Demande de conseil (M28) : plus d'appel à Claude, ça coûtait trop de crédit. L'observateur
+// répond dans un dialogue ; sans réponse en cinq secondes, une option est tirée au sort.
+const conseilLocal = new ConseilLocal(
+  element("dlg-conseil", HTMLDialogElement),
+  element("conseil-titre", HTMLHeadingElement),
+  element("conseil-sous-titre", HTMLParagraphElement),
+  element("conseil-options", HTMLOListElement),
+  element("conseil-compte", HTMLSpanElement),
+  envoyer,
 );
-// Les deux boutons Claude n'existent que là où `claude.use("sample")` existe : dans la page
-// publiée sur claude.ai. Le serveur comme la liaison locale acceptent les commandes.
-if (window.claude !== undefined) {
-  btnClaude.hidden = false;
-  btnConseils.hidden = false;
-  btnClaude.addEventListener("click", () => {
-    if (cerveauClaude.estActif) {
-      cerveauClaude.desactiver();
-      const el = document.getElementById("connexion");
-      if (el) el.textContent = "en direct";
-    } else {
-      cerveauClaude.activer();
-    }
-    btnClaude.classList.toggle("actif", cerveauClaude.estActif);
-  });
-  btnConseils.addEventListener("click", () => {
-    if (cerveauClaude.conseilsActifs) cerveauClaude.desactiverConseils();
-    else cerveauClaude.activerConseils();
-    btnConseils.classList.toggle("actif", cerveauClaude.conseilsActifs);
-  });
-}
 
 // Brouillard d'exploration : case dans la légende, touche b.
 function basculerBrouillard(valeur = !magasin.brouillard): void {
@@ -1448,24 +1422,16 @@ function boucle(maintenant: number): void {
     rafraichirLois();
     surveillerChronique();
     sauvegardeAutomatique(maintenant);
-    const questions = magasin.etat?.questions.length ?? 0;
-    badgeConseils.hidden = questions === 0;
-    badgeConseils.textContent = String(questions);
     // La question ouverte, en un clic : la pastille de la barre ouvre la fiche du demandeur.
     const q = magasin.etat?.questions[0];
     btnQuestion.hidden = q === undefined;
     if (q !== undefined) {
-      const texte = `❓ ${q.contexte.prenom} demande conseil${cerveauClaude.conseilsActifs ? " (Claude réfléchit)" : ""}`;
+      const texte = `❓ ${q.contexte.prenom} demande conseil`;
       if (btnQuestion.textContent !== texte) btnQuestion.textContent = texte;
       btnQuestion.dataset.id = q.personnageId;
     }
+    conseilLocal.suivre(q);
     dernierPanneau = maintenant;
-    if (cerveauClaude.estActif || cerveauClaude.conseilsActifs) {
-      void cerveauClaude.tick(maintenant).then(() => {
-        btnClaude.classList.toggle("actif", cerveauClaude.estActif);
-        btnConseils.classList.toggle("actif", cerveauClaude.conseilsActifs);
-      });
-    }
   }
   requestAnimationFrame(boucle);
 }

@@ -33,15 +33,13 @@ Personnage (pensée, besoins, famille, relations, souvenirs), Journal, Conversat
 Statistiques, Population. Cliquez sur un personnage ou un bâtiment pour l'inspecter, appuyez
 sur `s` pour que la caméra suive le personnage sélectionné.
 
-Sur la page publiée sur claude.ai, le bouton « 🧠 Claude » laisse Claude écrire, sur le compte de
-la personne qui regarde (aucune clé ni facture à part), la pensée du personnage sélectionné,
-l'épitaphe des défunts et le récit des inventions ; le moteur reste maître de ce qu'il applique.
-Le bouton « 💬 Conseils » va plus loin : quand un personnage est à court d'idées (faim ou froid
-qui dure, échecs répétés, besoin sans idée, aucun projet), il pose une question à Claude, qui
-choisit dans un catalogue fermé (une invention à chercher, un bâtiment, une leçon, une
-priorité, une direction) ; le moteur applique ce choix et suit l'**ambition** qui en naît
-(fiche, onglet Statistiques « Où ils vont », Journal). Le bouton « Demander conseil » d'une
-fiche fait poser la question tout de suite.
+Quand un personnage est à court d'idées (faim ou froid qui dure, échecs répétés, besoin sans
+idée, aucun projet), il pose une question dans un catalogue fermé (une invention à chercher, un
+bâtiment, une leçon, une priorité, une direction) : un dialogue liste les options, l'observateur
+en choisit une, ou aucune ; **sans réponse en cinq secondes, une option est tirée au sort** (M28 :
+la page ne sollicite plus Claude, ça coûtait trop de crédit). Le moteur applique le choix et suit
+l'**ambition** qui en naît (fiche, onglet Statistiques « Où ils vont », Journal). Le bouton
+« Demander conseil » d'une fiche fait poser la question tout de suite.
 
 Le bouton « ✨ Dieu » (touche `g`) ouvre une barre de pouvoirs : Ondée, Éclaircie, Sève,
 Souffle, Main qui guérit, Braise, Foudre, Songe, Regard, payés en faveur (✦) gagnée chaque jour
@@ -161,7 +159,7 @@ packages/core/src
   monde/        grille, génération, biomes, ressources, horloge, météo, recettes, bâtiments, faune, danger, village, divin (mode Dieu), terrain (pinceaux), creatures, conteur, objectifs (buts)
   agents/       identité, génome et héritage, besoins, inventaire, compétences, population, cycle de vie
   actions/      types d'actions et d'intentions, A*, planificateur, exécuteur
-  cerveau/      interface Cerveau, perception, RuleBrain (règles), conseil (demander à Claude)
+  cerveau/      interface Cerveau, perception, RuleBrain (règles), conseil (demander conseil)
   memoire/      flux de souvenirs, mise en mots des événements, réflexion du soir
   social/       relations, dialogues à gabarits, échanges et vol, couples
   genealogie.ts arbre des filiations et des unions
@@ -173,8 +171,9 @@ packages/server     serveur temps réel (WebSocket + fichiers statiques), comman
 packages/viewer     interface web (Vite, canvas 2D)
 ```
 
-Le moteur ne dépend d'aucun service réseau ; le cerveau Claude (phase M5) sera un paquet
-séparé qui s'y branche via l'interface `Cerveau`.
+Le moteur ne dépend d'aucun service réseau : les demandes de conseil produisent un catalogue
+d'options que quelque chose d'extérieur choisit (depuis M28, l'observateur ou un tirage au sort
+côté page), via l'interface `Cerveau`.
 
 ## Scripts
 
