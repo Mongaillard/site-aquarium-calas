@@ -1280,16 +1280,9 @@ element("btn-legende", HTMLButtonElement).addEventListener("click", () => {
   legende.classList.toggle("ouverte");
 });
 
-// Demande de conseil (M28) : plus d'appel à Claude, ça coûtait trop de crédit. L'observateur
-// répond dans un dialogue ; sans réponse en cinq secondes, une option est tirée au sort.
-const conseilLocal = new ConseilLocal(
-  element("dlg-conseil", HTMLDialogElement),
-  element("conseil-titre", HTMLHeadingElement),
-  element("conseil-sous-titre", HTMLParagraphElement),
-  element("conseil-options", HTMLOListElement),
-  element("conseil-compte", HTMLSpanElement),
-  envoyer,
-);
+// Demande de conseil (M28) : plus d'appel à Claude (trop de crédit) ni de dialogue (trop
+// d'écran) : une option du catalogue est tirée au sort dès que la question s'ouvre.
+const conseilLocal = new ConseilLocal(envoyer);
 
 // Brouillard d'exploration : case dans la légende, touche b.
 function basculerBrouillard(valeur = !magasin.brouillard): void {

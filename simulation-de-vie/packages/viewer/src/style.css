@@ -1045,21 +1045,6 @@ table.saisons td:first-child {
   flex: 1;
   min-width: 160px;
 }
-.conseil-options li {
-  display: block;
-  padding: 0;
-  border-bottom: none;
-  margin: 6px 0;
-}
-.conseil-options button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 8px 10px;
-}
-.conseil-options button:hover {
-  background: #343b47;
-}
 .btn-question {
   background: #ffd479;
   color: #10141a;

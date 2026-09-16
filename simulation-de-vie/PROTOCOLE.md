@@ -1111,14 +1111,15 @@ quelle que soit leur origine) ; seule la page change de méthode pour répondre.
   💬 Conseils) est retiré du viewer avec son test. Chaque personnage garde sa pensée par défaut,
   écrite par le moteur (`p.pensee`, inchangée) ; plus aucun appel réseau ni capacité `sample`
   utilisée nulle part dans le viewer.
-- **Demander conseil se répond dans la page** (`conseilLocal.ts`) : dès qu'une question s'ouvre
-  (`magasin.etat.questions[0]`), un dialogue modal liste les options du catalogue et une option
-  « Rien de tout ça » ; un clic envoie `{type: "conseil", choix, pensee: ""}` comme le faisait
-  Claude. **Sans réponse en cinq secondes réelles, une option est tirée au sort** (uniforme parmi
-  le catalogue, ou « aucun » s'il est vide) et envoyée de la même façon — le moteur ne sait pas
-  d'où vient le choix. Si la question expire ou est remplacée côté moteur avant la réponse (haute
-  vitesse : un jour simulé peut passer en moins de cinq secondes réelles à ×256), le dialogue se
-  ferme sans rien envoyer plutôt que de répondre à une question qui n'existe plus.
+- **Demander conseil se répond au hasard dans la page** (`conseilLocal.ts`) : dès qu'une
+  question s'ouvre (`magasin.etat.questions[0]`, lu au rafraîchissement du panneau), une option
+  du catalogue est tirée au sort (uniforme, ou « aucun » s'il est vide) et envoyée comme
+  `{type: "conseil", choix, pensee: ""}`, exactement ce qu'envoyait Claude — le moteur ne sait
+  pas d'où vient le choix. Une question n'est répondue qu'une fois (dernier identifiant retenu),
+  même si l'état la porte encore quelques rafraîchissements. **[DÉCISION]** Une première version
+  laissait l'observateur choisir dans un dialogue modal, avec le tirage au sort après cinq
+  secondes ; le dialogue encombrait l'écran à chaque question, il est retiré : ni réponse
+  humaine, ni attente.
 - Les textes de l'interface qui mentionnaient Claude pour les conseils (fiche personnage,
   journal, onglet Statistiques) sont reformulés ; ceux du cerveau ambiant disparaissent avec les
   boutons.

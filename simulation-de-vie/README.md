@@ -35,11 +35,11 @@ sur `s` pour que la caméra suive le personnage sélectionné.
 
 Quand un personnage est à court d'idées (faim ou froid qui dure, échecs répétés, besoin sans
 idée, aucun projet), il pose une question dans un catalogue fermé (une invention à chercher, un
-bâtiment, une leçon, une priorité, une direction) : un dialogue liste les options, l'observateur
-en choisit une, ou aucune ; **sans réponse en cinq secondes, une option est tirée au sort** (M28 :
-la page ne sollicite plus Claude, ça coûtait trop de crédit). Le moteur applique le choix et suit
-l'**ambition** qui en naît (fiche, onglet Statistiques « Où ils vont », Journal). Le bouton
-« Demander conseil » d'une fiche fait poser la question tout de suite.
+bâtiment, une leçon, une priorité, une direction) : **une option est tirée au sort** (M28 : la
+page ne sollicite plus Claude, ça coûtait trop de crédit, et ne fait pas choisir l'observateur,
+ça encombrait l'écran). Le moteur applique le choix et suit l'**ambition** qui en naît (fiche,
+onglet Statistiques « Où ils vont », Journal). Le bouton « Demander conseil » d'une fiche fait
+poser la question tout de suite.
 
 Le bouton « ✨ Dieu » (touche `g`) ouvre une barre de pouvoirs : Ondée, Éclaircie, Sève,
 Souffle, Main qui guérit, Braise, Foudre, Songe, Regard, payés en faveur (✦) gagnée chaque jour

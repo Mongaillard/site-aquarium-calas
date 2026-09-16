@@ -10,12 +10,12 @@ crédit sur le compte de la personne qui regarde la page ; à l'usage, ça en co
 - **Plus aucun appel à Claude** : `claude.ts` (cerveau Claude, boutons 🧠 Claude et 💬 Conseils)
   est retiré du viewer. Les pensées, épitaphes et récits automatiques disparaissent avec lui ;
   chaque personnage garde sa pensée par défaut, écrite par le moteur (inchangée).
-- **Demander conseil se répond localement** : dès qu'une question s'ouvre, un dialogue liste les
-  options du catalogue que le moteur a proposé (`nouveau fichier conseilLocal.ts`) ; l'observateur
-  clique une option, ou n'en choisit aucune ("Rien de tout ça"). **Sans réponse en cinq
-  secondes**, une option est tirée au sort dans le même catalogue (ou « aucun » s'il est vide) et
-  envoyée comme si l'observateur l'avait choisie. Le moteur ne change pas : il validait déjà tout
-  choix contre les options de la question, qu'il vienne de Claude ou d'ailleurs.
+- **Demander conseil se répond au hasard** (`nouveau fichier conseilLocal.ts`) : dès qu'une
+  question s'ouvre, une option du catalogue que le moteur a proposé est tirée au sort (ou
+  « aucun » s'il est vide) et envoyée comme un choix. Une première version laissait
+  l'observateur choisir dans un dialogue, avec le tirage au sort après cinq secondes ; le dialogue
+  encombrait l'écran, il est retiré. Le moteur ne change pas : il validait déjà tout choix
+  contre les options de la question, qu'il vienne de Claude ou d'ailleurs.
 - Les textes de l'interface qui mentionnaient Claude pour les conseils sont reformulés (fiche
   personnage, journal, onglet Statistiques).
 

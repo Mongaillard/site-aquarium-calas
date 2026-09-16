@@ -364,13 +364,13 @@ export class Panneaux {
       : autre !== undefined
         ? `Une question est déjà ouverte pour ${this.magasin.nom(autre.personnageId)} ; une seule à la fois`
         : f.conseilPossible
-          ? "Ce personnage pose sa question : répondez dans le dialogue, ou le hasard choisira dans cinq secondes"
+          ? "Ce personnage pose sa question : le hasard choisit une option du catalogue"
           : "Pas avant demain : il a déjà demandé conseil";
     const bouton = f.vivant
       ? `<button id="btn-conseil" ${f.conseilPossible && !enQuestion ? "" : "disabled"} title="${e(titre)}">💬 Demander conseil</button>`
       : "";
     const question = enQuestion
-      ? `<div class="question">❓ Question ouverte : répondez dans le dialogue, ou le hasard choisira dans cinq secondes.</div>`
+      ? `<div class="question">❓ Question ouverte : le hasard choisit une option.</div>`
       : "";
     const conseil = this.htmlConseil(f);
     if (a === null)
@@ -415,7 +415,7 @@ export class Panneaux {
                     ? "une autre question l'a remplacée"
                     : "la réponse n'était pas au catalogue",
             )}`;
-    return `<div class="conseil">${entete}<div class="discret" style="margin-top:4px">Options proposées${c.etat === "ouverte" ? " (cinq secondes pour répondre, sinon le hasard choisit)" : ""} :</div><ul>${options}</ul></div>`;
+    return `<div class="conseil">${entete}<div class="discret" style="margin-top:4px">Options proposées${c.etat === "ouverte" ? " (le hasard en choisit une)" : ""} :</div><ul>${options}</ul></div>`;
   }
 
   private htmlFiche(f: MessageFiche): string {
