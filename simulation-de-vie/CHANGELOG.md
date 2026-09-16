@@ -2,6 +2,16 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M35 bis – Tuniques ajustées, zoom doublé (2026-09-16)
+
+- La tunique des personnages était une cuirasse à épaulières (tuile 10 de la ligne 4 de la
+  planche Roguelike Characters), trop large pour le corps : c'est désormais la chemise unie
+  (tuile 12), qui épouse la silhouette avant d'être teintée à la couleur de la famille.
+- La carte se zoome deux fois plus près : 96 pixels par tuile au lieu de 48 (les sprites de
+  16 px se dessinent à ×6, nets).
+- Les gisements d'herbes (les simples) se dessinaient en carré blanc, faute de sprite : brins
+  verts et trois petites fleurs.
+
 ## M35 – Pillage complet et conquête (2026-09-16)
 
 Battre un village ne rapportait qu'une razzia (un cinquième des vivres, plafonné à vingt, et

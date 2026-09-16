@@ -155,6 +155,25 @@ export function gisement(
     case "fibres":
       herbe(ctx, x, y, "#d6e04b");
       break;
+    case "herbes": {
+      // Des simples : brins verts et trois petites fleurs blanches à cœur doré.
+      herbe(ctx, x, y, "#5fae4f");
+      for (const [dx, dy] of [
+        [0.3, 0.45],
+        [0.52, 0.38],
+        [0.7, 0.5],
+      ] as const) {
+        ctx.fillStyle = "#f4f4ff";
+        ctx.beginPath();
+        ctx.arc(x + dx, y + dy, 0.06 * t + 0.02, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#e8c23a";
+        ctx.beginPath();
+        ctx.arc(x + dx, y + dy, 0.025, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
     case "minerai":
       gemmes(ctx, x + 0.5, y + 0.6, 0.5 + 0.35 * t);
       break;

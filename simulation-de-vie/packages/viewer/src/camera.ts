@@ -7,7 +7,7 @@ export interface Camera {
 }
 
 export const ECHELLE_MIN = 3;
-export const ECHELLE_MAX = 48;
+export const ECHELLE_MAX = 96;
 
 /** Cadre le monde entier dans l'écran, avec une marge. */
 export function ajuster(

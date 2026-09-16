@@ -249,7 +249,8 @@ const OUTILS: Readonly<Record<string, readonly [number, number]>> = {
   canne: [44, 0],
   marteau: [49, 0],
 };
-const TUNIQUE: readonly [number, number] = [10, 4];
+/** La tunique blanche unie (colonne 12, ligne 4) : elle épouse le corps ; la 10 est une cuirasse à épaulières. */
+const TUNIQUE: readonly [number, number] = [12, 4];
 
 const cache = new Map<string, HTMLCanvasElement>();
 let brouillon: CanvasRenderingContext2D | null = null;
