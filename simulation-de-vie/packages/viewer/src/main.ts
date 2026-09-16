@@ -1,7 +1,19 @@
 /** Point d'entrée du viewer : liaison (serveur ou locale), rendu, interactions souris et tactiles. */
 import "./style.css";
 import type { Commande, MessageServeur, Pouvoir } from "@sdv/protocole";
-import { FICHES_POUVOIR, NOMS_CULTE, POUVOIRS, POUVOIRS_EXAUCANT, VITESSES } from "@sdv/protocole";
+import {
+  COUT_PEUPLE,
+  FICHES_PINCEAU,
+  FICHES_POUVOIR,
+  NOMS_CULTE,
+  PINCEAUX,
+  POUVOIRS,
+  POUVOIRS_EXAUCANT,
+  RAYON_PINCEAU_MAX,
+  TAILLES_PEUPLE,
+  VITESSES,
+} from "@sdv/protocole";
+import type { Outil } from "./etat.js";
 import { LIBELLES_SUJET, libelleReputation } from "./format.js";
 import type { Camera } from "./camera.js";
 import { cadrer, centrerSur, deplacer, versMonde, zoomer } from "./camera.js";
@@ -38,6 +50,8 @@ const survolEl = element("survol", HTMLDivElement);
 const formulaireLocal = element("local", HTMLFormElement);
 const graineEntree = element("graine-entree", HTMLInputElement);
 const populationEntree = element("population-entree", HTMLSelectElement);
+const peuplesEntree = element("peuples-entree", HTMLSelectElement);
+const viergeEntree = element("vierge-entree", HTMLInputElement);
 const magasin = new Magasin();
 const rendu = new Rendu(canvas, magasin);
 let cam: Camera = { echelle: 8, dx: 0, dy: 0 };
@@ -54,12 +68,23 @@ const joursAvance = Number.parseInt(parametres.get("jours") ?? "5", 10);
 /** Habitants au départ (`?population=`, ou le choix du formulaire) : 12 par défaut, 3 familles. */
 const POPULATIONS = [12, 24, 36, 48];
 const populationInitiale = Number.parseInt(parametres.get("population") ?? "12", 10);
-function population(): { initiale: number; familles: number } {
+/** Le peuple choisi au formulaire, avant de savoir si le monde naît vierge. */
+function peupleChoisi(): number {
   const n = Number.parseInt(populationEntree.value, 10);
-  const initiale = POPULATIONS.includes(n) ? n : 12;
-  return { initiale, familles: Math.max(3, Math.round(initiale / 4)) };
+  return POPULATIONS.includes(n) ? n : 12;
+}
+function population(): { initiale: number; familles: number; peuples: number } {
+  // Un monde vierge : personne au départ, le ciel posera son peuple où il veut.
+  const initiale = viergeEntree.checked ? 0 : peupleChoisi();
+  const peuples = viergeEntree.checked
+    ? 1
+    : Math.max(1, Math.min(4, Number.parseInt(peuplesEntree.value, 10) || 1));
+  return { initiale, familles: Math.max(3, Math.round(peupleChoisi() / 4)), peuples };
 }
 if (POPULATIONS.includes(populationInitiale)) populationEntree.value = String(populationInitiale);
+const peuplesInitiaux = Number.parseInt(parametres.get("peuples") ?? "1", 10);
+if (peuplesInitiaux >= 1 && peuplesInitiaux <= 4) peuplesEntree.value = String(peuplesInitiaux);
+if (parametres.has("vierge")) viergeEntree.checked = true;
 
 let derniereDemandeFiche = 0;
 const recevoir = (m: MessageServeur): void => {
@@ -93,7 +118,8 @@ function creerLiaison(graine: string, sauvegarde?: unknown): Liaison {
   return new LiaisonLocale(
     {
       seed,
-      joursAvance: Number.isFinite(joursAvance) ? joursAvance : 20,
+      joursAvance:
+        population().initiale === 0 ? 0 : Number.isFinite(joursAvance) ? joursAvance : 20,
       ticksParSeconde: 4,
       config: { population: population() },
       ...(sauvegarde !== undefined ? { sauvegarde } : {}),
@@ -361,6 +387,12 @@ if (modeLocal) {
   formulaireLocal.addEventListener("submit", (ev) => {
     ev.preventDefault();
     relancer(graineEntree.value.trim() || "42");
+    // Un monde vierge s'ouvre en mode Dieu, l'outil « peupler » en main, à la taille choisie.
+    if (viergeEntree.checked) {
+      magasin.taillePeuple = peupleChoisi();
+      basculerModeDieu(true);
+      armerOutil("peupler");
+    }
   });
   element("btn-sauvegardes", HTMLButtonElement).addEventListener("click", () => {
     void rafraichirListeSauvegardes();
@@ -483,7 +515,15 @@ function agirA(sx: number, sy: number): void {
     appliquerPouvoirA(sx, sy);
     return;
   }
+  if (magasin.modeDieu && magasin.outilArme !== null) {
+    appliquerOutilA(sx, sy);
+    return;
+  }
   toucherA(sx, sy);
+}
+/** Vrai si quelque chose (pouvoir ou outil) est armé et attend un point de la carte. */
+function enMain(): boolean {
+  return magasin.modeDieu && (magasin.pouvoirArme !== null || magasin.outilArme !== null);
 }
 
 /** Sélectionne ce qui se trouve sous un point écran : personnage, bâtiment, ou rien. */
@@ -503,11 +543,41 @@ function toucherA(sx: number, sy: number): void {
 
 // Souris : glisser pour déplacer, molette pour zoomer, clic pour sélectionner.
 let glisse: { x: number; y: number; bouge: boolean } | null = null;
+/** Peinture au pinceau : le bouton gauche enfoncé sculpte au fil du geste (pas de déplacement). */
+let peinture: { x: number; y: number } | null = null;
 canvas.addEventListener("mousedown", (ev) => {
+  if (
+    ev.button === 0 &&
+    magasin.modeDieu &&
+    magasin.outilArme !== null &&
+    magasin.outilArme !== "peupler"
+  ) {
+    const { sx, sy } = pointCanvas(ev.clientX, ev.clientY);
+    const m = versMonde(cam, sx, sy);
+    peinture = { x: Math.floor(m.x), y: Math.floor(m.y) };
+    sculpterEn(peinture.x, peinture.y);
+    return;
+  }
   glisse = { x: ev.clientX, y: ev.clientY, bouge: false };
   canvas.classList.add("glisse");
 });
 window.addEventListener("mousemove", (ev) => {
+  if (peinture !== null) {
+    const { sx, sy, dedans } = pointCanvas(ev.clientX, ev.clientY);
+    if (dedans) {
+      const m = versMonde(cam, sx, sy);
+      const x = Math.floor(m.x);
+      const y = Math.floor(m.y);
+      magasin.reticule = { x, y };
+      // Un coup par pas de rayon : un trait continu sans inonder la simulation.
+      const pas = Math.max(1, magasin.rayonPinceau);
+      if (Math.max(Math.abs(x - peinture.x), Math.abs(y - peinture.y)) >= pas) {
+        peinture = { x, y };
+        sculpterEn(x, y);
+      }
+    }
+    return;
+  }
   if (glisse) {
     const ddx = ev.clientX - glisse.x;
     const ddy = ev.clientY - glisse.y;
@@ -521,7 +591,7 @@ window.addEventListener("mousemove", (ev) => {
   }
   const { sx, sy, dedans } = pointCanvas(ev.clientX, ev.clientY);
   if (!dedans) return;
-  if (magasin.modeDieu && magasin.pouvoirArme !== null) {
+  if (enMain()) {
     const m = versMonde(cam, sx, sy);
     magasin.reticule = { x: Math.floor(m.x), y: Math.floor(m.y) };
   }
@@ -544,6 +614,7 @@ window.addEventListener("mousemove", (ev) => {
   }
 });
 window.addEventListener("mouseup", (ev) => {
+  peinture = null;
   if (glisse && !glisse.bouge) {
     const { sx, sy } = pointCanvas(ev.clientX, ev.clientY);
     if (ev.button === 2) desarmer();
@@ -594,12 +665,12 @@ canvas.addEventListener(
       const t = ev.touches.item(0);
       if (t) {
         doigt = { x: t.clientX, y: t.clientY, bouge: false };
-        if (magasin.modeDieu && magasin.pouvoirArme !== null) {
+        if (enMain()) {
           const { sx, sy } = pointCanvas(t.clientX, t.clientY);
           appuiLong = setTimeout(() => {
             appuiLong = null;
             if (doigt && !doigt.bouge) {
-              appliquerPouvoirA(sx, sy);
+              agirA(sx, sy);
               doigt = null;
             }
           }, DUREE_APPUI_LONG);
@@ -648,7 +719,7 @@ canvas.addEventListener("touchend", (ev) => {
   if (ev.touches.length === 0) {
     if (doigt && !doigt.bouge) {
       const { sx, sy } = pointCanvas(doigt.x, doigt.y);
-      if (magasin.modeDieu && magasin.pouvoirArme !== null) {
+      if (enMain()) {
         // Un simple toucher pose le réticule ; le bouton ✓ (ou un appui long) applique.
         const m = versMonde(cam, sx, sy);
         magasin.reticule = { x: Math.floor(m.x), y: Math.floor(m.y) };
@@ -700,6 +771,10 @@ POUVOIRS.forEach((pouvoir, i) => {
 });
 function armer(pouvoir: Pouvoir | null): void {
   magasin.pouvoirArme = pouvoir;
+  if (pouvoir !== null) magasin.outilArme = null;
+  reglageOutil.hidden = magasin.outilArme === null;
+  for (const [o, b] of boutonsOutil)
+    b.setAttribute("aria-pressed", o === magasin.outilArme ? "true" : "false");
   magasin.reticule = null;
   cibleTactile = null;
   btnAppliquer.hidden = true;
@@ -712,7 +787,108 @@ function armer(pouvoir: Pouvoir | null): void {
       : `${fiche.nom} : ${fiche.cible === "personnage" ? "touchez une personne" : fiche.cible === "batiment" ? "touchez un bâtiment" : "touchez une tuile connue"}. ${fiche.description}`;
 }
 function desarmer(): void {
+  magasin.outilArme = null;
   armer(null);
+}
+
+// Sculpter et peupler (M25) : la seconde palette, son rayon et la taille du peuple.
+const paletteOutils = element("outils", HTMLDivElement);
+const reglageOutil = element("reglage-outil", HTMLDivElement);
+const rayonOutilEl = element("rayon-outil", HTMLSpanElement);
+const taillePeupleEl = element("taille-peuple", HTMLSelectElement);
+const boutonsOutil = new Map<Outil, HTMLButtonElement>();
+const OUTILS: readonly Outil[] = [...PINCEAUX, "peupler"];
+for (const outil of OUTILS) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "pouvoir outil";
+  b.dataset.outil = outil;
+  b.setAttribute("aria-pressed", "false");
+  if (outil === "peupler") {
+    b.title = `Peupler (${String(COUT_PEUPLE)} ✦, gratuit dans un monde vide) — de nouvelles familles fondent leur village où vous touchez.`;
+    b.innerHTML = `👥<span class="cout">${String(COUT_PEUPLE)}</span>`;
+  } else {
+    const fiche = FICHES_PINCEAU[outil];
+    b.title = `${fiche.nom} — ${fiche.description} Glissez pour peindre.`;
+    b.innerHTML = `${fiche.emoji}<span class="cout">libre</span>`;
+  }
+  b.addEventListener("click", () => {
+    armerOutil(magasin.outilArme === outil ? null : outil);
+  });
+  paletteOutils.append(b);
+  boutonsOutil.set(outil, b);
+}
+for (const n of TAILLES_PEUPLE) {
+  const o = document.createElement("option");
+  o.value = String(n);
+  o.textContent = `${String(n)} habitants`;
+  taillePeupleEl.append(o);
+}
+taillePeupleEl.value = String(magasin.taillePeuple);
+taillePeupleEl.addEventListener("change", () => {
+  magasin.taillePeuple = Number.parseInt(taillePeupleEl.value, 10) || 12;
+});
+function reglerRayon(delta: number): void {
+  magasin.rayonPinceau = Math.max(0, Math.min(RAYON_PINCEAU_MAX, magasin.rayonPinceau + delta));
+  rayonOutilEl.textContent = String(magasin.rayonPinceau);
+}
+element("btn-rayon-moins", HTMLButtonElement).addEventListener("click", () => {
+  reglerRayon(-1);
+});
+element("btn-rayon-plus", HTMLButtonElement).addEventListener("click", () => {
+  reglerRayon(1);
+});
+function armerOutil(outil: Outil | null): void {
+  magasin.outilArme = outil;
+  magasin.pouvoirArme = null;
+  magasin.reticule = null;
+  cibleTactile = null;
+  btnAppliquer.hidden = true;
+  for (const [, b] of boutonsPouvoir) b.setAttribute("aria-pressed", "false");
+  for (const [o, b] of boutonsOutil) b.setAttribute("aria-pressed", o === outil ? "true" : "false");
+  reglageOutil.hidden = outil === null;
+  taillePeupleEl.hidden = outil !== "peupler";
+  rayonOutilEl.hidden = outil === "peupler";
+  for (const b of reglageOutil.querySelectorAll("button")) b.hidden = outil === "peupler";
+  if (taillePeupleEl.value !== String(magasin.taillePeuple))
+    taillePeupleEl.value = String(magasin.taillePeuple);
+  rayonOutilEl.textContent = String(magasin.rayonPinceau);
+  aidePouvoir.textContent =
+    outil === null
+      ? "Faveur ✦ : +1 par jour, plus quand la colonie prospère ou prie. Choisissez un pouvoir (coût en bas à droite), puis touchez la carte."
+      : outil === "peupler"
+        ? `Peupler : touchez la carte, ${String(magasin.taillePeuple)} personnes y fondent leur village (gratuit si le monde est vide, sinon ${String(COUT_PEUPLE)} ✦).`
+        : `${FICHES_PINCEAU[outil].nom} : glissez sur la carte pour peindre (rayon ${String(magasin.rayonPinceau)}). ${FICHES_PINCEAU[outil].description}`;
+}
+/** Un coup de pinceau à la tuile donnée (le pinceau armé, au rayon réglé). */
+function sculpterEn(x: number, y: number): void {
+  const outil = magasin.outilArme;
+  if (outil === null || outil === "peupler") return;
+  envoyer({ type: "sculpter", pinceau: outil, x, y, rayon: magasin.rayonPinceau });
+}
+/** Applique l'outil armé au point écran : un coup de pinceau, ou un peuple. */
+function appliquerOutilA(sx: number, sy: number): void {
+  const outil = magasin.outilArme;
+  const etat = magasin.etat;
+  if (outil === null || etat === null) return;
+  const m = versMonde(cam, sx, sy);
+  const x = Math.floor(m.x);
+  const y = Math.floor(m.y);
+  if (outil === "peupler") {
+    if (etat.stats.vivants > 0 && etat.faveur.valeur < COUT_PEUPLE) {
+      secouer();
+      return;
+    }
+    envoyer({ type: "peupler", x, y, taille: magasin.taillePeuple });
+    // Un peuple posé : on rend la main, le monde est habité.
+    armerOutil(null);
+  } else {
+    sculpterEn(x, y);
+  }
+  if ("vibrate" in navigator) navigator.vibrate(15);
+  cibleTactile = null;
+  btnAppliquer.hidden = true;
+  magasin.reticule = null;
 }
 function basculerModeDieu(valeur = !magasin.modeDieu): void {
   magasin.modeDieu = valeur;
@@ -726,7 +902,7 @@ btnDieu.addEventListener("click", () => {
   basculerModeDieu();
 });
 btnAppliquer.addEventListener("click", () => {
-  if (cibleTactile !== null) appliquerPouvoirA(cibleTactile.sx, cibleTactile.sy);
+  if (cibleTactile !== null) agirA(cibleTactile.sx, cibleTactile.sy);
 });
 function secouer(): void {
   barrePouvoirs.classList.remove("secousse");
@@ -793,6 +969,13 @@ function rafraichirPouvoirs(): void {
   }
   if (magasin.pouvoirArme !== null && boutonsPouvoir.get(magasin.pouvoirArme)?.disabled === true)
     desarmer();
+  const peupler = boutonsOutil.get("peupler");
+  if (peupler !== undefined) {
+    const gratuit = etat.stats.vivants === 0;
+    peupler.disabled = !gratuit && f.valeur < COUT_PEUPLE;
+    const cout = peupler.querySelector<HTMLElement>(".cout");
+    if (cout) cout.textContent = gratuit ? "libre" : String(COUT_PEUPLE);
+  }
   btnProvidence.setAttribute("aria-pressed", f.providence ? "true" : "false");
   reputationEl.textContent = `Réputation du ciel : ${libelleReputation(f.reputation)} · culte : ${NOMS_CULTE[f.culte] ?? "?"} · ${String(f.prieres)} prière${f.prieres > 1 ? "s" : ""}, ${String(f.exaucees)} exaucée${f.exaucees > 1 ? "s" : ""}`;
   // Les prières en attente : ce que la colonie demande au ciel, et ce qui l'exaucerait.
@@ -899,7 +1082,7 @@ window.addEventListener("keydown", (ev) => {
       basculerSuivi();
       break;
     case "Escape":
-      if (magasin.modeDieu && magasin.pouvoirArme !== null) {
+      if (enMain()) {
         desarmer();
         break;
       }
@@ -910,8 +1093,7 @@ window.addEventListener("keydown", (ev) => {
       basculerModeDieu();
       break;
     case "Enter":
-      if (magasin.modeDieu && magasin.pouvoirArme !== null && cibleTactile !== null)
-        appliquerPouvoirA(cibleTactile.sx, cibleTactile.sy);
+      if (enMain() && cibleTactile !== null) agirA(cibleTactile.sx, cibleTactile.sy);
       break;
     case "+":
     case "=": {

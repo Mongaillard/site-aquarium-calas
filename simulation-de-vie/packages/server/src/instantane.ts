@@ -361,10 +361,21 @@ export class SuiviClient {
   private readonly derniers = new Map<number, number>();
   /** Par morceau, les tuiles déjà annoncées à ce client. */
   private readonly decouvertesEnvoyees = new Map<number, Uint8Array>();
+  /** Version du terrain sculpté que ce client connaît. */
+  private versionTerrain = 0;
 
-  /** Tuiles découvertes depuis le dernier appel, en triplets x, y, biome (toutes au premier appel). */
+  /**
+   * Tuiles découvertes depuis le dernier appel, en triplets x, y, biome (toutes
+   * au premier appel), puis celles que le ciel a sculptées depuis : le viewer
+   * remplace le biome d'une tuile qu'il connaît déjà.
+   */
   nouvellesDecouvertes(sim: Simulation): number[] {
     const resultat: number[] = [];
+    if (sim.grille.versionDuTerrain !== this.versionTerrain) {
+      for (const { tuile: t } of sim.grille.sculpturesDepuis(this.versionTerrain))
+        if (sim.grille.estDecouverte(t.x, t.y)) resultat.push(t.x, t.y, codeBiome(t.biome));
+      this.versionTerrain = sim.grille.versionDuTerrain;
+    }
     for (const m of sim.grille.morceauxGeneres()) {
       if (m.nbDecouvertes === 0) continue;
       const cle = cleMorceau(m.cx, m.cy);

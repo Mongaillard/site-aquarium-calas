@@ -262,6 +262,14 @@ function res(d: EvenementEtat["details"]): string {
 }
 
 /** Résumé d'une ligne pour le journal. `nom(id)` rend « Prénom Nom ». */
+const LIBELLES_PINCEAU: Readonly<Record<string, string>> = {
+  terre: "terre",
+  eau: "eau",
+  foret: "forêt",
+  montagne: "montagne",
+  sable: "sable",
+};
+
 export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string): string {
   const d = e.details;
   const qui = e.acteur ? nom(e.acteur) : "";
@@ -467,6 +475,10 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
       }
     }
     case "divin":
+      if (d.pouvoir === "sculpture")
+        return `🪄 Le ciel sculpte le monde : ${String(d.tuiles)} tuile${Number(d.tuiles) > 1 ? "s" : ""} de ${LIBELLES_PINCEAU[String(d.pinceau)] ?? String(d.pinceau)} autour de (${String(d.x)}, ${String(d.y)}).`;
+      if (d.pouvoir === "peuple")
+        return `🪄 Un peuple de ${String(d.taille)} arrive par la volonté du ciel et fonde ${String(d.village)}${Number(d.cout) > 0 ? ` (${String(d.cout)} ✦)` : ""}.`;
       return `${d.auto === true ? "🙏✨ Providence : " : "✨ "}${String(d.nom)} en (${String(d.x)}, ${String(d.y)}) : ${String(d.effet)}${d.reaction !== null && d.reaction !== undefined && qui ? ` — ${qui} : « ${String(d.reaction)} »` : ""}${typeof d.exauces === "string" && d.exauces !== "" ? ` — prière exaucée : ${d.exauces}` : ""}`;
     case "priere":
       return `🙏 ${qui} prie pour ${LIBELLES_SUJET[String(d.sujet)] ?? String(d.sujet)}${d.autel === true ? " à l'autel" : ""}${typeof d.offrande === "string" ? ` et offre ${d.offrande}` : ""}.`;

@@ -1,5 +1,5 @@
 /** Rendu illustré de la carte : fond pré-rendu, gisements, bâtiments, personnages animés, bulles, nuit. */
-import { FICHES_POUVOIR, LEVER_COUCHER, opaciteNuit } from "@sdv/protocole";
+import { FICHES_PINCEAU, FICHES_POUVOIR, LEVER_COUCHER, opaciteNuit } from "@sdv/protocole";
 import type { BatimentEtat, PersonnageEtat } from "@sdv/protocole";
 import type { Camera } from "./camera.js";
 import { versEcran, versMonde } from "./camera.js";
@@ -227,8 +227,37 @@ export class Rendu {
     // Mode Dieu : effets des miracles, puis halo de visée (espace écran).
     if (etat !== null) {
       for (const f of magasin.effets) this.dessinerEffet(cam, f, maintenant);
-      if (magasin.modeDieu && magasin.pouvoirArme !== null && magasin.reticule !== null)
-        this.dessinerHalo(cam, magasin.pouvoirArme, magasin.reticule, maintenant);
+      if (magasin.modeDieu && magasin.reticule !== null) {
+        if (magasin.pouvoirArme !== null) {
+          const fiche = FICHES_POUVOIR[magasin.pouvoirArme];
+          this.dessinerHalo(
+            cam,
+            {
+              emoji: fiche.emoji,
+              rayon: fiche.rayon,
+              couleur: fiche.bienfait ? "#ffd479" : "#ff9c5f",
+            },
+            magasin.reticule,
+            maintenant,
+            magasin.biomeEn(magasin.reticule.x, magasin.reticule.y) >= 0,
+          );
+        } else if (magasin.outilArme !== null) {
+          const outil = magasin.outilArme;
+          this.dessinerHalo(
+            cam,
+            outil === "peupler"
+              ? { emoji: "👥", rayon: 4, couleur: "#9ad8ff" }
+              : {
+                  emoji: FICHES_PINCEAU[outil].emoji,
+                  rayon: magasin.rayonPinceau,
+                  couleur: "#c8f0a0",
+                },
+            magasin.reticule,
+            maintenant,
+            true,
+          );
+        }
+      }
     }
 
     // Les villages : leur nom au-dessus de leur centre.
@@ -354,17 +383,16 @@ export class Rendu {
   /** Halo de visée d'un pouvoir armé : cercle tireté tournant, rouge sur l'inconnu. */
   private dessinerHalo(
     cam: Camera,
-    pouvoir: keyof typeof FICHES_POUVOIR,
+    fiche: { readonly emoji: string; readonly rayon: number; readonly couleur: string },
     reticule: { x: number; y: number },
     maintenant: number,
+    valide: boolean,
   ): void {
-    const { ctx, magasin } = this;
-    const fiche = FICHES_POUVOIR[pouvoir];
-    const valide = magasin.biomeEn(reticule.x, reticule.y) >= 0;
+    const { ctx } = this;
     const centre = versEcran(cam, reticule.x + 0.5, reticule.y + 0.5);
     const r = Math.max(0.6, fiche.rayon + 0.5) * cam.echelle;
     ctx.save();
-    ctx.strokeStyle = !valide ? "#ff5f5f" : fiche.bienfait ? "#ffd479" : "#ff9c5f";
+    ctx.strokeStyle = valide ? fiche.couleur : "#ff5f5f";
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 6]);
     ctx.lineDashOffset = -(maintenant / 40) % 12;

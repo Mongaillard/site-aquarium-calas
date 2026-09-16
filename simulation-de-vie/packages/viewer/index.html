@@ -40,6 +40,19 @@
             <option value="36">36</option>
             <option value="48">48</option>
           </select>
+          <label for="peuples-entree" class="discret">peuples</label>
+          <select id="peuples-entree" title="Peuples rivaux au départ, chacun avec son village">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+          <label
+            class="discret case"
+            title="Un monde sans personne : sculptez-le, puis posez votre peuple où vous voulez (mode Dieu)"
+          >
+            <input id="vierge-entree" type="checkbox" /> vierge
+          </label>
           <button type="submit" id="btn-nouveau">Nouveau monde</button>
           <button type="button" id="btn-sauvegardes" title="Sauvegarder ou reprendre une partie">
             💾
@@ -86,6 +99,17 @@
               <i id="faveur-jauge"></i><span id="faveur-num">✦ 0</span>
             </div>
             <div id="palette" class="palette"></div>
+            <div
+              id="outils"
+              class="palette outils"
+              title="Sculpter le monde, poser un peuple"
+            ></div>
+            <div id="reglage-outil" class="reglage" hidden>
+              <button id="btn-rayon-moins" type="button" title="Pinceau plus petit">−</button>
+              <span id="rayon-outil">2</span>
+              <button id="btn-rayon-plus" type="button" title="Pinceau plus grand">+</button>
+              <select id="taille-peuple" title="Habitants du peuple à poser" hidden></select>
+            </div>
             <button
               id="btn-providence"
               class="pouvoir providence"

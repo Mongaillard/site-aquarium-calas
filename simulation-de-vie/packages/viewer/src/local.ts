@@ -151,6 +151,12 @@ export class LiaisonLocale implements Liaison {
       case "providence":
         sim.definirProvidence(commande.actif);
         break;
+      case "sculpter":
+        sim.sculpter(commande);
+        break;
+      case "peupler":
+        sim.peupler(commande);
+        break;
     }
     if (this.minuteur !== null) this.diffuser();
   }
@@ -170,7 +176,9 @@ export class LiaisonLocale implements Liaison {
 
   /** L'état complet du monde, à ranger où l'on veut (null tant que le monde n'est pas prêt). */
   sauvegarder(): Sauvegarde | null {
-    return this.sim === null || this.preparation !== null ? null : this.sim.sauvegarder();
+    return this.sim === null || this.preparation !== null || this.ferme
+      ? null
+      : this.sim.sauvegarder();
   }
 
   /**
@@ -180,7 +188,7 @@ export class LiaisonLocale implements Liaison {
    * Une demande pendant qu'une autre est en cours reçoit la même sauvegarde.
    */
   sauvegarderSansBloquer(): Promise<Sauvegarde | null> {
-    if (this.sim === null || this.preparation !== null) return Promise.resolve(null);
+    if (this.sim === null || this.preparation !== null || this.ferme) return Promise.resolve(null);
     if (this.encodage !== null) return this.encodage;
     const promesse = this.encoderParTranches().finally(() => {
       if (this.encodage === promesse) this.encodage = null;

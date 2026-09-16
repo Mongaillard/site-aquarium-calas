@@ -669,6 +669,45 @@ table.saisons td:first-child {
   background: rgba(20, 23, 28, 0.6);
   pointer-events: none;
 }
+/* Sculpter et peupler (M25) : une seconde palette, séparée par un filet. */
+.pouvoirs .outils {
+  border-left: 1px solid var(--bord);
+  padding-left: 8px;
+  flex: none;
+  overflow: visible;
+}
+.pouvoirs .palette:not(.outils) {
+  flex: 0 1 auto;
+  min-width: 96px;
+}
+.pouvoirs .reglage {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.pouvoirs .reglage button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  background: #262b33;
+  font-size: 16px;
+  line-height: 1;
+}
+.pouvoirs .reglage span {
+  min-width: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pouvoirs .reglage select {
+  height: 28px;
+}
+.local .case {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .pouvoirs .colonne {
   display: flex;
   flex-direction: column;

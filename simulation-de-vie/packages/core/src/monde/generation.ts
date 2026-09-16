@@ -61,7 +61,8 @@ export function choisirBiome(altitude: number, humidite: number): Biome {
   return "prairie";
 }
 
-function tirerGisement(rng: Rng, biome: Biome, abondance = 1): Gisement | null {
+/** Tire (ou non) le gisement d'une tuile selon son biome ; sert aussi au pinceau du ciel. */
+export function tirerGisement(rng: Rng, biome: Biome, abondance = 1): Gisement | null {
   // Même nombre de tirages quelle que soit l'abondance : les mondes à douze ne changent pas.
   const facteur = 1 + 0.5 * (abondance - 1);
   const richesse = Math.sqrt(abondance);

@@ -966,7 +966,54 @@ export type Commande =
   /** L'observateur demande qu'un personnage pose sa question à Claude. */
   | { readonly type: "demander_conseil"; readonly id: string }
   /** Providence : répondre automatiquement aux prières (ou cesser). */
-  | { readonly type: "providence"; readonly actif: boolean };
+  | { readonly type: "providence"; readonly actif: boolean }
+  /** Sculpter le monde (M25) : un pinceau en disque sur la carte. */
+  | {
+      readonly type: "sculpter";
+      readonly pinceau: Pinceau;
+      readonly x: number;
+      readonly y: number;
+      readonly rayon: number;
+    }
+  /** Poser un peuple (M25) : de nouvelles familles fondent leur village au point choisi. */
+  | { readonly type: "peupler"; readonly x: number; readonly y: number; readonly taille: number };
+
+/** Les pinceaux du ciel (M25) : ce qu'ils posent, dans l'ordre de la palette. */
+export const PINCEAUX = ["terre", "eau", "foret", "montagne", "sable"] as const;
+export type Pinceau = (typeof PINCEAUX)[number];
+
+export interface FichePinceau {
+  readonly nom: string;
+  readonly emoji: string;
+  readonly description: string;
+}
+
+export const FICHES_PINCEAU: Readonly<Record<Pinceau, FichePinceau>> = {
+  terre: { nom: "Terre", emoji: "🟩", description: "De la prairie : on y bâtit, on y cultive." },
+  eau: {
+    nom: "Eau",
+    emoji: "🟦",
+    description: "Un lac ou un bras de mer : à boire, du poisson, et une frontière.",
+  },
+  foret: {
+    nom: "Forêt",
+    emoji: "🌲",
+    description: "Du bois et des baies, mais on y voit moins loin.",
+  },
+  montagne: {
+    nom: "Montagne",
+    emoji: "⛰️",
+    description: "Pierre et minerai au cœur, collines en lisière ; on n'y bâtit pas.",
+  },
+  sable: { nom: "Sable", emoji: "🟨", description: "Une plage : de l'argile pour les potiers." },
+};
+
+/** Rayon maximal d'un coup de pinceau, en tuiles. */
+export const RAYON_PINCEAU_MAX = 6;
+/** Tailles de peuple proposées par l'interface. */
+export const TAILLES_PEUPLE: readonly number[] = [6, 12, 24, 36, 48];
+/** Faveur que coûte un peuple posé par le ciel dans un monde déjà habité (gratuit s'il est vide). */
+export const COUT_PEUPLE = 25;
 
 /** Vitesses proposées par l'interface (ticks de jeu par seconde réelle). */
 export const VITESSES: readonly number[] = [1, 4, 16, 64, 128, 256];
@@ -997,7 +1044,13 @@ export function analyserCommande(texte: string): Commande | null {
     pensee?: unknown;
     ambition?: unknown;
     actif?: unknown;
+    pinceau?: unknown;
+    rayon?: unknown;
+    taille?: unknown;
   };
+  const coordonnees = Number.isInteger(c.x) && Number.isInteger(c.y);
+  const dansLeMonde =
+    coordonnees && Math.abs(c.x as number) <= 100_000 && Math.abs(c.y as number) <= 100_000;
   switch (c.type) {
     case "pause":
     case "reprendre":
@@ -1028,12 +1081,32 @@ export function analyserCommande(texte: string): Commande | null {
         ...(typeof c.savoir === "string" ? { savoir: c.savoir } : {}),
       };
     }
+    case "sculpter": {
+      const pinceau = c.pinceau;
+      if (typeof pinceau !== "string" || !(PINCEAUX as readonly string[]).includes(pinceau))
+        return null;
+      if (!dansLeMonde || !Number.isInteger(c.rayon)) return null;
+      const rayon = c.rayon as number;
+      if (rayon < 0 || rayon > RAYON_PINCEAU_MAX) return null;
+      return {
+        type: "sculpter",
+        pinceau: pinceau as Pinceau,
+        x: c.x as number,
+        y: c.y as number,
+        rayon,
+      };
+    }
+    case "peupler": {
+      if (!dansLeMonde || !Number.isInteger(c.taille)) return null;
+      const taille = c.taille as number;
+      if (taille < 1 || taille > 48) return null;
+      return { type: "peupler", x: c.x as number, y: c.y as number, taille };
+    }
     case "pouvoir": {
       const pouvoir = c.pouvoir;
       if (typeof pouvoir !== "string" || !(POUVOIRS as readonly string[]).includes(pouvoir))
         return null;
-      if (!Number.isInteger(c.x) || !Number.isInteger(c.y)) return null;
-      if (Math.abs(c.x as number) > 100_000 || Math.abs(c.y as number) > 100_000) return null;
+      if (!dansLeMonde) return null;
       return {
         type: "pouvoir",
         pouvoir: pouvoir as Pouvoir,

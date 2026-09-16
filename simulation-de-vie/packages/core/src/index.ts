@@ -16,7 +16,7 @@ export { BruitSimplex2D } from "./monde/bruit.js";
 export { RESSOURCES, OUTILS, GISEMENTS_PAR_BIOME, ASCII_RESSOURCE } from "./monde/ressources.js";
 export type { Ressource, Outil, Gisement } from "./monde/ressources.js";
 export { Grille, TAILLE_MORCEAU, cleMorceau, coordMorceau } from "./monde/grille.js";
-export type { Position, Tuile, Morceau, Generateur } from "./monde/grille.js";
+export type { Position, Tuile, Morceau, Generateur, Sculpture } from "./monde/grille.js";
 export { genererGrille, choisirBiome, SEUILS } from "./monde/generation.js";
 export type { OptionsGeneration } from "./monde/generation.js";
 export { hacherGrille } from "./monde/hachage.js";
@@ -129,7 +129,14 @@ export type {
   Echec,
   OptionsPersonnage,
 } from "./agents/personnage.js";
-export { genererPopulation, trouverPointDeDepart } from "./agents/population.js";
+export {
+  famillesLibres,
+  genererGroupe,
+  genererPopulation,
+  trouverPointDeDepart,
+} from "./agents/population.js";
+export { PINCEAUX, RAYON_PINCEAU_MAX, biomeDuPinceau, sculpter } from "./monde/terrain.js";
+export type { Pinceau, ResultatSculpture } from "./monde/terrain.js";
 export { trouverChemin, coutChemin } from "./actions/chemin.js";
 export type { OptionsChemin } from "./actions/chemin.js";
 export { decrireAction, decrireIntention, memeIntention } from "./actions/types.js";
@@ -168,7 +175,14 @@ export type {
 export type { Evenement, TypeEvenement, Auditeur } from "./evenements/journal.js";
 export { estEau, eauAdjacente, personnagesVivants } from "./monde.js";
 export type { Monde } from "./monde.js";
-export type { Statistiques, Inspiration, EtapesSauvegarde } from "./simulation.js";
+export type {
+  Statistiques,
+  Inspiration,
+  EtapesSauvegarde,
+  CommandeSculpter,
+  CommandePeupler,
+  ResultatPeuplement,
+} from "./simulation.js";
 export { METEOS, EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
 export type { Meteo, EffetsMeteo, EffetsSaison } from "./monde/meteo.js";
 export {

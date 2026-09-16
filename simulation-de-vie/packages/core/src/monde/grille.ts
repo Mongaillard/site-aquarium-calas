@@ -5,7 +5,7 @@
  * être négatives ; l'origine (0, 0) est le berceau de la colonie.
  */
 import type { Biome } from "./biomes.js";
-import { INFO_BIOME } from "./biomes.js";
+import { BIOMES, INFO_BIOME } from "./biomes.js";
 import type { Batiment } from "./batiments.js";
 import type { Gisement } from "./ressources.js";
 
@@ -17,7 +17,8 @@ export interface Position {
 export interface Tuile {
   readonly x: number;
   readonly y: number;
-  readonly biome: Biome;
+  /** Le biome ; il ne change que sous le pinceau du ciel (`Grille.modifierBiome`). */
+  biome: Biome;
   /** Altitude normalisée dans [-1, 1] (négatif = sous le niveau de la mer). */
   readonly altitude: number;
   /** Humidité normalisée dans [-1, 1]. */
@@ -35,8 +36,8 @@ export interface Morceau {
   readonly cy: number;
   /** Tuiles, indexées (y − cy·T) · T + (x − cx·T) ; `null` = hors du monde. */
   readonly tuiles: readonly (Tuile | null)[];
-  /** Tuiles dotées d'un gisement à la génération, dans un ordre stable. */
-  readonly avecGisement: readonly Tuile[];
+  /** Tuiles dotées d'un gisement à la génération (ou sous le pinceau), dans un ordre stable. */
+  readonly avecGisement: Tuile[];
   /** 1 = tuile déjà vue par la colonie. */
   readonly decouvertes: Uint8Array;
   nbTuiles: number;
@@ -51,6 +52,18 @@ export interface EtatGrille {
     readonly decouvertes: readonly number[];
     readonly gisements: readonly (readonly [number, Gisement])[];
   }[];
+  /** Tuiles sculptées par le ciel : x, y, code du biome (rejouées après la regénération). */
+  readonly terrain?: readonly (readonly [number, number, number])[];
+}
+
+/** Une tuile modifiée par le ciel, et la version du terrain où elle l'a été. */
+export interface Sculpture {
+  readonly tuile: Tuile;
+  readonly version: number;
+}
+
+function cleTuile(x: number, y: number): number {
+  return (x + 32_768) * 65_536 + (y + 32_768);
 }
 
 /** Produit les tuiles d'un morceau ; ne doit dépendre que de (cx, cy) et de la graine. */
@@ -83,6 +96,10 @@ export class Grille {
   private readonly ordre: Morceau[] = [];
   private nbDecouvertes = 0;
   private nbTuiles = 0;
+  /** Tuiles sculptées, par clé de tuile, dans l'ordre de première modification. */
+  private readonly sculptures = new Map<number, Sculpture>();
+  /** Incrémentée à chaque tuile modifiée : les clients savent ce qu'ils ont déjà vu. */
+  private versionTerrain = 0;
 
   /**
    * @param generateur produit un morceau à la demande
@@ -167,7 +184,49 @@ export class Grille {
         });
         return { cx: m.cx, cy: m.cy, decouvertes, gisements };
       }),
+      terrain: [...this.sculptures.values()].map(({ tuile: t }) => [
+        t.x,
+        t.y,
+        BIOMES.indexOf(t.biome),
+      ]),
     };
+  }
+
+  /**
+   * Change le biome d'une tuile (pinceau du ciel). Le gisement de l'ancien biome
+   * disparaît ; le nouveau, s'il y en a un, est à poser par l'appelant. Faux si
+   * la tuile n'existe pas ou si rien ne change.
+   */
+  modifierBiome(x: number, y: number, biome: Biome): boolean {
+    const t = this.tuileOuNull(x, y);
+    if (t === null || t.biome === biome) return false;
+    t.gisement = null;
+    this.sculpter(t, biome);
+    return true;
+  }
+
+  private sculpter(t: Tuile, biome: Biome): void {
+    t.biome = biome;
+    this.versionTerrain += 1;
+    this.sculptures.set(cleTuile(t.x, t.y), { tuile: t, version: this.versionTerrain });
+  }
+
+  /** Pose un gisement sur une tuile (pinceau du ciel) et la range parmi celles qui repoussent. */
+  poserGisement(t: Tuile, gisement: Gisement): void {
+    t.gisement = gisement;
+    const m = this.morceau(coordMorceau(t.x), coordMorceau(t.y));
+    if (!m.avecGisement.includes(t)) m.avecGisement.push(t);
+  }
+
+  /** Les tuiles sculptées, dans l'ordre de première modification. */
+  sculpturesDepuis(version: number): Sculpture[] {
+    if (version >= this.versionTerrain) return [];
+    return [...this.sculptures.values()].filter((s) => s.version > version);
+  }
+
+  /** Version courante du terrain (nombre de modifications depuis la génération). */
+  get versionDuTerrain(): number {
+    return this.versionTerrain;
   }
 
   /** Regénère les morceaux dans le même ordre et y remet découvertes et gisements. */
@@ -183,6 +242,12 @@ export class Grille {
         const t = m.tuiles[i];
         if (t) this.decouvrir(t.x, t.y);
       }
+    }
+    // Les sculptures se rejouent après les gisements : ceux posés par le pinceau restent.
+    for (const [x, y, code] of etat.terrain ?? []) {
+      const biome = BIOMES[code];
+      const t = biome === undefined ? null : this.tuileOuNull(x, y);
+      if (t !== null && biome !== undefined && t.biome !== biome) this.sculpter(t, biome);
     }
   }
 

@@ -190,6 +190,12 @@ export class Serveur {
       case "providence":
         this.sim.definirProvidence(commande.actif);
         break;
+      case "sculpter":
+        this.sim.sculpter(commande);
+        break;
+      case "peupler":
+        this.sim.peupler(commande);
+        break;
     }
     this.diffuser();
   }

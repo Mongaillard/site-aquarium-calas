@@ -46,18 +46,61 @@ function tuilesAutour(grille: Grille, centre: Position, rayon: number): Position
   return resultat;
 }
 
+/** Un peuple à poser : où, combien, sous quels noms, à partir de quel numéro. */
+export interface OptionsGroupe {
+  readonly centre: Position;
+  readonly taille: number;
+  readonly familles: readonly string[];
+  /** Numéro du premier personnage (les identifiants sont `p-0001`, `p-0002`…). */
+  readonly premierNumero: number;
+}
+
+/** Noms de famille pas encore portés, dans un ordre tiré au sort (les plus proches du début d'abord). */
+export function famillesLibres(rng: Rng, portes: ReadonlySet<string>, n: number): string[] {
+  const libres = rng.melanger(NOMS_FAMILLE.filter((f) => !portes.has(f)));
+  const choisies = libres.slice(0, n);
+  // Plus de familles demandées que de noms libres : des branches numérotées.
+  for (let k = 0; choisies.length < n; k++)
+    choisies.push(`${NOMS_FAMILLE[k % NOMS_FAMILLE.length] ?? "Sansnom"}-${String(k + 2)}`);
+  return choisies;
+}
+
+/** La population du premier peuple, autour du berceau (l'origine). */
 export function genererPopulation(rngMonde: Rng, config: SimConfig, grille: Grille): Personnage[] {
   const rng = rngMonde.fork("population");
   const n = config.population.initiale;
   const nbFamilles = Math.max(1, Math.min(config.population.familles, n));
   const familles = rng.melanger(NOMS_FAMILLE).slice(0, nbFamilles);
-  const centre = trouverPointDeDepart(grille);
+  return genererGroupe(rngMonde, rng, config, grille, {
+    centre: trouverPointDeDepart(grille),
+    taille: n,
+    familles,
+    premierNumero: 1,
+  });
+}
+
+/**
+ * Un peuple de plus, où l'on veut : ses membres s'installent autour du centre
+ * (tuile constructible la plus proche), adultes de 18 à 35 ans, à parts égales
+ * entre les familles données.
+ */
+export function genererGroupe(
+  rngMonde: Rng,
+  rng: Rng,
+  config: SimConfig,
+  grille: Grille,
+  options: OptionsGroupe,
+): Personnage[] {
+  const n = options.taille;
+  const familles = options.familles.length > 0 ? options.familles : ["Sansnom"];
+  const nbFamilles = familles.length;
+  const centre = trouverPointDeDepart(grille, options.centre);
   const emplacements = rng.melanger(tuilesAutour(grille, centre, 4));
   const prenomsUtilises = new Set<string>();
   const personnages: Personnage[] = [];
 
   for (let i = 0; i < n; i++) {
-    const id = `p-${String(i + 1).padStart(4, "0")}`;
+    const id = `p-${String(options.premierNumero + i).padStart(4, "0")}`;
     const position = emplacements[i % Math.max(1, emplacements.length)] ?? centre;
     const ageAnnees = rng.entier(18, 35);
     const ageJours =

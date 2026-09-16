@@ -21,7 +21,7 @@ import {
 } from "./agents/corps.js";
 import type { Gisement, Ressource } from "./monde/ressources.js";
 import type { Personnage } from "./agents/personnage.js";
-import { genererPopulation } from "./agents/population.js";
+import { famillesLibres, genererGroupe, genererPopulation } from "./agents/population.js";
 import { creerPersonnage, elaguerConnaissance } from "./agents/personnage.js";
 import { heriter as heriterGenome } from "./agents/genetique.js";
 import {
@@ -59,6 +59,8 @@ import { inventer } from "./savoirs/inventions.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
 import { abondanceDuBerceau, genererGrille } from "./monde/generation.js";
 import { Grille, cleMorceau } from "./monde/grille.js";
+import { RAYON_PINCEAU_MAX, sculpter, tuilePraticableProche } from "./monde/terrain.js";
+import type { Pinceau, ResultatSculpture } from "./monde/terrain.js";
 import {
   COTE_BASSIN,
   CROISSANCE_POISSON,
@@ -91,6 +93,7 @@ import { EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
 import type { Meteo } from "./monde/meteo.js";
 import { Rng } from "./rng.js";
 import type { FaveurEtat, Pouvoir, QuestionConseil } from "@sdv/protocole";
+import { COUT_PEUPLE } from "@sdv/protocole";
 import {
   FAVEUR_EVENEMENTS,
   FAVEUR_OFFRANDE,
@@ -202,6 +205,29 @@ export type ResultatConseil =
 
 /** Rayon, en tuiles, de ce que la colonie connaît de son berceau au premier jour. */
 const RAYON_CONNAISSANCE_INITIALE = 14;
+/** Rayon, en tuiles, que le ciel voit d'un monde vierge (pour le sculpter et le peupler). */
+const RAYON_MONDE_VIERGE = 40;
+/** Distance du berceau à laquelle les peuples rivaux du départ s'installent. */
+const DISTANCE_PEUPLES = 48;
+
+/** Commande `sculpter` : un pinceau, un centre, un rayon. */
+export interface CommandeSculpter {
+  readonly pinceau: Pinceau;
+  readonly x: number;
+  readonly y: number;
+  readonly rayon: number;
+}
+
+/** Commande `peupler` : un point et une taille de peuple. */
+export interface CommandePeupler {
+  readonly x: number;
+  readonly y: number;
+  readonly taille: number;
+}
+
+export type ResultatPeuplement =
+  | { readonly ok: true; readonly village: string; readonly personnages: readonly string[] }
+  | { readonly ok: false; readonly raison: "hors_monde" | "faveur" };
 
 /**
  * Met à niveau l'état d'une sauvegarde d'une version antérieure : les champs
@@ -240,6 +266,8 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
     });
     brut.villages = villages;
   }
+  // Version 5 (M25) : les peuples rivaux du départ (un seul dans les mondes d'avant).
+  defauts(etat.config.population, { peuples: 1 });
   for (const p of etat.personnages) {
     const q = p as unknown as Record<string, unknown>;
     defauts(q, { prestige: 0, maitre: null, banni: null });
@@ -389,14 +417,31 @@ export class Simulation implements Monde {
     } else {
       this.personnages = genererPopulation(rng, config, grille);
       this.compteurPersonnages = this.personnages.length;
-      fonderPremierVillage(this, this.personnages[0]?.corps.position ?? { x: 0, y: 0 }, [
-        ...new Set(this.personnages.map((p) => p.identite.nomFamille)),
-      ]);
+      if (this.personnages.length > 0)
+        fonderPremierVillage(this, this.personnages[0]?.corps.position ?? { x: 0, y: 0 }, [
+          ...new Set(this.personnages.map((p) => p.identite.nomFamille)),
+        ]);
+      // Des peuples rivaux dès le départ : chacun son village, à bonne distance du berceau.
+      const rngPeuples = rng.fork("peuples");
+      const decalage = rngPeuples.suivant() * Math.PI * 2;
+      for (let k = 1; k < config.population.peuples; k++) {
+        const angle = decalage + (Math.PI * 2 * k) / config.population.peuples;
+        this.poserPeuple(
+          {
+            x: Math.round(Math.cos(angle) * DISTANCE_PEUPLES),
+            y: Math.round(Math.sin(angle) * DISTANCE_PEUPLES),
+          },
+          config.population.initiale,
+          rngPeuples,
+        );
+      }
       this.danger = etatDangerInitial(horloge.ticksParJour);
       this.peuplerFaune();
       // La colonie s'installe en terrain reconnu : chacun connaît déjà les environs
       // du berceau (points d'eau, gisements), et ces tuiles comptent comme découvertes.
       for (const p of this.personnages) observer(this, p, RAYON_CONNAISSANCE_INITIALE);
+      // Un monde vierge : le ciel voit le berceau, pour le sculpter et y poser un peuple.
+      if (this.personnages.length === 0) this.reveler({ x: 0, y: 0 }, RAYON_MONDE_VIERGE);
     }
     this.journal.ecouter((e) => {
       this.memoriser(e);
@@ -513,6 +558,113 @@ export class Simulation implements Monde {
     } else {
       p.drapeaux.soirsSansIdee = besoinSansIdee(this, p) ? p.drapeaux.soirsSansIdee + 1 : 0;
     }
+  }
+
+  // ------------------------------------------------------------ sculpter et peupler
+
+  /** Découvre un disque de tuiles autour d'un centre (vue du ciel). */
+  private reveler(centre: Position, rayon: number): void {
+    for (let dy = -rayon; dy <= rayon; dy++)
+      for (let dx = -rayon; dx <= rayon; dx++)
+        if (Math.hypot(dx, dy) <= rayon + 0.5) this.grille.decouvrir(centre.x + dx, centre.y + dy);
+  }
+
+  /**
+   * Le pinceau du ciel (commande `sculpter`) : remodèle le terrain en disque.
+   * Gratuit : c'est l'acte de création, pas un miracle. Les personnes que l'eau
+   * profonde surprend sont posées sur la rive la plus proche.
+   */
+  sculpter(commande: CommandeSculpter): ResultatSculpture {
+    const rayon = Math.max(0, Math.min(RAYON_PINCEAU_MAX, commande.rayon));
+    const centre = { x: commande.x, y: commande.y };
+    const resultat = sculpter(this.grille, this.rng, commande.pinceau, centre, rayon);
+    if (resultat.tuiles === 0) return resultat;
+    for (const p of this.personnages) {
+      if (!p.vivant) continue;
+      const pos = p.corps.position;
+      if (Grille.distance(pos, centre) > rayon + 1) continue;
+      const t = this.grille.tuileOuNull(pos.x, pos.y);
+      if (t === null || INFO_BIOME[t.biome].praticable) continue;
+      const rive = tuilePraticableProche(this.grille, pos);
+      if (rive !== null) p.corps.position = { x: rive.x, y: rive.y };
+    }
+    this.emettre(
+      "divin",
+      null,
+      { pouvoir: "sculpture", pinceau: commande.pinceau, rayon, tuiles: resultat.tuiles },
+      3,
+      centre,
+    );
+    return resultat;
+  }
+
+  /**
+   * Un peuple posé par le ciel (commande `peupler`) : de nouvelles familles
+   * s'installent autour du point choisi et y fondent leur village. Le premier
+   * peuple d'un monde vierge ne coûte rien ; les suivants coûtent de la faveur.
+   */
+  peupler(commande: CommandePeupler): ResultatPeuplement {
+    const taille = Math.max(1, Math.min(48, Math.floor(commande.taille)));
+    const site = tuilePraticableProche(this.grille, { x: commande.x, y: commande.y }, 24);
+    if (site === null) return { ok: false, raison: "hors_monde" };
+    const gratuit = this.vivants().length === 0;
+    const cout = gratuit ? 0 : COUT_PEUPLE;
+    if (this.faveur.valeur < cout) return { ok: false, raison: "faveur" };
+    const rng = this.rng.fork(`peuple:${String(this.villages.compteurs.villages + 1)}`);
+    const nouveaux = this.poserPeuple({ x: site.x, y: site.y }, taille, rng);
+    if (nouveaux.length === 0) return { ok: false, raison: "hors_monde" };
+    this.faveur.valeur -= cout;
+    for (const p of nouveaux) {
+      observer(this, p, RAYON_CONNAISSANCE_INITIALE);
+      this.emettre(
+        "arrivee",
+        p,
+        { prenom: p.identite.prenom, nomFamille: p.identite.nomFamille, source: "divin" },
+        5,
+      );
+    }
+    const village = this.villages.villages[this.villages.villages.length - 1];
+    this.emettre(
+      "divin",
+      null,
+      { pouvoir: "peuple", taille: nouveaux.length, village: village?.nom ?? "", cout },
+      6,
+      { x: site.x, y: site.y },
+    );
+    return { ok: true, village: village?.id ?? "", personnages: nouveaux.map((p) => p.id) };
+  }
+
+  /** Pose un peuple : familles neuves, membres, fratries, village. Renvoie les nouveaux venus. */
+  private poserPeuple(centre: Position, taille: number, rng: Rng): Personnage[] {
+    const portees = new Set<string>();
+    for (const p of this.personnages) portees.add(p.identite.nomFamille);
+    for (const v of this.villages.villages) for (const f of v.familles) portees.add(f);
+    const familles = famillesLibres(rng, portees, Math.max(1, Math.round(taille / 4)));
+    let nouveaux: Personnage[];
+    try {
+      nouveaux = genererGroupe(this.rng, rng, this.config, this.grille, {
+        centre,
+        taille,
+        familles,
+        premierNumero: this.compteurPersonnages + 1,
+      });
+    } catch {
+      return [];
+    }
+    this.compteurPersonnages += nouveaux.length;
+    for (const a of nouveaux) {
+      this.personnages.push(a);
+      this.cerveaux.set(a.id, new RuleBrain(a));
+      for (const b of nouveaux)
+        if (a.id !== b.id && a.identite.nomFamille === b.identite.nomFamille)
+          a.relations.set(b.id, relationFamiliale(b.id, "fratrie"));
+    }
+    const premier = nouveaux[0];
+    if (premier !== undefined)
+      fonderPremierVillage(this, premier.corps.position, [
+        ...new Set(nouveaux.map((p) => p.identite.nomFamille)),
+      ]);
+    return nouveaux;
   }
 
   // ------------------------------------------------------------ mode Dieu

@@ -21,6 +21,8 @@ export interface SimConfig {
   population: {
     initiale: number;
     familles: number;
+    /** Peuples rivaux au départ (1 = la seule colonie du berceau) ; chacun a `initiale` habitants. */
+    peuples: number;
   };
   temps: {
     minutesParTick: number;
@@ -71,7 +73,7 @@ export interface SimConfig {
 export const CONFIG_PAR_DEFAUT: SimConfig = {
   seed: 42,
   monde: { joursParSaison: 30, echelleRelief: 40, echelleContinents: 220, berceau: 28 },
-  population: { initiale: 12, familles: 3 },
+  population: { initiale: 12, familles: 3, peuples: 1 },
   temps: { minutesParTick: 10, snapshotTousLesTicks: 144 },
   vie: {
     joursParAnnee: 120,
@@ -137,6 +139,8 @@ export function validerConfig(config: SimConfig): void {
     erreurs.push("vie.joursParAnnee doit valoir 4 × monde.joursParSaison");
   }
   if (config.population.initiale < 0) erreurs.push("population.initiale doit être ≥ 0");
+  if (config.population.peuples < 1 || config.population.peuples > 6)
+    erreurs.push("population.peuples doit être entre 1 et 6");
   if (erreurs.length > 0) {
     throw new Error(`Configuration invalide :\n - ${erreurs.join("\n - ")}`);
   }

@@ -7,7 +7,7 @@ import type {
   MessageServeur,
 } from "@sdv/protocole";
 import { FICHES_POUVOIR, decouperTranscription } from "@sdv/protocole";
-import type { Pouvoir } from "@sdv/protocole";
+import type { Pinceau, Pouvoir } from "@sdv/protocole";
 
 export interface Bulle {
   readonly id: string;
@@ -17,6 +17,9 @@ export interface Bulle {
 }
 
 /** Effet visuel d'un miracle sur la carte (une seconde environ). */
+/** Un outil du ciel : un pinceau de terrain, ou poser un peuple. */
+export type Outil = Pinceau | "peupler";
+
 export interface Effet {
   readonly pouvoir: string;
   readonly x: number;
@@ -94,6 +97,10 @@ export class Magasin {
   /** Mode Dieu : actif, pouvoir armé, réticule (tactile) et effets en cours. */
   modeDieu = false;
   pouvoirArme: Pouvoir | null = null;
+  /** Sculpter et peupler (M25) : l'outil armé, le rayon du pinceau, la taille du peuple. */
+  outilArme: Outil | null = null;
+  rayonPinceau = 2;
+  taillePeuple = 12;
   reticule: { x: number; y: number } | null = null;
   effets: Effet[] = [];
 
