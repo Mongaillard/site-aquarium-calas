@@ -3,7 +3,8 @@
  * déjà mis à l'échelle : 1 = une tuile). Aucune image externe.
  */
 
-import { buissonBaies, gemmes, pin, tasDArgile, tasDePierre } from "./atlas.js";
+import { buissonBaies, gemmes, pin, spritePersonnage, tasDArgile, tasDePierre } from "./atlas.js";
+import type { CouchesPersonnage } from "./atlas.js";
 
 export type Ctx = CanvasRenderingContext2D;
 
@@ -207,7 +208,7 @@ export function abri(ctx: Ctx, x: number, y: number): void {
 }
 
 /** L'ombre portée d'un bâtiment, au sud-est. */
-function ombreSol(ctx: Ctx, x: number, y: number): void {
+export function ombreSol(ctx: Ctx, x: number, y: number): void {
   ctx.fillStyle = "rgba(0,0,0,0.22)";
   ctx.beginPath();
   ctx.ellipse(x + 0.55, y + 0.93, 0.5, 0.12, 0, 0, Math.PI * 2);
@@ -333,14 +334,19 @@ export function fumoir(ctx: Ctx, x: number, y: number, maintenant: number): void
   ctx.fill();
   ctx.fillStyle = "#2a1a10";
   ctx.fillRect(x + 0.42, y + 0.66, 0.16, 0.26);
+  fumee(ctx, x + 0.5, y + 0.2, maintenant);
+}
+
+/** Une fumée qui ondule depuis le point (x, y) : trois volutes qui montent et s'élargissent. */
+export function fumee(ctx: Ctx, x: number, y: number, maintenant: number): void {
   const t = maintenant / 900;
   ctx.fillStyle = "rgba(220,220,220,0.5)";
   for (let i = 0; i < 3; i++) {
     const phase = (t + i * 0.33) % 1;
     ctx.beginPath();
     ctx.arc(
-      x + 0.5 + Math.sin((phase + i) * 6) * 0.08,
-      y + 0.2 - phase * 0.3,
+      x + Math.sin((phase + i) * 6) * 0.08,
+      y - phase * 0.3,
       0.05 + phase * 0.05,
       0,
       Math.PI * 2,
@@ -566,6 +572,11 @@ export interface AspectPersonnage {
   readonly notable?: boolean;
   /** Banni : silhouette grisée. */
   readonly banni?: boolean;
+  /**
+   * Les couches du sprite Kenney (M31) : si elles sont données et la planche décodée, le
+   * personnage se dessine en pixels ; sinon la figure vectorielle reste.
+   */
+  readonly couches?: CouchesPersonnage;
 }
 
 export const TEINTS: Readonly<Record<string, string>> = {
@@ -599,6 +610,12 @@ export function personnage(ctx: Ctx, x: number, y: number, a: AspectPersonnage):
   ctx.beginPath();
   ctx.ellipse(cx, sol, 0.26 * s, 0.08 * s, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  const sprite = a.couches === undefined ? null : spritePersonnage(a.couches);
+  if (sprite !== null) {
+    personnageEnPixels(ctx, sprite, cx, sol, a);
+    return;
+  }
 
   if (a.endormi) {
     // Allongé : corps horizontal, tête à gauche.
@@ -637,28 +654,7 @@ export function personnage(ctx: Ctx, x: number, y: number, a: AspectPersonnage):
     ctx.fillStyle = "#d63b3b";
     ctx.fillRect(cx - 0.19 * s, sol - 0.5 * s, 0.38 * s, 0.07 * s);
   }
-  if (a.alerte === true) {
-    ctx.fillStyle = "#ffd23a";
-    ctx.font = `bold ${0.5 * s}px sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText("!", cx, sol - 1.05 * s);
-  } else if (a.notable === true) {
-    ctx.fillStyle = "#ffd479";
-    ctx.beginPath();
-    const r = 0.14 * s;
-    const cy = sol - 1.12 * s;
-    for (let i = 0; i < 10; i++) {
-      const ang = -Math.PI / 2 + (i * Math.PI) / 5;
-      const rr = i % 2 === 0 ? r : r * 0.45;
-      const px = cx + Math.cos(ang) * rr;
-      const py = cy + Math.sin(ang) * rr;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
+  insignes(ctx, cx, sol, a);
   ctx.strokeStyle = a.contour;
   ctx.lineWidth = 0.035;
   ctx.stroke();
@@ -709,6 +705,78 @@ export function personnage(ctx: Ctx, x: number, y: number, a: AspectPersonnage):
   ctx.arc(cx - 0.05 * s, ty + 0.02 * s, 0.02 * s, 0, Math.PI * 2);
   ctx.arc(cx + 0.05 * s, ty + 0.02 * s, 0.02 * s, 0, Math.PI * 2);
   ctx.fill();
+}
+
+/** Le « ! » d'alarme ou l'étoile de notable au-dessus de la tête. */
+function insignes(ctx: Ctx, cx: number, sol: number, a: AspectPersonnage): void {
+  const s = a.echelle;
+  if (a.alerte === true) {
+    ctx.fillStyle = "#ffd23a";
+    ctx.font = `bold ${0.5 * s}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("!", cx, sol - 1.05 * s);
+  } else if (a.notable === true) {
+    ctx.fillStyle = "#ffd479";
+    ctx.beginPath();
+    const r = 0.14 * s;
+    const cy = sol - 1.12 * s;
+    for (let i = 0; i < 10; i++) {
+      const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rr = i % 2 === 0 ? r : r * 0.45;
+      const px = cx + Math.cos(ang) * rr;
+      const py = cy + Math.sin(ang) * rr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/**
+ * Le personnage en pixels (M31) : le sprite composé, une tuile de haut, les pieds au sol.
+ * Couché quand il dort ; en marche, un balancement et un léger roulis.
+ */
+function personnageEnPixels(
+  ctx: Ctx,
+  sprite: HTMLCanvasElement,
+  cx: number,
+  sol: number,
+  a: AspectPersonnage,
+): void {
+  const s = a.echelle;
+  const c = 1.05 * s;
+  if (a.endormi) {
+    ctx.save();
+    ctx.translate(cx, sol - 0.22 * s);
+    ctx.rotate(-Math.PI / 2);
+    ctx.drawImage(sprite, -c / 2, -c / 2, c, c);
+    ctx.restore();
+    ctx.fillStyle = "#cfe6ff";
+    ctx.font = `${0.32 * s}px sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("z", cx + 0.2 * s, sol - 0.45 * s);
+    return;
+  }
+  const t = a.marche ? Math.sin(a.phase * Math.PI * 2) : 0;
+  ctx.save();
+  ctx.translate(cx, sol - Math.abs(t) * 0.05 * s);
+  if (a.marche) ctx.rotate(t * 0.07);
+  ctx.drawImage(sprite, -c / 2, -c, c, c);
+  ctx.restore();
+  if (a.enceinte) {
+    ctx.fillStyle = a.couleur;
+    ctx.beginPath();
+    ctx.arc(cx + 0.1 * s, sol - 0.36 * s, 0.11 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (a.blesse === true) {
+    ctx.fillStyle = "#d63b3b";
+    ctx.fillRect(cx - 0.2 * s, sol - 0.52 * s, 0.4 * s, 0.07 * s);
+  }
+  insignes(ctx, cx, sol, a);
 }
 
 export interface AspectTroupeau {

@@ -37,6 +37,7 @@ import {
   habitants,
   nourritureDe,
   forceDe,
+  possede,
 } from "@sdv/core";
 import type {
   Evenement,
@@ -47,6 +48,7 @@ import type {
   Lecon,
   Savoir,
   TypeBatiment,
+  TypeObjet,
 } from "@sdv/core";
 import type {
   AmbitionFiche,
@@ -123,7 +125,43 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     banni: estBanni(sim, p),
     abattu: p.psyche.abattu,
     foi: Math.round(p.foi * 10) / 10,
+    outil: outilEnMain(p),
   };
+}
+
+/** L'outil qu'un personnage tient, d'après ce qu'il veut faire et ce qu'il porte (M31). */
+export function outilEnMain(p: Personnage): string | null {
+  const i = p.intention;
+  if (i === null) return null;
+  const inv = p.corps.inventaire;
+  const a = (type: TypeObjet): boolean => possede(inv, type);
+  const arme = (): string | null => (a("arc") ? "arc" : a("lance") ? "lance" : null);
+  switch (i.type) {
+    case "recolter":
+      switch (i.ressource) {
+        case "bois":
+          return a("hache_cuivre") ? "hache_cuivre" : a("hache_pierre") ? "hache" : null;
+        case "pierre":
+        case "minerai":
+        case "cuivre":
+          return a("pioche_cuivre") ? "pioche_cuivre" : a("pioche") ? "pioche" : null;
+        case "poisson":
+          return a("canne_a_peche") || a("filet") ? "canne" : null;
+        case "gibier":
+          return arme();
+        default:
+          return null;
+      }
+    case "abattre":
+    case "defendre":
+    case "veiller":
+      return arme();
+    case "construire":
+    case "reparer":
+      return "marteau";
+    default:
+      return null;
+  }
 }
 
 /** Les villages, pour l'onglet Village et la carte. */

@@ -1,8 +1,9 @@
 /**
- * Atlas de tuiles (M27) : deux planches CC0 de Kenney chargées une fois,
- * découpées par coordonnées de grille, et posées comme textures ponctuelles
- * au-dessus du fond vectoriel (arbres, buissons, tas de pierre et d'argile,
- * minerai, mousserons). Voir `assets/tuiles/CREDITS.md`.
+ * Atlas de tuiles (M27, M31) : quatre planches CC0 de Kenney chargées une fois,
+ * découpées par coordonnées de grille ou par rectangle, et posées comme textures
+ * au-dessus du fond vectoriel — arbres, buissons, tas de pierre et d'argile,
+ * minerai, mousserons (M27) ; bâtiments et personnages en couches (M31).
+ * Voir `assets/tuiles/CREDITS.md`.
  *
  * Chaque planche s'importe en `?inline` : elle finit en URL `data:` dans le
  * script, comme le reste du rendu — aucune image externe à charger au
@@ -10,6 +11,8 @@
  */
 import roguelikeUrl from "./assets/tuiles/roguelike/roguelikeSheet_transparent.png?inline";
 import tinyTownUrl from "./assets/tuiles/tiny-town/tilemap_packed.png?inline";
+import medievalUrl from "./assets/tuiles/medieval-rts/medievalRTS_spritesheet.png?inline";
+import personnagesUrl from "./assets/tuiles/roguelike-characters/roguelikeChar_transparent.png?inline";
 
 interface Feuille {
   readonly image: HTMLImageElement;
@@ -31,10 +34,12 @@ function charger(url: string, tuile: number, pas: number): Feuille {
 
 const roguelike = charger(roguelikeUrl, 16, 17);
 const tinyTown = charger(tinyTownUrl, 16, 16);
+const medieval = charger(medievalUrl, 0, 0);
+const personnages = charger(personnagesUrl, 16, 17);
 
-/** Vrai une fois les deux planches décodées : avant, mieux vaut ne rien mettre en cache. */
+/** Vrai une fois les quatre planches décodées : avant, mieux vaut ne rien mettre en cache. */
 export function atlasPret(): boolean {
-  return roguelike.prete && tinyTown.prete;
+  return roguelike.prete && tinyTown.prete && medieval.prete && personnages.prete;
 }
 
 /** Dessine la tuile (col, row) d'une feuille dans le carré [x, y, w, h] (repère monde). */
@@ -133,4 +138,199 @@ export function mousserons(
 ): void {
   const c = taille;
   tuile(ctx, tinyTown, 5, 2, x + 0.5 - c / 2, y + 0.95 - c, c, c);
+}
+
+/* ---------- Bâtiments (Medieval RTS, M31) ---------- */
+
+/** Rectangles de l'atlas Medieval RTS (x, y, largeur, hauteur en pixels), recopiés de son XML. */
+const STRUCTURES = {
+  tente: [479, 382, 32, 40],
+  grange: [380, 447, 56, 60],
+  puits: [511, 197, 20, 36],
+  maison_haute: [431, 84, 44, 60],
+  maison_basse: [431, 262, 44, 48],
+  four: [383, 320, 52, 60],
+  fumoir: [384, 0, 52, 48],
+  sanctuaire: [431, 226, 44, 36],
+} as const;
+
+export type Structure = keyof typeof STRUCTURES;
+
+/** Vrai si la planche des bâtiments est décodée : sinon, le dessin vectoriel reste. */
+export function batimentsPrets(): boolean {
+  return medieval.prete;
+}
+
+/**
+ * Pose un bâtiment de l'atlas sur la tuile (x, y) : `largeur` tuiles de large, ancré au sol
+ * (le bas du sprite à y + 0.98), hauteur proportionnelle. Renvoie faux si la planche manque.
+ */
+export function structure(
+  ctx: CanvasRenderingContext2D,
+  nom: Structure,
+  x: number,
+  y: number,
+  largeur: number,
+): boolean {
+  if (!medieval.prete) return false;
+  const [sx, sy, sw, sh] = STRUCTURES[nom];
+  const hauteur = (largeur * sh) / sw;
+  ctx.drawImage(
+    medieval.image,
+    sx,
+    sy,
+    sw,
+    sh,
+    x + 0.5 - largeur / 2,
+    y + 0.98 - hauteur,
+    largeur,
+    hauteur,
+  );
+  return true;
+}
+
+/* ---------- Personnages (Roguelike Characters, M31) ---------- */
+
+/** Ce qu'il faut pour composer un personnage : chaque clé change le sprite en cache. */
+export interface CouchesPersonnage {
+  /** Clé de teint du moteur : clair, hâlé, mat, foncé. */
+  readonly teint: string;
+  /** Clé de cheveux du moteur : noirs, bruns, châtains, blonds, roux, gris. */
+  readonly cheveux: string;
+  readonly sexe: "F" | "M";
+  /** Coiffure 0..2, tirée de l'identité pour varier les têtes. */
+  readonly coiffure: number;
+  /** Couleur CSS de la tunique (la famille). */
+  readonly couleur: string;
+  /** Outil en main (`PersonnageEtat.outil`) ou null. */
+  readonly outil: string | null;
+  readonly malade: boolean;
+  readonly banni: boolean;
+}
+
+const TAILLE = 16;
+/** Corps : colonne 0, ligne par teint ; `foncé` prend le corps brun assombri. */
+const CORPS: Readonly<Record<string, { readonly row: number; readonly teinte: string | null }>> = {
+  clair: { row: 0, teinte: null },
+  hâlé: { row: 1, teinte: null },
+  mat: { row: 2, teinte: null },
+  foncé: { row: 2, teinte: "#a07858" },
+};
+/** Blocs de cheveux : coin haut-gauche (col, row) d'un bloc de 4×4 coiffures d'une couleur. */
+const BLOCS_CHEVEUX: Readonly<Record<string, readonly [number, number]>> = {
+  bruns: [19, 0],
+  châtains: [19, 0],
+  roux: [23, 0],
+  blonds: [19, 4],
+  noirs: [23, 4],
+  gris: [19, 8],
+};
+/** Coiffures dans un bloc : (dcol, drow) — courtes pour les hommes, longues pour les femmes. */
+const COIFFURES: Readonly<Record<"F" | "M", readonly (readonly [number, number])[]>> = {
+  M: [
+    [0, 0],
+    [2, 0],
+    [3, 0],
+  ],
+  F: [
+    [1, 0],
+    [1, 1],
+    [3, 1],
+  ],
+};
+/** Outils : colonne, et ligne selon la matière (pierre : bois brun ; cuivre : ferrure claire). */
+const OUTILS: Readonly<Record<string, readonly [number, number]>> = {
+  hache: [51, 0],
+  hache_cuivre: [51, 7],
+  pioche: [50, 0],
+  pioche_cuivre: [50, 7],
+  lance: [42, 0],
+  arc: [52, 0],
+  canne: [44, 0],
+  marteau: [49, 0],
+};
+const TUNIQUE: readonly [number, number] = [10, 4];
+
+const cache = new Map<string, HTMLCanvasElement>();
+let brouillon: CanvasRenderingContext2D | null = null;
+
+function contexte(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const ctx = canvas.getContext("2d");
+  if (ctx === null) throw new Error("canvas 2D indisponible");
+  return ctx;
+}
+
+/** Une couche de la planche, teintée (multiplication) si demandé, posée sur `dest`. */
+function couche(
+  dest: CanvasRenderingContext2D,
+  col: number,
+  row: number,
+  teinte: string | null,
+): void {
+  const { image, pas } = personnages;
+  if (teinte === null) {
+    dest.drawImage(image, col * pas, row * pas, TAILLE, TAILLE, 0, 0, TAILLE, TAILLE);
+    return;
+  }
+  if (brouillon === null) {
+    const c = document.createElement("canvas");
+    c.width = TAILLE;
+    c.height = TAILLE;
+    brouillon = contexte(c);
+  }
+  const b = brouillon;
+  b.globalCompositeOperation = "source-over";
+  b.clearRect(0, 0, TAILLE, TAILLE);
+  b.drawImage(image, col * pas, row * pas, TAILLE, TAILLE, 0, 0, TAILLE, TAILLE);
+  b.globalCompositeOperation = "multiply";
+  b.fillStyle = teinte;
+  b.fillRect(0, 0, TAILLE, TAILLE);
+  // La multiplication a peint tout le carré : on ne garde que la silhouette de la couche.
+  b.globalCompositeOperation = "destination-in";
+  b.drawImage(image, col * pas, row * pas, TAILLE, TAILLE, 0, 0, TAILLE, TAILLE);
+  b.globalCompositeOperation = "source-over";
+  dest.drawImage(b.canvas, 0, 0);
+}
+
+/** Le sprite composé d'un personnage (16×16), mis en cache par apparence ; null si la planche manque. */
+export function spritePersonnage(c: CouchesPersonnage): HTMLCanvasElement | null {
+  if (!personnages.prete) return null;
+  const cle = `${c.teint}|${c.cheveux}|${c.sexe}|${String(c.coiffure)}|${c.couleur}|${c.outil ?? ""}|${c.malade ? "m" : ""}|${c.banni ? "b" : ""}`;
+  const existant = cache.get(cle);
+  if (existant !== undefined) return existant;
+  if (cache.size > 2000) cache.clear();
+  const canvas = document.createElement("canvas");
+  canvas.width = TAILLE;
+  canvas.height = TAILLE;
+  const ctx = contexte(canvas);
+  const corps = CORPS[c.teint] ?? { row: 0, teinte: null };
+  couche(ctx, 0, corps.row, c.malade ? "#c9d8c6" : corps.teinte);
+  couche(ctx, TUNIQUE[0], TUNIQUE[1], c.couleur);
+  const bloc = BLOCS_CHEVEUX[c.cheveux] ?? [19, 0];
+  const coiffures = COIFFURES[c.sexe];
+  const coiffure = coiffures[Math.abs(c.coiffure) % coiffures.length] ?? [0, 0];
+  couche(
+    ctx,
+    bloc[0] + coiffure[0],
+    bloc[1] + coiffure[1],
+    c.cheveux === "châtains" ? "#e0c090" : null,
+  );
+  const outil = c.outil === null ? undefined : OUTILS[c.outil];
+  if (outil !== undefined) couche(ctx, outil[0], outil[1], null);
+  if (c.banni && brouillon !== null) {
+    // À l'écart du village : une silhouette éteinte. La multiplication peint tout le carré,
+    // une copie du composé sert ensuite de pochoir pour n'en garder que la silhouette.
+    const b = brouillon;
+    b.globalCompositeOperation = "source-over";
+    b.clearRect(0, 0, TAILLE, TAILLE);
+    b.drawImage(canvas, 0, 0);
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = "#8a8a90";
+    ctx.fillRect(0, 0, TAILLE, TAILLE);
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(b.canvas, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+  }
+  cache.set(cle, canvas);
+  return canvas;
 }

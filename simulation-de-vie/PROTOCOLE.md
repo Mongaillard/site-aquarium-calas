@@ -1197,6 +1197,46 @@ pirogue dans ce moteur ; il est écarté.
   (gués présents, rares, étroits, rive à rive). `actions.test.ts` ne marche plus sur l'eau.
   Calibration graine 7, 240 jours : ≥ 12 vivants tenus ; poisson −28 %.
 
+## 8 undecies. Bâtiments et personnages en sprites tels que réalisés (M31)
+
+Deux planches CC0 de plus dans `assets/tuiles/` (voir `CREDITS.md`), importées en `?inline`
+comme celles de M27 : `medieval-rts/medievalRTS_spritesheet.png` (atlas 550 × 550, rectangles
+recopiés de son XML) et `roguelike-characters/roguelikeChar_transparent.png` (54 × 12 tuiles de
+16 px, pas 17). `atlasPret()` attend les quatre planches avant de mettre un fond en cache.
+
+- **Bâtiments** (`atlas.ts` `structure(ctx, nom, x, y, largeur)`) : le sprite est ancré au sol
+  (bas à y + 0,98), `largeur` tuiles de large, hauteur proportionnelle ; `rendu.ts` pose d'abord
+  `sprites.ombreSol` puis le sprite, et retombe sur le vectoriel si la planche n'est pas décodée.
+  Correspondances : abri → Structure_08 (tente, 0,9), maison → 17 ou 18 selon `bruit(x, y, 31)`
+  (1,0), entrepôt → 09 (grange, 1,15), four → 19 (1,05), fumoir → 20 (1,05 ; `sprites.fumee`
+  reste, sur la cheminée), puits → 12 (0,55), autel → 23 (sanctuaire, 0,95). **[DÉCISION]**
+  Tombe, stèle, enclos, champ, palissade, feu de camp, port et chantiers restent vectoriels :
+  animés (feu, champ par stade) ou sans équivalent dans la planche.
+- **Personnages** (`atlas.ts` `spritePersonnage(couches)`) : un canevas 16 × 16 composé une
+  fois par apparence et mis en cache (clé = teint, cheveux, sexe, coiffure, couleur, outil,
+  malade, banni ; vidé au-delà de 2 000). Couches, dans l'ordre : corps (colonne 0, ligne 0 clair,
+  1 hâlé, 2 mat ; foncé = ligne 2 multipliée par `#a07858` ; malade = multiplié par `#c9d8c6`),
+  tunique blanche (10, 4) multipliée par la couleur de famille, cheveux (blocs de 4 × 4 : bruns et
+  châtains (19, 0) — châtains éclaircis —, roux (23, 0), blonds (19, 4), noirs (23, 4), gris
+  (19, 8) ; coiffure = `coiffureDe(id)` ∈ 0..2, hommes (0,0) (2,0) (3,0), femmes (1,0) (1,1)
+  (3,1)), outil (hache 51, pioche 50, lance 42, arc 52, canne 44 (bâton), marteau 49 ; ligne 0
+  pierre, ligne 7 cuivre). Banni : le composé multiplié par `#8a8a90` sous son propre pochoir.
+  La teinte se fait par `multiply` puis `destination-in` sur un brouillon partagé.
+- **Dessin** (`sprites.personnage`) : si `couches` est donné et la planche décodée,
+  `personnageEnPixels` : 1,05 × échelle de côté, pieds au sol ; endormi = tourné de −90° et un
+  « z » ; en marche, montée de 0,05 × |sin| et roulis de ±0,07 rad ; ventre de grossesse, bandeau
+  de blessure, « ! » et étoile (`insignes`) par-dessus. Sinon la figure vectorielle d'avant.
+  `rendu.ts` met `imageSmoothingEnabled` à faux à partir de `SEUIL_PIXELS = 14` px par tuile
+  autour des boucles de personnages et de bandes (les bandes : hâlé, noirs, tunique `#5a5a60`,
+  lance).
+- **Protocole** : `PersonnageEtat.outil: string | null`, calculé par `outilEnMain` dans
+  `instantane.ts` (donc pour le serveur comme pour le mode local) : recolter bois → hache
+  (cuivre si possédée, sinon pierre) ; pierre, minerai, cuivre → pioche ; poisson → canne (canne
+  ou filet) ; gibier, abattre, défendre, veiller → arc puis lance ; construire, réparer →
+  marteau ; sinon null.
+- Pas de test de rendu (le viewer se teste sans DOM) ; vérifié par captures Playwright, ordi et
+  téléphone, jour et nuit.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

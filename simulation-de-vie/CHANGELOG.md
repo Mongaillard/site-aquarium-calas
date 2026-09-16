@@ -2,6 +2,32 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M31 – Bâtiments et personnages en sprites (2026-09-16)
+
+Le fond avait ses tuiles (M27) ; bâtiments et personnages restaient des dessins vectoriels.
+Deux planches CC0 de Kenney de plus, fournies par l'auteur du projet, les remplacent.
+
+- **Sept bâtiments passent en sprites Medieval RTS** : tente → abri, deux maisons (haute ou
+  basse selon la position), grange → entrepôt, four, fumoir (sa fumée animée reste, sur la
+  cheminée), puits, sanctuaire → autel ; chacun ancré au sol avec son ombre. Tombe, stèle,
+  enclos, champ, palissade, feu de camp, port et chantiers restent en vectoriel (ils animent ou
+  n'ont pas d'équivalent).
+- **Les personnages se composent en couches Roguelike Characters** (16 px) : corps par teint
+  (le teint foncé assombrit le corps brun), tunique blanche **teintée à la couleur de la
+  famille** (multiplication), cheveux dans la couleur du moteur (six blocs) et une coiffure
+  tirée de l'identifiant (trois courtes pour les hommes, trois longues pour les femmes), et
+  **l'outil en main** : hache, pioche (pierre ou cuivre), lance, arc, canne, marteau. Malade :
+  corps pâli ; banni : silhouette éteinte. Enfants et adolescents à l'échelle. Couchés quand ils
+  dorment ; en marche, un balancement et un léger roulis. Bandeau rouge, « ! » et étoile
+  restent. Les bandes ennemies portent la lance, en gris.
+- **`PersonnageEtat.outil`** (protocole) : déduit dans `instantane.ts` de l'intention et de
+  l'inventaire (`outilEnMain`) — récolter du bois avec une hache, pierre, minerai ou cuivre avec
+  une pioche, pêcher avec une canne ou un filet, chasser, abattre, défendre ou veiller avec un
+  arc ou une lance, construire ou réparer avec un marteau.
+- Les sprites composés sont mis en cache par apparence ; pixels nets dès quatorze pixels par
+  tuile, lissés de plus loin. Sans planche décodée, le dessin vectoriel reste. La page publiée
+  reste un fichier unique (les deux planches en URL `data:`, +105 ko).
+
 ## M30 – L'eau : gués, pirogue, port (2026-09-16)
 
 Les personnages marchaient sur l'eau : l'eau peu profonde était un gué partout, et chaque lac en

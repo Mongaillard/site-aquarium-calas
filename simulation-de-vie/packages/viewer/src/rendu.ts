@@ -7,7 +7,8 @@ import { Brouillard, COULEUR_INCONNU } from "./brouillard.js";
 import type { Magasin, MorceauVue } from "./etat.js";
 import { cleMorceau } from "./etat.js";
 import { construireFondMorceau } from "./fond.js";
-import { atlasPret } from "./atlas.js";
+import { atlasPret, structure } from "./atlas.js";
+import type { Structure } from "./atlas.js";
 import {
   couleurFamille,
   couleurFoi,
@@ -167,7 +168,8 @@ export class Rendu {
         ctx.arc(c.x + 0.7, c.y + 0.78, 0.12, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Les bandes : des silhouettes grises, en groupe.
+      // Les bandes : des silhouettes grises, lance au poing, en groupe.
+      ctx.imageSmoothingEnabled = cam.echelle < SEUIL_PIXELS;
       for (const b of etat.villages.bandes) {
         if (!visible(b.x, b.y)) continue;
         for (let i = 0; i < Math.min(4, b.taille); i++) {
@@ -184,9 +186,20 @@ export class Rendu {
             enceinte: false,
             selection: false,
             survol: false,
+            couches: {
+              teint: "hâlé",
+              cheveux: "noirs",
+              sexe: "M",
+              coiffure: i,
+              couleur: "#5a5a60",
+              outil: "lance",
+              malade: false,
+              banni: false,
+            },
           });
         }
       }
+      ctx.imageSmoothingEnabled = true;
       // Lieux interdits : une zone hachurée qu'on évite.
       for (const l of etat.societe.lieuxInterdits) {
         if (!visible(l.x, l.y)) continue;
@@ -245,10 +258,13 @@ export class Rendu {
             ctx.strokeRect(b.x + 0.08, b.y + 0.08, 0.84, 0.84);
           }
       }
+      // En pixels nets dès que la carte est assez proche pour les voir ; lissés de loin.
+      ctx.imageSmoothingEnabled = cam.echelle < SEUIL_PIXELS;
       for (const { p, pos } of positions) {
         if (!visible(pos.x, pos.y)) continue;
+        const couleur = couleurFamille(p.nomFamille);
         sprites.personnage(ctx, pos.x, pos.y, {
-          couleur: couleurFamille(p.nomFamille),
+          couleur,
           contour: couleurMoral(p.besoins.moral),
           teint: p.malade ? "#cfd3cf" : (sprites.TEINTS[p.teint] ?? "#f3d3b3"),
           cheveux: sprites.CHEVEUX[p.cheveux] ?? "#4a2e1a",
@@ -264,8 +280,19 @@ export class Rendu {
           banni: p.banni,
           selection: p.id === magasin.selection,
           survol: p.id === survol,
+          couches: {
+            teint: p.teint,
+            cheveux: p.cheveux,
+            sexe: p.sexe,
+            coiffure: coiffureDe(p.id),
+            couleur,
+            outil: p.outil,
+            malade: p.malade,
+            banni: p.banni,
+          },
         });
       }
+      ctx.imageSmoothingEnabled = true;
 
       // Les créatures du ciel (M25) : un halo au sol, un grand glyphe, leur nom.
       for (const c of etat.creatures) {
@@ -749,27 +776,35 @@ export class Rendu {
       sprites.chantier(ctx, b.x, b.y, Object.keys(b.manquants).length > 0 ? 0 : avancement);
       return;
     }
+    // Les bâtiments de l'atlas Medieval RTS (M31), avec leur ombre ; le vectoriel reste en
+    // secours tant que la planche n'est pas décodée.
+    const rts = (nom: Structure, largeur: number): boolean => {
+      sprites.ombreSol(ctx, b.x, b.y);
+      return structure(ctx, nom, b.x, b.y, largeur);
+    };
     switch (b.type) {
       case "abri":
-        sprites.abri(ctx, b.x, b.y);
+        if (!rts("tente", 0.9)) sprites.abri(ctx, b.x, b.y);
         break;
       case "maison":
-        sprites.maison(ctx, b.x, b.y, nuit);
+        if (!rts(sprites.bruit(b.x, b.y, 31) < 0.5 ? "maison_haute" : "maison_basse", 1))
+          sprites.maison(ctx, b.x, b.y, nuit);
         break;
       case "entrepot":
-        sprites.entrepot(ctx, b.x, b.y);
+        if (!rts("grange", 1.15)) sprites.entrepot(ctx, b.x, b.y);
         break;
       case "feu_de_camp":
         sprites.feu(ctx, b.x, b.y, b.allume, maintenant);
         break;
       case "four":
-        sprites.four(ctx, b.x, b.y);
+        if (!rts("four", 1.05)) sprites.four(ctx, b.x, b.y);
         break;
       case "fumoir":
-        sprites.fumoir(ctx, b.x, b.y, maintenant);
+        if (rts("fumoir", 1.05)) sprites.fumee(ctx, b.x + 0.78, b.y + 0.12, maintenant);
+        else sprites.fumoir(ctx, b.x, b.y, maintenant);
         break;
       case "puits":
-        sprites.puits(ctx, b.x, b.y);
+        if (!rts("puits", 0.55)) sprites.puits(ctx, b.x, b.y);
         break;
       case "palissade":
         sprites.palissade(ctx, b.x, b.y);
@@ -781,7 +816,7 @@ export class Rendu {
         sprites.stele(ctx, b.x, b.y);
         break;
       case "autel":
-        sprites.autel(ctx, b.x, b.y, maintenant);
+        if (!rts("sanctuaire", 0.95)) sprites.autel(ctx, b.x, b.y, maintenant);
         break;
       case "enclos":
         sprites.enclos(ctx, b.x, b.y);
@@ -844,6 +879,16 @@ export class Rendu {
 
 function cleDe(m: MorceauVue): number {
   return (m.cx + 32_768) * 65_536 + (m.cy + 32_768);
+}
+
+/** En deçà de cette échelle (px par tuile), les sprites de 16 px se lissent ; au-delà, pixels nets. */
+const SEUIL_PIXELS = 14;
+
+/** Une coiffure 0..2 stable par identifiant, pour que les têtes ne se ressemblent pas toutes. */
+function coiffureDe(id: string): number {
+  let h = 7;
+  for (let i = 0; i < id.length; i++) h = (Math.imul(h, 31) + id.charCodeAt(i)) | 0;
+  return Math.abs(h) % 3;
 }
 
 function arrondi(

@@ -94,9 +94,15 @@ page reste fluide à deux cents habitants (quatre peuples de quarante-huit, chac
 **De vraies tuiles (M27).** Pins, pommiers, buissons à baies, tas de pierre et d'argile, amas de
 gemmes et mousserons viennent de deux planches CC0 de Kenney (domaine public, aucune attribution
 requise ; voir `packages/viewer/src/assets/tuiles/CREDITS.md`) plutôt que d'un dessin vectoriel ;
-bâtiments et gisements sans icône nette (poisson, gibier, fibres) restent en vectoriel. La page
-publiée reste un fichier unique : les planches s'embarquent en URL `data:`, sans image externe à
-charger.
+gisements sans icône nette (poisson, gibier, fibres) restent en vectoriel. La page publiée reste
+un fichier unique : les planches s'embarquent en URL `data:`, sans image externe à charger.
+
+**Bâtiments et personnages en sprites (M31).** Deux planches CC0 de Kenney de plus : tente,
+maisons, grange, four, fumoir, puits et sanctuaire viennent de _Medieval RTS_ ; chaque personnage
+se compose en couches de _Roguelike Characters_ — corps par teint, tunique teintée à la couleur
+de sa famille, cheveux et coiffure, et l'outil qu'il tient (hache, pioche, lance, arc, canne,
+marteau) selon ce qu'il fait et ce qu'il porte. Les malades pâlissent, les bannis s'éteignent,
+les dormeurs se couchent.
 
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la

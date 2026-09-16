@@ -71,6 +71,11 @@ export interface PersonnageEtat {
   readonly abattu: boolean;
   /** Foi 0..3 (calque « foi », M25). */
   readonly foi: number;
+  /**
+   * L'outil en main (M31), déduit de l'intention et de l'inventaire : `hache`, `hache_cuivre`,
+   * `pioche`, `pioche_cuivre`, `lance`, `arc`, `canne`, `marteau` — ou null les mains vides.
+   */
+  readonly outil: string | null;
 }
 
 export interface BatimentEtat {
