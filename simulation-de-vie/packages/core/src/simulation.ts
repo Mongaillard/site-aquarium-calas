@@ -57,7 +57,8 @@ import type { Lecon } from "./savoirs/catalogue.js";
 import { apprenants, apprendre, tirerLecons } from "./savoirs/lecons.js";
 import { inventer } from "./savoirs/inventions.js";
 import type { Batiment, TypeBatiment } from "./monde/batiments.js";
-import { abondanceDuBerceau, genererGrille } from "./monde/generation.js";
+import { abondanceDuBerceau, genererGrille, sitesDesPeuples } from "./monde/generation.js";
+import type { OptionsGeneration } from "./monde/generation.js";
 import { Grille, cleMorceau } from "./monde/grille.js";
 import { RAYON_PINCEAU_MAX, sculpter, tuilePraticableProche } from "./monde/terrain.js";
 import type { Pinceau, ResultatSculpture } from "./monde/terrain.js";
@@ -222,8 +223,6 @@ export type ResultatConseil =
 const RAYON_CONNAISSANCE_INITIALE = 14;
 /** Rayon, en tuiles, que le ciel voit d'un monde vierge (pour le sculpter et le peupler). */
 const RAYON_MONDE_VIERGE = 40;
-/** Distance du berceau à laquelle les peuples rivaux du départ s'installent. */
-const DISTANCE_PEUPLES = 48;
 
 /** Commande `sculpter` : un pinceau, un centre, un rayon. */
 export interface CommandeSculpter {
@@ -302,6 +301,8 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
   defauts(brut.lois as Record<string, unknown>, loisParDefaut());
   defauts(brut, { creatures: [], compteurCreatures: 0, conteur: etatConteurInitial() });
   defauts(brut.config as Record<string, unknown>, { jeu: { scenario: null } });
+  // Version 6 (M26) : les foyers des peuples rivaux ; les mondes d'avant gardent leur terrain.
+  defauts(etat.config.monde, { foyers: false });
   defauts(brut, { objectifs: etatObjectifsInitial(null, etat.config.vie.joursParAnnee) });
   defauts(brut.faveur as Record<string, unknown>, { domaine: null, rang: 0, usages: [] });
   defauts(brut.config as Record<string, unknown>, { dieu: { domaine: null } });
@@ -487,18 +488,9 @@ export class Simulation implements Monde {
         ]);
       // Des peuples rivaux dès le départ : chacun son village, à bonne distance du berceau.
       const rngPeuples = rng.fork("peuples");
-      const decalage = rngPeuples.suivant() * Math.PI * 2;
-      for (let k = 1; k < config.population.peuples; k++) {
-        const angle = decalage + (Math.PI * 2 * k) / config.population.peuples;
-        this.poserPeuple(
-          {
-            x: Math.round(Math.cos(angle) * DISTANCE_PEUPLES),
-            y: Math.round(Math.sin(angle) * DISTANCE_PEUPLES),
-          },
-          config.population.initiale,
-          rngPeuples,
-        );
-      }
+      rngPeuples.suivant();
+      for (const site of sitesDesPeuples(rng, config.population.peuples))
+        this.poserPeuple(site, config.population.initiale, rngPeuples);
       this.danger = etatDangerInitial(horloge.ticksParJour);
       this.peuplerFaune();
       // La colonie s'installe en terrain reconnu : chacun connaît déjà les environs
@@ -1247,13 +1239,21 @@ export class Simulation implements Monde {
     const config = fusionnerConfig(partielle);
     validerConfig(config);
     const rng = Rng.depuisGraine(config.seed);
-    const grille = genererGrille(rng.fork("monde"), {
+    const grille = genererGrille(rng.fork("monde"), Simulation.optionsGeneration(config, rng));
+    return Simulation.creerAvecGrille(config, grille);
+  }
+
+  /** Les options de génération d'un monde : le berceau, son abondance, les foyers des peuples. */
+  private static optionsGeneration(config: SimConfig, rng: Rng): OptionsGeneration {
+    return {
       echelleRelief: config.monde.echelleRelief,
       echelleContinents: config.monde.echelleContinents,
       berceau: config.monde.berceau,
       abondance: abondanceDuBerceau(config.population.initiale),
-    });
-    return Simulation.creerAvecGrille(config, grille);
+      ...(config.monde.foyers && config.population.peuples > 1
+        ? { foyers: sitesDesPeuples(rng, config.population.peuples) }
+        : {}),
+    };
   }
 
   // ------------------------------------------------------------ sauvegarde
@@ -1363,12 +1363,11 @@ export class Simulation implements Monde {
     const etat = migrer(decoder(sauvegarde.etat) as EtatSimulation, sauvegarde.version);
     const config = etat.config;
     const rng = Rng.depuisEtat(etat.rng);
-    const grille = genererGrille(Rng.depuisGraine(config.seed).fork("monde"), {
-      echelleRelief: config.monde.echelleRelief,
-      echelleContinents: config.monde.echelleContinents,
-      berceau: config.monde.berceau,
-      abondance: abondanceDuBerceau(config.population.initiale),
-    });
+    const racine = Rng.depuisGraine(config.seed);
+    const grille = genererGrille(
+      racine.fork("monde"),
+      Simulation.optionsGeneration(config, racine),
+    );
     grille.restaurer(etat.grille);
     const horloge = new Horloge(
       {

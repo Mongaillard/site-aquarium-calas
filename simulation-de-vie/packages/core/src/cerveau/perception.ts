@@ -29,7 +29,7 @@ import {
   abriDisponible,
   batimentAReparer,
   batimentsAccessibles,
-  estEau,
+  estTuileEau,
   feuAAlimenter,
   feuEteint,
   feuProche,
@@ -357,54 +357,52 @@ export function observer(monde: Monde, p: Personnage, rayon: number): void {
     if (!PROFILS[tr.espece].predateur)
       troupeauxIci.set(cleLieu(tr.position.x, tr.position.y), tr.taille);
   }
-  for (let dy = -rayon; dy <= rayon; dy++) {
-    for (let dx = -rayon; dx <= rayon; dx++) {
-      const t = monde.grille.tuileOuNull(x + dx, y + dy);
-      if (t === null) continue;
-      monde.grille.decouvrir(t.x, t.y);
-      const cle = cleLieu(t.x, t.y);
-      const betes = troupeauxIci.get(cle);
-      if (betes !== undefined) {
-        p.connaissance.set(cle, {
+  const connaissance = p.connaissance;
+  // Parcours par morceau : la question revient pour cent soixante-neuf tuiles à chaque pas.
+  monde.grille.parcourir(x - rayon, y - rayon, x + rayon, y + rayon, (t, m, i) => {
+    monde.grille.decouvrirIndex(m, i);
+    const cle = cleLieu(t.x, t.y);
+    const betes = troupeauxIci.get(cle);
+    if (betes !== undefined) {
+      connaissance.set(cle, {
+        x: t.x,
+        y: t.y,
+        type: "gibier",
+        outilRequis: "lance",
+        quantiteVue: betes,
+        tickVu: tick,
+      });
+    } else if (t.gisement) {
+      const connu = connaissance.get(cle);
+      if (connu?.type === t.gisement.type && connu.outilRequis === t.gisement.outilRequis) {
+        connu.quantiteVue = t.gisement.quantite;
+        connu.tickVu = tick;
+      } else {
+        connaissance.set(cle, {
           x: t.x,
           y: t.y,
-          type: "gibier",
-          outilRequis: "lance",
-          quantiteVue: betes,
+          type: t.gisement.type,
+          outilRequis: t.gisement.outilRequis,
+          quantiteVue: t.gisement.quantite,
           tickVu: tick,
         });
-      } else if (t.gisement) {
-        const connu = p.connaissance.get(cle);
-        if (connu?.type === t.gisement.type && connu.outilRequis === t.gisement.outilRequis) {
-          connu.quantiteVue = t.gisement.quantite;
-          connu.tickVu = tick;
-        } else {
-          p.connaissance.set(cle, {
-            x: t.x,
-            y: t.y,
-            type: t.gisement.type,
-            outilRequis: t.gisement.outilRequis,
-            quantiteVue: t.gisement.quantite,
-            tickVu: tick,
-          });
-        }
-      } else if (estEau(monde, t.x, t.y)) {
-        if (!p.connaissance.has(cle)) {
-          p.connaissance.set(cle, {
-            x: t.x,
-            y: t.y,
-            type: "eau",
-            outilRequis: null,
-            quantiteVue: Infinity,
-            tickVu: tick,
-          });
-        }
-      } else if (p.connaissance.has(cle)) {
-        // Le gisement connu a disparu.
-        p.connaissance.delete(cle);
       }
+    } else if (estTuileEau(t)) {
+      if (!connaissance.has(cle)) {
+        connaissance.set(cle, {
+          x: t.x,
+          y: t.y,
+          type: "eau",
+          outilRequis: null,
+          quantiteVue: Infinity,
+          tickVu: tick,
+        });
+      }
+    } else if (connaissance.has(cle)) {
+      // Le gisement connu a disparu.
+      connaissance.delete(cle);
     }
-  }
+  });
 }
 
 export function percevoir(monde: Monde, p: Personnage, observerDabord = true): Perception {

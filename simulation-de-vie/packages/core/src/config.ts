@@ -18,6 +18,8 @@ export interface SimConfig {
     echelleContinents: number;
     /** Rayon du berceau : terre garantie autour de l'origine, en tuiles. */
     berceau: number;
+    /** Les peuples rivaux ont leur propre berceau (M26) ; faux dans les mondes d'avant. */
+    foyers: boolean;
   };
   population: {
     initiale: number;
@@ -81,7 +83,13 @@ export interface SimConfig {
 
 export const CONFIG_PAR_DEFAUT: SimConfig = {
   seed: 42,
-  monde: { joursParSaison: 30, echelleRelief: 40, echelleContinents: 220, berceau: 28 },
+  monde: {
+    joursParSaison: 30,
+    echelleRelief: 40,
+    echelleContinents: 220,
+    berceau: 28,
+    foyers: true,
+  },
   population: { initiale: 12, familles: 3, peuples: 1 },
   temps: { minutesParTick: 10, snapshotTousLesTicks: 144 },
   vie: {

@@ -9,7 +9,7 @@ import type { Rng } from "../rng.js";
 import type { Biome } from "./biomes.js";
 import { BruitSimplex2D } from "./bruit.js";
 import { Grille, TAILLE_MORCEAU } from "./grille.js";
-import type { Tuile } from "./grille.js";
+import type { Position, Tuile } from "./grille.js";
 import { GISEMENTS_PAR_BIOME } from "./ressources.js";
 import type { Gisement } from "./ressources.js";
 
@@ -26,6 +26,32 @@ export interface OptionsGeneration {
    * dans le berceau, pour une colonie qui démarre nombreuse.
    */
   readonly abondance?: number;
+  /**
+   * Foyers des peuples rivaux (M26) : autour de chacun, la terre est garantie,
+   * un rivage se creuse et les gisements ont l'abondance du berceau.
+   */
+  readonly foyers?: readonly Position[];
+}
+
+/** Distance du berceau à laquelle les peuples rivaux du départ s'installent. */
+export const DISTANCE_PEUPLES = 48;
+
+/**
+ * Les sites des peuples rivaux (M26), tirés de la graine : répartis en cercle
+ * autour du berceau, à partir d'un angle de départ. Le premier peuple est à
+ * l'origine ; les suivants viennent ici.
+ */
+export function sitesDesPeuples(rng: Rng, peuples: number): Position[] {
+  const decalage = rng.fork("peuples").suivant() * Math.PI * 2;
+  const sites: Position[] = [];
+  for (let k = 1; k < peuples; k++) {
+    const angle = decalage + (Math.PI * 2 * k) / peuples;
+    sites.push({
+      x: Math.round(Math.cos(angle) * DISTANCE_PEUPLES),
+      y: Math.round(Math.sin(angle) * DISTANCE_PEUPLES),
+    });
+  }
+  return sites;
 }
 
 /** Abondance du berceau pour une population de départ : une part pour douze habitants, quatre au plus. */
@@ -111,6 +137,17 @@ export function genererGrille(rng: Rng, options: OptionsGeneration = {}): Grille
     return { x: Math.cos(a) * DISTANCE_MARES, y: Math.sin(a) * DISTANCE_MARES };
   });
   const T = TAILLE_MORCEAU;
+  // Les foyers des peuples rivaux : même berceau, rivage tourné vers le large (loin de l'origine).
+  const foyers = (options.foyers ?? []).map((f) => {
+    const a = Math.atan2(f.y, f.x);
+    return { x: f.x, y: f.y, rivage: { x: Math.cos(a), y: Math.sin(a) } };
+  });
+  const maresFoyers = foyers.flatMap((f) =>
+    Array.from({ length: nombreMares }, (_, k) => {
+      const a = Math.atan2(f.rivage.y, f.rivage.x) + (Math.PI * 2 * (k + 1)) / (nombreMares + 1);
+      return { x: f.x + Math.cos(a) * DISTANCE_MARES, y: f.y + Math.sin(a) * DISTANCE_MARES };
+    }),
+  );
 
   return new Grille((cx, cy) => {
     const tuiles: Tuile[] = [];
@@ -126,7 +163,15 @@ export function genererGrille(rng: Rng, options: OptionsGeneration = {}): Grille
         const cote = clamp((x * rivage.x + y * rivage.y - 5) / 8, 0, 1);
         const cible = 0.22 - 0.5 * cote;
         let altitude = clamp(brute + (cible - brute) * poids, -1, 1);
+        for (const f of foyers) {
+          const df = Math.hypot(x - f.x, y - f.y) / berceau;
+          if (df > 3) continue;
+          const pf = Math.exp(-df * df);
+          const cf = clamp(((x - f.x) * f.rivage.x + (y - f.y) * f.rivage.y - 5) / 8, 0, 1);
+          altitude = clamp(altitude + (0.22 - 0.5 * cf - altitude) * pf, -1, 1);
+        }
         if (mares.some((m) => Math.hypot(x - m.x, y - m.y) < RAYON_MARE)) altitude = -0.05;
+        if (maresFoyers.some((m) => Math.hypot(x - m.x, y - m.y) < RAYON_MARE)) altitude = -0.05;
         const humidite = clamp(bruitHumidite.fbm(x, y, 1 / (echelle * 0.7), 3, 0.55, 2), -1, 1);
         tuiles.push({
           x,
@@ -145,7 +190,11 @@ export function genererGrille(rng: Rng, options: OptionsGeneration = {}): Grille
       t.gisement = tirerGisement(
         rngGisements,
         t.biome,
-        abondance > 1 && Math.hypot(t.x, t.y) <= berceau ? abondance : 1,
+        abondance > 1 &&
+          (Math.hypot(t.x, t.y) <= berceau ||
+            foyers.some((f) => Math.hypot(t.x - f.x, t.y - f.y) <= berceau))
+          ? abondance
+          : 1,
       );
     return tuiles;
   });

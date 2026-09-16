@@ -336,6 +336,50 @@ export class Grille {
     return this.nbDecouvertes;
   }
 
+  /**
+   * Parcourt un rectangle de tuiles (bornes incluses), morceau par morceau : le
+   * morceau et l'index local sont passés avec la tuile, pour marquer une
+   * découverte sans repasser par les coordonnées. Génère les morceaux au besoin.
+   */
+  parcourir(
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    f: (t: Tuile, m: Morceau, i: number) => void,
+  ): void {
+    const T = TAILLE_MORCEAU;
+    const xa = Math.max(x0, -this.limite);
+    const ya = Math.max(y0, -this.limite);
+    const xb = Math.min(x1, this.limite);
+    const yb = Math.min(y1, this.limite);
+    // Ligne par ligne (l'ordre de parcours est celui des boucles d'avant : il compte pour
+    // l'ordre des cartes mentales), un morceau à la fois le long de la ligne.
+    for (let y = ya; y <= yb; y++) {
+      const cy = coordMorceau(y);
+      const ly = y - cy * T;
+      for (let cx = coordMorceau(xa); cx <= coordMorceau(xb); cx++) {
+        const m = this.morceau(cx, cy);
+        const lx0 = Math.max(xa, cx * T) - cx * T;
+        const lx1 = Math.min(xb, cx * T + T - 1) - cx * T;
+        const base = ly * T;
+        for (let lx = lx0; lx <= lx1; lx++) {
+          const i = base + lx;
+          const t = m.tuiles[i];
+          if (t !== null && t !== undefined) f(t, m, i);
+        }
+      }
+    }
+  }
+
+  /** Marque une tuile découverte par son morceau et son index local (voir `parcourir`). */
+  decouvrirIndex(m: Morceau, i: number): void {
+    if (m.decouvertes[i] === 1) return;
+    m.decouvertes[i] = 1;
+    m.nbDecouvertes += 1;
+    this.nbDecouvertes += 1;
+  }
+
   /** Itère les tuiles existantes des morceaux générés, morceau par morceau. */
   *toutes(): IterableIterator<Tuile> {
     for (const m of this.ordre) for (const t of m.tuiles) if (t !== null) yield t;

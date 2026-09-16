@@ -34,7 +34,21 @@ export interface OptionsLocales {
   readonly sauvegarde?: unknown;
 }
 
-export class LiaisonLocale implements Liaison {
+/** Une liaison qui simule (dans la page ou dans un travailleur) et sait sauvegarder. */
+export interface LiaisonSimulee extends Liaison {
+  /** La sauvegarde de l'instant, d'un bloc (null tant que le monde n'est pas prêt). */
+  sauvegarder(): Sauvegarde | null;
+  /** La même, sans figer la page. */
+  sauvegarderSansBloquer(): Promise<Sauvegarde | null>;
+  readonly coutSauvegardeMs: number;
+}
+
+/** Vrai si cette liaison simule et sait sauvegarder. */
+export function estSimulee(liaison: Liaison): liaison is LiaisonSimulee {
+  return "sauvegarderSansBloquer" in liaison;
+}
+
+export class LiaisonLocale implements LiaisonSimulee {
   private sim: Simulation | null = null;
   private readonly suivi = new SuiviClient();
   private readonly bilan = new BilanSaisons();

@@ -17,7 +17,13 @@ export { RESSOURCES, OUTILS, GISEMENTS_PAR_BIOME, ASCII_RESSOURCE } from "./mond
 export type { Ressource, Outil, Gisement } from "./monde/ressources.js";
 export { Grille, TAILLE_MORCEAU, cleMorceau, coordMorceau } from "./monde/grille.js";
 export type { Position, Tuile, Morceau, Generateur, Sculpture } from "./monde/grille.js";
-export { genererGrille, choisirBiome, SEUILS } from "./monde/generation.js";
+export {
+  genererGrille,
+  choisirBiome,
+  SEUILS,
+  sitesDesPeuples,
+  DISTANCE_PEUPLES,
+} from "./monde/generation.js";
 export type { OptionsGeneration } from "./monde/generation.js";
 export { hacherGrille } from "./monde/hachage.js";
 export {

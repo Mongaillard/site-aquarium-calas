@@ -33,7 +33,8 @@ import { LIBELLES_SUJET, libelleReputation } from "./format.js";
 import type { Camera } from "./camera.js";
 import { cadrer, centrerSur, deplacer, versMonde, zoomer } from "./camera.js";
 import { Magasin } from "./etat.js";
-import { LiaisonLocale } from "./local.js";
+import { LiaisonLocale, estSimulee } from "./local.js";
+import { LiaisonTravailleur } from "./travailleur-liaison.js";
 import { CerveauClaude, sampleDeLaPage } from "./claude.js";
 import { Panneaux } from "./panneaux.js";
 import { Rendu } from "./rendu.js";
@@ -86,6 +87,21 @@ let camAjustee = false;
 let survol: string | null = null;
 let survolBatiment: string | null = null;
 
+// Application installable (M26) : le service worker garde la page hors ligne quand elle est
+// servie par http(s) hors de claude.ai (dans l'artefact, la page est déjà un seul fichier).
+if (
+  "serviceWorker" in navigator &&
+  (window.location.protocol === "https:" || window.location.hostname === "localhost") &&
+  !window.location.hostname.endsWith("claude.ai") &&
+  window.claude === undefined
+) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((erreur: unknown) => {
+      console.warn("service worker :", erreur);
+    });
+  });
+}
+
 // Mode local : la simulation tourne dans la page (page publiée, mobile, ?local dans l'URL).
 const parametres = new URLSearchParams(window.location.search);
 const modeLocal = import.meta.env.VITE_MODE_LOCAL === "1" || parametres.has("local");
@@ -93,7 +109,7 @@ const graineInitiale = parametres.get("seed") ?? "42";
 // Quelques jours d'avance seulement : on assiste ainsi à l'exploration du monde.
 const joursAvance = Number.parseInt(parametres.get("jours") ?? "5", 10);
 /** Habitants au départ (`?population=`, ou le choix du formulaire) : 12 par défaut, 3 familles. */
-const POPULATIONS = [12, 24, 36, 48];
+const POPULATIONS = [12, 24, 36, 48, 64];
 const populationInitiale = Number.parseInt(parametres.get("population") ?? "12", 10);
 /** Le peuple choisi au formulaire, avant de savoir si le monde naît vierge. */
 function peupleChoisi(): number {
@@ -144,7 +160,12 @@ const progression = (jour: number, total: number): void => {
 function creerLiaison(graine: string, sauvegarde?: unknown): Liaison {
   if (!modeLocal) return new Reseau(urlWebSocket(window.location), recevoir, connexion);
   const seed = /^-?\d+$/.test(graine) ? Number.parseInt(graine, 10) : graine;
-  return new LiaisonLocale(
+  // Dans un travailleur quand le navigateur le permet : la page n'attend plus la simulation.
+  const Liaison =
+    LiaisonTravailleur.disponible() && !parametres.has("sansworker")
+      ? LiaisonTravailleur
+      : LiaisonLocale;
+  return new Liaison(
     {
       seed,
       joursAvance:
@@ -346,7 +367,7 @@ const INTERVALLE_DISTANT_MS = 60_000;
  * l'automatique).
  */
 async function sauvegarderSous(nom: string, immediate = false, distant = true): Promise<boolean> {
-  if (!(liaison instanceof LiaisonLocale)) return false;
+  if (!estSimulee(liaison)) return false;
   // Une sortie de page n'attend pas ; le reste du temps, la page ne gèle pas.
   const s = immediate ? liaison.sauvegarder() : await liaison.sauvegarderSansBloquer();
   if (s === null) return false;
@@ -488,8 +509,7 @@ function sauvegardeAutomatique(maintenant: number, force = false): void {
   const coutImmediat = performance.now() - debut;
   void promesse.then((fait) => {
     if (fait) dernierTickSauve = tick;
-    const cout =
-      liaison instanceof LiaisonLocale && !force ? liaison.coutSauvegardeMs : coutImmediat;
+    const cout = estSimulee(liaison) && !force ? liaison.coutSauvegardeMs : coutImmediat;
     intervalleAutoMs = Math.min(
       INTERVALLE_AUTO_MAX_MS,
       Math.max(INTERVALLE_AUTO_MS, cout * PART_ENCODAGE),

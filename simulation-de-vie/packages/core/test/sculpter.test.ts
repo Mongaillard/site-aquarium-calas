@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../src/simulation.js";
 import { INFO_BIOME } from "../src/monde/biomes.js";
 import { biomeDuPinceau } from "../src/monde/terrain.js";
+import { sitesDesPeuples } from "../src/monde/generation.js";
+import { Rng } from "../src/rng.js";
 
 describe("M25 : sculpter le monde et poser des peuples", () => {
   it("le pinceau pose le biome demandé en disque, découvre la zone et garde les bâtiments", () => {
@@ -116,5 +118,17 @@ describe("M25 : sculpter le monde et poser des peuples", () => {
     );
     for (let j = 0; j < 5; j++) sim.avancerJusquaAube();
     expect(sim.vivants().length).toBeGreaterThan(10);
+    // Les foyers (M26) : chaque peuple rival a son berceau, terre garantie et gisements plus
+    // denses ; le terrain se regénère à l'identique à la reprise d'une sauvegarde.
+    const copie = Simulation.restaurer(sim.sauvegarder());
+    for (const v of sim.villages.villages) {
+      const t = sim.grille.tuile(v.centre.x, v.centre.y);
+      expect(INFO_BIOME[t.biome].praticable).toBe(true);
+      expect(copie.grille.tuile(v.centre.x, v.centre.y).biome).toBe(t.biome);
+    }
+    expect(sitesDesPeuples(Rng.depuisGraine(5), 3)).toEqual(
+      sitesDesPeuples(Rng.depuisGraine(5), 3),
+    );
+    expect(sitesDesPeuples(Rng.depuisGraine(5), 3)).toHaveLength(2);
   });
 });

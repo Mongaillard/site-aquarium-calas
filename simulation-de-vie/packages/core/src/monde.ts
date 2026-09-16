@@ -11,7 +11,7 @@ import { PLANS_BATIMENT } from "./monde/batiments.js";
 import { INFO_BIOME } from "./monde/biomes.js";
 import { Grille } from "./monde/grille.js";
 import { SEUIL_SAVOIR } from "./savoirs/catalogue.js";
-import type { Position } from "./monde/grille.js";
+import type { Position, Tuile } from "./monde/grille.js";
 import type { Horloge } from "./monde/horloge.js";
 import type { Meteo } from "./monde/meteo.js";
 import type { Troupeau } from "./monde/faune.js";
@@ -78,7 +78,11 @@ export function apparentes(a: Personnage, b: Personnage): boolean {
 /** Vrai si la tuile est de l'eau (source de boisson). */
 export function estEau(monde: Monde, x: number, y: number): boolean {
   const t = monde.grille.tuileOuNull(x, y);
-  if (t === null) return false;
+  return t !== null && estTuileEau(t);
+}
+
+/** La même question, la tuile en main. */
+export function estTuileEau(t: Tuile): boolean {
   if (t.biome === "eau_profonde" || t.biome === "eau_peu_profonde") return true;
   return (
     t.batiment !== null &&
@@ -137,22 +141,68 @@ export function batimentsAccessibles(monde: Monde, p: Personnage, type?: TypeBat
   const nombre = monde.batiments.size;
   let entree = cacheAcces.get(p);
   if (entree?.heure !== heure || entree.nombre !== nombre) {
-    entree = {
-      heure,
-      nombre,
-      liste: [...monde.batiments.values()].filter((b) => autorise(monde, b, p)),
-    };
+    entree = { heure, nombre, liste: accessibles(monde, p) };
     cacheAcces.set(p, entree);
   }
-  // Le tri par distance, lui, suit le personnage à chaque appel.
+  // Le tri par distance, lui, suit le personnage à chaque appel (une distance par bâtiment).
   const pos = p.corps.position;
-  return (
-    type === undefined ? [...entree.liste] : entree.liste.filter((b) => b.type === type)
-  ).sort(
-    (a, b) =>
-      Grille.distance(pos, a.position) - Grille.distance(pos, b.position) ||
-      a.id.localeCompare(b.id),
-  );
+  const candidats = type === undefined ? entree.liste : entree.liste.filter((b) => b.type === type);
+  const distances = candidats.map((b) => Grille.distance(pos, b.position));
+  const ordre = candidats.map((_, i) => i);
+  ordre.sort((i, j) => {
+    const d = (distances[i] ?? 0) - (distances[j] ?? 0);
+    return d !== 0 ? d : (candidats[i]?.id ?? "").localeCompare(candidats[j]?.id ?? "");
+  });
+  return ordre.map((i) => candidats[i]).filter((b): b is Batiment => b !== undefined);
+}
+
+/**
+ * Les bâtiments auxquels le personnage a droit : les mêmes règles qu'`autorise`,
+ * avec ce qui ne dépend que de la personne calculé une fois (bannissement,
+ * stocks ouverts, familles alliées) — à deux cents habitants, la question se
+ * pose des milliers de fois par tick.
+ */
+function accessibles(monde: Monde, p: Personnage): Batiment[] {
+  const jour = monde.horloge.moment().jourAbsolu;
+  const s = monde.societe;
+  const famille = p.identite.nomFamille;
+  const liste: Batiment[] = [];
+  if (p.banni !== null && jour < p.banni.jusquaJour) {
+    for (const b of monde.batiments.values())
+      if (b.type === "tombe" || b.commun === true) liste.push(b);
+    return liste;
+  }
+  const stocksOuverts = jour < s.stocksOuvertsJusquaJour;
+  const allies = new Set<string>();
+  for (const a of s.alliances) {
+    const i = a.indexOf("|");
+    const g = a.slice(0, i);
+    const d = a.slice(i + 1);
+    if (g === famille) allies.add(d);
+    else if (d === famille) allies.add(g);
+  }
+  for (const b of monde.batiments.values()) {
+    if (
+      b.commun === true ||
+      b.proprietaire === p.id ||
+      b.famille === famille ||
+      b.autorises.includes(p.id)
+    ) {
+      liste.push(b);
+      continue;
+    }
+    if (b.stock !== null && stocksOuverts) {
+      liste.push(b);
+      continue;
+    }
+    if (PLANS_BATIMENT[b.type].abri && allies.has(b.famille)) {
+      liste.push(b);
+      continue;
+    }
+    const proprietaire = monde.personnage(b.proprietaire);
+    if (proprietaire !== undefined && apparentes(p, proprietaire)) liste.push(b);
+  }
+  return liste;
 }
 
 /** Comptage des dormeurs mémorisé ; à refaire dès que quelqu'un s'endort, se réveille, meurt ou grandit. */
