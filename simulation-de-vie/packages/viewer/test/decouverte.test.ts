@@ -58,6 +58,8 @@ function etat(decouvertes: number[]): MessageEtat {
       tuiles: 1024,
       morceaux: 1,
       savoirs: [],
+      conquetes: 0,
+      raidsRepousses: 0,
     },
     decouvertes,
     rayonVision: 6,

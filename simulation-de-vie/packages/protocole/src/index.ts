@@ -190,6 +190,9 @@ export interface Statistiques {
   readonly raids: number;
   readonly caravanes: number;
   readonly batailles: number;
+  /** M35/M32c : villages conquis, raids repoussés par les armes. */
+  readonly conquetes: number;
+  readonly raidsRepousses: number;
 }
 
 /** Un récit du village, tel qu'on le raconte aujourd'hui. */

@@ -125,7 +125,7 @@ export const DUREE_COMBAT_MAX = 72;
 export const DUREE_MARCHE_MAX = 288;
 export const GUERRIERS_MAX = 12;
 /** La défense ne dégarnit pas le village : une fois et demie la troupe adverse au plus. */
-export const RATIO_DEFENSE = 1.5;
+export const RATIO_DEFENSE = 1.2;
 /** Ticks entre deux coups d'un même combattant. */
 export const CADENCE_FRAPPE = 3;
 export const FRAPPES_GARDEES = 40;
@@ -337,7 +337,7 @@ export function leverTroupe(
         ? [a, b]
         : [b, a];
   const disponibles = guerriersDisponibles(monde, att);
-  const n = Math.min(GUERRIERS_MAX, Math.max(2, Math.ceil(disponibles.length * 0.6)));
+  const n = Math.min(GUERRIERS_MAX, Math.max(2, Math.ceil(disponibles.length * 0.7)));
   const guerriers = disponibles.slice(0, n);
   if (guerriers.length < 2) return null;
   e.derniereBatailleJour = jourDe(monde);

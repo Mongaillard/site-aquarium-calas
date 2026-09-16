@@ -39,13 +39,14 @@ export function construireFondMorceau(
   taille: number,
   nomsBiomes: readonly string[],
   voisin?: (x: number, y: number) => number,
+  resolution: number = RESOLUTION_FOND,
 ): HTMLCanvasElement {
   const c = document.createElement("canvas");
-  c.width = taille * RESOLUTION_FOND;
-  c.height = taille * RESOLUTION_FOND;
+  c.width = taille * resolution;
+  c.height = taille * resolution;
   const ctx = c.getContext("2d");
   if (ctx === null) return c;
-  ctx.scale(RESOLUTION_FOND, RESOLUTION_FOND);
+  ctx.scale(resolution, resolution);
   const x0 = m.cx * taille;
   const y0 = m.cy * taille;
   // Le repère du canevas est celui du monde, décalé à l'origine du morceau.

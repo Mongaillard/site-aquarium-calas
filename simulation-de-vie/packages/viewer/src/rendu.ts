@@ -6,7 +6,7 @@ import { versEcran, versMonde } from "./camera.js";
 import { Brouillard, COULEUR_INCONNU } from "./brouillard.js";
 import type { Magasin, MorceauVue } from "./etat.js";
 import { cleMorceau } from "./etat.js";
-import { construireFondMorceau } from "./fond.js";
+import { RESOLUTION_FOND, construireFondMorceau } from "./fond.js";
 import { atlasPret, structure } from "./atlas.js";
 import type { Structure } from "./atlas.js";
 import {
@@ -50,9 +50,11 @@ export class Rendu {
     m: MorceauVue,
     taille: number,
     nomsBiomes: readonly string[],
+    resolution: number,
   ): HTMLCanvasElement {
-    // Les bords d'un morceau dépendent aussi de ses voisins : leur version compte.
-    let version = m.version;
+    // Les bords d'un morceau dépendent aussi de ses voisins : leur version compte ; la
+    // résolution aussi (M36 : de près, le fond se redessine à 48 px par tuile).
+    let version = m.version * 4 + (resolution > RESOLUTION_FOND ? 1 : 0);
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue;
@@ -60,8 +62,12 @@ export class Rendu {
       }
     const existant = this.fonds.get(m);
     if (existant?.version === version) return existant.canvas;
-    const canvas = construireFondMorceau(m, taille, nomsBiomes, (x, y) =>
-      this.magasin.biomeEn(x, y),
+    const canvas = construireFondMorceau(
+      m,
+      taille,
+      nomsBiomes,
+      (x, y) => this.magasin.biomeEn(x, y),
+      resolution,
     );
     // Tant que les tuiles Kenney ne sont pas décodées, le fond se dessine sans elles (les
     // aplats vectoriels restent) mais ne se met pas en cache : le morceau se refait dès
@@ -94,13 +100,14 @@ export class Rendu {
     ctx.imageSmoothingEnabled = true;
     ctx.translate(cam.dx, cam.dy);
     ctx.scale(cam.echelle, cam.echelle);
-    // Fond : les morceaux connus qui tombent dans la fenêtre.
+    // Fond : les morceaux connus qui tombent dans la fenêtre ; de près, en haute résolution.
     const T = magasin.tailleMorceau;
+    const resolutionFond = cam.echelle >= 36 ? RESOLUTION_FOND * 2 : RESOLUTION_FOND;
     for (const m of magasin.morceaux.values()) {
       const x = m.cx * T;
       const y = m.cy * T;
       if (x + T < hg.x - 1 || x > bd.x + 1 || y + T < hg.y - 1 || y > bd.y + 1) continue;
-      ctx.drawImage(this.fondMorceau(m, T, init.nomsBiomes), x, y, T, T);
+      ctx.drawImage(this.fondMorceau(m, T, init.nomsBiomes, resolutionFond), x, y, T, T);
     }
     // Les morceaux oubliés (nouveau monde) libèrent leur fond.
     for (const m of [...this.fonds.keys()])
@@ -751,10 +758,14 @@ export class Rendu {
       ctx.font = "12px system-ui, sans-serif";
       ctx.textBaseline = "middle";
       const affichees = new Set<string>();
-      // Six bulles à la fois au plus : au-delà, la carte se couvre de texte.
+      // Six bulles à la fois au plus (trois pendant une bataille) : au-delà, la carte se
+      // couvre de texte ; et jamais sur un combattant (M36).
+      const combattants = magasin.combattants;
+      const plafond = magasin.batailleActive === null ? 6 : 3;
       for (const bulle of magasin.bulles) {
-        if (affichees.size >= 6) break;
+        if (affichees.size >= plafond) break;
         if (bulle.debut > maintenant || bulle.fin < maintenant || affichees.has(bulle.id)) continue;
+        if (combattants.has(bulle.id)) continue;
         affichees.add(bulle.id);
         const p = etat.personnages.find((x) => x.id === bulle.id);
         if (p === undefined) continue;
@@ -1032,10 +1043,18 @@ export class Rendu {
       case "abri":
         if (!rts("tente", 0.9)) sprites.abri(ctx, b.x, b.y);
         break;
-      case "maison":
-        if (!rts(sprites.bruit(b.x, b.y, 31) < 0.5 ? "maison_haute" : "maison_basse", 1))
-          sprites.maison(ctx, b.x, b.y, nuit);
+      case "maison": {
+        const haute = sprites.bruit(b.x, b.y, 31) < 0.5;
+        if (!rts(haute ? "maison_haute" : "maison_basse", 1)) sprites.maison(ctx, b.x, b.y, nuit);
+        else if (nuit) {
+          // La nuit, une lueur chaude aux fenêtres du sprite (M36).
+          ctx.fillStyle = `rgba(255, 210, 120, ${String(0.75 + 0.15 * Math.sin(maintenant / 400 + b.x))})`;
+          const yF = b.y + (haute ? 0.62 : 0.66);
+          ctx.fillRect(b.x + 0.2, yF, 0.14, 0.13);
+          ctx.fillRect(b.x + 0.66, yF, 0.14, 0.13);
+        }
         break;
+      }
       case "entrepot":
         if (!rts("grange", 1.15)) sprites.entrepot(ctx, b.x, b.y);
         break;

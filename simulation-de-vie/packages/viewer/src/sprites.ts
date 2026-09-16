@@ -785,6 +785,15 @@ function personnageEnPixels(
   if (a.marche) ctx.rotate(t * 0.07);
   ctx.drawImage(sprite, -c / 2, -c, c, c);
   ctx.restore();
+  if (a.couches?.outil === "canne") {
+    // Le fil de la canne (M36) : de la pointe du bâton vers l'eau, devant soi.
+    ctx.strokeStyle = "rgba(255,255,255,0.75)";
+    ctx.lineWidth = 0.02;
+    ctx.beginPath();
+    ctx.moveTo(cx + 0.36 * s, sol - 0.98 * s);
+    ctx.quadraticCurveTo(cx + 0.6 * s, sol - 0.7 * s, cx + 0.62 * s, sol - 0.05 * s);
+    ctx.stroke();
+  }
   if (a.enceinte) {
     ctx.fillStyle = a.couleur;
     ctx.beginPath();

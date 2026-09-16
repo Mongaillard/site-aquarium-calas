@@ -147,7 +147,7 @@ export class Panneaux {
       .map(([n, c]) => `<span class="pastille" style="background:${c}"></span>${e(n)}`)
       .join(" ");
     $("legende").innerHTML =
-      `${biomes}<br>${ressources}<br>personnages : vêtement = famille, contour = moral · bêtes : cerfs, sangliers, mouflons, lièvres, aurochs, loups (×n = taille du troupeau, yeux jaunes = meute qui rôde, « ! » = alarme) · huttes, maisons, entrepôts, feux · pointillé = chantier · clic : inspecter · <label><input type="checkbox" id="brouillard-case" checked /> brouillard d'exploration (b)</label>`;
+      `${biomes}<br>${ressources}<br>personnages : tunique = famille, outil en main = ce qu'ils font, anneau rouge/bleu et barre de vie = au combat · bêtes : cerfs, sangliers, mouflons, lièvres, aurochs, loups (×n = taille du troupeau, yeux jaunes = meute qui rôde, « ! » = alarme) · huttes, maisons, entrepôts, feux · pointillé = chantier · clic : inspecter · <label><input type="checkbox" id="brouillard-case" checked /> brouillard d'exploration (b)</label>`;
   }
 
   /** Met à jour les panneaux visibles ; `force` ignore le cache de version. */
@@ -782,7 +782,7 @@ export class Panneaux {
         ${tuile(s.vivants, "vivants")}${tuile(s.enfants, "enfants")}${tuile(s.population, "population totale")}${tuile(s.morts, "morts")}
         ${tuile(s.naissances, "naissances")}${tuile(s.unions, "unions")}${tuile(s.generations, "générations")}${tuile(s.dialogues, "dialogues")}
         ${tuile(s.batiments, "bâtiments")}${tuile(s.chantiers, "chantiers")}${tuile(s.evenements, "événements")}${tuile(s.tick, "ticks")}
-        ${tuile(s.malades, "malades")}${tuile(s.age === "cuivre" ? "cuivre" : "pierre", "âge")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}${tuile(s.foiMoyenne, "foi moyenne /10")}${tuile(`${s.prieres} · ${s.exaucees}`, "prières · exaucées")}${tuile(`${s.veillees} · ${s.fetes}`, "veillées · fêtes")}${tuile(`${s.palabres} · ${s.exils}`, "palabres · exils")}${tuile(s.rixes, "rixes")}${tuile(`${s.legendes} · ${s.lieuxNommes}`, "légendes · lieux nommés")}${tuile(s.abattus, "abattus")}${tuile(`${s.villages} · ${s.raids}`, "villages · raids")}${tuile(`${s.caravanes} · ${s.batailles}`, "caravanes · batailles")}
+        ${tuile(s.malades, "malades")}${tuile(s.age === "cuivre" ? "cuivre" : "pierre", "âge")}${tuile(s.betail, "bêtes apprivoisées")}${tuile(s.champs, "champs")}${tuile(s.tuilesDecouvertes, "tuiles découvertes")}${tuile(s.morceaux, "morceaux du monde")}${tuile(s.appelsLLM, "appels IA")}${tuile(`${s.coutLLM.toFixed(2)} $`, "coût IA")}${tuile(s.miracles, "miracles")}${tuile(`✦ ${etat.faveur.valeur}/${etat.faveur.max}`, "faveur")}${tuile(s.foiMoyenne, "foi moyenne /10")}${tuile(`${s.prieres} · ${s.exaucees}`, "prières · exaucées")}${tuile(`${s.veillees} · ${s.fetes}`, "veillées · fêtes")}${tuile(`${s.palabres} · ${s.exils}`, "palabres · exils")}${tuile(s.rixes, "rixes")}${tuile(`${s.legendes} · ${s.lieuxNommes}`, "légendes · lieux nommés")}${tuile(s.abattus, "abattus")}${tuile(`${s.villages} · ${s.raids}`, "villages · raids")}${tuile(`${s.caravanes} · ${s.batailles}`, "caravanes · batailles")}${tuile(`${s.conquetes} · ${s.raidsRepousses}`, "conquêtes · raids repoussés")}
       </div>
       <h3>Où ils vont</h3>
       ${

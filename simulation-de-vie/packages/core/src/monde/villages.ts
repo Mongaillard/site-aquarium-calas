@@ -170,7 +170,7 @@ export const JOURS_ENTRE_CARAVANES = 20;
 export const JOURS_ENTRE_BATAILLES = 10;
 export const BATAILLES_MAX = 2;
 /** Seuils d'attitude : guerre en dessous (avec casus belli), alliance au-dessus. */
-export const SEUIL_GUERRE = -60;
+export const SEUIL_GUERRE = -50;
 export const SEUIL_ALLIANCE = 60;
 
 // --------------------------------------------------------------- outils

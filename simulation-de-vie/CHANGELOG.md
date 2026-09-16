@@ -2,6 +2,18 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M36 – Finitions (2026-09-16)
+
+- **Fond net de près** : au-delà de 36 px par tuile, le fond de carte se redessine à 48 px par
+  tuile (au lieu de 24 agrandi), mis en cache par résolution ; de loin, rien ne change.
+- **Fenêtres allumées la nuit** sur les maisons en sprite (une lueur chaude qui vacille).
+- **Bulles sobres** : trois bulles au plus pendant une bataille (six sinon), jamais sur un
+  combattant ; la légende décrit les sprites (tunique, outil, anneau et barre de vie).
+- **Guerre moins timide** : la guerre se déclare dès −50 d'attitude (−60 avant), la troupe
+  prend 70 % des adultes valides (60 %), la défense se plafonne à 1,2 fois la troupe (1,5).
+- **Statistiques** : tuile « conquêtes · raids repoussés ».
+- **Le fil de la canne à pêche** part de la pointe du bâton quand on pêche.
+
 ## M35 bis – Tuniques ajustées, zoom doublé (2026-09-16)
 
 - La tunique des personnages était une cuirasse à épaulières (tuile 10 de la ligne 4 de la

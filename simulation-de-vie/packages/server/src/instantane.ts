@@ -675,6 +675,8 @@ export function statistiques(sim: Simulation, bilan: BilanSaisons): Statistiques
     raids: sim.villages.compteurs.tributs + sim.villages.compteurs.pillages,
     caravanes: sim.villages.compteurs.caravanes,
     batailles: sim.villages.compteurs.batailles,
+    conquetes: sim.villages.compteurs.conquetes ?? 0,
+    raidsRepousses: sim.villages.compteurs.raidsRepousses ?? 0,
   };
 }
 
