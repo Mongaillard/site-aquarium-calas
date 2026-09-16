@@ -2,6 +2,39 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M32 – La guerre se voit : batailles tick par tick, animées (2026-09-16)
+
+Une bataille entre villages se résolvait d'un coup à l'aube, hors écran : on la lisait dans le
+journal. Désormais elle dure, se joue sur la carte, et l'on peut la regarder.
+
+- **Moteur** (`monde/bataille.ts`) : à l'aube d'une guerre déclarée, le village le plus fort
+  (au hasard près) **lève une troupe** — jusqu'à douze adultes valides, les plus forts —
+  qui **marche** sur le village ennemi (intention `combattre`, longue marche partagée avec la
+  migration). À six tuiles, **l'assaut** : l'alarme lève les adultes du village défenseur à
+  quarante tuiles, les plus proches d'abord, une fois et demie la troupe au plus, et les
+  retardataires prennent les armes en arrivant. Sur le **champ de bataille** (huit tuiles
+  autour du centre), chacun rejoint l'adversaire le plus proche par deux pas et **frappe** à
+  sa cadence (trois ticks) : la chance de toucher tient à l'arme (lance, hache de cuivre,
+  arc, hache), à l'expérience de chasse, au cuir de l'autre et à la palissade ; un coup fait
+  une **blessure** de M8 (8, 20 ou 30 de santé), rarement la mort. Sous quarante de santé, on
+  **se retire et on fuit**. Fin : un camp vidé ou **en déroute** (au quart de sa force) perd ;
+  vingt-quatre ticks sans contact, le camp resté sur le champ l'emporte ; une demi-journée
+  de contact, **trêve** ; un village désert est **pris**. L'issue rejoue M21 (butin, bâtiments
+  ébranlés, peur, attitude, compte des batailles, prix du sang) ; sans troupe possible, la
+  paix. Les non-combattants à douze tuiles fuient. Les **coups** sont consignés (`frappes`).
+- **Protocole** : `villages.batailles` (camps, phase, lieu, rayon, ticks, issue, frappes),
+  événements `village` de genre `marche`, `assaut`, `bataille` (avec `issue`, `duree`).
+- **Viewer** : le **champ de bataille** en cercle rouge pointillé, un **anneau de camp** sous
+  chaque combattant (rouge attaquant, bleu défenseur), une **barre de vie** au-dessus de la
+  tête, les coups animés (**élan** du sprite vers l'adversaire, **éclat** à l'impact, le
+  **chiffre des dégâts** qui monte, ☠ pour un coup mortel), et une **jauge de bataille** en
+  haut de la carte (les deux camps, leur force restante, les morts ; cliquer y mène). Le fil
+  raconte la levée, l'assaut, l'issue.
+- Mode local : `?guerre` (avec `peuples=2`) déclare la guerre entre les deux premiers
+  villages et fait partir la troupe sur-le-champ, pour voir une bataille tout de suite.
+- Tests : levée, marche, assaut, conclusion ; déterminisme ; sauvegarde en cours de bataille ;
+  côté viewer, les coups animés une seule fois, pas de rattrapage, les camps.
+
 ## M31 – Bâtiments et personnages en sprites (2026-09-16)
 
 Le fond avait ses tuiles (M27) ; bâtiments et personnages restaient des dessins vectoriels.

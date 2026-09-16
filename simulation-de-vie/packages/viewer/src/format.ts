@@ -619,8 +619,16 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
           return `L'alliance entre ${String(d.aNom)} et ${String(d.bNom)} se défait.`;
         case "guerre":
           return `⚔️ ${String(d.aNom)} et ${String(d.bNom)} entrent en guerre : ${String(d.casusBelli)}.`;
-        case "bataille":
-          return `⚔️ Bataille ${String(d.numero)} entre ${String(d.aNom)} et ${String(d.bNom)} : ${String(d.gagnantNom)} l'emporte (${String(d.blesses)} blessé${Number(d.blesses) > 1 ? "s" : ""}${Number(d.morts) > 0 ? `, ${String(d.morts)} mort` : ""}, ${String(d.butin)} portions prises).`;
+        case "marche":
+          return `⚔️ ${String(d.aNom)} lève ${String(d.guerriers)} guerriers et marche sur ${String(d.bNom)} (bataille ${String(d.numero)}).`;
+        case "assaut":
+          return `⚔️ Assaut sur ${String(d.bNom)} : ${String(d.guerriers)} attaquants, ${String(d.defenseurs)} défenseur${Number(d.defenseurs) > 1 ? "s" : ""} prennent les armes.`;
+        case "bataille": {
+          const bilan = `${String(d.blesses)} coup${Number(d.blesses) > 1 ? "s" : ""} porté${Number(d.blesses) > 1 ? "s" : ""}${Number(d.morts) > 0 ? `, ${String(d.morts)} mort${Number(d.morts) > 1 ? "s" : ""}` : ""}`;
+          if (d.issue === "treve" || d.gagnantNom === null || d.gagnantNom === undefined)
+            return `⚔️ Bataille ${String(d.numero)} entre ${String(d.aNom)} et ${String(d.bNom)} : chacun rentre chez soi (${bilan}).`;
+          return `⚔️ Bataille ${String(d.numero)} entre ${String(d.aNom)} et ${String(d.bNom)} : ${String(d.gagnantNom)} l'emporte (${bilan}, ${String(d.butin)} portions prises).`;
+        }
         case "paix":
           return `🕊️ Paix entre ${String(d.aNom)} et ${String(d.bNom)} après ${String(d.batailles)} bataille${Number(d.batailles) > 1 ? "s" : ""} : le prix du sang, ${String(d.donne)} portions.`;
         default:

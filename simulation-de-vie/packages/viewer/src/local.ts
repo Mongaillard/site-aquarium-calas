@@ -3,7 +3,7 @@
  * avec exactement les mêmes messages que le serveur WebSocket. Utile sur mobile
  * et pour les pages publiées.
  */
-import { Simulation } from "@sdv/core";
+import { Simulation, declarerGuerre, leverTroupe } from "@sdv/core";
 import type { Sauvegarde, SimConfigPartielle } from "@sdv/core";
 import type { Commande, MessageEtat, MessageServeur } from "@sdv/protocole";
 import {
@@ -32,6 +32,8 @@ export interface OptionsLocales {
   readonly config?: SimConfigPartielle;
   /** Reprendre un monde sauvegardé au lieu d'en créer un (pas de pré-simulation). */
   readonly sauvegarde?: unknown;
+  /** Après la pré-simulation, deux villages entrent en guerre (M32, `?guerre`, pour voir une bataille). */
+  readonly guerre?: boolean;
 }
 
 /** Une liaison qui simule (dans la page ou dans un travailleur) et sait sauvegarder. */
@@ -108,6 +110,16 @@ export class LiaisonLocale implements LiaisonSimulee {
         return;
       }
       this.preparation = null;
+      if (this.options.guerre === true) {
+        // Deux villages en guerre, et la troupe part sur-le-champ : on assiste à la bataille.
+        const [a, b] = sim.villages.villages;
+        const r =
+          a !== undefined && b !== undefined
+            ? declarerGuerre(sim, a, b, "une vieille rancune")
+            : null;
+        if (r !== null && a !== undefined && b !== undefined)
+          leverTroupe(sim, sim.rng.fork("guerre"), r, a, b);
+      }
       this.dernierTemps = performance.now();
       this.mesureDepuis = this.dernierTemps;
       this.diffuser();

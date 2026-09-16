@@ -54,7 +54,8 @@ export interface Camp {
   readonly village: string | null;
   /** Les combattants encore engagés (identifiants de personnages). */
   guerriers: string[];
-  readonly forceInitiale: number;
+  /** Tous ceux qui ont pris les armes depuis le début (la défense se lève au fil du combat). */
+  forceInitiale: number;
   /** Coups reçus et morts, comptés au fil du combat. */
   blesses: number;
   morts: number;
@@ -89,7 +90,9 @@ export const TICKS_SANS_CONTACT = 24;
 /** Un combat ne dure pas plus d'une demi-journée ; une marche, deux jours. */
 export const DUREE_COMBAT_MAX = 72;
 export const DUREE_MARCHE_MAX = 288;
-export const GUERRIERS_MAX = 6;
+export const GUERRIERS_MAX = 12;
+/** La défense ne dégarnit pas le village : une fois et demie la troupe adverse au plus. */
+export const RATIO_DEFENSE = 1.5;
 /** Ticks entre deux coups d'un même combattant. */
 export const CADENCE_FRAPPE = 3;
 export const FRAPPES_GARDEES = 40;
@@ -248,22 +251,43 @@ export function aubeBatailles(monde: Monde, rng: Rng): void {
 
 function enroler(monde: Monde, b: Bataille, p: Personnage): void {
   b.defenseur.guerriers.push(p.id);
+  b.defenseur.forceInitiale += 1;
   p.drapeaux.bataille = b.id;
   p.drapeaux.alerteJusqua = Math.max(p.drapeaux.alerteJusqua, monde.horloge.tick + 36);
 }
 
-/** Les adultes du village défenseur à portée qui ne se battent pas encore prennent les armes. */
+/**
+ * Les adultes du village défenseur à portée qui ne se battent pas encore prennent les armes,
+ * les plus proches d'abord, sans dépasser une fois et demie la troupe adverse.
+ */
 function leverLaDefense(monde: Monde, b: Bataille, rayon: number): number {
   const village = villageDId(monde, b.defenseur.village);
   if (village === null) return 0;
+  const plafond = Math.max(2, Math.ceil(b.attaquant.forceInitiale * RATIO_DEFENSE));
+  const candidats = adultesDe(monde, village)
+    .filter(
+      (p) =>
+        (p.drapeaux.bataille ?? null) === null &&
+        p.corps.sante >= SANTE_FUITE &&
+        Grille.distance(p.corps.position, b.lieu) <= rayon,
+    )
+    .sort(
+      (x, y) =>
+        Grille.distance(x.corps.position, b.lieu) - Grille.distance(y.corps.position, b.lieu) ||
+        x.id.localeCompare(y.id),
+    );
   let n = 0;
-  for (const p of adultesDe(monde, village)) {
-    if ((p.drapeaux.bataille ?? null) !== null || p.corps.sante < SANTE_FUITE) continue;
-    if (Grille.distance(p.corps.position, b.lieu) > rayon) continue;
+  for (const p of candidats) {
+    if (b.defenseur.forceInitiale >= plafond) break;
     enroler(monde, b, p);
     n += 1;
   }
   return n;
+}
+
+/** Un camp réduit au quart de sa force (ou à un seul) est en déroute. */
+function enDeroute(c: Camp): boolean {
+  return c.guerriers.length <= Math.max(1, Math.floor(c.forceInitiale / 4));
 }
 
 function liberer(monde: Monde, id: string): void {
@@ -348,7 +372,6 @@ export function tickBatailles(monde: Monde): void {
         b.phase = "combat";
         b.combatTick = tick;
         const n = leverLaDefense(monde, b, RAYON_DEFENSE);
-        (b.defenseur as { forceInitiale: number }).forceInitiale = n;
         const att = villageDId(monde, b.attaquant.village);
         const def = villageDId(monde, b.defenseur.village);
         if (def !== null)
@@ -392,6 +415,10 @@ export function tickBatailles(monde: Monde): void {
       const depuisAssaut = tick - (b.combatTick ?? tick);
       if (b.attaquant.guerriers.length === 0) conclure(monde, b, "defenseur");
       else if (b.defenseur.guerriers.length === 0) conclure(monde, b, "attaquant");
+      else if (b.contactTick !== null && enDeroute(b.attaquant) && !enDeroute(b.defenseur))
+        conclure(monde, b, "defenseur");
+      else if (b.contactTick !== null && enDeroute(b.defenseur) && !enDeroute(b.attaquant))
+        conclure(monde, b, "attaquant");
       else if (b.contactTick === null) {
         // Personne en face : le village est pris, ou la troupe s'est dispersée avant.
         if (depuisAssaut >= DUREE_COMBAT_MAX)

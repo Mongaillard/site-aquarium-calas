@@ -267,6 +267,44 @@ export interface CaravaneEtat {
 }
 
 /** Les villages (jalon 15) : grappes nommées, routes, bandes, caravanes, relations. */
+/** Un coup porté dans une bataille (M32) ; `degats` 0 quand il est manqué. */
+export interface FrappeEtat {
+  readonly tick: number;
+  readonly de: string;
+  readonly vers: string;
+  readonly degats: number;
+  readonly mortelle: boolean;
+}
+
+export interface CampEtat {
+  readonly village: string | null;
+  readonly nom: string;
+  /** Les combattants encore engagés. */
+  readonly guerriers: readonly string[];
+  readonly forceInitiale: number;
+  readonly blesses: number;
+  readonly morts: number;
+}
+
+/** Une bataille (M32) : en marche, au combat, ou finie depuis peu. */
+export interface BatailleEtat {
+  readonly id: string;
+  readonly genre: string;
+  readonly phase: "marche" | "combat" | "finie";
+  readonly attaquant: CampEtat;
+  readonly defenseur: CampEtat;
+  /** Le lieu de l'assaut et le rayon du champ de bataille. */
+  readonly x: number;
+  readonly y: number;
+  readonly rayon: number;
+  readonly debutTick: number;
+  readonly combatTick: number | null;
+  readonly finTick: number | null;
+  readonly issue: "attaquant" | "defenseur" | "treve" | null;
+  /** Les derniers coups, pour l'animation. */
+  readonly frappes: readonly FrappeEtat[];
+}
+
 export interface VillagesEtat {
   readonly villages: readonly VillageEtat[];
   readonly relations: readonly DiplomatieEtat[];
@@ -274,6 +312,8 @@ export interface VillagesEtat {
   readonly caravanes: readonly CaravaneEtat[];
   /** Routes empruntées, par paires de positions [x1, y1, x2, y2]. */
   readonly routes: readonly (readonly [number, number, number, number])[];
+  /** Les batailles (M32) en cours ou fraîchement finies. */
+  readonly batailles: readonly BatailleEtat[];
 }
 
 /** Une coutume du village : une leçon que tout adulte suit. */

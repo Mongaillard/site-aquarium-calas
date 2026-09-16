@@ -97,6 +97,13 @@ requise ; voir `packages/viewer/src/assets/tuiles/CREDITS.md`) plutôt que d'un 
 gisements sans icône nette (poisson, gibier, fibres) restent en vectoriel. La page publiée reste
 un fichier unique : les planches s'embarquent en URL `data:`, sans image externe à charger.
 
+**La guerre se voit (M32).** Une guerre entre villages ne se règle plus hors écran : à
+l'aube, une **troupe** se lève et marche sur le village ennemi, l'alarme lève les défenseurs,
+et le combat se joue sur la carte, coup par coup — **barres de vie**, élans et impacts,
+chiffres de dégâts, blessés qui se retirent, morts rares — avec une **jauge de bataille** en
+haut de l'écran. Le village pris perd des vivres, la rancune monte, et la paix se fait au
+prix du sang. Pour en voir une tout de suite : `?peuples=2&guerre`.
+
 **Bâtiments et personnages en sprites (M31).** Deux planches CC0 de Kenney de plus : tente,
 maisons, grange, four, fumoir, puits et sanctuaire viennent de _Medieval RTS_ ; chaque personnage
 se compose en couches de _Roguelike Characters_ — corps par teint, tunique teintée à la couleur

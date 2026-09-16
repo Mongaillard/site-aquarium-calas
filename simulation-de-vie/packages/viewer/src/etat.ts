@@ -1,5 +1,6 @@
 /** Magasin d'état côté viewer : ce que le serveur a envoyé, plus l'état d'interface. */
 import type {
+  BatailleEtat,
   EvenementEtat,
   MessageEtat,
   MessageFiche,
@@ -36,6 +37,16 @@ export interface Effet {
   readonly x: number;
   readonly y: number;
   readonly rayon: number;
+  readonly debut: number;
+  readonly fin: number;
+}
+
+/** Un coup de bataille à animer (M32) : élan de `de` vers `vers`, impact et chiffre. */
+export interface Coup {
+  readonly de: string;
+  readonly vers: string;
+  readonly degats: number;
+  readonly mortelle: boolean;
   readonly debut: number;
   readonly fin: number;
 }
@@ -118,6 +129,9 @@ export class Magasin {
   repere: { x: number; y: number; fin: number } | null = null;
   reticule: { x: number; y: number } | null = null;
   effets: Effet[] = [];
+  /** Les coups de bataille en cours d'animation, et le dernier tick vu par bataille. */
+  coups: Coup[] = [];
+  private readonly derniereFrappe = new Map<string, number>();
 
   nom(id: string): string {
     return this.noms.get(id) ?? id;
@@ -139,6 +153,8 @@ export class Magasin {
     this.selectionBatiment = null;
     this.suivre = false;
     this.effets = [];
+    this.coups = [];
+    this.derniereFrappe.clear();
     this.reticule = null;
     this.morceaux.clear();
     this.zone = null;
@@ -305,6 +321,7 @@ export class Magasin {
           if (e.type === "divin" && e.position !== null) this.ajouterEffet(e, maintenant);
         }
         this.effets = this.effets.filter((f) => f.fin > maintenant);
+        this.ajouterCoups(message, maintenant);
         if (this.evenements.length > MAX_EVENEMENTS)
           this.evenements.splice(0, this.evenements.length - MAX_EVENEMENTS);
         this.bulles = this.bulles.filter((b) => b.fin > maintenant);
@@ -356,6 +373,42 @@ export class Magasin {
       debut: maintenant,
       fin: maintenant + (pouvoir === "foudre" ? 900 : 1400),
     });
+  }
+
+  /** Les coups nouveaux de chaque bataille deviennent des animations, échelonnées. */
+  private ajouterCoups(message: MessageEtat, maintenant: number): void {
+    for (const b of message.villages.batailles) {
+      const dernier = this.derniereFrappe.get(b.id) ?? -1;
+      let n = 0;
+      let plusRecent = dernier;
+      for (const f of b.frappes) {
+        if (f.tick <= dernier) continue;
+        plusRecent = Math.max(plusRecent, f.tick);
+        // Une pré-simulation ou un rattrapage n'anime pas la carte.
+        if (message.tick - f.tick > 24) continue;
+        const debut = maintenant + n * 90;
+        n += 1;
+        this.coups.push({ ...f, debut, fin: debut + 520 });
+      }
+      this.derniereFrappe.set(b.id, plusRecent);
+    }
+    this.coups = this.coups.filter((c) => c.fin > maintenant);
+  }
+
+  /** La bataille en cours (marche ou combat), ou null. */
+  get batailleActive(): BatailleEtat | null {
+    return this.etat?.villages.batailles.find((b) => b.phase !== "finie") ?? null;
+  }
+
+  /** Qui se bat, dans quel camp, pour les anneaux et les barres de vie. */
+  get combattants(): ReadonlyMap<string, "attaquant" | "defenseur"> {
+    const m = new Map<string, "attaquant" | "defenseur">();
+    for (const b of this.etat?.villages.batailles ?? []) {
+      if (b.phase === "finie") continue;
+      for (const id of b.attaquant.guerriers) m.set(id, "attaquant");
+      for (const id of b.defenseur.guerriers) m.set(id, "defenseur");
+    }
+    return m;
   }
 
   /** Personnages ayant une question de conseil ouverte. */

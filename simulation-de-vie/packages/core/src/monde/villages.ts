@@ -941,6 +941,40 @@ function diplomatie(monde: MondeVillages): void {
   }
 }
 
+/**
+ * Déclare la guerre entre deux villages, quel que soit leur attitude (M32 : le paramètre
+ * `?guerre` du mode local ; M33 : le pouvoir « Sonner la guerre »). Une troupe se lève à
+ * l'aube suivante. Renvoie la relation, ou null si les deux sont le même village.
+ */
+export function declarerGuerre(
+  monde: MondeVillages,
+  a: Village,
+  b: Village,
+  casusBelli: string,
+): Diplomatie | null {
+  if (a.id === b.id) return null;
+  const e = monde.villages;
+  const jour = jourDe(monde);
+  const r = relationEntre(e, a.id, b.id);
+  if (r.etat === "guerre") return r;
+  r.etat = "guerre";
+  r.casusBelli = casusBelli;
+  r.attitude = Math.min(r.attitude, -80);
+  r.batailles = 0;
+  r.depuisJour = jour - 3;
+  e.derniereBatailleJour = Math.min(e.derniereBatailleJour, jour - JOURS_ENTRE_BATAILLES);
+  e.compteurs.guerres += 1;
+  monde.emettre(
+    "village",
+    null,
+    { genre: "guerre", a: a.id, b: b.id, aNom: a.nom, bNom: b.nom, casusBelli },
+    10,
+    a.centre,
+  );
+  for (const p of [...habitants(monde, a), ...habitants(monde, b)]) stresser(p, 10);
+  return r;
+}
+
 /** La porte de sortie : le prix du sang. Le perdant donne dix portions, et l'on se parle de nouveau. */
 export function faireLaPaix(monde: MondeVillages, r: Diplomatie, a: Village, b: Village): void {
   const e = monde.villages;

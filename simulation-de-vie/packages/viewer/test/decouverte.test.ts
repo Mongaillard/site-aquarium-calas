@@ -89,7 +89,7 @@ function etat(decouvertes: number[]): MessageEtat {
       bannis: [],
     },
     chronique: { recits: [], lieuxNommes: [], proverbes: [] },
-    villages: { villages: [], relations: [], bandes: [], caravanes: [], routes: [] },
+    villages: { villages: [], relations: [], bandes: [], caravanes: [], routes: [], batailles: [] },
     lois: {
       faim: true,
       maladies: true,

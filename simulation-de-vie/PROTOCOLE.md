@@ -1237,6 +1237,64 @@ recopiés de son XML) et `roguelike-characters/roguelikeChar_transparent.png` (5
 - Pas de test de rendu (le viewer se teste sans DOM) ; vérifié par captures Playwright, ordi et
   téléphone, jour et nuit.
 
+## 8 duodecies. La guerre qui se voit telle que réalisée (M32)
+
+Avant : `villages.ts:bataille()` mesurait deux forces à l'aube et appliquait blessures, un mort
+au plus, butin et peur, en un tick. **[DÉCISION]** La bataille devient un objet du monde qui
+dure (`monde/bataille.ts`, `EtatVillages.batailles`), les combattants de vrais personnages qui
+marchent et frappent ; le viewer anime les coups. Déterministe (les frappes tirent sur le
+générateur du personnage), sauvegardé structurellement (drapeau `bataille` par personnage,
+`batailles` par défaut sur les mondes d'avant).
+
+- **Levée** (`aubeBatailles`, après `aubeVillages`) : pour chaque relation en guerre sous
+  `BATAILLES_MAX`, dix jours après la précédente et trois après la déclaration, `leverTroupe` :
+  le camp le plus fort (`forceDe` × 0,8–1,2) attaque ; `guerriersDisponibles` (adultes, santé
+  ≥ 60, ni malade ni enceinte, sans plaie qui saigne, triés par force) → 60 % d'entre eux, de
+  deux à `GUERRIERS_MAX = 12`. Une bataille à la fois. Sans troupe : `faireLaPaix`. Événement
+  `village/marche`.
+- **Marche** : `drapeaux.bataille` ; `RuleBrain.urgence` renvoie `combattre` avant tout ;
+  `planifierCombat` → `marcherVers(lieu, RAYON_ASSAUT = 6)` (chemin d'un coup ou vingt tuiles
+  dans la direction, comme `migrer`). Deux jours au plus (`DUREE_MARCHE_MAX`), sinon trêve.
+- **Assaut** (`tickBatailles`, chaque tick avant les personnages) : un attaquant à six tuiles du
+  lieu → phase `combat`, `leverLaDefense` à `RAYON_DEFENSE = 40` (les plus proches d'abord,
+  plafond `RATIO_DEFENSE = 1,5` × troupe, cumulé sur la bataille), alerte et stress du
+  village, événement `village/assaut`. Les retardataires s'enrôlent chaque tick jusqu'au
+  plafond.
+- **Combat** : sur le champ (`RAYON_CHAMP = 8` autour du lieu ; hors du champ, on y revient ;
+  un adversaire hors du champ n'est pas poursuivi), `adversaireLePlusProche`, `allerPresDe`
+  tronqué à deux pas, puis action `combattre` (`CADENCE_FRAPPE = 3` ticks) → `frapper` :
+  chance = 0,35 + `bonusArme` (lance 0,2, hache de cuivre 0,15, arc 0,12, hache 0,1) + 0,03 ×
+  niveau de chasse − 0,05 si cuir − 0,1 si le défenseur est à trois tuiles d'une palissade,
+  bornée à [0,1 ; 0,85] ; touché : `blesser` coupure de gravité 1/2/3 (60/35/5 %) ; mort si
+  santé ≤ 15 après un coup de gravité ≥ 2, une fois sur deux. Chaque coup, manqué ou non, va
+  dans `frappes` (quarante gardés). L'adversaire qui a bougé termine l'action sans échec.
+- **Retrait** : chaque tick, morts et blessés sous `SANTE_FUITE = 40` quittent leur camp,
+  drapeau levé, intention `fuir`. Non-combattants à douze tuiles d'un combat : `menacePercue`
+  renvoie une menace sans cible → `fuir`.
+- **Fin** (`conclure`) : camp vide ; **déroute** (au quart de la force, ou un seul) face à un
+  camp qui tient ; avant tout contact, `DUREE_COMBAT_MAX = 72` ticks → le camp sur le champ
+  l'emporte (village désert pris, troupe dispersée) ; après contact, `TICKS_SANS_CONTACT = 24`
+  sans les deux camps sur le champ → celui qui reste l'emporte, ou trêve ; 72 ticks de contact
+  → trêve. Puis les effets de M21 : `r.batailles`, compteurs, butin (20 % des vivres du perdant
+  vers le stock du gagnant, plafonné à vingt), bâtiments à huit tuiles −20 de solidité,
+  stress 15 et sécurité −25 pour tous, attitude −10 ; événement `village/bataille` (`issue`,
+  `gagnant` nullable, `blesses` = coups portés, `morts`, `butin`, `numero`, `duree`). Les
+  batailles finies restent un jour dans l'état (`REMANENCE`), puis s'effacent.
+- **Protocole** : `BatailleEtat` (`CampEtat` avec `nom`, `guerriers`, `forceInitiale`,
+  `blesses`, `morts` ; `x`, `y`, `rayon` ; ticks ; `issue` ; `frappes`). `declarerGuerre`
+  (exporté, `?guerre` du mode local) déclare et date la guerre pour qu'une troupe parte à
+  l'aube suivante ; le mode local la lève sur-le-champ.
+- **Viewer** : `Magasin.coups` (les frappes nouvelles par bataille, échelonnées de 90 ms,
+  520 ms chacune ; pas d'animation à plus de vingt-quatre ticks du présent), `batailleActive`,
+  `combattants`. `rendu.ts` : cercle du champ, anneaux de camp, élan (0,38 tuile vers
+  l'adversaire sur les six premiers dixièmes), éclat à l'impact (blanc manqué, rouge porté),
+  barre de vie en pixels (26 × 4, vert/jaune/rouge, tiret de camp) dès cinq pixels par tuile,
+  chiffre des dégâts qui monte et s'efface. `panneaux.ts:jauge()` → `#bataille` (titre
+  cliquable « aller voir », deux barres de force, morts), gardée trente-six ticks après la fin.
+- Tests : `core/test/bataille.test.ts` (levée, marche, assaut, conclusion, drapeaux levés,
+  journal ; même graine, même bataille ; sauvegarde en cours de route), `viewer/test/bataille.test.ts`
+  (coups animés une fois, échelonnés, effacés ; rattrapage muet ; camps).
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

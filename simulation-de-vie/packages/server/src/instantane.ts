@@ -38,6 +38,7 @@ import {
   nourritureDe,
   forceDe,
   possede,
+  RAYON_CHAMP,
 } from "@sdv/core";
 import type {
   Evenement,
@@ -49,11 +50,13 @@ import type {
   Savoir,
   TypeBatiment,
   TypeObjet,
+  CampBataille,
 } from "@sdv/core";
 import type {
   AmbitionFiche,
   AmbitionStat,
   BatimentEtat,
+  CampEtat,
   ConseilFiche,
   BilanSaison,
   EvenementEtat,
@@ -222,6 +225,36 @@ export function villagesEtat(sim: Simulation): VillagesEtat {
         return ca === null || cb === null ? null : ([ca.x, ca.y, cb.x, cb.y] as const);
       })
       .filter((r): r is readonly [number, number, number, number] => r !== null),
+    batailles: e.batailles.map((b) => ({
+      id: b.id,
+      genre: b.genre,
+      phase: b.phase,
+      attaquant: campEtat(sim, b.attaquant),
+      defenseur: campEtat(sim, b.defenseur),
+      x: b.lieu.x,
+      y: b.lieu.y,
+      rayon: RAYON_CHAMP,
+      debutTick: b.debutTick,
+      combatTick: b.combatTick,
+      finTick: b.finTick,
+      issue: b.issue,
+      frappes: b.frappes.map((f) => ({ ...f })),
+    })),
+  };
+}
+
+function campEtat(sim: Simulation, c: CampBataille): CampEtat {
+  const nom =
+    c.village === null
+      ? "des étrangers"
+      : (sim.villages.villages.find((v) => v.id === c.village)?.nom ?? c.village);
+  return {
+    village: c.village,
+    nom,
+    guerriers: [...c.guerriers],
+    forceInitiale: c.forceInitiale,
+    blesses: c.blesses,
+    morts: c.morts,
   };
 }
 

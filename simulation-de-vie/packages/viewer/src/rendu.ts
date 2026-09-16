@@ -236,6 +236,55 @@ export class Rendu {
           pos: magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y, enMouvement: false },
         }))
         .sort((a, b) => a.pos.y - b.pos.y);
+      // La bataille (M32) : le champ, les anneaux de camp, les élans des coups.
+      const parId = new Map(positions.map(({ p, pos }) => [p.id, pos] as const));
+      const combattants = magasin.combattants;
+      const elans = new Map<string, { dx: number; dy: number }>();
+      const impacts: { x: number; y: number; t: number; degats: number; mortelle: boolean }[] = [];
+      for (const c of magasin.coups) {
+        if (c.debut > maintenant || c.fin < maintenant) continue;
+        const de = parId.get(c.de);
+        const vers = parId.get(c.vers);
+        if (de === undefined || vers === undefined) continue;
+        const t = (maintenant - c.debut) / (c.fin - c.debut);
+        const dx = vers.x - de.x;
+        const dy = vers.y - de.y;
+        const d = Math.hypot(dx, dy) || 1;
+        // L'élan : un bond vers l'adversaire sur la première moitié, puis le retour.
+        const a = Math.sin(Math.min(1, t / 0.6) * Math.PI) * 0.38;
+        elans.set(c.de, { dx: (dx / d) * a, dy: (dy / d) * a });
+        if (t >= 0.3)
+          impacts.push({
+            x: vers.x,
+            y: vers.y,
+            t: (t - 0.3) / 0.7,
+            degats: c.degats,
+            mortelle: c.mortelle,
+          });
+      }
+      for (const b of etat.villages.batailles) {
+        if (b.phase !== "combat" || !visible(b.x, b.y)) continue;
+        ctx.strokeStyle = `rgba(255, 96, 96, ${String(0.45 + 0.2 * Math.sin(maintenant / 250))})`;
+        ctx.lineWidth = 0.14;
+        ctx.setLineDash([0.8, 0.5]);
+        ctx.lineDashOffset = -(maintenant / 120) % 1.3;
+        ctx.beginPath();
+        ctx.arc(b.x + 0.5, b.y + 0.5, b.rayon + 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (combattants.size > 0) {
+        ctx.lineWidth = 0.12;
+        for (const { p, pos } of positions) {
+          const camp = combattants.get(p.id);
+          if (camp === undefined || !visible(pos.x, pos.y)) continue;
+          ctx.strokeStyle =
+            camp === "attaquant" ? "rgba(255, 96, 96, 0.9)" : "rgba(111, 176, 255, 0.9)";
+          ctx.beginPath();
+          ctx.ellipse(pos.x + 0.5, pos.y + 0.9, 0.5, 0.22, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
       // Calques familles / foi : un anneau au sol sous chaque personne, lisible même de loin.
       if (magasin.calque === "familles" || magasin.calque === "foi") {
         ctx.lineWidth = 0.18;
@@ -263,7 +312,8 @@ export class Rendu {
       for (const { p, pos } of positions) {
         if (!visible(pos.x, pos.y)) continue;
         const couleur = couleurFamille(p.nomFamille);
-        sprites.personnage(ctx, pos.x, pos.y, {
+        const elan = elans.get(p.id);
+        sprites.personnage(ctx, pos.x + (elan?.dx ?? 0), pos.y + (elan?.dy ?? 0), {
           couleur,
           contour: couleurMoral(p.besoins.moral),
           teint: p.malade ? "#cfd3cf" : (sprites.TEINTS[p.teint] ?? "#f3d3b3"),
@@ -293,6 +343,23 @@ export class Rendu {
         });
       }
       ctx.imageSmoothingEnabled = true;
+      // Les impacts des coups : un éclat blanc qui s'ouvre, rouge s'il a porté.
+      for (const i of impacts) {
+        if (!visible(i.x, i.y)) continue;
+        const r = 0.15 + i.t * 0.35;
+        ctx.strokeStyle =
+          i.degats > 0
+            ? `rgba(255, 90, 60, ${String(1 - i.t)})`
+            : `rgba(255, 255, 255, ${String(0.7 * (1 - i.t))})`;
+        ctx.lineWidth = 0.08;
+        ctx.beginPath();
+        for (let k = 0; k < 6; k++) {
+          const ang = (k / 6) * Math.PI * 2 + i.t;
+          ctx.moveTo(i.x + 0.5 + Math.cos(ang) * r * 0.4, i.y + 0.45 + Math.sin(ang) * r * 0.4);
+          ctx.lineTo(i.x + 0.5 + Math.cos(ang) * r, i.y + 0.45 + Math.sin(ang) * r);
+        }
+        ctx.stroke();
+      }
 
       // Les créatures du ciel (M25) : un halo au sol, un grand glyphe, leur nom.
       for (const c of etat.creatures) {
@@ -479,6 +546,50 @@ export class Rendu {
         ctx.fill();
         ctx.fillStyle = "#10141a";
         ctx.fillText("?", e.x, y + 0.5);
+      }
+    }
+
+    // Barres de vie des combattants (M32), au-dessus de la tête, en pixels.
+    if (etat !== null && cam.echelle >= 5) {
+      const combattants = magasin.combattants;
+      for (const p of etat.personnages) {
+        const camp = combattants.get(p.id);
+        if (camp === undefined || !p.vivant) continue;
+        const pos = magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y };
+        if (!visible(pos.x, pos.y)) continue;
+        const e = versEcran(cam, pos.x + 0.5, pos.y - 0.05);
+        const w = 26;
+        const x = Math.round(e.x - w / 2);
+        const y = Math.round(e.y - (cam.echelle >= 12 ? 16 : 4));
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(x - 1, y - 1, w + 2, 6);
+        ctx.fillStyle = "#3a1414";
+        ctx.fillRect(x, y, w, 4);
+        const part = Math.max(0, Math.min(1, p.sante / 100));
+        ctx.fillStyle = part > 0.5 ? "#6fd36f" : part > 0.3 ? "#ffcf4a" : "#ff5a5a";
+        ctx.fillRect(x, y, Math.round(w * part), 4);
+        ctx.fillStyle = camp === "attaquant" ? "#ff6060" : "#6fb0ff";
+        ctx.fillRect(x - 4, y, 2, 4);
+      }
+      // Les dégâts qui montent et s'effacent.
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      for (const c of magasin.coups) {
+        if (c.debut > maintenant || c.fin < maintenant || c.degats <= 0) continue;
+        const t = (maintenant - c.debut) / (c.fin - c.debut);
+        if (t < 0.3) continue;
+        const p = etat.personnages.find((x) => x.id === c.vers);
+        if (p === undefined) continue;
+        const pos = magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y };
+        const e = versEcran(cam, pos.x + 0.5, pos.y - 0.2);
+        const y = e.y - 18 - ((t - 0.3) / 0.7) * 22;
+        const alpha = 1 - (t - 0.3) / 0.7;
+        const texte = c.mortelle ? `☠ −${String(c.degats)}` : `−${String(c.degats)}`;
+        ctx.fillStyle = `rgba(0,0,0,${String(0.8 * alpha)})`;
+        ctx.fillText(texte, e.x + 1, y + 1);
+        ctx.fillStyle = `rgba(255, 90, 60, ${String(alpha)})`;
+        ctx.fillText(texte, e.x, y);
       }
     }
 

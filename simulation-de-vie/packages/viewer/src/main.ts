@@ -179,6 +179,7 @@ function creerLiaison(graine: string, sauvegarde?: unknown): Liaison {
         jeu: { scenario: scenarioChoisi() },
       },
       ...(sauvegarde !== undefined ? { sauvegarde } : {}),
+      ...(parametres.has("guerre") ? { guerre: true } : {}),
     },
     recevoir,
     connexion,

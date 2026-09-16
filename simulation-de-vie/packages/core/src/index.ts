@@ -219,7 +219,7 @@ export type {
   ActeConteur,
   ChroniqueAnnee,
 } from "./monde/conteur.js";
-export { lancerBande } from "./monde/villages.js";
+export { lancerBande, declarerGuerre } from "./monde/villages.js";
 export {
   batailleActive,
   batailleDe,
@@ -236,6 +236,7 @@ export {
   DUREE_MARCHE_MAX,
   CADENCE_FRAPPE,
   GUERRIERS_MAX,
+  RATIO_DEFENSE,
 } from "./monde/bataille.js";
 export type {
   Bataille,

@@ -268,6 +268,69 @@ a.lien,
 .fil li.nouveau button {
   border-color: #ffd479;
 }
+/* La jauge de bataille (M32) : au milieu en haut, les deux camps face à face. */
+.bataille {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--hud) + 8px);
+  transform: translateX(-50%);
+  width: min(360px, calc(100% - 16px));
+  background: var(--voile);
+  border: 1px solid #ff6060;
+  border-radius: 10px;
+  padding: 6px 10px 8px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 3;
+}
+.bataille .titre {
+  width: 100%;
+  text-align: center;
+  font-weight: 600;
+  color: #ffd479;
+  background: none;
+  border: none;
+  padding: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bataille .camp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2fr auto;
+  align-items: center;
+  gap: 8px;
+}
+.bataille .camp .nom {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bataille .camp .effectif {
+  font-variant-numeric: tabular-nums;
+  color: var(--discret);
+}
+.bataille .barre {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.bataille .barre i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.bataille .att .barre i {
+  background: #ff6060;
+}
+.bataille .def .barre i {
+  background: #6fb0ff;
+}
 /* Légende : derrière un « ? », en bas à gauche. */
 .legende {
   display: none;
@@ -1169,6 +1232,16 @@ table.saisons td:first-child {
 
 /* Téléphone et tablette étroite : un onglet à la fois, barre de navigation en bas. */
 @media (max-width: 900px) {
+  /* Sous la rangée des calques, pleine largeur ; le fil descend d'autant. */
+  .bataille {
+    top: calc(var(--hud) + 36px);
+    font-size: 11px;
+    padding: 4px 8px 6px;
+  }
+  .bataille:not([hidden]) ~ .fil {
+    top: calc(var(--hud) + 116px);
+  }
+
   #zone-carte {
     bottom: var(--nav);
   }

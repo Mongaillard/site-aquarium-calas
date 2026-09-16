@@ -54,6 +54,7 @@ export class Panneaux {
   private dernierRenduLent = 0;
   private ficheAffichee: MessageFiche | null = null;
   private derniereCleFil = "";
+  private derniereCleJauge = "";
 
   constructor(
     private readonly magasin: Magasin,
@@ -153,6 +154,7 @@ export class Panneaux {
   rafraichir(force = false): void {
     this.barre();
     this.fil();
+    this.jauge();
     const version = this.magasin.version;
     switch (this.ongletActif) {
       case "inspecteur":
@@ -645,6 +647,45 @@ export class Panneaux {
       <h3>Scénario</h3>${scenario}
       <h3>Prophéties</h3>${propheties}
       <h3>Succès · ${String(debloques)}/${String(b.succes.length)}</h3>${succes}`;
+  }
+
+  /** La jauge de bataille (M32) en haut de la carte : les deux camps, leur force, l'issue. */
+  private jauge(): void {
+    const etat = this.magasin.etat;
+    const el = $("bataille");
+    const b =
+      etat?.villages.batailles.find(
+        (x) => x.phase !== "finie" || (x.finTick !== null && etat.tick - x.finTick < 36),
+      ) ?? null;
+    if (b === null || etat === null) {
+      if (!el.hidden) el.hidden = true;
+      this.derniereCleJauge = "";
+      return;
+    }
+    const cle = `${b.id}|${b.phase}|${String(b.attaquant.guerriers.length)}|${String(b.defenseur.guerriers.length)}|${String(b.defenseur.forceInitiale)}|${String(b.issue)}`;
+    if (cle === this.derniereCleJauge) return;
+    this.derniereCleJauge = cle;
+    // « le village des Naudin » → « les Naudin » : la jauge est étroite.
+    const court = (nom: string): string => nom.replace(/^le village (des|de la|de|d')\s*/i, "les ");
+    const a = court(b.attaquant.nom);
+    const d = court(b.defenseur.nom);
+    const titre =
+      b.phase === "marche"
+        ? `${a} marchent sur ${d}`
+        : b.phase === "combat"
+          ? `Bataille : ${a} contre ${d}`
+          : b.issue === "treve"
+            ? `Trêve entre ${a} et ${d}`
+            : `${b.issue === "attaquant" ? a : d} l'emportent`;
+    const camp = (c: typeof b.attaquant, classe: string): string => {
+      const total = Math.max(c.forceInitiale, c.guerriers.length);
+      const part = total === 0 ? 0 : Math.round((c.guerriers.length / total) * 100);
+      const effectif = total === 0 ? "—" : `${String(c.guerriers.length)}/${String(total)}`;
+      return `<div class="camp ${classe}"><span class="nom">${e(court(c.nom))}</span><span class="barre"><i style="width:${String(part)}%"></i></span><span class="effectif">${effectif}${c.morts > 0 ? ` · ${String(c.morts)} ☠` : ""}</span></div>`;
+    };
+    el.innerHTML = `<button class="voir titre" type="button" data-x="${String(b.x)}" data-y="${String(b.y)}" title="Aller voir la bataille">⚔️ ${e(titre)}</button>${camp(b.attaquant, "att")}${camp(b.defenseur, "def")}`;
+    el.hidden = false;
+    this.brancherVoir(el);
   }
 
   /** Le fil des grands événements sur la carte (importance ≥ 6), les quatre derniers. */
