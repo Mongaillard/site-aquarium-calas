@@ -3,14 +3,14 @@ import type { EvenementEtat, MomentEtat } from "@sdv/protocole";
 import { teinteFamille } from "@sdv/protocole";
 
 export const COULEURS_BIOME: Readonly<Record<string, string>> = {
-  eau_profonde: "#1b3a6b",
-  eau_peu_profonde: "#2e6ea8",
-  plage: "#e6d59c",
-  prairie: "#7db85a",
-  foret: "#2f7a3a",
-  colline: "#a3955e",
-  montagne: "#8d8d8d",
-  marais: "#587a5a",
+  eau_profonde: "#1d4470",
+  eau_peu_profonde: "#3f86bd",
+  plage: "#e5d5a6",
+  prairie: "#7fb257",
+  foret: "#3b7c3e",
+  colline: "#a49a63",
+  montagne: "#8a8681",
+  marais: "#5f8260",
 };
 
 export const COULEURS_RESSOURCE: Readonly<Record<string, string>> = {

@@ -15,19 +15,35 @@ export function bruit(x: number, y: number, sel = 0): number {
 export function arbre(ctx: Ctx, x: number, y: number, taille: number, variante: number): void {
   const cx = x + 0.5;
   const base = y + 0.92;
+  // Tronc, avec son ombre au sol.
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.beginPath();
+  ctx.ellipse(cx + 0.06 * taille, base, 0.22 * taille, 0.07 * taille, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = "#5a3a1a";
-  ctx.fillRect(cx - 0.05 * taille, base - 0.35 * taille, 0.1 * taille, 0.35 * taille);
-  const verts = ["#2f7a3a", "#276b33", "#3a8a44"];
-  ctx.fillStyle = verts[variante % verts.length] ?? "#2f7a3a";
-  ctx.beginPath();
-  ctx.arc(cx, base - 0.5 * taille, 0.3 * taille, 0, Math.PI * 2);
-  ctx.arc(cx - 0.18 * taille, base - 0.38 * taille, 0.22 * taille, 0, Math.PI * 2);
-  ctx.arc(cx + 0.18 * taille, base - 0.4 * taille, 0.22 * taille, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.12)";
-  ctx.beginPath();
-  ctx.arc(cx - 0.08 * taille, base - 0.6 * taille, 0.12 * taille, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillRect(cx - 0.05 * taille, base - 0.4 * taille, 0.1 * taille, 0.4 * taille);
+  const verts: readonly (readonly [string, string])[] = [
+    ["#3f8a44", "#245a2b"],
+    ["#357a3c", "#1f4f27"],
+    ["#4a9a4c", "#2a6330"],
+  ];
+  const [clair, sombre] = verts[variante % verts.length] ?? ["#3f8a44", "#245a2b"];
+  const couronne = (dx: number, dy: number, r: number): void => {
+    ctx.beginPath();
+    ctx.arc(cx + dx * taille, base - dy * taille, r * taille, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  // Le dessous de la couronne, dans l'ombre ; le dessus, au soleil.
+  ctx.fillStyle = sombre;
+  couronne(0, 0.5, 0.32);
+  couronne(-0.2, 0.4, 0.24);
+  couronne(0.2, 0.42, 0.24);
+  ctx.fillStyle = clair;
+  couronne(-0.03, 0.58, 0.27);
+  couronne(-0.2, 0.47, 0.18);
+  couronne(0.18, 0.5, 0.18);
+  ctx.fillStyle = "rgba(255,255,230,0.18)";
+  couronne(-0.1, 0.68, 0.12);
 }
 
 export function rocher(ctx: Ctx, x: number, y: number, taille: number, teinte = "#9a9a9a"): void {
@@ -191,58 +207,154 @@ export function gisement(
 /* ---------- Bâtiments ---------- */
 
 export function abri(ctx: Ctx, x: number, y: number): void {
-  ctx.fillStyle = "#c9a56b";
-  ctx.fillRect(x + 0.18, y + 0.52, 0.64, 0.4);
-  ctx.fillStyle = "#6b4423";
+  ombreSol(ctx, x, y);
+  // Une hutte de peaux tendues sur des perches.
+  ctx.fillStyle = "#b8925c";
   ctx.beginPath();
-  ctx.moveTo(x + 0.06, y + 0.55);
-  ctx.lineTo(x + 0.5, y + 0.1);
-  ctx.lineTo(x + 0.94, y + 0.55);
+  ctx.moveTo(x + 0.08, y + 0.9);
+  ctx.lineTo(x + 0.5, y + 0.12);
+  ctx.lineTo(x + 0.92, y + 0.9);
   ctx.closePath();
   ctx.fill();
+  ctx.fillStyle = "#8d6a3f";
+  ctx.beginPath();
+  ctx.moveTo(x + 0.5, y + 0.12);
+  ctx.lineTo(x + 0.92, y + 0.9);
+  ctx.lineTo(x + 0.62, y + 0.9);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#5a3a1a";
+  ctx.lineWidth = 0.04;
+  ctx.beginPath();
+  ctx.moveTo(x + 0.5, y + 0.05);
+  ctx.lineTo(x + 0.08, y + 0.9);
+  ctx.moveTo(x + 0.5, y + 0.05);
+  ctx.lineTo(x + 0.92, y + 0.9);
+  ctx.moveTo(x + 0.44, y + 0.02);
+  ctx.lineTo(x + 0.56, y + 0.2);
+  ctx.moveTo(x + 0.56, y + 0.02);
+  ctx.lineTo(x + 0.44, y + 0.2);
+  ctx.stroke();
   ctx.fillStyle = "#3d2412";
-  ctx.fillRect(x + 0.42, y + 0.66, 0.16, 0.26);
+  ctx.beginPath();
+  ctx.moveTo(x + 0.4, y + 0.9);
+  ctx.lineTo(x + 0.5, y + 0.55);
+  ctx.lineTo(x + 0.6, y + 0.9);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** L'ombre portée d'un bâtiment, au sud-est. */
+function ombreSol(ctx: Ctx, x: number, y: number): void {
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.beginPath();
+  ctx.ellipse(x + 0.55, y + 0.93, 0.5, 0.12, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 export function maison(ctx: Ctx, x: number, y: number, nuit: boolean): void {
-  ctx.fillStyle = "#e8d5b5";
+  ombreSol(ctx, x, y);
+  // Murs de torchis sur colombage.
+  ctx.fillStyle = "#e3d0ad";
   ctx.fillRect(x + 0.08, y + 0.42, 0.84, 0.52);
-  ctx.fillStyle = "#8b3a2a";
+  ctx.strokeStyle = "#7a5230";
+  ctx.lineWidth = 0.035;
   ctx.beginPath();
-  ctx.moveTo(x, y + 0.45);
-  ctx.lineTo(x + 0.5, y + 0.06);
-  ctx.lineTo(x + 1, y + 0.45);
+  ctx.moveTo(x + 0.08, y + 0.42);
+  ctx.lineTo(x + 0.08, y + 0.94);
+  ctx.moveTo(x + 0.92, y + 0.42);
+  ctx.lineTo(x + 0.92, y + 0.94);
+  ctx.moveTo(x + 0.08, y + 0.7);
+  ctx.lineTo(x + 0.92, y + 0.7);
+  ctx.moveTo(x + 0.3, y + 0.42);
+  ctx.lineTo(x + 0.3, y + 0.94);
+  ctx.moveTo(x + 0.7, y + 0.42);
+  ctx.lineTo(x + 0.7, y + 0.94);
+  ctx.stroke();
+  // Toit de chaume, plus sombre côté ombre, avec ses lignes de paille.
+  ctx.fillStyle = "#a8783c";
+  ctx.beginPath();
+  ctx.moveTo(x - 0.02, y + 0.46);
+  ctx.lineTo(x + 0.5, y + 0.04);
+  ctx.lineTo(x + 1.02, y + 0.46);
   ctx.closePath();
   ctx.fill();
+  ctx.fillStyle = "rgba(60,30,10,0.28)";
+  ctx.beginPath();
+  ctx.moveTo(x + 0.5, y + 0.04);
+  ctx.lineTo(x + 1.02, y + 0.46);
+  ctx.lineTo(x + 0.5, y + 0.46);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(90,50,15,0.45)";
+  ctx.lineWidth = 0.025;
+  ctx.beginPath();
+  for (let i = 1; i <= 3; i++) {
+    const t = i / 4;
+    ctx.moveTo(x - 0.02 + 0.52 * t, y + 0.46 - 0.42 * t);
+    ctx.lineTo(x + 1.02 - 0.52 * t, y + 0.46 - 0.42 * t);
+  }
+  ctx.stroke();
+  // Porte cintrée, fenêtres, cheminée.
   ctx.fillStyle = "#4a2a15";
-  ctx.fillRect(x + 0.42, y + 0.64, 0.16, 0.3);
+  ctx.beginPath();
+  ctx.moveTo(x + 0.42, y + 0.94);
+  ctx.lineTo(x + 0.42, y + 0.7);
+  ctx.arc(x + 0.5, y + 0.7, 0.08, Math.PI, 0);
+  ctx.lineTo(x + 0.58, y + 0.94);
+  ctx.closePath();
+  ctx.fill();
   ctx.fillStyle = nuit ? "#ffd27a" : "#9ecbe6";
-  ctx.fillRect(x + 0.16, y + 0.52, 0.16, 0.14);
-  ctx.fillRect(x + 0.68, y + 0.52, 0.16, 0.14);
-  ctx.fillStyle = "#6b4423";
-  ctx.fillRect(x + 0.68, y + 0.16, 0.1, 0.2);
+  ctx.fillRect(x + 0.14, y + 0.5, 0.14, 0.14);
+  ctx.fillRect(x + 0.72, y + 0.5, 0.14, 0.14);
+  ctx.strokeStyle = "#7a5230";
+  ctx.lineWidth = 0.02;
+  ctx.strokeRect(x + 0.14, y + 0.5, 0.14, 0.14);
+  ctx.strokeRect(x + 0.72, y + 0.5, 0.14, 0.14);
+  ctx.fillStyle = "#6f6a66";
+  ctx.fillRect(x + 0.68, y + 0.12, 0.11, 0.22);
 }
 
 export function entrepot(ctx: Ctx, x: number, y: number): void {
+  ombreSol(ctx, x, y);
+  // Une grange de planches, toit de bardeaux à deux pans, grande porte.
   ctx.fillStyle = "#7a4a1e";
   ctx.fillRect(x + 0.05, y + 0.38, 0.9, 0.56);
-  ctx.fillStyle = "#555555";
+  ctx.strokeStyle = "rgba(40,20,5,0.4)";
+  ctx.lineWidth = 0.02;
   ctx.beginPath();
-  ctx.moveTo(x, y + 0.4);
-  ctx.lineTo(x + 0.2, y + 0.12);
-  ctx.lineTo(x + 0.8, y + 0.12);
-  ctx.lineTo(x + 1, y + 0.4);
+  for (let i = 1; i < 6; i++) {
+    ctx.moveTo(x + 0.05, y + 0.38 + i * 0.093);
+    ctx.lineTo(x + 0.95, y + 0.38 + i * 0.093);
+  }
+  ctx.stroke();
+  ctx.fillStyle = "#5c5652";
+  ctx.beginPath();
+  ctx.moveTo(x - 0.02, y + 0.4);
+  ctx.lineTo(x + 0.2, y + 0.1);
+  ctx.lineTo(x + 0.8, y + 0.1);
+  ctx.lineTo(x + 1.02, y + 0.4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  ctx.moveTo(x + 0.5, y + 0.1);
+  ctx.lineTo(x + 0.8, y + 0.1);
+  ctx.lineTo(x + 1.02, y + 0.4);
+  ctx.lineTo(x + 0.5, y + 0.4);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = "#4a2a15";
-  ctx.fillRect(x + 0.32, y + 0.55, 0.36, 0.39);
+  ctx.fillRect(x + 0.3, y + 0.55, 0.4, 0.39);
   ctx.strokeStyle = "#c9a56b";
-  ctx.lineWidth = 0.04;
+  ctx.lineWidth = 0.035;
   ctx.beginPath();
-  ctx.moveTo(x + 0.32, y + 0.55);
-  ctx.lineTo(x + 0.68, y + 0.94);
-  ctx.moveTo(x + 0.68, y + 0.55);
-  ctx.lineTo(x + 0.32, y + 0.94);
+  ctx.moveTo(x + 0.3, y + 0.55);
+  ctx.lineTo(x + 0.7, y + 0.94);
+  ctx.moveTo(x + 0.7, y + 0.55);
+  ctx.lineTo(x + 0.3, y + 0.94);
+  ctx.moveTo(x + 0.5, y + 0.55);
+  ctx.lineTo(x + 0.5, y + 0.94);
   ctx.stroke();
 }
 
@@ -570,6 +682,11 @@ export function personnage(ctx: Ctx, x: number, y: number, a: AspectPersonnage):
   ctx.strokeStyle = a.contour;
   ctx.lineWidth = 0.035;
   ctx.stroke();
+  // Une ceinture et un col : la tunique a une coupe.
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillRect(cx - 0.19 * s, sol - 0.36 * s, 0.38 * s, 0.045 * s);
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.fillRect(cx - 0.06 * s, haut + 0.01 * s, 0.12 * s, 0.05 * s);
   if (a.enceinte) {
     ctx.fillStyle = a.couleur;
     ctx.beginPath();
@@ -585,12 +702,15 @@ export function personnage(ctx: Ctx, x: number, y: number, a: AspectPersonnage):
   ctx.moveTo(cx + 0.2 * s, haut + 0.08 * s);
   ctx.lineTo(cx + 0.27 * s, sol - 0.3 * s + balancement);
   ctx.stroke();
-  // Tête.
+  // Tête, cernée d'un trait sombre pour rester lisible sur tout fond.
   const ty = haut - 0.15 * s;
   ctx.fillStyle = a.teint;
   ctx.beginPath();
   ctx.arc(cx, ty, 0.16 * s, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = "rgba(30,15,5,0.45)";
+  ctx.lineWidth = 0.025;
+  ctx.stroke();
   // Cheveux : calotte, plus longue pour les femmes.
   ctx.fillStyle = a.cheveux;
   ctx.beginPath();

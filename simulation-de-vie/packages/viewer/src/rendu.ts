@@ -5,7 +5,8 @@ import type { Camera } from "./camera.js";
 import { versEcran, versMonde } from "./camera.js";
 import { Brouillard, COULEUR_INCONNU } from "./brouillard.js";
 import type { Magasin, MorceauVue } from "./etat.js";
-import { RESOLUTION_FOND, construireFondMorceau } from "./fond.js";
+import { cleMorceau } from "./etat.js";
+import { construireFondMorceau } from "./fond.js";
 import {
   couleurFamille,
   couleurFoi,
@@ -47,10 +48,19 @@ export class Rendu {
     taille: number,
     nomsBiomes: readonly string[],
   ): HTMLCanvasElement {
+    // Les bords d'un morceau dépendent aussi de ses voisins : leur version compte.
+    let version = m.version;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        version += (this.magasin.morceaux.get(cleMorceau(m.cx + dx, m.cy + dy))?.version ?? 0) * 7;
+      }
     const existant = this.fonds.get(m);
-    if (existant?.version === m.version) return existant.canvas;
-    const canvas = construireFondMorceau(m, taille, nomsBiomes);
-    this.fonds.set(m, { canvas, version: m.version });
+    if (existant?.version === version) return existant.canvas;
+    const canvas = construireFondMorceau(m, taille, nomsBiomes, (x, y) =>
+      this.magasin.biomeEn(x, y),
+    );
+    this.fonds.set(m, { canvas, version });
     return canvas;
   }
 
@@ -75,7 +85,7 @@ export class Rendu {
       x >= hg.x - 2 && x <= bd.x + 1 && y >= hg.y - 2 && y <= bd.y + 1;
 
     ctx.save();
-    ctx.imageSmoothingEnabled = cam.echelle < RESOLUTION_FOND;
+    ctx.imageSmoothingEnabled = true;
     ctx.translate(cam.dx, cam.dy);
     ctx.scale(cam.echelle, cam.echelle);
     // Fond : les morceaux connus qui tombent dans la fenêtre.
@@ -463,15 +473,22 @@ export class Rendu {
       const [lever, coucher] = LEVER_COUCHER[etat.moment.saison] ?? [6, 20];
       const alpha = opaciteNuit(etat.moment.heure, etat.moment.minute, lever, coucher);
       if (alpha > 0) {
-        ctx.fillStyle = `rgba(10, 18, 50, ${alpha})`;
+        // Crépuscule et aube : une lueur chaude avant que le bleu de la nuit ne tombe.
+        const crepuscule = alpha < 0.45 ? (0.45 - alpha) / 0.45 : 0;
+        if (crepuscule > 0) {
+          ctx.fillStyle = `rgba(255, 140, 60, ${String(0.12 * crepuscule * (alpha / 0.45 + 0.3))})`;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.fillStyle = `rgba(8, 14, 46, ${String(alpha * 1.15)})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         for (const b of etat.batiments) {
           if (b.type !== "feu_de_camp" || !b.allume || b.etat !== "termine") continue;
           const e = versEcran(cam, b.x + 0.5, b.y + 0.6);
           const r = cam.echelle * (3 + Math.sin(maintenant / 150) * 0.15);
           const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
-          grad.addColorStop(0, `rgba(255,190,90,${alpha * 0.95})`);
-          grad.addColorStop(1, "rgba(255,190,90,0)");
+          grad.addColorStop(0, `rgba(255,200,110,${String(alpha * 1.1)})`);
+          grad.addColorStop(0.5, `rgba(255,170,70,${String(alpha * 0.45)})`);
+          grad.addColorStop(1, "rgba(255,170,70,0)");
           ctx.fillStyle = grad;
           ctx.fillRect(e.x - r, e.y - r, 2 * r, 2 * r);
         }
@@ -483,7 +500,9 @@ export class Rendu {
       ctx.font = "12px system-ui, sans-serif";
       ctx.textBaseline = "middle";
       const affichees = new Set<string>();
+      // Six bulles à la fois au plus : au-delà, la carte se couvre de texte.
       for (const bulle of magasin.bulles) {
+        if (affichees.size >= 6) break;
         if (bulle.debut > maintenant || bulle.fin < maintenant || affichees.has(bulle.id)) continue;
         affichees.add(bulle.id);
         const p = etat.personnages.find((x) => x.id === bulle.id);
