@@ -1124,6 +1124,39 @@ quelle que soit leur origine) ; seule la page change de méthode pour répondre.
   journal, onglet Statistiques) sont reformulés ; ceux du cerveau ambiant disparaissent avec les
   boutons.
 
+## 8 nonies. L'interface refaite telle que réalisée (M29)
+
+Le diagnostic (captures ordi 1400×900 et téléphone 390×780) : densité, pas style. En-tête sur
+deux rangées, quinze commandes toujours visibles, fil d'événements en quatre cartes qui
+masquaient la carte (tout l'écran sur téléphone), huit onglets sur deux rangées, légende de six
+lignes en permanence. **[DÉCISION]** L'ancien mode « plein écran » de la page (carte pleine,
+barre et panneau flottants) était déjà la bonne cible : il devient l'unique disposition, fini
+proprement, et les dispositions à colonnes disparaissent.
+
+- **Structure** (`index.html`) : `#zone-carte` couvre la page (`inset: 0`, moins la barre du bas
+  sur téléphone) ; dessus flottent `#hud` (une rangée : ☰, ⏸, vitesse, pastille
+  `#horloge · #meteo · #vivants`, `#conteur`, `#btn-question`, ✨, 📋), `#calques`, `#prieres`,
+  `#fil`, `#lois`, `#legende` + « ? », `#pouvoirs`. À côté : `#panneau` (le volet, `.ouvert`
+  l'affiche), `#menu` (formulaire « Nouveau monde », 💾, +1 tick, → aube, `#vitesses`, ⚖️ Lois,
+  ⛶ plein écran du navigateur, `#resume`, `#connexion`) et `#nav-bas` (téléphone seulement).
+  Les identifiants que `main.ts` et `panneaux.ts` lisaient sont conservés ; seuls les doublons
+  (`flot-*`, `btn-poignee`) et le titre sont retirés.
+- **Règles** (`main.ts`) : `ouvrirMenu()` et `ouvrirVolet()` s'excluent ; `Panneaux.deplier()`
+  ouvre le volet (sélection sur la carte, onglet demandé) et ferme le menu ; Échap ferme le menu
+  s'il est ouvert, sinon désélectionne et ferme le volet ; ✕ de la fiche ferme le volet ; les
+  boutons `[data-onglet]` sont lus dans toute la page, donc la barre du bas et les onglets du
+  volet partagent le même état actif ; `#nav-carte` ferme tout. Le bouton ouvert se colore par
+  `#app:has(#panneau.ouvert) #btn-panneau` (idem ☰).
+- **Fil** : deux lignes (`li:nth-child(n+3)` masqué, une sur téléphone), chaque entrée sur une
+  ligne avec points de suspension ; « aller voir » inchangé.
+- **Téléphone** (`max-width: 900px`) : `--nav: 56px` ; `.ordi` masque ce qui n'a pas sa place
+  (conteur) ; la pastille d'état passe en bloc sur deux lignes à 11 px sans météo ni vivants ;
+  `#panneau` couvre l'écran entre la barre du haut et celle du bas ; `.pouvoirs` s'étire sur la
+  largeur en deux rangées (`order`), pouvoirs puis outils, chacune défilant ; les prières en
+  bandeau sous les calques repoussent le fil (`.prieres:not([hidden]) ~ .fil`).
+- `panneaux.ts` n'écrase plus la classe du conteur (qui porte `ordi`) : il bascule la phase par
+  `classList`.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

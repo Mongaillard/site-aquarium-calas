@@ -63,6 +63,8 @@ function element<T extends HTMLElement>(id: string, type: new () => T): T {
 const canvas = element("carte", HTMLCanvasElement);
 const zone = element("zone-carte", HTMLDivElement);
 const survolEl = element("survol", HTMLDivElement);
+const panneauEl = element("panneau", HTMLElement);
+const menu = element("menu", HTMLDivElement);
 const formulaireLocal = element("local", HTMLFormElement);
 const graineEntree = element("graine-entree", HTMLInputElement);
 const populationEntree = element("population-entree", HTMLSelectElement);
@@ -294,6 +296,7 @@ function basculerLois(valeur = panneauLois.hidden): void {
 }
 btnLois.addEventListener("click", () => {
   basculerLois();
+  menu.hidden = true;
 });
 /** Reflète les lois du monde dans le panneau et le bouton (une loi suspendue le colore). */
 function rafraichirLois(): void {
@@ -517,48 +520,40 @@ function sauvegardeAutomatique(maintenant: number, force = false): void {
   });
 }
 
-const btnMenu = element("btn-menu", HTMLButtonElement);
-btnMenu.addEventListener("click", () => {
-  formulaireLocal.classList.toggle("ouvert");
+// Tout flotte sur la carte (M29) : le menu ☰ à gauche, le volet 📋 à droite, jamais les deux.
+function ouvrirMenu(valeur = menu.hidden): void {
+  menu.hidden = !valeur;
+  if (valeur) panneauEl.classList.remove("ouvert");
+}
+function ouvrirVolet(valeur = !panneauEl.classList.contains("ouvert")): void {
+  panneauEl.classList.toggle("ouvert", valeur);
+  if (valeur) menu.hidden = true;
+}
+element("btn-menu", HTMLButtonElement).addEventListener("click", () => {
+  ouvrirMenu();
 });
-
-// Plein écran : la carte prend tout l'écran, les commandes deviennent des menus flottants.
-const app = element("app", HTMLDivElement);
-const barre = element("barre", HTMLElement);
-const panneauEl = element("panneau", HTMLElement);
-const flottants = element("flottants", HTMLDivElement);
-function basculerPleinEcran(valeur = !app.classList.contains("plein-ecran")): void {
-  app.classList.toggle("plein-ecran", valeur);
-  flottants.hidden = !valeur;
-  barre.classList.remove("ouvert");
-  panneauEl.classList.toggle("ouvert", valeur && magasin.selection !== null);
-  if (valeur) {
-    // Le vrai plein écran du navigateur quand il est permis ; sinon, la page seule suffit.
-    if (document.fullscreenElement === null)
-      document.documentElement.requestFullscreen().catch(() => undefined);
-  } else if (document.fullscreenElement !== null) {
-    document.exitFullscreen().catch(() => undefined);
-  }
-  redimensionner();
+element("btn-fermer-menu", HTMLButtonElement).addEventListener("click", () => {
+  ouvrirMenu(false);
+});
+element("btn-panneau", HTMLButtonElement).addEventListener("click", () => {
+  ouvrirVolet();
+});
+element("btn-fermer-panneau", HTMLButtonElement).addEventListener("click", () => {
+  ouvrirVolet(false);
+});
+element("nav-carte", HTMLButtonElement).addEventListener("click", () => {
+  ouvrirVolet(false);
+  ouvrirMenu(false);
+});
+/** Le plein écran du navigateur, quand il est permis ; la page est déjà pleine sinon. */
+function basculerPleinEcran(): void {
+  if (document.fullscreenElement === null)
+    document.documentElement.requestFullscreen().catch(() => undefined);
+  else document.exitFullscreen().catch(() => undefined);
 }
 element("btn-plein", HTMLButtonElement).addEventListener("click", () => {
-  basculerPleinEcran(true);
-});
-element("flot-sortir", HTMLButtonElement).addEventListener("click", () => {
-  basculerPleinEcran(false);
-});
-element("flot-menu", HTMLButtonElement).addEventListener("click", () => {
-  barre.classList.toggle("ouvert");
-  panneauEl.classList.remove("ouvert");
-});
-element("flot-panneau", HTMLButtonElement).addEventListener("click", () => {
-  panneauEl.classList.toggle("ouvert");
-  barre.classList.remove("ouvert");
-});
-document.addEventListener("fullscreenchange", () => {
-  // Échap ou geste du navigateur : on quitte aussi le mode plein écran de la page.
-  if (document.fullscreenElement === null && app.classList.contains("plein-ecran"))
-    basculerPleinEcran(false);
+  basculerPleinEcran();
+  ouvrirMenu(false);
 });
 if (modeLocal) {
   formulaireLocal.hidden = false;
@@ -1319,8 +1314,13 @@ window.addEventListener("keydown", (ev) => {
         desarmer();
         break;
       }
+      if (!menu.hidden) {
+        ouvrirMenu(false);
+        break;
+      }
       magasin.selectionBatiment = null;
       selectionner(null);
+      ouvrirVolet(false);
       break;
     case "g":
       basculerModeDieu();

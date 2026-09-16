@@ -7,7 +7,11 @@
   --accent: #6cc2ff;
   --ok: #7dffa0;
   --alerte: #ff5f5f;
+  --voile: rgba(20, 23, 28, 0.88);
   --police: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Hauteur de la barre du haut et de la barre du bas (téléphone), pour caler ce qui flotte. */
+  --hud: 44px;
+  --nav: 56px;
 }
 * {
   box-sizing: border-box;
@@ -68,72 +72,15 @@ a.lien,
   display: none !important;
 }
 
+/* La carte prend tout ; tout le reste flotte dessus (M29). */
 #app {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  position: relative;
   height: 100%;
-}
-#barre {
-  display: flex;
-  align-items: center;
-  gap: 8px 16px;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--bord);
-  background: var(--panneau);
-  white-space: nowrap;
-  flex-wrap: wrap;
-  min-height: 48px;
-}
-#barre .titre {
-  font-weight: 600;
-}
-#barre .horloge {
-  font-variant-numeric: tabular-nums;
-  min-width: 190px;
-}
-#barre .controles {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-#barre .vitesses button {
-  padding: 4px 8px;
-}
-#barre .resume {
-  color: var(--discret);
-  flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
-}
-#barre .local {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin: 0;
-}
-#barre .local input {
-  width: 72px;
-}
-#barre .connexion {
-  font-size: 12px;
-  color: var(--discret);
-}
-#barre .connexion.ok {
-  color: var(--ok);
-}
-#barre .connexion.ko {
-  color: var(--alerte);
-}
-
-#principal {
-  display: grid;
-  grid-template-columns: 1fr 400px;
-  min-height: 0;
 }
 #zone-carte {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
 }
 #carte {
   width: 100%;
@@ -146,18 +93,198 @@ a.lien,
 #carte.glisse {
   cursor: grabbing;
 }
-.legende {
+#carte.dieu {
+  cursor: crosshair;
+}
+
+/* La barre du haut : une seule rangée, ce qui sert à chaque instant. */
+#hud {
   position: absolute;
   left: 8px;
-  bottom: 8px;
-  background: rgba(20, 23, 28, 0.85);
+  right: 8px;
+  top: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+#hud > * {
+  pointer-events: auto;
+}
+#hud button,
+#hud select {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  font-size: 15px;
+  flex: none;
+}
+#hud select {
+  font-size: 13px;
+  padding: 4px 4px;
+}
+#hud .etat {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#hud .etat > span + span:not(:empty)::before {
+  content: "\00a0·\00a0";
+  color: var(--discret);
+}
+#hud .etat > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#hud .etat .horloge {
+  flex: none;
+}
+#hud .conteur {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--discret);
+  border-left: 3px solid #8fd18f;
+}
+/* Le bouton d'un volet ouvert se voit. */
+#app:has(#menu:not([hidden])) #btn-menu,
+#app:has(#panneau.ouvert) #btn-panneau {
+  background: var(--accent);
+  color: #10141a;
+  border-color: var(--accent);
+}
+#hud .conteur.montee {
+  border-left-color: #ffd479;
+  color: #ffd479;
+}
+#hud .conteur.crise {
+  border-left-color: #ff5f5f;
+  color: #ff9c9c;
+}
+#hud .conteur.repit {
+  border-left-color: #9ad8ff;
+  color: #9ad8ff;
+}
+.btn-dieu.actif {
+  background: var(--accent);
+  color: #10141a;
+}
+.btn-dieu.suspendue {
+  color: #ff9c5f;
+}
+.btn-question {
+  background: #ffd479;
+  color: #10141a;
+  font-weight: 600;
+  font-size: 12px;
+  animation: pulsation 1.6s infinite;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#hud .btn-question {
+  background: #ffd479;
+  color: #10141a;
+}
+@keyframes pulsation {
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 212, 121, 0.35);
+  }
+}
+
+/* Calques de lecture (M25), sous la barre. */
+.calques {
+  position: absolute;
+  left: 8px;
+  top: calc(var(--hud) + 12px);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+}
+.calques button {
+  padding: 3px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--discret);
+}
+.calques button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+/* Le fil des grands événements : une ligne par événement, deux au plus, « aller voir » d'un clic. */
+.fil {
+  position: absolute;
+  left: 8px;
+  top: calc(var(--hud) + 48px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(460px, calc(100% - 16px));
+}
+.fil li:nth-child(n + 3) {
+  display: none;
+}
+.fil button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.3;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  color: #ffd479;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fil button .quand {
+  color: var(--discret);
+  margin-right: 4px;
+}
+.fil li.nouveau button {
+  border-color: #ffd479;
+}
+/* Légende : derrière un « ? », en bas à gauche. */
+.legende {
+  display: none;
+  position: absolute;
+  left: 8px;
+  bottom: 50px;
+  background: var(--voile);
   border: 1px solid var(--bord);
   border-radius: 8px;
   padding: 6px 10px;
   font-size: 12px;
   color: var(--discret);
-  max-width: 60%;
+  max-width: min(560px, calc(100% - 16px));
   line-height: 1.5;
+}
+.legende.ouverte {
+  display: block;
 }
 .legende .pastille {
   display: inline-block;
@@ -168,7 +295,6 @@ a.lien,
   vertical-align: middle;
 }
 .btn-legende {
-  display: none;
   position: absolute;
   left: 8px;
   bottom: 8px;
@@ -177,6 +303,12 @@ a.lien,
   border-radius: 50%;
   padding: 0;
   font-weight: 600;
+  background: var(--voile);
+}
+/* En mode Dieu, la barre de pouvoirs prend la place de la légende. */
+#zone-carte.dieu .legende,
+#zone-carte.dieu .btn-legende {
+  display: none;
 }
 .survol {
   position: absolute;
@@ -188,23 +320,57 @@ a.lien,
   font-size: 12px;
 }
 
+/* Le volet : onglets et contenu, par-dessus la carte, à droite. */
 #panneau {
-  display: flex;
+  position: absolute;
+  right: 8px;
+  top: calc(var(--hud) + 12px);
+  bottom: 8px;
+  width: min(420px, calc(100% - 16px));
+  z-index: 6;
+  display: none;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid var(--bord);
   background: var(--panneau);
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+#panneau.ouvert {
+  display: flex;
+}
+.panneau-entete {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--bord);
 }
 #onglets {
   display: flex;
   gap: 2px;
   padding: 6px;
-  border-bottom: 1px solid var(--bord);
-  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#onglets::-webkit-scrollbar {
+  display: none;
 }
 #onglets button {
   padding: 4px 8px;
   font-size: 13px;
+  white-space: nowrap;
+  flex: none;
+}
+.fermer {
+  flex: none;
+  min-width: 32px;
+  min-height: 32px;
+  margin: 0 6px;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--discret);
 }
 .onglet {
   display: none;
@@ -231,6 +397,109 @@ a.lien,
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* Le menu ☰ : nouveau monde, sauvegardes, pas à pas, vitesse, lois, plein écran. */
+.menu {
+  position: absolute;
+  left: 8px;
+  top: calc(var(--hud) + 12px);
+  z-index: 7;
+  width: min(380px, calc(100% - 16px));
+  max-height: calc(100% - var(--hud) - 20px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  background: var(--panneau);
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.menu-entete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.menu-entete .titre {
+  font-weight: 600;
+}
+.menu-entete .discret {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu .local {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-items: center;
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--bord);
+}
+.menu .local label {
+  color: var(--discret);
+  font-size: 13px;
+}
+.menu .local .case,
+.menu .local .ligne {
+  grid-column: 1 / -1;
+}
+.menu .local .case {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.menu .ligne {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.menu .ligne button {
+  flex: 1;
+  min-height: 36px;
+}
+.menu .vitesses {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.menu .vitesses button {
+  flex: 1;
+  min-height: 34px;
+  padding: 4px 6px;
+  font-variant-numeric: tabular-nums;
+}
+.menu .connexion {
+  font-size: 12px;
+  color: var(--discret);
+}
+.menu .connexion.ok {
+  color: var(--ok);
+}
+.menu .connexion.ko {
+  color: var(--alerte);
+}
+.menu #resume {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.btn-reprendre {
+  background: #7dffa0;
+  color: #10141a;
+  font-weight: 600;
+  min-height: 36px;
+}
+
+/* La barre du bas (téléphone) : un onglet à la fois, façon appli. */
+#nav-bas {
+  display: none;
+}
+
 .liste {
   list-style: none;
   margin: 0;
@@ -252,6 +521,30 @@ a.lien,
 }
 .liste li.majeur {
   color: #ffd479;
+}
+.liste li .voir {
+  float: right;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-radius: 6px;
+  background: transparent;
+}
+.liste li .voir:hover {
+  background: var(--accent);
+}
+.liste li[data-id] {
+  cursor: pointer;
+}
+.liste li[data-id]:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.liste li.reve {
+  font-style: italic;
+  color: #c9d6ff;
+}
+.liste li.altere {
+  font-style: italic;
 }
 .filtres {
   display: flex;
@@ -294,6 +587,20 @@ a.lien,
   border-radius: 0 6px 6px 0;
   margin: 8px 0;
 }
+.pensee.claude {
+  border-left-color: var(--accent);
+}
+.pensee.reve {
+  border-left-color: #c9a7ff;
+  font-size: 13px;
+}
+.epitaphe {
+  font-style: italic;
+  color: var(--discret);
+  border-left: 3px solid var(--bord);
+  padding-left: 8px;
+  margin: 8px 0;
+}
 .jauges {
   display: grid;
   grid-template-columns: 70px 1fr 34px;
@@ -328,6 +635,10 @@ a.lien,
   border-radius: 10px;
   padding: 1px 8px;
   font-size: 12px;
+}
+.puce.blessure {
+  background: #4a2323;
+  color: #ffb3b3;
 }
 table.relations {
   width: 100%;
@@ -403,166 +714,43 @@ table.saisons td:first-child {
   font-size: 12px;
   margin-left: auto;
 }
+.ambition {
+  border-left: 3px solid #ffd479;
+  padding: 6px 8px;
+  margin: 6px 0;
+  background: rgba(255, 212, 121, 0.08);
+  border-radius: 0 6px 6px 0;
+}
+.ambition .but {
+  font-style: italic;
+}
+.ambition.finie {
+  border-left-color: var(--bord);
+  opacity: 0.8;
+}
+.question {
+  color: #ffd479;
+}
+.conseil {
+  border-left: 3px solid var(--accent);
+  padding: 6px 8px;
+  margin: 6px 0;
+  border-radius: 0 6px 6px 0;
+  background: rgba(108, 194, 255, 0.06);
+}
+.conseil ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.conseil li {
+  font-size: 12px;
+  line-height: 1.35;
+}
+.conseil li.choisi {
+  color: #ffd479;
+  font-weight: 600;
+}
 
-.btn-menu,
-.vitesse-select,
-.poignee {
-  display: none;
-}
-.pouvoir.providence[aria-pressed="true"] {
-  background: #3b6a3f;
-  box-shadow: 0 0 0 2px #7dffa0 inset;
-}
-@media (max-width: 900px) {
-  #principal {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
-  }
-  #principal,
-  #panneau,
-  #barre {
-    min-width: 0;
-    max-width: 100vw;
-  }
-  #panneau {
-    border-left: none;
-    border-top: 1px solid var(--bord);
-    height: 46vh;
-    transition: height 0.2s ease;
-  }
-  #barre {
-    white-space: normal;
-  }
-  #barre .horloge {
-    font-size: 13px;
-  }
-  #panneau.replie {
-    height: 46px;
-    min-height: 46px;
-    overflow: hidden;
-  }
-  #panneau.replie .onglet {
-    display: none;
-  }
-  .poignee {
-    display: inline-block;
-    min-width: 36px;
-    font-size: 14px;
-  }
-  #onglets {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  #onglets button {
-    white-space: nowrap;
-    min-height: 32px;
-  }
-
-  #barre .resume {
-    display: none;
-  }
-  #barre .horloge {
-    min-width: 0;
-  }
-  .legende {
-    display: none;
-  }
-  .legende.ouverte {
-    display: block;
-    left: 48px;
-    max-width: calc(100% - 64px);
-  }
-  .btn-legende {
-    display: block;
-  }
-  #onglets button {
-    padding: 4px 7px;
-    font-size: 12px;
-  }
-  .onglet {
-    padding: 8px 10px;
-  }
-  .entete-fiche .nom {
-    font-size: 15px;
-  }
-}
-@media (max-width: 640px) {
-  #barre {
-    gap: 4px 6px;
-    padding: 4px 8px;
-    min-height: 0;
-  }
-  #barre button,
-  #barre select {
-    min-height: 34px;
-    padding: 4px 8px;
-  }
-  #barre .vitesses {
-    display: none;
-  }
-  .vitesse-select {
-    display: inline-block;
-  }
-  .btn-menu {
-    display: inline-block;
-    margin-left: auto;
-  }
-  #barre .local {
-    display: none;
-    flex-basis: 100%;
-  }
-  #barre .local.ouvert {
-    display: flex;
-  }
-  #barre .connexion {
-    flex-basis: 100%;
-    font-size: 11px;
-    margin: 0;
-  }
-  .btn-question {
-    font-size: 12px;
-    padding: 4px 8px;
-  }
-}
-@media (max-width: 520px) {
-  #barre {
-    gap: 4px 6px;
-    padding: 4px 8px;
-  }
-  #barre .titre {
-    font-size: 13px;
-  }
-  #barre .titre .discret {
-    display: none;
-  }
-  #barre .meteo {
-    font-size: 13px;
-  }
-  #barre .local label {
-    display: none;
-  }
-  #barre .local input {
-    width: 58px;
-    padding: 2px 5px;
-  }
-  #barre button {
-    padding: 3px 7px;
-  }
-  #barre .connexion {
-    margin-left: auto;
-  }
-  .jauges {
-    grid-template-columns: 60px 1fr 30px;
-  }
-}
-.btn-dieu.actif {
-  background: var(--accent);
-  color: #10141a;
-}
-.btn-dieu.suspendue {
-  color: #ff9c5f;
-}
 /* Mode Dieu : barre de pouvoirs flottante en bas de la carte. */
 .pouvoirs {
   position: absolute;
@@ -637,6 +825,10 @@ table.saisons td:first-child {
   background: var(--accent);
   box-shadow: 0 0 0 2px #ffd479 inset;
 }
+.pouvoir.providence[aria-pressed="true"] {
+  background: #3b6a3f;
+  box-shadow: 0 0 0 2px #7dffa0 inset;
+}
 .pouvoir:disabled {
   opacity: 0.4;
 }
@@ -658,8 +850,9 @@ table.saisons td:first-child {
   position: absolute;
   inset: 0;
   border-radius: 10px;
+  overflow: hidden;
   background: rgba(20, 23, 28, 0.75);
-  font-size: 11px;
+  font-size: 10px;
   color: #ffd479;
   display: flex;
   align-items: flex-end;
@@ -673,10 +866,6 @@ table.saisons td:first-child {
 .pouvoir.etranger .cout {
   color: #ff9c5f;
 }
-.domaine-choix {
-  margin-top: 4px;
-  font-size: 12px;
-}
 .pouvoir .recharge {
   position: absolute;
   inset: 0;
@@ -684,29 +873,138 @@ table.saisons td:first-child {
   background: rgba(20, 23, 28, 0.6);
   pointer-events: none;
 }
-/* Calques de lecture (M25) : petits boutons en haut à gauche de la carte. */
-.calques {
+.domaine-choix {
+  margin-top: 4px;
+  font-size: 12px;
+}
+/* Sculpter et peupler (M25) : une seconde palette, séparée par un filet. */
+.pouvoirs .outils {
+  border-left: 1px solid var(--bord);
+  padding-left: 8px;
+  flex: none;
+  overflow: visible;
+}
+.pouvoirs .palette:not(.outils) {
+  flex: 0 1 auto;
+  min-width: 96px;
+}
+.pouvoirs .reglage {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.pouvoirs .reglage button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  background: #262b33;
+  font-size: 16px;
+  line-height: 1;
+}
+.pouvoirs .reglage span {
+  min-width: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pouvoirs .reglage select {
+  height: 28px;
+}
+.pouvoirs .colonne {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 200px;
+}
+.pouvoirs .aide {
+  font-size: 11px;
+  line-height: 1.3;
+}
+.pouvoirs .reputation {
+  font-size: 11px;
+}
+.pouvoirs .btn-appliquer {
+  flex: none;
+  background: #ffd479;
+  color: #10141a;
+  font-weight: 600;
+}
+.pouvoirs.secousse {
+  animation: secousse 0.3s;
+}
+@keyframes secousse {
+  25% {
+    transform: translateX(calc(-50% - 6px));
+  }
+  75% {
+    transform: translateX(calc(-50% + 6px));
+  }
+}
+/* Les prières en attente : les quêtes du dieu, en haut à droite. */
+.prieres {
+  position: absolute;
+  right: 8px;
+  top: calc(var(--hud) + 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(280px, 60%);
+}
+.prieres button {
+  text-align: left;
+  font-size: 12px;
+  padding: 4px 8px;
+  background: rgba(20, 23, 28, 0.9);
+  border: 1px solid #6a5a2e;
+  border-radius: 8px;
+  color: #ffe9a8;
+}
+.prieres button .discret {
+  display: block;
+  font-size: 11px;
+}
+/* Les lois du monde (M25) : un panneau flottant sous la barre. */
+.lois {
   position: absolute;
   left: 8px;
-  top: 8px;
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  background: rgba(20, 23, 28, 0.85);
+  top: calc(var(--hud) + 12px);
+  z-index: 4;
+  width: min(360px, calc(100% - 16px));
+  padding: 10px 12px;
+  background: rgba(20, 23, 28, 0.96);
   border: 1px solid var(--bord);
-  border-radius: 8px;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
-.calques button {
-  padding: 3px 8px;
+.lois h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.lois p {
+  margin: 0 0 8px;
   font-size: 12px;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--discret);
 }
-.calques button[aria-pressed="true"] {
-  background: var(--accent);
-  color: #fff;
+.lois label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid var(--bord);
+  font-size: 13px;
+  cursor: pointer;
 }
+.lois label input {
+  margin-top: 3px;
+}
+.lois label .discret {
+  display: block;
+  font-size: 12px;
+}
+.lois label.suspendue {
+  color: #ff9c5f;
+}
+
 /* Les buts (M26) : scénario, prophéties, grille des succès. */
 .scenario {
   border-left: 3px solid #ffd479;
@@ -759,27 +1057,6 @@ table.saisons td:first-child {
 .propheties li.ouverte {
   color: #ffd479;
 }
-/* Le conteur (M25) : une pastille dans la barre, colorée par la phase. */
-#barre .conteur {
-  padding: 2px 8px;
-  font-size: 12px;
-  border-radius: 999px;
-  background: #262b33;
-  color: var(--discret);
-  border-left: 3px solid #8fd18f;
-}
-#barre .conteur.montee {
-  border-left-color: #ffd479;
-  color: #ffd479;
-}
-#barre .conteur.crise {
-  border-left-color: #ff5f5f;
-  color: #ff9c9c;
-}
-#barre .conteur.repit {
-  border-left-color: #9ad8ff;
-  color: #9ad8ff;
-}
 .dialogue.chronique h2 {
   font-style: italic;
 }
@@ -793,91 +1070,6 @@ table.saisons td:first-child {
 }
 .actes li.bienfait {
   color: #9ad8ff;
-}
-/* Les lois du monde (M25) : un panneau flottant sous la barre. */
-.lois {
-  position: absolute;
-  left: 8px;
-  top: 44px;
-  z-index: 3;
-  width: min(360px, calc(100% - 16px));
-  padding: 10px 12px;
-  background: rgba(20, 23, 28, 0.96);
-  border: 1px solid var(--bord);
-  border-radius: 10px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-}
-.lois h3 {
-  margin: 0 0 4px;
-  font-size: 14px;
-}
-.lois p {
-  margin: 0 0 8px;
-  font-size: 12px;
-}
-.lois label {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 5px 0;
-  border-top: 1px solid var(--bord);
-  font-size: 13px;
-  cursor: pointer;
-}
-.lois label input {
-  margin-top: 3px;
-}
-.lois label .discret {
-  display: block;
-  font-size: 12px;
-}
-.lois label.suspendue {
-  color: #ff9c5f;
-}
-/* Le fil des grands événements, sous les calques : « aller voir » d'un clic. */
-.fil {
-  position: absolute;
-  left: 8px;
-  top: 44px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  max-width: min(320px, 55%);
-}
-.fil li {
-  display: flex;
-}
-.fil button {
-  text-align: left;
-  font-size: 12px;
-  line-height: 1.3;
-  padding: 4px 8px;
-  border-radius: 8px;
-  background: rgba(20, 23, 28, 0.85);
-  border: 1px solid var(--bord);
-  color: #ffd479;
-  max-width: 100%;
-}
-.fil button .quand {
-  color: var(--discret);
-  margin-right: 4px;
-}
-.fil li.nouveau button {
-  border-color: #ffd479;
-}
-.liste li .voir {
-  float: right;
-  padding: 0 4px;
-  font-size: 12px;
-  line-height: 1.2;
-  border-radius: 6px;
-  background: transparent;
-}
-.liste li .voir:hover {
-  background: var(--accent);
 }
 /* Arbres des familles (onglet Population). */
 .familles {
@@ -927,86 +1119,8 @@ table.saisons td:first-child {
   margin: 6px 0 2px;
   font-size: 13px;
 }
-/* Sculpter et peupler (M25) : une seconde palette, séparée par un filet. */
-.pouvoirs .outils {
-  border-left: 1px solid var(--bord);
-  padding-left: 8px;
-  flex: none;
-  overflow: visible;
-}
-.pouvoirs .palette:not(.outils) {
-  flex: 0 1 auto;
-  min-width: 96px;
-}
-.pouvoirs .reglage {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-}
-.pouvoirs .reglage button {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 8px;
-  background: #262b33;
-  font-size: 16px;
-  line-height: 1;
-}
-.pouvoirs .reglage span {
-  min-width: 14px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-.pouvoirs .reglage select {
-  height: 28px;
-}
-.local .case {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.pouvoirs .colonne {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-width: 200px;
-}
-.pouvoirs .aide {
-  font-size: 11px;
-  line-height: 1.3;
-}
-.pouvoirs .reputation {
-  font-size: 11px;
-}
-/* Les prières en attente : les quêtes du dieu, au-dessus de la barre de pouvoirs. */
-.prieres {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: min(280px, 60%);
-}
-.prieres button {
-  text-align: left;
-  font-size: 12px;
-  padding: 4px 8px;
-  background: rgba(20, 23, 28, 0.9);
-  border: 1px solid #6a5a2e;
-  border-radius: 8px;
-  color: #ffe9a8;
-}
-.prieres button .discret {
-  display: block;
-  font-size: 11px;
-}
-.btn-reprendre {
-  background: #7dffa0;
-  color: #10141a;
-  font-weight: 600;
-}
+
+/* Boîtes de dialogue. */
 .dialogue {
   background: var(--panneau);
   color: inherit;
@@ -1045,147 +1159,61 @@ table.saisons td:first-child {
   flex: 1;
   min-width: 160px;
 }
-.btn-question {
-  background: #ffd479;
-  color: #10141a;
-  font-weight: 600;
-  animation: pulsation 1.6s infinite;
-}
-@keyframes pulsation {
-  50% {
-    box-shadow: 0 0 0 4px rgba(255, 212, 121, 0.35);
-  }
-}
-.liste li[data-id] {
-  cursor: pointer;
-}
-.liste li[data-id]:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-.conseil {
-  border-left: 3px solid var(--accent);
-  padding: 6px 8px;
-  margin: 6px 0;
-  border-radius: 0 6px 6px 0;
-  background: rgba(108, 194, 255, 0.06);
-}
-.conseil ul {
-  margin: 4px 0 0;
-  padding-left: 18px;
-}
-.conseil li {
-  font-size: 12px;
-  line-height: 1.35;
-}
-.conseil li.choisi {
-  color: #ffd479;
-  font-weight: 600;
-}
-.pouvoirs .btn-appliquer {
-  flex: none;
-  background: #ffd479;
-  color: #10141a;
-  font-weight: 600;
-}
-.pouvoirs.secousse {
-  animation: secousse 0.3s;
-}
-@keyframes secousse {
-  25% {
-    transform: translateX(calc(-50% - 6px));
-  }
-  75% {
-    transform: translateX(calc(-50% + 6px));
-  }
-}
-#carte.dieu {
-  cursor: crosshair;
-}
-/* En mode Dieu, la barre de pouvoirs prend la place de la légende. */
-#zone-carte.dieu .legende,
-#zone-carte.dieu .btn-legende {
-  display: none;
-}
-.ambition {
-  border-left: 3px solid #ffd479;
-  padding: 6px 8px;
-  margin: 6px 0;
-  background: rgba(255, 212, 121, 0.08);
-  border-radius: 0 6px 6px 0;
-}
-.ambition .but {
-  font-style: italic;
-}
-.ambition.finie {
-  border-left-color: var(--bord);
-  opacity: 0.8;
-}
-.question {
-  color: #ffd479;
-}
-@media (max-width: 900px) {
-  .calques button {
-    padding: 3px 5px;
-    font-size: 11px;
-  }
-  .fil {
-    max-width: 45%;
-  }
-  .pouvoirs .colonne {
-    display: none;
-  }
-  .prieres {
-    max-width: 55%;
-  }
-  .prieres button .discret {
-    display: none;
-  }
-  .pouvoirs {
-    bottom: 6px;
-  }
-}
-.pensee.claude {
-  border-left-color: var(--accent);
-}
-.epitaphe {
-  font-style: italic;
-  color: var(--discret);
-  border-left: 3px solid var(--bord);
-  padding-left: 8px;
-  margin: 8px 0;
-}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+    animation: none !important;
   }
 }
 
-.puce.blessure {
-  background: #4a2323;
-  color: #ffb3b3;
-}
-
-/* Écran étroit : les règles ci-dessous doivent l'emporter sur celles du mode Dieu, d'où leur place. */
+/* Téléphone et tablette étroite : un onglet à la fois, barre de navigation en bas. */
 @media (max-width: 900px) {
+  #zone-carte {
+    bottom: var(--nav);
+  }
+  .ordi {
+    display: none !important;
+  }
+  /* L'état tient sur deux lignes serrées ; la météo et le compte de vivants attendent le menu. */
+  #hud .etat {
+    display: block;
+    padding: 3px 8px;
+    font-size: 11px;
+    line-height: 1.25;
+    white-space: normal;
+    max-height: 36px;
+  }
+  #hud .etat .meteo,
+  #hud .etat .vivants {
+    display: none;
+  }
+  #hud select {
+    max-width: 58px;
+  }
+  #hud .btn-question {
+    max-width: 44px;
+    padding: 4px 6px;
+  }
   .calques button {
     padding: 3px 5px;
     font-size: 11px;
   }
   .fil {
-    max-width: 45%;
+    max-width: calc(100% - 16px);
   }
-  .pouvoirs .colonne {
+  .fil li:nth-child(n + 2) {
     display: none;
   }
   .prieres {
     left: 8px;
     right: 8px;
-    top: 8px;
     max-width: none;
     flex-direction: row;
     overflow-x: auto;
     scrollbar-width: none;
     pointer-events: none;
+    top: calc(var(--hud) + 48px);
   }
   .prieres button {
     pointer-events: auto;
@@ -1197,141 +1225,105 @@ table.saisons td:first-child {
   .prieres button .discret {
     display: none;
   }
-}
-
-/* Plein écran : la carte prend tout, la barre et le panneau deviennent des menus flottants. */
-.flottants {
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  pointer-events: none;
-  z-index: 3;
-}
-.flottants > * {
-  pointer-events: auto;
-}
-.flottants button {
-  min-width: 40px;
-  min-height: 40px;
-  border-radius: 10px;
-  background: rgba(20, 23, 28, 0.9);
-  border: 1px solid var(--bord);
-  font-size: 16px;
-}
-.flottants .flot-horloge {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(20, 23, 28, 0.8);
-  border: 1px solid var(--bord);
-  font-variant-numeric: tabular-nums;
-}
-#app.plein-ecran {
-  grid-template-rows: 1fr;
-}
-#app.plein-ecran #barre {
-  position: absolute;
-  left: 8px;
-  top: 56px;
-  z-index: 4;
-  width: min(360px, calc(100vw - 16px));
-  max-height: calc(100vh - 72px);
-  overflow: auto;
-  border: 1px solid var(--bord);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  flex-direction: column;
-  align-items: stretch;
-  white-space: normal;
-  display: none;
-}
-#app.plein-ecran #barre.ouvert {
-  display: flex;
-}
-#app.plein-ecran #barre .titre,
-#app.plein-ecran #barre .horloge,
-#app.plein-ecran #barre .meteo,
-#app.plein-ecran #barre .resume,
-#app.plein-ecran #barre .btn-menu,
-#app.plein-ecran #barre .btn-plein,
-#app.plein-ecran #barre .vitesse-select {
-  display: none;
-}
-#app.plein-ecran #barre .local {
-  display: flex;
-}
-#app.plein-ecran #barre .vitesses {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-#app.plein-ecran #barre button {
-  min-height: 36px;
-}
-#app.plein-ecran #principal {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-}
-#app.plein-ecran #panneau {
-  position: absolute;
-  right: 8px;
-  top: 56px;
-  bottom: 8px;
-  width: min(420px, calc(100vw - 16px));
-  height: auto;
-  min-height: 0;
-  z-index: 4;
-  border: 1px solid var(--bord);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  display: none;
-}
-#app.plein-ecran #panneau.ouvert {
-  display: flex;
-}
-#app.plein-ecran .poignee,
-#app.plein-ecran .legende {
-  display: none;
-}
-#app.plein-ecran .btn-legende {
-  display: block;
-}
-#app.plein-ecran .prieres {
-  top: 56px;
-}
-@media (max-width: 640px) {
-  #app.plein-ecran #panneau {
+  .prieres:not([hidden]) ~ .fil {
+    top: calc(var(--hud) + 84px);
+  }
+  /* La barre de pouvoirs tient en deux rangées qui défilent : pouvoirs, puis outils. */
+  .pouvoirs {
     left: 8px;
     right: 8px;
-    top: auto;
-    bottom: 8px;
+    bottom: 6px;
+    transform: none;
+    max-width: none;
+    justify-content: flex-start;
+  }
+  .pouvoirs .colonne {
+    display: none;
+  }
+  .pouvoirs .palette:not(.outils) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .pouvoirs .outils,
+  .pouvoirs .reglage {
+    order: 1;
+  }
+  .pouvoirs .outils {
+    flex: 1 1 100%;
+    min-width: 0;
+    overflow-x: auto;
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--bord);
+    padding-top: 6px;
+  }
+  .pouvoirs .btn-appliquer {
+    order: 2;
+  }
+  #panneau {
+    left: 0;
+    right: 0;
+    top: calc(var(--hud) + 8px);
+    bottom: var(--nav);
     width: auto;
-    height: 62vh;
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
   }
-  #app.plein-ecran .flottants .flot-horloge {
-    font-size: 11px;
-    padding: 6px 8px;
+  #onglets button {
+    min-height: 32px;
+    font-size: 12px;
+    padding: 4px 7px;
   }
-}
-
-/* Jalon 14 : rêves et souvenirs altérés. */
-.liste li.reve {
-  font-style: italic;
-  color: #c9d6ff;
-}
-.liste li.altere {
-  font-style: italic;
-}
-.pensee.reve {
-  border-left-color: #c9a7ff;
-  font-size: 13px;
+  .onglet {
+    padding: 8px 10px;
+  }
+  .entete-fiche .nom {
+    font-size: 15px;
+  }
+  .jauges {
+    grid-template-columns: 60px 1fr 30px;
+  }
+  .menu {
+    max-height: calc(100% - var(--hud) - var(--nav) - 16px);
+  }
+  #nav-bas {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--nav);
+    z-index: 8;
+    display: flex;
+    background: var(--panneau);
+    border-top: 1px solid var(--bord);
+  }
+  #nav-bas button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--discret);
+    font-size: 18px;
+    line-height: 1;
+  }
+  #nav-bas button span {
+    font-size: 10px;
+  }
+  #nav-bas button.actif {
+    background: transparent;
+    color: var(--accent);
+  }
+  /* Volet fermé : c'est la carte qui est active, pas le dernier onglet vu. */
+  #app:not(:has(#panneau.ouvert)) #nav-bas button.actif {
+    color: var(--discret);
+  }
+  #app:not(:has(#panneau.ouvert)) #nav-carte {
+    color: var(--accent);
+  }
 }

@@ -65,10 +65,9 @@ export class Panneaux {
   }
 
   private installerControles(): void {
-    for (const id of ["btn-pause", "flot-pause"])
-      $(id).addEventListener("click", () => {
-        this.inter.envoyer({ type: this.magasin.etat?.pause ? "reprendre" : "pause" });
-      });
+    $("btn-pause").addEventListener("click", () => {
+      this.inter.envoyer({ type: this.magasin.etat?.pause ? "reprendre" : "pause" });
+    });
     $("btn-tick").addEventListener("click", () => {
       this.inter.envoyer({ type: "tick" });
     });
@@ -95,32 +94,17 @@ export class Panneaux {
       this.inter.envoyer({ type: "vitesse", ticksParSeconde: Number(select.value) });
       this.inter.envoyer({ type: "reprendre" });
     });
-    // Panneau repliable (écran étroit) : replié (onglets seuls, carte plein écran) ou déplié.
-    const panneau = $("panneau");
-    $("btn-poignee").addEventListener("click", () => {
-      panneau.classList.toggle("replie");
-      this.rafraichirPoignee();
-    });
   }
 
-  private rafraichirPoignee(): void {
-    $("btn-poignee").textContent = $("panneau").classList.contains("replie") ? "▴" : "▾";
-  }
-
-  /** Déplie le panneau s'il était replié (une sélection sur la carte, par exemple). */
+  /** Ouvre le volet (une sélection sur la carte, un onglet demandé) ; le menu ☰ s'efface. */
   deplier(): void {
-    const panneau = $("panneau");
-    if (panneau.classList.contains("replie")) {
-      panneau.classList.remove("replie");
-      this.rafraichirPoignee();
-    }
-    // En plein écran, le panneau est un volet : une sélection l'ouvre.
-    if (document.getElementById("app")?.classList.contains("plein-ecran"))
-      panneau.classList.add("ouvert");
+    $("panneau").classList.add("ouvert");
+    $("menu").hidden = true;
   }
 
+  /** Les boutons d'onglet : dans le volet, et dans la barre du bas sur téléphone. */
   private installerOnglets(): void {
-    for (const b of $("onglets").querySelectorAll<HTMLButtonElement>("button[data-onglet]")) {
+    for (const b of document.querySelectorAll<HTMLButtonElement>("button[data-onglet]")) {
       b.addEventListener("click", () => {
         this.afficherOnglet(b.dataset.onglet ?? "inspecteur");
       });
@@ -130,7 +114,7 @@ export class Panneaux {
   afficherOnglet(nom: string): void {
     this.ongletActif = nom;
     this.deplier();
-    for (const b of $("onglets").querySelectorAll<HTMLButtonElement>("button[data-onglet]"))
+    for (const b of document.querySelectorAll<HTMLButtonElement>("button[data-onglet]"))
       b.classList.toggle("actif", b.dataset.onglet === nom);
     for (const s of document.querySelectorAll<HTMLElement>(".onglet"))
       s.classList.toggle("actif", s.id === nom);
@@ -247,12 +231,11 @@ export class Panneaux {
     const c = etat.conteur;
     const texteConteur = `🎭 ${LIBELLES_PHASE[c.phase]} · ${String(c.tension)}`;
     if (conteur.textContent !== texteConteur) conteur.textContent = texteConteur;
-    conteur.className = `conteur ${c.phase}`;
+    for (const phase of Object.keys(LIBELLES_PHASE))
+      conteur.classList.toggle(phase, phase === c.phase);
     conteur.hidden = false;
     $("btn-pause").textContent = etat.pause ? "▶" : "⏸";
-    $("flot-pause").textContent = etat.pause ? "▶" : "⏸";
-    $("flot-horloge").textContent =
-      `${formaterMoment(etat.moment)} · ${LIBELLES_METEO[etat.meteo] ?? etat.meteo} · ${etat.stats.vivants} vivants`;
+    $("vivants").textContent = `${String(etat.stats.vivants)} vivants`;
     for (const b of $("vitesses").querySelectorAll<HTMLButtonElement>("button")) {
       b.classList.toggle(
         "actif",
@@ -341,6 +324,7 @@ export class Panneaux {
     });
     conteneur.querySelector("#btn-fermer")?.addEventListener("click", () => {
       this.inter.selectionner(null);
+      $("panneau").classList.remove("ouvert");
     });
     conteneur.querySelector("#btn-conseil")?.addEventListener("click", () => {
       this.inter.envoyer({ type: "demander_conseil", id: fiche.id });

@@ -33,6 +33,15 @@ Personnage (pensée, besoins, famille, relations, souvenirs), Journal, Conversat
 Statistiques, Population. Cliquez sur un personnage ou un bâtiment pour l'inspecter, appuyez
 sur `s` pour que la caméra suive le personnage sélectionné.
 
+**L'interface (M29).** La carte prend tout l'écran ; tout le reste flotte dessus. En haut, une
+seule barre : menu ☰ (nouveau monde, sauvegardes, pas à pas, vitesses, lois, plein écran),
+pause, vitesse, date et météo, mode Dieu ✨, volet 📋. Le volet à droite porte les onglets
+(Personnage, Journal, Population, Village, Statistiques, Buts, Légendes, Conversations) ; une
+sélection sur la carte l'ouvre, ✕ ou Échap le ferme. Le fil des grands événements tient sur
+deux lignes (une sur téléphone), la légende attend derrière « ? ». Sur téléphone, une barre de
+navigation en bas (Carte, Personnage, Journal, Village, Plus) ouvre un onglet à la fois en
+plein écran, façon appli.
+
 Quand un personnage est à court d'idées (faim ou froid qui dure, échecs répétés, besoin sans
 idée, aucun projet), il pose une question dans un catalogue fermé (une invention à chercher, un
 bâtiment, une leçon, une priorité, une direction) : **une option est tirée au sort** (M28 : la

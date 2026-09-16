@@ -9,40 +9,156 @@
   </head>
   <body>
     <div id="app">
-      <header id="barre">
-        <div class="titre">Simulation de vie <span id="graine" class="discret"></span></div>
-        <div id="horloge" class="horloge">—</div>
-        <div id="meteo" class="meteo"></div>
-        <button
-          id="conteur"
-          class="conteur"
-          type="button"
-          title="Le conteur : la tension du récit (calme, montée, crise, répit). Cliquer ouvre la dernière chronique."
-          hidden
-        ></button>
-        <div class="controles">
-          <button id="btn-pause" title="Pause / reprendre (espace)">⏸</button>
-          <button id="btn-tick" title="Avancer d'un tick (→)">+1</button>
-          <button id="btn-aube" title="Sauter à l'aube suivante (a)">aube</button>
-          <span class="vitesses" id="vitesses"></span>
+      <div id="zone-carte">
+        <canvas id="carte"></canvas>
+        <header id="hud">
+          <button
+            id="btn-menu"
+            type="button"
+            title="Menu : nouveau monde, sauvegardes, vitesse, lois, plein écran"
+          >
+            ☰
+          </button>
+          <button id="btn-pause" type="button" title="Pause / reprendre (espace)">⏸</button>
           <select id="vitesse-select" class="vitesse-select" title="Vitesse"></select>
+          <div class="etat">
+            <span id="horloge" class="horloge">—</span><span id="meteo" class="meteo"></span
+            ><span id="vivants" class="vivants"></span>
+          </div>
+          <button
+            id="conteur"
+            class="conteur ordi"
+            type="button"
+            title="Le conteur : la tension du récit (calme, montée, crise, répit). Cliquer ouvre la dernière chronique."
+            hidden
+          ></button>
+          <button id="btn-question" class="btn-question" type="button" hidden></button>
+          <button
+            id="btn-dieu"
+            class="btn-dieu"
+            type="button"
+            title="Mode Dieu : exercer des pouvoirs sur le monde (g)"
+          >
+            ✨
+          </button>
+          <button id="btn-panneau" type="button" title="Personnage, journal, village, statistiques">
+            📋
+          </button>
+        </header>
+        <div id="calques" class="calques" title="Calques de lecture (c)"></div>
+        <div id="prieres" class="prieres" hidden></div>
+        <ol id="fil" class="fil" hidden></ol>
+        <div id="lois" class="lois" hidden>
+          <h3>Les lois du monde</h3>
+          <p class="discret">
+            Décochez pour suspendre une loi ; le monde s'en souvient (sauvegardé).
+          </p>
+          <div id="liste-lois"></div>
         </div>
-        <div id="resume" class="resume"></div>
-        <button
-          id="btn-menu"
-          class="btn-menu"
-          type="button"
-          title="Graine, nouveau monde, sauvegardes"
-        >
-          ⋯
-        </button>
-        <button id="btn-plein" class="btn-plein" type="button" title="Carte en plein écran (p)">
-          ⛶
-        </button>
+        <div id="legende" class="legende"></div>
+        <button id="btn-legende" class="btn-legende" type="button" title="Légende">?</button>
+        <div id="survol" class="survol" hidden></div>
+        <div id="pouvoirs" class="pouvoirs" hidden>
+          <div class="faveur" title="Faveur : gagnée chaque jour et quand la colonie prospère">
+            <i id="faveur-jauge"></i><span id="faveur-num">✦ 0</span>
+          </div>
+          <div id="palette" class="palette"></div>
+          <div id="outils" class="palette outils" title="Sculpter le monde, poser un peuple"></div>
+          <div id="reglage-outil" class="reglage" hidden>
+            <button id="btn-rayon-moins" type="button" title="Pinceau plus petit">−</button>
+            <span id="rayon-outil">2</span>
+            <button id="btn-rayon-plus" type="button" title="Pinceau plus grand">+</button>
+            <select id="taille-peuple" title="Habitants du peuple à poser" hidden></select>
+          </div>
+          <button
+            id="btn-providence"
+            class="pouvoir providence"
+            type="button"
+            aria-pressed="false"
+            title="Providence : le ciel répond de lui-même aux prières, tant que la faveur le permet"
+          >
+            🙏<span class="cout">auto</span>
+          </button>
+          <div class="colonne">
+            <div id="pouvoir-aide" class="aide discret">
+              Faveur ✦ : +1 par jour, plus quand la colonie prospère ou prie. Choisissez un pouvoir
+              (coût en bas à droite), puis touchez la carte.
+            </div>
+            <div id="reputation" class="reputation discret"></div>
+            <div id="domaine-choix" class="domaine-choix" hidden>
+              <label for="domaine-select" class="discret">Le ciel n'a pas de visage :</label>
+              <select id="domaine-select">
+                <option value="">choisir un domaine…</option>
+                <option value="moisson">🌾 Moisson, le Semeur</option>
+                <option value="orage">⚡ Orage, le Tonnant</option>
+                <option value="feu">🔥 Feu, la Braise</option>
+                <option value="songes">🌙 Songes, le Veilleur</option>
+              </select>
+            </div>
+          </div>
+          <button id="btn-appliquer" class="btn-appliquer" type="button" hidden>✓ Ici</button>
+        </div>
+      </div>
+      <aside id="panneau">
+        <div class="panneau-entete">
+          <nav id="onglets">
+            <button data-onglet="inspecteur" class="actif">Personnage</button>
+            <button data-onglet="journal">Journal</button>
+            <button data-onglet="population">Population</button>
+            <button data-onglet="village">Village</button>
+            <button data-onglet="stats">Statistiques</button>
+            <button data-onglet="buts">Buts</button>
+            <button data-onglet="legendes">Légendes</button>
+            <button data-onglet="conversations">Conversations</button>
+          </nav>
+          <button id="btn-fermer-panneau" class="fermer" type="button" title="Fermer (Échap)">
+            ✕
+          </button>
+        </div>
+        <section id="inspecteur" class="onglet actif">
+          <p class="discret">
+            Cliquez sur un personnage de la carte, ou choisissez-le dans l'onglet Population.
+          </p>
+        </section>
+        <section id="journal" class="onglet">
+          <div class="filtres">
+            <select id="filtre-type">
+              <option value="">Tous les types</option>
+            </select>
+            <select id="filtre-personnage">
+              <option value="">Tout le monde</option>
+            </select>
+            <label
+              ><input type="checkbox" id="filtre-important" checked /> importants seulement</label
+            >
+          </div>
+          <ol id="liste-journal" class="liste"></ol>
+        </section>
+        <section id="conversations" class="onglet">
+          <ol id="liste-conversations" class="liste"></ol>
+        </section>
+        <section id="stats" class="onglet"></section>
+        <section id="village" class="onglet"></section>
+        <section id="legendes" class="onglet"></section>
+        <section id="buts" class="onglet"></section>
+        <section id="population" class="onglet">
+          <details id="familles" class="familles">
+            <summary>Arbres des familles</summary>
+            <div id="arbres"></div>
+          </details>
+          <ol id="liste-population" class="liste"></ol>
+        </section>
+      </aside>
+      <div id="menu" class="menu" hidden>
+        <div class="menu-entete">
+          <span class="titre">Simulation de vie</span>
+          <span id="graine" class="discret"></span>
+          <button id="btn-fermer-menu" class="fermer" type="button" title="Fermer">✕</button>
+        </div>
         <form id="local" class="local" hidden>
-          <label for="graine-entree" class="discret">graine</label>
+          <label for="graine-entree">graine</label>
           <input id="graine-entree" type="text" inputmode="numeric" size="6" value="42" />
-          <label for="population-entree" class="discret">habitants</label>
+          <label for="population-entree">habitants</label>
           <select id="population-entree" title="Habitants au départ du nouveau monde">
             <option value="12">12</option>
             <option value="24">24</option>
@@ -50,14 +166,14 @@
             <option value="48">48</option>
             <option value="64">64</option>
           </select>
-          <label for="peuples-entree" class="discret">peuples</label>
+          <label for="peuples-entree">peuples</label>
           <select id="peuples-entree" title="Peuples rivaux au départ, chacun avec son village">
             <option value="1">1</option>
             <option value="2">2</option>
             <option value="3">3</option>
             <option value="4">4</option>
           </select>
-          <label for="domaine-entree" class="discret">ciel</label>
+          <label for="domaine-entree">ciel</label>
           <select
             id="domaine-entree"
             title="Le domaine du ciel : colore les pouvoirs et donne ses créatures"
@@ -68,7 +184,7 @@
             <option value="feu">🔥 Feu</option>
             <option value="songes">🌙 Songes</option>
           </select>
-          <label for="scenario-entree" class="discret">but</label>
+          <label for="scenario-entree">but</label>
           <select
             id="scenario-entree"
             title="Un scénario à réussir avant une année limite (ou partie libre)"
@@ -81,161 +197,47 @@
             <option value="cent_ames">Cent âmes</option>
           </select>
           <label
-            class="discret case"
+            class="case"
             title="Un monde sans personne : sculptez-le, puis posez votre peuple où vous voulez (mode Dieu)"
           >
-            <input id="vierge-entree" type="checkbox" /> vierge
+            <input id="vierge-entree" type="checkbox" /> monde vierge
           </label>
-          <button type="submit" id="btn-nouveau">Nouveau monde</button>
-          <button type="button" id="btn-sauvegardes" title="Sauvegarder ou reprendre une partie">
-            💾
-          </button>
+          <div class="ligne">
+            <button type="submit" id="btn-nouveau">Nouveau monde</button>
+            <button type="button" id="btn-sauvegardes" title="Sauvegarder ou reprendre une partie">
+              💾 Sauvegardes
+            </button>
+          </div>
         </form>
         <button id="btn-reprendre" class="btn-reprendre" type="button" hidden></button>
-        <button
-          id="btn-dieu"
-          class="btn-dieu"
-          type="button"
-          title="Mode Dieu : exercer des pouvoirs sur le monde (g)"
-        >
-          ✨ Dieu
-        </button>
-        <button
-          id="btn-lois"
-          class="btn-dieu"
-          type="button"
-          title="Les lois du monde : suspendre la faim, les maladies, les bêtes, les raids, les schismes, la vieillesse (l)"
-        >
-          ⚖️ Lois
-        </button>
-        <button id="btn-question" class="btn-question" type="button" hidden></button>
-        <div id="connexion" class="connexion">connexion…</div>
-      </header>
-      <main id="principal">
-        <div id="zone-carte">
-          <canvas id="carte"></canvas>
-          <div id="calques" class="calques" title="Calques de lecture (c)"></div>
-          <div id="lois" class="lois" hidden>
-            <h3>Les lois du monde</h3>
-            <p class="discret">
-              Décochez pour suspendre une loi ; le monde s'en souvient (sauvegardé). Les vitesses
-              sont dans la barre du haut.
-            </p>
-            <div id="liste-lois"></div>
-          </div>
-          <ol id="fil" class="fil" hidden></ol>
-          <div id="legende" class="legende"></div>
-          <button id="btn-legende" class="btn-legende" title="Légende">?</button>
-          <div id="survol" class="survol" hidden></div>
-          <div id="pouvoirs" class="pouvoirs" hidden>
-            <div class="faveur" title="Faveur : gagnée chaque jour et quand la colonie prospère">
-              <i id="faveur-jauge"></i><span id="faveur-num">✦ 0</span>
-            </div>
-            <div id="palette" class="palette"></div>
-            <div
-              id="outils"
-              class="palette outils"
-              title="Sculpter le monde, poser un peuple"
-            ></div>
-            <div id="reglage-outil" class="reglage" hidden>
-              <button id="btn-rayon-moins" type="button" title="Pinceau plus petit">−</button>
-              <span id="rayon-outil">2</span>
-              <button id="btn-rayon-plus" type="button" title="Pinceau plus grand">+</button>
-              <select id="taille-peuple" title="Habitants du peuple à poser" hidden></select>
-            </div>
-            <button
-              id="btn-providence"
-              class="pouvoir providence"
-              type="button"
-              aria-pressed="false"
-              title="Providence : le ciel répond de lui-même aux prières, tant que la faveur le permet"
-            >
-              🙏<span class="cout">auto</span>
-            </button>
-            <div class="colonne">
-              <div id="pouvoir-aide" class="aide discret">
-                Faveur ✦ : +1 par jour, plus quand la colonie prospère ou prie. Choisissez un
-                pouvoir (coût en bas à droite), puis touchez la carte.
-              </div>
-              <div id="reputation" class="reputation discret"></div>
-              <div id="domaine-choix" class="domaine-choix" hidden>
-                <label for="domaine-select" class="discret">Le ciel n'a pas de visage :</label>
-                <select id="domaine-select">
-                  <option value="">choisir un domaine…</option>
-                  <option value="moisson">🌾 Moisson, le Semeur</option>
-                  <option value="orage">⚡ Orage, le Tonnant</option>
-                  <option value="feu">🔥 Feu, la Braise</option>
-                  <option value="songes">🌙 Songes, le Veilleur</option>
-                </select>
-              </div>
-            </div>
-            <button id="btn-appliquer" class="btn-appliquer" type="button" hidden>✓ Ici</button>
-          </div>
-          <div id="prieres" class="prieres" hidden></div>
-          <div id="flottants" class="flottants" hidden>
-            <button id="flot-menu" type="button" title="Commandes">☰</button>
-            <button id="flot-pause" type="button" title="Pause / reprendre">⏸</button>
-            <span id="flot-horloge" class="flot-horloge"></span>
-            <button id="flot-panneau" type="button" title="Personnage, journal, statistiques">
-              📋
-            </button>
-            <button id="flot-sortir" type="button" title="Quitter le plein écran">✕</button>
-          </div>
+        <div class="ligne">
+          <button id="btn-tick" type="button" title="Avancer d'un tick (→)">+1 tick</button>
+          <button id="btn-aube" type="button" title="Sauter à l'aube suivante (a)">→ aube</button>
         </div>
-        <aside id="panneau">
-          <nav id="onglets">
-            <button
-              id="btn-poignee"
-              class="poignee"
-              type="button"
-              title="Replier ou agrandir le panneau"
-            >
-              ▾
-            </button>
-            <button data-onglet="inspecteur" class="actif">Personnage</button>
-            <button data-onglet="journal">Journal</button>
-            <button data-onglet="conversations">Conversations</button>
-            <button data-onglet="stats">Statistiques</button>
-            <button data-onglet="village">Village</button>
-            <button data-onglet="legendes">Légendes</button>
-            <button data-onglet="population">Population</button>
-            <button data-onglet="buts">Buts</button>
-          </nav>
-          <section id="inspecteur" class="onglet actif">
-            <p class="discret">
-              Cliquez sur un personnage de la carte, ou choisissez-le dans l'onglet Population.
-            </p>
-          </section>
-          <section id="journal" class="onglet">
-            <div class="filtres">
-              <select id="filtre-type">
-                <option value="">Tous les types</option>
-              </select>
-              <select id="filtre-personnage">
-                <option value="">Tout le monde</option>
-              </select>
-              <label
-                ><input type="checkbox" id="filtre-important" checked /> importants seulement</label
-              >
-            </div>
-            <ol id="liste-journal" class="liste"></ol>
-          </section>
-          <section id="conversations" class="onglet">
-            <ol id="liste-conversations" class="liste"></ol>
-          </section>
-          <section id="stats" class="onglet"></section>
-          <section id="village" class="onglet"></section>
-          <section id="legendes" class="onglet"></section>
-          <section id="buts" class="onglet"></section>
-          <section id="population" class="onglet">
-            <details id="familles" class="familles">
-              <summary>Arbres des familles</summary>
-              <div id="arbres"></div>
-            </details>
-            <ol id="liste-population" class="liste"></ol>
-          </section>
-        </aside>
-      </main>
+        <div class="vitesses" id="vitesses"></div>
+        <div class="ligne">
+          <button
+            id="btn-lois"
+            class="btn-dieu"
+            type="button"
+            title="Les lois du monde : suspendre la faim, les maladies, les bêtes, les raids, les schismes, la vieillesse (l)"
+          >
+            ⚖️ Lois
+          </button>
+          <button id="btn-plein" type="button" title="Plein écran du navigateur (p)">
+            ⛶ Plein écran
+          </button>
+        </div>
+        <div id="resume" class="discret"></div>
+        <div id="connexion" class="connexion">connexion…</div>
+      </div>
+      <nav id="nav-bas">
+        <button id="nav-carte" type="button">🗺<span>Carte</span></button>
+        <button data-onglet="inspecteur" type="button">👤<span>Personnage</span></button>
+        <button data-onglet="journal" type="button">📜<span>Journal</span></button>
+        <button data-onglet="village" type="button">🏘<span>Village</span></button>
+        <button data-onglet="stats" type="button">⋯<span>Plus</span></button>
+      </nav>
     </div>
     <dialog id="dlg-sauvegardes" class="dialogue">
       <h2>Sauvegardes</h2>

@@ -2,6 +2,30 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M29 – L'interface refaite, ordi et téléphone (2026-09-16)
+
+L'en-tête faisait deux rangées de quinze commandes, le fil d'événements masquait un coin de
+carte, et sur téléphone l'en-tête mangeait un tiers de l'écran avec quatre cartes du fil par-dessus
+tout le reste. Moins, mais mieux.
+
+- **La carte prend tout l'écran**, sur toutes les tailles ; l'ancien mode « plein écran » de la
+  page devient l'unique disposition, et le bouton ⛶ ne fait plus que demander le plein écran du
+  navigateur.
+- **Une seule barre en haut** (`#hud`) : ☰ menu, pause, vitesse, une pastille date · météo · vivants,
+  la pastille du conteur, ✨ Dieu, 📋 volet. Le titre, la graine, le formulaire « Nouveau monde »,
+  💾 Sauvegardes, +1 tick, → aube, les vitesses ×1…×256, ⚖️ Lois et ⛶ passent dans le **menu ☰**,
+  un panneau flottant à gauche.
+- **Le volet 📋** à droite (420 px) porte les huit onglets sur une rangée qui défile, avec ✕ ;
+  une sélection sur la carte l'ouvre, Échap le ferme ; menu et volet ne s'ouvrent jamais ensemble.
+- **Le fil** des grands événements tient sur deux lignes (une sur téléphone) ; **la légende**
+  attend derrière « ? » sur toutes les tailles.
+- **Téléphone** (≤ 900 px) : une barre de navigation en bas (Carte, Personnage, Journal, Village,
+  Plus) ouvre un onglet à la fois en plein écran ; la pastille d'état passe sur deux lignes ; la
+  barre de pouvoirs du mode Dieu tient en deux rangées qui défilent (pouvoirs, puis outils).
+- Retiré : le panneau repliable à poignée, les boutons flottants doublons (`flot-*`), les
+  dispositions à deux colonnes et à en-tête ; `panneaux.ts` écrit le compte de vivants dans la
+  barre et lit les onglets partout dans la page (volet et barre du bas).
+
 ## M28 – Demander conseil sans Claude (2026-09-16)
 
 Chaque question posée à Claude (bouton 💬 Conseils, pensées, épitaphes, récits) coûtait du
