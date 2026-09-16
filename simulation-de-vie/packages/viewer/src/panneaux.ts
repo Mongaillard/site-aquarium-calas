@@ -8,6 +8,7 @@ import {
   LIBELLES_METEO,
   LIBELLES_MOTIF,
   LIBELLES_SAISON,
+  LIBELLES_BIOME,
   LIBELLES_FETE,
   LIBELLES_SUJET,
   LIBELLES_TYPE,
@@ -138,7 +139,7 @@ export class Panneaux {
     const biomes = Object.entries(COULEURS_BIOME)
       .map(
         ([n, c]) =>
-          `<span class="pastille" style="background:${c}"></span>${e(n.replace(/_/g, " "))}`,
+          `<span class="pastille" style="background:${c}"></span>${e(LIBELLES_BIOME[n] ?? n.replace(/_/g, " "))}`,
       )
       .join(" ");
     const ressources = Object.entries(COULEURS_RESSOURCE)

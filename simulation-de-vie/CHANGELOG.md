@@ -2,6 +2,33 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M30 – L'eau : gués, pirogue, port (2026-09-16)
+
+Les personnages marchaient sur l'eau : l'eau peu profonde était un gué partout, et chaque lac en
+est ceinturé. Désormais il faut apprendre à traverser.
+
+- **L'eau peu profonde ne se passe plus à pied.** Elle se traverse à gué, en pirogue, ou de port
+  à port. Un nouveau biome **gué** naît à la génération : sur un rang tiré de la graine (un sur
+  douze par axe), un banc d'eau peu profonde de trois tuiles au plus entre deux rives de terre
+  devient une ligne de gué, rive à rive ; rare et visible (des pierres qui affleurent).
+- **La pirogue** (idée, recette et objet existaient) fait traverser toute eau à son porteur,
+  peu profonde comprise.
+- **Le port**, nouveau bâtiment (bois 20, pierre 6, corde 4 ; 60 de travail), se bâtit sur la
+  rive par qui maîtrise la pirogue et connaît bien l'eau (vingt-cinq lieux d'eau), un par
+  village ; **entre deux ports achevés, tout le monde traverse** en barque, pirogue ou non :
+  l'A\* relie chaque port à tout autre au prix de l'eau en pirogue, l'exécuteur paie le saut à la
+  distance. Le conseil propose le port ; la fiche et la carte le montrent (un ponton, une
+  barque).
+- **Boire cherche la rive atteignable la plus proche** (`trouverCheminVers`, une recherche en
+  largeur pondérée depuis la personne jusqu'à une rive d'eau connue ou d'un puits) au lieu des
+  trois tuiles d'eau les plus proches à vol d'oiseau, dont la rive était parfois un îlot ou
+  l'autre berge : sans cela, quatre morts de soif sur la graine 7 en deux cent quarante jours.
+- **La pêche se lance à deux tuiles** de la rive (`porteeRecolte`), la récolte des autres
+  gisements reste à une ; boire et récolter sautent les tuiles d'eau sans rive à portée avant
+  de compter leurs essais.
+- Calibration (graine 7, 240 jours, sans conteur) : douze vivants et plus, comme avant ; le
+  poisson pêché baisse d'un quart (les bancs au large attendent la pirogue).
+
 ## M29 – L'interface refaite, ordi et téléphone (2026-09-16)
 
 L'en-tête faisait deux rangées de quinze commandes, le fil d'événements masquait un coin de

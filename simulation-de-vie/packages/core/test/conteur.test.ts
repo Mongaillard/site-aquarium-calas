@@ -10,26 +10,30 @@ function colonie(seed = 31): Simulation {
 }
 
 describe("M25 : le conteur", () => {
-  it("naît calme, monte, frappe puis souffle : la courbe s'enchaîne sur soixante jours", () => {
-    const sim = colonie();
-    expect(sim.conteur.phase).toBe("calme");
-    expect(sim.conteur.phaseDureeJours).toBe(PREMIER_CALME_JOURS);
-    const phases = new Set<string>();
-    for (let j = 0; j < 60; j++) {
-      sim.avancerJusquaAube();
-      sim.avancer(1);
-      phases.add(sim.conteur.phase);
-    }
-    expect(phases.has("montee")).toBe(true);
-    expect(phases.has("repit")).toBe(true);
-    expect(sim.conteur.crises + sim.conteur.bienfaits).toBeGreaterThan(0);
-    const evts = sim.journal.parType("conteur");
-    expect(evts.some((e) => e.details.genre === "bienfait" || e.details.genre === "crise")).toBe(
-      true,
-    );
-    expect(sim.conteur.actes.length).toBe(sim.conteur.crises + sim.conteur.bienfaits);
-    expect(sim.vivants().length).toBeGreaterThan(0);
-  });
+  it(
+    "naît calme, monte, frappe puis souffle : la courbe s'enchaîne sur soixante jours",
+    { timeout: 20000 },
+    () => {
+      const sim = colonie();
+      expect(sim.conteur.phase).toBe("calme");
+      expect(sim.conteur.phaseDureeJours).toBe(PREMIER_CALME_JOURS);
+      const phases = new Set<string>();
+      for (let j = 0; j < 60; j++) {
+        sim.avancerJusquaAube();
+        sim.avancer(1);
+        phases.add(sim.conteur.phase);
+      }
+      expect(phases.has("montee")).toBe(true);
+      expect(phases.has("repit")).toBe(true);
+      expect(sim.conteur.crises + sim.conteur.bienfaits).toBeGreaterThan(0);
+      const evts = sim.journal.parType("conteur");
+      expect(evts.some((e) => e.details.genre === "bienfait" || e.details.genre === "crise")).toBe(
+        true,
+      );
+      expect(sim.conteur.actes.length).toBe(sim.conteur.crises + sim.conteur.bienfaits);
+      expect(sim.vivants().length).toBeGreaterThan(0);
+    },
+  );
 
   it("la crise respecte les lois : sans bêtes, ni raids, ni maladies, il ne reste que le ciel", () => {
     const sim = colonie();

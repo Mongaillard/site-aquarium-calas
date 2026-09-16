@@ -51,8 +51,14 @@ interface ProfilGisement {
  * une tuile ne porte qu'un seul gisement. Le bois mort (sans outil) précède
  * les arbres (hache requise) pour permettre la fabrication de la première hache.
  */
+/** Jusqu'où l'on récolte un gisement : la canne et le filet se lancent depuis la rive (M30). */
+export function porteeRecolte(type: Ressource): number {
+  return type === "poisson" ? 2 : 1;
+}
+
 export const GISEMENTS_PAR_BIOME: Record<Biome, readonly ProfilGisement[]> = {
   eau_profonde: [],
+  gue: [],
   eau_peu_profonde: [
     {
       type: "poisson",

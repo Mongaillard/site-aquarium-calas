@@ -1157,6 +1157,46 @@ proprement, et les dispositions à colonnes disparaissent.
 - `panneaux.ts` n'écrase plus la classe du conteur (qui porte `ordi`) : il bascule la phase par
   `classList`.
 
+## 8 decies. L'eau telle que réalisée (M30)
+
+Avant : `eau_peu_profonde` praticable (coût 2,5), donc un gué partout, et chaque lac en est
+ceinturé ; `eau_profonde` infranchissable sauf pirogue (objet en poche, `traverseEau` dans
+l'A\*). **[DÉCISION]** L'eau peu profonde devient infranchissable à pied ; trois façons de
+traverser, dans l'ordre où une colonie les gagne : le gué (donné), la pirogue (une invention),
+le port (un bâtiment qui sert à tous). Le « radeau » envisagé n'apportait rien de plus que la
+pirogue dans ce moteur ; il est écarté.
+
+- **Biome `gue`** (`biomes.ts`, ajouté en fin de liste pour garder les codes) : praticable
+  (coût 2), non constructible, sans gisement. Posé à la génération (`generation.ts`) : l'altitude
+  devient une fonction `altitudeEn(x, y)` avec un cache par morceau, car `estGue` regarde
+  jusqu'à trois tuiles au-delà du bord ; une tuile d'eau peu profonde est un gué si, sur un axe,
+  son rang est le rang élu de sa bande de douze (`rangDeGue`, haché de la graine) et si la terre
+  (altitude ≥ `SEUILS.mer`) est à trois pas au plus de chaque côté, sans eau profonde entre :
+  toute la traversée est alors gué, en ligne droite. Le pinceau « eau » du ciel n'en pose pas.
+- **A\*** (`chemin.ts`) : `OptionsChemin.ports` ; d'un port, la barque mène à tout autre port
+  (un saut de coût distance × `COUT_EAU_PIROGUE`, admissible pour l'heuristique de Tchebychev) ;
+  `coutChemin` et l'exécuteur paient le saut à la distance. `trouverCheminVers(grille, depart,
+  estArrivee)` : la même recherche, heuristique nulle, vers la première tuile qui satisfait un
+  prédicat ; `trouverChemin` en est un cas particulier (`chercher`).
+- **Boire** (`planificateur.ts`) : `trouverCheminVers` jusqu'à une `riveConnue` (voisine d'une
+  eau connue de la personne, ou d'un puits), 6 000 nœuds au plus. **[DÉCISION]** Avant, les
+  trois tuiles d'eau connues les plus proches à vol d'oiseau, et abandon ; avec l'eau peu
+  profonde fermée, leur « rive praticable » était parfois un îlot ou l'autre berge : quatre
+  morts de soif sur la graine 7. Récolter saute de même les gisements sans terre à portée avant
+  de compter ses essais.
+- **Pêche** : `porteeRecolte("poisson") = 2` (`ressources.ts`), lue par `destinationPourAtteindre`
+  (rayon paramétré), `allerPresDe` et `tickRecolter`.
+- **Port** (`batiments.ts`) : bois 20, pierre 6, corde 4, travail 60. `prochainBatimentNecessaire`
+  le propose après le four : pirogue maîtrisée (force 1), `lieuxEauConnus ≥ 25`, aucun port à
+  moins de 40 tuiles. `sitePortuaire` : terre constructible libre voisine d'eau à douze tuiles
+  des bâtiments familiaux, l'eau profonde à côté préférée. `portsDe(monde)` liste les ports
+  achevés pour l'A\* (exécuteur, `allerPresDe`, `allerSur`, exploration). Le conseil propose
+  « bâtir : port ». Viewer : `sprites.port` (ponton, barque), couleurs et libellés.
+- Tests (`eau.test.ts`) : eau peu profonde fermée, gué ouvert ; pirogue ; saut de port à port
+  (chemin, coût, port seul) ; `trouverCheminVers` (rive atteignable, pas l'îlot) ; génération
+  (gués présents, rares, étroits, rive à rive). `actions.test.ts` ne marche plus sur l'eau.
+  Calibration graine 7, 240 jours : ≥ 12 vivants tenus ; poisson −28 %.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

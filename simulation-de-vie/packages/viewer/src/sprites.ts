@@ -381,6 +381,24 @@ export function puits(ctx: Ctx, x: number, y: number): void {
   ctx.fillRect(x + 0.15, y + 0.2, 0.7, 0.08);
 }
 
+/** Port (M30) : un ponton de planches sur pilotis, une barque amarrée au bout. */
+export function port(ctx: Ctx, x: number, y: number): void {
+  ctx.fillStyle = "#6b4423";
+  for (const px of [0.18, 0.5, 0.82]) ctx.fillRect(x + px - 0.04, y + 0.35, 0.08, 0.55);
+  ctx.fillStyle = "#a07a4a";
+  for (let i = 0; i < 5; i++) ctx.fillRect(x + 0.08, y + 0.32 + i * 0.11, 0.84, 0.075);
+  ctx.fillStyle = "#5a3a1e";
+  ctx.beginPath();
+  ctx.moveTo(x + 0.15, y + 0.2);
+  ctx.quadraticCurveTo(x + 0.5, y + 0.36, x + 0.85, y + 0.2);
+  ctx.lineTo(x + 0.72, y + 0.06);
+  ctx.lineTo(x + 0.28, y + 0.06);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#e9dcc0";
+  ctx.fillRect(x + 0.47, y + 0.02, 0.05, 0.2);
+}
+
 export function palissade(ctx: Ctx, x: number, y: number): void {
   ctx.fillStyle = "#7a5a2e";
   for (let i = 0; i < 4; i++) ctx.fillRect(x + 0.1 + i * 0.22, y + 0.3, 0.12, 0.6);

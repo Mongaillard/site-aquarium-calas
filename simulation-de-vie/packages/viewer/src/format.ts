@@ -11,6 +11,12 @@ export const COULEURS_BIOME: Readonly<Record<string, string>> = {
   colline: "#a49a63",
   montagne: "#8a8681",
   marais: "#5f8260",
+  gue: "#63a8c9",
+};
+
+/** Noms de biomes qui ne se déduisent pas de la clé. */
+export const LIBELLES_BIOME: Readonly<Record<string, string>> = {
+  gue: "gué",
 };
 
 export const COULEURS_RESSOURCE: Readonly<Record<string, string>> = {
@@ -40,6 +46,7 @@ export const LETTRES_BATIMENT: Readonly<Record<string, string>> = {
   enclos: "O",
   champ: "=",
   autel: "^",
+  port: "H",
 };
 
 export const COULEURS_BATIMENT: Readonly<Record<string, string>> = {
@@ -55,6 +62,7 @@ export const COULEURS_BATIMENT: Readonly<Record<string, string>> = {
   enclos: "#a0783c",
   champ: "#8fa63a",
   autel: "#d8c68a",
+  port: "#7a5a3a",
 };
 
 export const NOMS_BATIMENT: Readonly<Record<string, string>> = {
@@ -71,6 +79,7 @@ export const NOMS_BATIMENT: Readonly<Record<string, string>> = {
   champ: "champ",
   autel: "autel",
   stele: "stèle",
+  port: "port",
 };
 
 export const LIBELLES_METEO: Readonly<Record<string, string>> = {

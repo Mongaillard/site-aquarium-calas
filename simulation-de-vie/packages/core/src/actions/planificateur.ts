@@ -18,6 +18,7 @@ import type { Position } from "../monde/grille.js";
 import { RECETTES, REPARATIONS_MAX, inventionDeRecette } from "../monde/recettes.js";
 import type { NomRecette, TypeObjet } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
+import { porteeRecolte } from "../monde/ressources.js";
 import {
   abriDisponible,
   autorise,
@@ -28,6 +29,7 @@ import {
   estEau,
   feuAAlimenter,
   feuProche,
+  portsDe,
   prochainBatimentNecessaire,
   RESERVE_BOIS_MAX,
   tuileEnceinteManquante,
@@ -38,7 +40,7 @@ import { eviteLeLieu } from "../social/societe.js";
 import { lieuEvite } from "../memoire/psyche.js";
 import { partenaireDe } from "../social/couple.js";
 import { relationAvec } from "../agents/personnage.js";
-import { trouverChemin } from "./chemin.js";
+import { trouverChemin, trouverCheminVers } from "./chemin.js";
 import { connait } from "../savoirs/lecons.js";
 import { cleLieu } from "../agents/personnage.js";
 import { PROFILS } from "../monde/faune.js";
@@ -395,14 +397,15 @@ function planifierVol(monde: Monde, p: Personnage): ResultatPlan {
   return ok(plan);
 }
 
-/** Déplacement vers une tuile à distance ≤ 1 de `cible` (ou `null` si inaccessible). */
-function allerPresDe(monde: Monde, p: Personnage, cible: Position): Action | null {
+/** Déplacement vers une tuile à distance ≤ `portee` de `cible` (ou `null` si inaccessible). */
+function allerPresDe(monde: Monde, p: Personnage, cible: Position, portee = 1): Action | null {
   const pos = p.corps.position;
-  if (Grille.distance(pos, cible) <= 1) return null;
-  const destination = destinationPourAtteindre(monde, pos, cible);
+  if (Grille.distance(pos, cible) <= portee) return null;
+  const destination = destinationPourAtteindre(monde, pos, cible, portee);
   if (destination === null) return null;
   const chemin = trouverChemin(monde.grille, pos, destination, {
     traverseEau: possede(p.corps.inventaire, "pirogue"),
+    ports: portsDe(monde),
   });
   if (chemin === null) return null;
   return { type: "deplacer", cible: destination, chemin, progression: 0 };
@@ -414,25 +417,41 @@ function allerSur(monde: Monde, p: Personnage, cible: Position): Action | null {
   if (pos.x === cible.x && pos.y === cible.y) return null;
   const chemin = trouverChemin(monde.grille, pos, cible, {
     traverseEau: possede(p.corps.inventaire, "pirogue"),
+    ports: portsDe(monde),
   });
   if (chemin === null) return null;
   return { type: "deplacer", cible, chemin, progression: 0 };
 }
 
+/** Une tuile d'où l'on boit : au bord d'une eau qu'on connaît, ou d'un puits. */
+function riveConnue(monde: Monde, p: Personnage, x: number, y: number): boolean {
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      const t = monde.grille.tuileOuNull(x + dx, y + dy);
+      if (t === null || !estEau(monde, t.x, t.y)) continue;
+      if (t.batiment !== null && PLANS_BATIMENT[t.batiment.type].sourceEau) return true;
+      if (p.connaissance.get(cleLieu(t.x, t.y))?.type === "eau") return true;
+    }
+  return false;
+}
+
 function planifierBoire(monde: Monde, p: Personnage): ResultatPlan {
   const pos = p.corps.position;
   if (eauAdjacente(monde, pos)) return ok([{ type: "boire", cible: pos, ticksRestants: null }]);
-  const lieux = lieuxConnusTries(p, "eau");
-  if (lieux.length === 0) return echec("aucun point d'eau connu");
-  for (const lieu of lieux.slice(0, ESSAIS_MAX)) {
-    const aller = allerPresDe(monde, p, lieu);
-    if (aller === null) continue;
-    return ok([
-      aller,
-      { type: "boire", cible: aller.type === "deplacer" ? aller.cible : pos, ticksRestants: null },
-    ]);
-  }
-  return echec("point d'eau inaccessible");
+  if (lieuxConnusTries(p, "eau").length === 0) return echec("aucun point d'eau connu");
+  // Depuis M30, l'eau la plus proche à vol d'oiseau n'a pas toujours de rive de ce côté-ci (un
+  // banc peu profond, un îlot, l'autre berge) : on cherche la rive atteignable la plus proche.
+  const chemin = trouverCheminVers(monde.grille, pos, (x, y) => riveConnue(monde, p, x, y), {
+    traverseEau: possede(p.corps.inventaire, "pirogue"),
+    ports: portsDe(monde),
+    maxNoeuds: 6_000,
+  });
+  const cible = chemin?.at(-1);
+  if (chemin === null || cible === undefined) return echec("point d'eau inaccessible");
+  return ok([
+    { type: "deplacer", cible, chemin, progression: 0 },
+    { type: "boire", cible, ticksRestants: null },
+  ]);
 }
 
 /**
@@ -549,10 +568,15 @@ function planifierRecolte(
     (t, a) => t + (a.type === "jeter" || a.type === "deposer" ? a.quantite : 0),
     0,
   );
-  for (const lieu of lieux.slice(0, ESSAIS_MAX)) {
+  const portee = porteeRecolte(ressource);
+  let essais = 0;
+  for (const lieu of lieux) {
+    // Un gisement sans terre à portée (du poisson au large) ne vaut pas un chemin.
+    if (destinationPourAtteindre(monde, p.corps.position, lieu, portee) === null) continue;
+    if (++essais > ESSAIS_MAX) break;
     const plan: Action[] = [...liberation];
-    const aller = allerPresDe(monde, p, lieu);
-    if (aller === null && Grille.distance(p.corps.position, lieu) > 1) continue;
+    const aller = allerPresDe(monde, p, lieu, portee);
+    if (aller === null && Grille.distance(p.corps.position, lieu) > portee) continue;
     if (aller) plan.push(aller);
     const parAction = 1 + Math.floor(niveau(p.experience.recolte) / 2);
     const place = Math.max(1, placeLibre(inv) + placeLiberee);
@@ -716,6 +740,7 @@ function planifierExploration(monde: Monde, p: Personnage): ResultatPlan {
     const chemin = trouverChemin(monde.grille, pos, c.cible, {
       maxNoeuds: 4_000,
       traverseEau: possede(p.corps.inventaire, "pirogue"),
+      ports: portsDe(monde),
     });
     if (chemin !== null && chemin.length > 0) {
       return ok([{ type: "deplacer", cible: c.cible, chemin, progression: 0 }]);
@@ -888,6 +913,7 @@ function planifierFondation(monde: Monde, p: Personnage, type: TypeBatiment): Re
  */
 export function choisirSite(monde: Monde, p: Personnage, type: TypeBatiment): Position | null {
   if (type === "palissade") return tuileEnceinteManquante(monde, p);
+  if (type === "port") return sitePortuaire(monde, p);
   const acces = batimentsAccessibles(monde, p);
   // En migration, loin du vieux foyer, on bâtit là où l'on est.
   const a = p.ambition;
@@ -930,6 +956,43 @@ export function choisirSite(monde: Monde, p: Personnage, type: TypeBatiment): Po
       }
     }
   }
+  return meilleur;
+}
+
+/**
+ * Site d'un port (M30) : de la terre constructible et libre au bord de l'eau, près des
+ * bâtiments de la famille ; l'eau profonde à côté vaut mieux, c'est une vraie voie d'eau.
+ */
+export function sitePortuaire(monde: Monde, p: Personnage): Position | null {
+  const centre = batimentsAccessibles(monde, p)[0]?.position ?? p.corps.position;
+  let meilleur: Position | null = null;
+  let meilleurScore = Infinity;
+  for (let dy = -12; dy <= 12; dy++)
+    for (let dx = -12; dx <= 12; dx++) {
+      const x = centre.x + dx;
+      const y = centre.y + dy;
+      const t = monde.grille.tuileOuNull(x, y);
+      if (
+        t === null ||
+        !INFO_BIOME[t.biome].constructible ||
+        t.batiment !== null ||
+        t.gisement !== null ||
+        !monde.grille.estPraticable(x, y)
+      )
+        continue;
+      let profonde = 0;
+      let eau = 0;
+      for (const v of monde.grille.voisins(x, y)) {
+        if (v.biome === "eau_profonde") profonde++;
+        else if (v.biome === "eau_peu_profonde" || v.biome === "gue") eau++;
+      }
+      if (profonde + eau === 0) continue;
+      const score = Grille.distance(centre, { x, y }) + (profonde > 0 ? 0 : 3);
+      if (score < meilleurScore) {
+        meilleurScore = score;
+        meilleur = { x, y };
+      }
+    }
   return meilleur;
 }
 
@@ -1018,18 +1081,19 @@ export function lieuxConnusTries(p: Personnage, type: Ressource): LieuConnu[] {
 }
 
 /**
- * Tuile praticable à distance ≤ 1 du lieu, la plus proche du personnage.
- * Préfère la terre ferme à l'eau peu profonde.
+ * Tuile praticable à distance ≤ `portee` du lieu, la plus proche du personnage.
+ * Préfère la terre ferme à un gué.
  */
 export function destinationPourAtteindre(
   monde: Monde,
   depuis: Position,
   lieu: Position,
+  portee = 1,
 ): Position | null {
   let meilleure: Position | null = null;
   let meilleurScore = Infinity;
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
+  for (let dy = -portee; dy <= portee; dy++) {
+    for (let dx = -portee; dx <= portee; dx++) {
       const x = lieu.x + dx;
       const y = lieu.y + dy;
       if (!monde.grille.estPraticable(x, y)) continue;

@@ -277,6 +277,7 @@ const NOMS_BIOME: Readonly<Record<string, string>> = {
   plage: "la grève",
   eau_peu_profonde: "la crique",
   eau_profonde: "le large",
+  gue: "le gué",
 };
 
 function lieuDejaNomme(c: EtatChronique, pos: Position): boolean {

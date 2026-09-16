@@ -101,6 +101,21 @@ export function eauAdjacente(monde: Monde, pos: Position): boolean {
   return false;
 }
 
+/** Les ports achevés (M30) : d'un port, la barque mène à tout autre, pirogue ou non. */
+export function portsDe(monde: Monde): Position[] {
+  const ports: Position[] = [];
+  for (const b of monde.batiments.values())
+    if (b.type === "port" && b.etat === "termine") ports.push(b.position);
+  return ports;
+}
+
+/** Lieux d'eau que connaît une personne : la mesure de « l'eau est partout autour ». */
+export function lieuxEauConnus(p: Personnage): number {
+  let n = 0;
+  for (const l of p.connaissance.values()) if (l.type === "eau") n++;
+  return n;
+}
+
 export function personnagesVivants(monde: Monde): Personnage[] {
   return monde.personnages.filter((p) => p.vivant);
 }
@@ -357,6 +372,16 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
     ![...monde.batiments.values()].some((b) => b.type === "four")
   )
     return "four";
+  // Un port (M30), une fois la pirogue maîtrisée et l'eau bien connue : entre deux ports, tout
+  // le monde traverse, pirogue ou non. Un seul par village.
+  if (
+    (p.savoirs.get("pirogue")?.force ?? 0) >= 1 &&
+    lieuxEauConnus(p) >= LIEUX_EAU_POUR_PORT &&
+    ![...monde.batiments.values()].some(
+      (b) => b.type === "port" && Grille.distance(b.position, p.corps.position) <= RAYON_PORT,
+    )
+  )
+    return "port";
   // Des bêtes et pas d'enclos : on en bâtit un.
   if (
     betesDe(monde, p.identite.nomFamille).length > 0 &&
@@ -390,6 +415,10 @@ export function grainesAccessibles(monde: Monde, p: Personnage): number {
 
 /** Distance au vieux foyer à partir de laquelle une migration s'installe (nouvel abri). */
 export const DISTANCE_MIGRATION = 16;
+/** Lieux d'eau connus à partir desquels un port vaut la peine (autant que l'idée de la pirogue). */
+export const LIEUX_EAU_POUR_PORT = 25;
+/** Un port sert à tout un village : pas deux à moins de cette distance. */
+export const RAYON_PORT = 40;
 
 /** Rayon de l'enceinte de palissade autour de l'abri familial. */
 export const RAYON_ENCEINTE = 3;

@@ -9,6 +9,7 @@ export const BIOMES = [
   "colline",
   "montagne",
   "marais",
+  "gue",
 ] as const;
 export type Biome = (typeof BIOMES)[number];
 
@@ -33,10 +34,11 @@ export const INFO_BIOME: Record<Biome, InfoBiome> = {
     constructible: false,
     opacite: 0,
   },
+  // L'eau peu profonde ne se passe plus à pied (M30) : à gué, en pirogue, ou de port à port.
   eau_peu_profonde: {
-    coutDeplacement: 2.5,
+    coutDeplacement: Infinity,
     ascii: "-",
-    praticable: true,
+    praticable: false,
     constructible: false,
     opacite: 0,
   },
@@ -52,6 +54,8 @@ export const INFO_BIOME: Record<Biome, InfoBiome> = {
     opacite: 1,
   },
   marais: { coutDeplacement: 2.2, ascii: "%", praticable: true, constructible: false, opacite: 1 },
+  /** Un gué : de l'eau peu profonde qui se passe à pied, posée à la génération (M30). */
+  gue: { coutDeplacement: 2, ascii: "_", praticable: true, constructible: false, opacite: 0 },
 };
 
 /** Code numérique stable d'un biome (utilisé pour le hachage et la sérialisation compacte). */

@@ -789,6 +789,9 @@ export class Rendu {
       case "champ":
         sprites.champ(ctx, b.x, b.y, b.culture?.seme ?? false, b.culture?.stade ?? 0);
         break;
+      case "port":
+        sprites.port(ctx, b.x, b.y);
+        break;
       default:
         ctx.fillStyle = "#888";
         ctx.fillRect(b.x + 0.1, b.y + 0.1, 0.8, 0.8);

@@ -42,6 +42,12 @@ deux lignes (une sur téléphone), la légende attend derrière « ? ». Sur té
 navigation en bas (Carte, Personnage, Journal, Village, Plus) ouvre un onglet à la fois en
 plein écran, façon appli.
 
+**L'eau (M30).** L'eau peu profonde ne se passe plus à pied : à **gué** (des lignes de pierres
+rares, posées à la génération là où un banc est étroit), en **pirogue** (une invention : son
+porteur traverse toute eau), ou de **port** à port (un bâtiment de rive, réservé à qui maîtrise
+la pirogue ; entre deux ports, tout le monde traverse en barque). La pêche se lance à deux tuiles
+de la rive.
+
 Quand un personnage est à court d'idées (faim ou froid qui dure, échecs répétés, besoin sans
 idée, aucun projet), il pose une question dans un catalogue fermé (une invention à chercher, un
 bâtiment, une leçon, une priorité, une direction) : **une option est tirée au sort** (M28 : la

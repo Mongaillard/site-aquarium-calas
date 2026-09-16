@@ -84,6 +84,8 @@ export interface OptionsChemin {
   readonly maxNoeuds?: number;
   /** Avec une pirogue : l'eau devient praticable (à ce coût par tuile). */
   readonly traverseEau?: boolean;
+  /** Les ports achevés (M30) : d'un port, la barque mène à tout autre, au prix de l'eau en pirogue. */
+  readonly ports?: readonly Position[];
 }
 
 /** Coût d'une tuile d'eau en pirogue. */
@@ -105,17 +107,57 @@ export function trouverChemin(
 ): Position[] | null {
   if (!grille.estPraticable(arrivee.x, arrivee.y)) return null;
   if (depart.x === arrivee.x && depart.y === arrivee.y) return [];
+  const iArrivee = cle(arrivee.x, arrivee.y);
+  return chercher(
+    grille,
+    depart,
+    (i) => i === iArrivee,
+    (x, y) => Math.max(Math.abs(x - arrivee.x), Math.abs(y - arrivee.y)),
+    options,
+  );
+}
+
+/**
+ * Chemin le plus court de `depart` (exclu) à la première tuile qui satisfait `estArrivee`
+ * (incluse), sans savoir d'avance laquelle : une recherche en largeur pondérée, `null` si
+ * aucune à portée. Sert à rejoindre « une rive » plutôt qu'un point précis (M30).
+ */
+export function trouverCheminVers(
+  grille: Grille,
+  depart: Position,
+  estArrivee: (x: number, y: number) => boolean,
+  options: OptionsChemin = {},
+): Position[] | null {
+  if (estArrivee(depart.x, depart.y)) return [];
+  return chercher(
+    grille,
+    depart,
+    (i) => {
+      const p = decle(i);
+      return estArrivee(p.x, p.y);
+    },
+    () => 0,
+    options,
+  );
+}
+
+function chercher(
+  grille: Grille,
+  depart: Position,
+  estBut: (index: number) => boolean,
+  heuristique: (x: number, y: number) => number,
+  options: OptionsChemin,
+): Position[] | null {
   const maxNoeuds = options.maxNoeuds ?? 20_000;
   const idx = cle;
-  const heuristique = (x: number, y: number): number =>
-    Math.max(Math.abs(x - arrivee.x), Math.abs(y - arrivee.y));
 
   const g = new Map<number, number>();
   const parent = new Map<number, number>();
   const ferme = new Set<number>();
   const file = new FilePriorite();
   const iDepart = idx(depart.x, depart.y);
-  const iArrivee = idx(arrivee.x, arrivee.y);
+  const ports = options.ports ?? [];
+  const clesPorts = new Set(ports.map((q) => idx(q.x, q.y)));
   g.set(iDepart, 0);
   file.push({ index: iDepart, f: heuristique(depart.x, depart.y) });
 
@@ -124,7 +166,7 @@ export function trouverChemin(
     const courant = file.pop();
     if (courant === undefined) break;
     if (ferme.has(courant.index)) continue;
-    if (courant.index === iArrivee) return reconstruire(parent, iDepart, iArrivee);
+    if (estBut(courant.index)) return reconstruire(parent, iDepart, courant.index);
     ferme.add(courant.index);
     if (++developpes > maxNoeuds) return null;
 
@@ -149,6 +191,17 @@ export function trouverChemin(
         g.set(iVoisin, gVoisin);
         parent.set(iVoisin, courant.index);
         file.push({ index: iVoisin, f: gVoisin + heuristique(nx, ny) });
+      }
+    }
+    if (!clesPorts.has(courant.index)) continue;
+    for (const q of ports) {
+      const iQ = idx(q.x, q.y);
+      if (iQ === courant.index || ferme.has(iQ)) continue;
+      const gQ = gCourant + Math.max(Math.abs(q.x - cx), Math.abs(q.y - cy)) * COUT_EAU_PIROGUE;
+      if (gQ < (g.get(iQ) ?? Infinity)) {
+        g.set(iQ, gQ);
+        parent.set(iQ, courant.index);
+        file.push({ index: iQ, f: gQ + heuristique(q.x, q.y) });
       }
     }
   }
@@ -184,8 +237,13 @@ export function coutChemin(grille: Grille, depart: Position, chemin: readonly Po
   let cout = 0;
   let prec = depart;
   for (const p of chemin) {
+    const saut = Math.max(Math.abs(p.x - prec.x), Math.abs(p.y - prec.y));
     const diag = p.x !== prec.x && p.y !== prec.y;
-    cout += INFO_BIOME[grille.tuile(p.x, p.y).biome].coutDeplacement * (diag ? Math.SQRT2 : 1);
+    // Deux pas d'écart ou plus : la barque d'un port à l'autre.
+    cout +=
+      saut > 1
+        ? saut * COUT_EAU_PIROGUE
+        : INFO_BIOME[grille.tuile(p.x, p.y).biome].coutDeplacement * (diag ? Math.SQRT2 : 1);
     prec = p;
   }
   return cout;

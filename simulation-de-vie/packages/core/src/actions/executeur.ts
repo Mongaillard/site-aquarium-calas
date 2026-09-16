@@ -29,12 +29,14 @@ import {
   REPARATIONS_MAX,
 } from "../monde/recettes.js";
 import type { Ressource } from "../monde/ressources.js";
+import { porteeRecolte } from "../monde/ressources.js";
 import {
   atelierAdjacent,
   autorise,
   eauAdjacente,
   feuProche,
   grainesAccessibles,
+  portsDe,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
 import { seRecueillir } from "../social/societe.js";
@@ -646,10 +648,12 @@ function tickDeplacer(
   p: Personnage,
   action: Extract<Action, { type: "deplacer" }>,
 ): Resultat {
-  const pos = p.corps.position;
   const pirogue = possede(p.corps.inventaire, "pirogue");
   if (action.chemin === null) {
-    action.chemin = trouverChemin(monde.grille, pos, action.cible, { traverseEau: pirogue });
+    action.chemin = trouverChemin(monde.grille, p.corps.position, action.cible, {
+      traverseEau: pirogue,
+      ports: portsDe(monde),
+    });
     if (action.chemin === null) return echec("destination inaccessible");
   }
   if (action.chemin.length === 0) return TERMINEE;
@@ -657,14 +661,20 @@ function tickDeplacer(
   while (action.chemin.length > 0) {
     const suivante = action.chemin[0];
     if (suivante === undefined) break;
+    const ici = p.corps.position;
     const biome = monde.grille.tuileOuNull(suivante.x, suivante.y)?.biome;
     if (biome === undefined) return echec("chemin bloqué");
-    // L'eau profonde ne se traverse qu'en pirogue ; l'eau peu profonde se passe à gué.
+    // L'eau ne se traverse qu'en pirogue, à gué (un biome à part) ou de port à port (M30).
     const info = INFO_BIOME[biome];
     const enPirogue = !info.praticable && pirogue && estTuileEau(biome);
     if (!info.praticable && !enPirogue) return echec("chemin bloqué");
-    const diag = suivante.x !== pos.x && suivante.y !== pos.y;
-    const cout = (enPirogue ? COUT_EAU_PIROGUE : info.coutDeplacement) * (diag ? Math.SQRT2 : 1);
+    // Deux pas d'écart ou plus : la barque d'un port à l'autre, payée à la distance.
+    const saut = Grille.distance(ici, suivante);
+    const diag = suivante.x !== ici.x && suivante.y !== ici.y;
+    const cout =
+      saut > 1
+        ? saut * COUT_EAU_PIROGUE
+        : (enPirogue ? COUT_EAU_PIROGUE : info.coutDeplacement) * (diag ? Math.SQRT2 : 1);
     if (action.progression < cout) break;
     action.progression -= cout;
     p.corps.position = { x: suivante.x, y: suivante.y };
@@ -690,7 +700,8 @@ function tickRecolter(
     p.connaissance.delete(cleLieu(action.cible.x, action.cible.y));
     return echec("plus de gisement ici");
   }
-  if (Grille.distance(p.corps.position, action.cible) > 1) return echec("gisement trop loin");
+  if (Grille.distance(p.corps.position, action.cible) > porteeRecolte(gisement.type))
+    return echec("gisement trop loin");
   const outil = gisement.outilRequis;
   if (!outilSatisfait(p.corps.inventaire, outil)) return echec(`outil requis : ${outil ?? ""}`);
   // Un grand enfant cueille des baies ; le reste attend l'adolescence.

@@ -20,6 +20,7 @@ export const TYPES_BATIMENT = [
   "champ",
   "autel",
   "stele",
+  "port",
 ] as const;
 export type TypeBatiment = (typeof TYPES_BATIMENT)[number];
 
@@ -209,6 +210,20 @@ export const PLANS_BATIMENT: Record<TypeBatiment, PlanBatiment> = {
     atelier: null,
     sourceEau: false,
     ascii: "+",
+  },
+  /** Un ponton sur la rive (M30) : entre deux ports achevés, tout le monde traverse. */
+  port: {
+    nom: "port",
+    materiaux: { bois: 20, pierre: 6, corde: 4 },
+    travail: 60,
+    capaciteDormeurs: 0,
+    capaciteStock: 0,
+    chaleur: 0,
+    rayonChaleur: 0,
+    abri: false,
+    atelier: null,
+    sourceEau: false,
+    ascii: "H",
   },
 };
 

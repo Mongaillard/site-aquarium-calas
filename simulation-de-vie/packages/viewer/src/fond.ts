@@ -19,6 +19,7 @@ export const RESOLUTION_FOND = 24;
 const COUCHES: readonly string[] = [
   "eau_profonde",
   "eau_peu_profonde",
+  "gue",
   "marais",
   "plage",
   "prairie",
@@ -66,7 +67,7 @@ export function construireFondMorceau(
   for (const couche of COUCHES) {
     const base = COULEURS_BIOME[couche] ?? "#7db85a";
     // L'écume : la terre se détache de l'eau par un liseré clair.
-    const terre = couche !== "eau_profonde" && couche !== "eau_peu_profonde";
+    const terre = !estEau(couche);
     if (terre) {
       ctx.strokeStyle =
         couche === "marais" ? "rgba(120, 160, 120, 0.5)" : "rgba(235, 240, 220, 0.55)";
@@ -107,6 +108,13 @@ export function construireFondMorceau(
         case "eau_peu_profonde":
           tache(ctx, x, y, b, "rgba(255,255,255,0.08)");
           if (b > 0.55) vaguelette(ctx, x, y, bruit(x, y, 5), 0.28);
+          break;
+        case "gue":
+          // Des pierres qui affleurent : on voit qu'on y passe à pied.
+          tache(ctx, x, y, b, "rgba(255,255,255,0.10)");
+          galet(ctx, x + 0.25, y + 0.5 + (b - 0.5) * 0.2, 0.09, "#b9b09a");
+          galet(ctx, x + 0.52, y + 0.42 + (bruit(x, y, 4) - 0.5) * 0.2, 0.1, "#cdbf8a");
+          galet(ctx, x + 0.78, y + 0.55 + (bruit(x, y, 6) - 0.5) * 0.2, 0.09, "#b9b09a");
           break;
         case "eau_profonde":
           tache(ctx, x, y, b, "rgba(0,0,30,0.14)");
@@ -178,12 +186,15 @@ function blob(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.roundRect(x - DEBORD, y - DEBORD, 1 + 2 * DEBORD, 1 + 2 * DEBORD, RAYON);
 }
 
+function estEau(nom: string | null): boolean {
+  return nom === "eau_profonde" || nom === "eau_peu_profonde" || nom === "gue";
+}
+
 function bordEau(biomeEn: BiomeEn, x: number, y: number): boolean {
   for (let dy = -1; dy <= 1; dy++)
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue;
-      const v = biomeEn(x + dx, y + dy);
-      if (v === "eau_profonde" || v === "eau_peu_profonde") return true;
+      if (estEau(biomeEn(x + dx, y + dy))) return true;
     }
   return false;
 }

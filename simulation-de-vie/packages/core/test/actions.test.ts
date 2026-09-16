@@ -53,12 +53,19 @@ describe("actions", () => {
     const { sim, p } = scenario();
     const r = executerTick(sim, p, {
       type: "deplacer",
+      cible: { x: 1, y: 0 },
+      chemin: null,
+      progression: 0,
+    });
+    // La rive se rejoint ; x = 0 est de l'eau peu profonde, infranchissable à pied depuis M30.
+    expect(r.statut === "encours" || r.statut === "terminee").toBe(true);
+    const eau = executerTick(sim, p, {
+      type: "deplacer",
       cible: { x: 0, y: 0 },
       chemin: null,
       progression: 0,
     });
-    // x = 0 est de l'eau peu profonde, praticable : on vise l'extérieur de la grille pour l'échec.
-    expect(r.statut === "encours" || r.statut === "terminee").toBe(true);
+    expect(eau).toEqual({ statut: "echec", raison: "destination inaccessible" });
     const hors = executerTick(sim, p, {
       type: "deplacer",
       cible: { x: 99, y: 99 },

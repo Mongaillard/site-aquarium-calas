@@ -106,6 +106,7 @@ const BATIMENTS_CONSEILLABLES: readonly TypeBatiment[] = [
   "enclos",
   "champ",
   "palissade",
+  "port",
 ];
 
 /** Inventions dont on a l'idée sans avoir réussi le prototype. */
@@ -250,6 +251,13 @@ function batimentsPossibles(monde: Monde, p: Personnage): OptionConseil[] {
           acces.some((b) => b.etat === "termine" && PLANS_BATIMENT[b.type].abri) &&
           !acces.some((b) => b.type === "palissade")
             ? "des pieux autour de l'abri contre les loups"
+            : null;
+        break;
+      case "port":
+        pourquoi =
+          (p.savoirs.get("pirogue")?.force ?? 0) >= 1 &&
+          ![...monde.batiments.values()].some((b) => b.type === "port")
+            ? "la pirogue est connue ; un port ferait traverser tout le monde"
             : null;
         break;
       default:

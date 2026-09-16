@@ -149,39 +149,46 @@ export function genererGrille(rng: Rng, options: OptionsGeneration = {}): Grille
     }),
   );
 
+  const graineGues = Math.floor(rng.fork("gues").suivant() * 2_147_483_647);
+
   return new Grille((cx, cy) => {
+    // L'altitude ne dépend que de la position ; on la garde le temps du morceau, car les gués
+    // regardent jusqu'à trois tuiles au-delà de ses bords.
+    const cache = new Map<number, number>();
+    const altitudeEn = (x: number, y: number): number => {
+      const k = (x + 1_048_576) * 2_097_152 + (y + 1_048_576);
+      const connue = cache.get(k);
+      if (connue !== undefined) return connue;
+      const continent = bruitContinents.fbm(x, y, 1 / echelleContinents, 3, 0.5, 2);
+      const relief = bruitRelief.fbm(x, y, 1 / echelle, 5, 0.5, 2);
+      const brute = continent * 0.55 + relief * 0.6 + 0.02;
+      const d = Math.hypot(x, y) / berceau;
+      const poids = Math.exp(-d * d);
+      const cote = clamp((x * rivage.x + y * rivage.y - 5) / 8, 0, 1);
+      const cible = 0.22 - 0.5 * cote;
+      let altitude = clamp(brute + (cible - brute) * poids, -1, 1);
+      for (const f of foyers) {
+        const df = Math.hypot(x - f.x, y - f.y) / berceau;
+        if (df > 3) continue;
+        const pf = Math.exp(-df * df);
+        const cf = clamp(((x - f.x) * f.rivage.x + (y - f.y) * f.rivage.y - 5) / 8, 0, 1);
+        altitude = clamp(altitude + (0.22 - 0.5 * cf - altitude) * pf, -1, 1);
+      }
+      if (mares.some((m) => Math.hypot(x - m.x, y - m.y) < RAYON_MARE)) altitude = -0.05;
+      if (maresFoyers.some((m) => Math.hypot(x - m.x, y - m.y) < RAYON_MARE)) altitude = -0.05;
+      cache.set(k, altitude);
+      return altitude;
+    };
     const tuiles: Tuile[] = [];
     for (let j = 0; j < T; j++) {
       for (let i = 0; i < T; i++) {
         const x = cx * T + i;
         const y = cy * T + j;
-        const continent = bruitContinents.fbm(x, y, 1 / echelleContinents, 3, 0.5, 2);
-        const relief = bruitRelief.fbm(x, y, 1 / echelle, 5, 0.5, 2);
-        const brute = continent * 0.55 + relief * 0.6 + 0.02;
-        const d = Math.hypot(x, y) / berceau;
-        const poids = Math.exp(-d * d);
-        const cote = clamp((x * rivage.x + y * rivage.y - 5) / 8, 0, 1);
-        const cible = 0.22 - 0.5 * cote;
-        let altitude = clamp(brute + (cible - brute) * poids, -1, 1);
-        for (const f of foyers) {
-          const df = Math.hypot(x - f.x, y - f.y) / berceau;
-          if (df > 3) continue;
-          const pf = Math.exp(-df * df);
-          const cf = clamp(((x - f.x) * f.rivage.x + (y - f.y) * f.rivage.y - 5) / 8, 0, 1);
-          altitude = clamp(altitude + (0.22 - 0.5 * cf - altitude) * pf, -1, 1);
-        }
-        if (mares.some((m) => Math.hypot(x - m.x, y - m.y) < RAYON_MARE)) altitude = -0.05;
-        if (maresFoyers.some((m) => Math.hypot(x - m.x, y - m.y) < RAYON_MARE)) altitude = -0.05;
+        const altitude = altitudeEn(x, y);
         const humidite = clamp(bruitHumidite.fbm(x, y, 1 / (echelle * 0.7), 3, 0.55, 2), -1, 1);
-        tuiles.push({
-          x,
-          y,
-          biome: choisirBiome(altitude, humidite),
-          altitude,
-          humidite,
-          gisement: null,
-          batiment: null,
-        });
+        let biome = choisirBiome(altitude, humidite);
+        if (biome === "eau_peu_profonde" && estGue(altitudeEn, graineGues, x, y)) biome = "gue";
+        tuiles.push({ x, y, biome, altitude, humidite, gisement: null, batiment: null });
       }
     }
     // Gisements dans un second passage, avec un flux propre au morceau (reproductible).
@@ -198,6 +205,55 @@ export function genererGrille(rng: Rng, options: OptionsGeneration = {}): Grille
       );
     return tuiles;
   });
+}
+
+/** Rangs entre deux gués possibles, sur chaque axe. */
+export const PAS_GUE = 12;
+/** Largeur maximale d'un banc d'eau peu profonde qu'un gué traverse. */
+export const LARGEUR_GUE_MAX = 3;
+
+type AltitudeEn = (x: number, y: number) => number;
+
+/** Le rang, dans une bande de douze, où un gué peut se poser : tiré de la graine et de la bande. */
+function rangDeGue(bande: number, axe: number, graine: number): number {
+  return ((Math.imul(bande, 2654435761) ^ Math.imul(axe + 1, 40503) ^ graine) >>> 0) % PAS_GUE;
+}
+
+/** Pas jusqu'à la rive dans une direction (1 : la voisine est terre), ou null si l'eau continue. */
+function riveA(
+  altitudeEn: AltitudeEn,
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+): number | null {
+  for (let k = 1; k <= LARGEUR_GUE_MAX; k++) {
+    const a = altitudeEn(x + dx * k, y + dy * k);
+    if (a >= SEUILS.mer) return k;
+    if (a < SEUILS.eauProfonde) return null;
+  }
+  return null;
+}
+
+/**
+ * Un gué (M30) : sur un rang choisi (un sur douze par axe), un banc d'eau peu profonde de trois
+ * tuiles au plus entre deux rives de terre. Toute la traversée y passe : une ligne droite,
+ * rive à rive. Ailleurs, l'eau peu profonde ne se passe qu'en pirogue ou de port à port.
+ */
+export function estGue(altitudeEn: AltitudeEn, graine: number, x: number, y: number): boolean {
+  for (const [dx, dy, axe] of [
+    [1, 0, 0],
+    [0, 1, 1],
+  ] as const) {
+    const rang = axe === 0 ? y : x;
+    const bande = Math.floor(rang / PAS_GUE);
+    if (rang - bande * PAS_GUE !== rangDeGue(bande, axe, graine)) continue;
+    const avant = riveA(altitudeEn, x, y, -dx, -dy);
+    const apres = riveA(altitudeEn, x, y, dx, dy);
+    if (avant === null || apres === null || avant + apres - 1 > LARGEUR_GUE_MAX) continue;
+    return true;
+  }
+  return false;
 }
 
 function clamp(v: number, min: number, max: number): number {
