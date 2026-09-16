@@ -20,6 +20,17 @@ export interface Bulle {
 /** Un outil du ciel : un pinceau de terrain, ou poser un peuple. */
 export type Outil = Pinceau | "peupler";
 
+/** Les calques de lecture de la carte (M25) : ce que l'on colore par-dessus le terrain. */
+export const CALQUES = ["aucun", "villages", "familles", "foi", "vivres"] as const;
+export type Calque = (typeof CALQUES)[number];
+export const LIBELLES_CALQUE: Readonly<Record<Calque, string>> = {
+  aucun: "Carte",
+  villages: "Villages",
+  familles: "Familles",
+  foi: "Foi",
+  vivres: "Vivres",
+};
+
 export interface Effet {
   readonly pouvoir: string;
   readonly x: number;
@@ -101,6 +112,10 @@ export class Magasin {
   outilArme: Outil | null = null;
   rayonPinceau = 2;
   taillePeuple = 12;
+  /** Calque de lecture affiché par-dessus la carte. */
+  calque: Calque = "aucun";
+  /** « Aller voir » : un repère qui pulse quelques secondes là où l'on vient d'arriver. */
+  repere: { x: number; y: number; fin: number } | null = null;
   reticule: { x: number; y: number } | null = null;
   effets: Effet[] = [];
 

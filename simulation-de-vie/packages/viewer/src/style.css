@@ -669,6 +669,122 @@ table.saisons td:first-child {
   background: rgba(20, 23, 28, 0.6);
   pointer-events: none;
 }
+/* Calques de lecture (M25) : petits boutons en haut à gauche de la carte. */
+.calques {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(20, 23, 28, 0.85);
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+}
+.calques button {
+  padding: 3px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--discret);
+}
+.calques button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+/* Le fil des grands événements, sous les calques : « aller voir » d'un clic. */
+.fil {
+  position: absolute;
+  left: 8px;
+  top: 44px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(320px, 55%);
+}
+.fil li {
+  display: flex;
+}
+.fil button {
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.3;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(20, 23, 28, 0.85);
+  border: 1px solid var(--bord);
+  color: #ffd479;
+  max-width: 100%;
+}
+.fil button .quand {
+  color: var(--discret);
+  margin-right: 4px;
+}
+.fil li.nouveau button {
+  border-color: #ffd479;
+}
+.liste li .voir {
+  float: right;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-radius: 6px;
+  background: transparent;
+}
+.liste li .voir:hover {
+  background: var(--accent);
+}
+/* Arbres des familles (onglet Population). */
+.familles {
+  margin-bottom: 8px;
+}
+.familles summary {
+  cursor: pointer;
+  color: var(--discret);
+  font-size: 13px;
+}
+.arbre,
+.arbre ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 14px;
+  border-left: 1px solid var(--bord);
+}
+.arbre {
+  padding-left: 0;
+  border-left: 0;
+  margin-bottom: 8px;
+}
+.arbre .noeud {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: transparent;
+}
+.arbre .noeud:hover {
+  background: var(--accent);
+}
+.arbre .noeud .rond {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  flex: none;
+}
+.arbre .noeud.mort {
+  color: var(--discret);
+  text-decoration: line-through;
+}
+.arbre h4 {
+  margin: 6px 0 2px;
+  font-size: 13px;
+}
 /* Sculpter et peupler (M25) : une seconde palette, séparée par un filet. */
 .pouvoirs .outils {
   border-left: 1px solid var(--bord);
@@ -866,6 +982,13 @@ table.saisons td:first-child {
   color: #ffd479;
 }
 @media (max-width: 900px) {
+  .calques button {
+    padding: 3px 5px;
+    font-size: 11px;
+  }
+  .fil {
+    max-width: 45%;
+  }
   .pouvoirs .colonne {
     display: none;
   }
@@ -902,6 +1025,13 @@ table.saisons td:first-child {
 
 /* Écran étroit : les règles ci-dessous doivent l'emporter sur celles du mode Dieu, d'où leur place. */
 @media (max-width: 900px) {
+  .calques button {
+    padding: 3px 5px;
+    font-size: 11px;
+  }
+  .fil {
+    max-width: 45%;
+  }
   .pouvoirs .colonne {
     display: none;
   }

@@ -69,6 +69,8 @@ export interface PersonnageEtat {
   readonly banni: boolean;
   /** Abattu (jalon 14) : ne fait plus que le nécessaire. */
   readonly abattu: boolean;
+  /** Foi 0..3 (calque « foi », M25). */
+  readonly foi: number;
 }
 
 export interface BatimentEtat {

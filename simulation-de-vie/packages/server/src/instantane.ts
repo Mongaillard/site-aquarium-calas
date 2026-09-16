@@ -119,6 +119,7 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     notable: estNotable(sim, p),
     banni: estBanni(sim, p),
     abattu: p.psyche.abattu,
+    foi: Math.round(p.foi * 10) / 10,
   };
 }
 

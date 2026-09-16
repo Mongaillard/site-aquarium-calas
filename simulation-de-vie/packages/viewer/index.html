@@ -91,6 +91,8 @@
       <main id="principal">
         <div id="zone-carte">
           <canvas id="carte"></canvas>
+          <div id="calques" class="calques" title="Calques de lecture (c)"></div>
+          <ol id="fil" class="fil" hidden></ol>
           <div id="legende" class="legende"></div>
           <button id="btn-legende" class="btn-legende" title="Légende">?</button>
           <div id="survol" class="survol" hidden></div>
@@ -183,6 +185,10 @@
           <section id="village" class="onglet"></section>
           <section id="legendes" class="onglet"></section>
           <section id="population" class="onglet">
+            <details id="familles" class="familles">
+              <summary>Arbres des familles</summary>
+              <div id="arbres"></div>
+            </details>
             <ol id="liste-population" class="liste"></ol>
           </section>
         </aside>

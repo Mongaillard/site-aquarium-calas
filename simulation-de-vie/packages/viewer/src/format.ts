@@ -187,6 +187,23 @@ export function couleurFamille(nomFamille: string): string {
   return `hsl(${teinteFamille(nomFamille)} 70% 58%)`;
 }
 
+/** Couleur d'un village (calque villages) : une teinte stable tirée de son identifiant. */
+export function couleurVillage(id: string): string {
+  return `hsl(${teinteFamille(`village:${id}`)} 65% 55%)`;
+}
+
+/** Couleur des réserves d'un village : rouge quand il n'y a rien, vert à partir de trois jours de vivres par tête. */
+export function couleurVivres(nourriture: number, habitants: number): string {
+  const part = Math.max(0, Math.min(1, nourriture / Math.max(1, habitants * 3)));
+  return `hsl(${Math.round(part * 120)} 75% 50%)`;
+}
+
+/** Couleur de la foi (0 : gris ; 3 : or). */
+export function couleurFoi(foi: number): string {
+  const part = Math.max(0, Math.min(1, foi / 3));
+  return `hsl(45 ${Math.round(20 + 75 * part)}% ${Math.round(45 + 25 * part)}%)`;
+}
+
 export function couleurMoral(moral: number): string {
   return moral >= 65 ? "#7dffa0" : moral <= 35 ? "#ff5f5f" : "#f0f0f0";
 }

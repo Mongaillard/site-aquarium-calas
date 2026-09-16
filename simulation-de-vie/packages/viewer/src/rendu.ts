@@ -6,8 +6,26 @@ import { versEcran, versMonde } from "./camera.js";
 import { Brouillard, COULEUR_INCONNU } from "./brouillard.js";
 import type { Magasin, MorceauVue } from "./etat.js";
 import { RESOLUTION_FOND, construireFondMorceau } from "./fond.js";
-import { couleurFamille, couleurMoral } from "./format.js";
+import {
+  couleurFamille,
+  couleurFoi,
+  couleurMoral,
+  couleurVillage,
+  couleurVivres,
+} from "./format.js";
 import * as sprites from "./sprites.js";
+
+/** Distance (en tuiles) d'un point à la fenêtre visible ; 0 s'il est dedans. */
+function distanceFenetre(
+  x: number,
+  y: number,
+  hg: { x: number; y: number },
+  bd: { x: number; y: number },
+): number {
+  const dx = x < hg.x ? hg.x - x : x > bd.x ? x - bd.x : 0;
+  const dy = y < hg.y ? hg.y - y : y > bd.y ? y - bd.y : 0;
+  return Math.max(dx, dy);
+}
 
 export class Rendu {
   /** Fond pré-rendu de chaque morceau connu, avec la version dessinée. */
@@ -87,6 +105,27 @@ export class Rendu {
     }
 
     const nuit = etat?.moment.estNuit ?? false;
+    if (etat !== null && (magasin.calque === "villages" || magasin.calque === "vivres")) {
+      // Calque villages / vivres : le territoire de chaque village, teinté par village ou par ses réserves.
+      for (const v of etat.villages.villages) {
+        const rayon = 8 + Math.sqrt(Math.max(1, v.habitants)) * 2.2;
+        if (!visible(v.x, v.y) && distanceFenetre(v.x, v.y, hg, bd) > rayon) continue;
+        const couleur =
+          magasin.calque === "villages"
+            ? couleurVillage(v.id)
+            : couleurVivres(v.nourriture, v.habitants);
+        ctx.fillStyle = couleur;
+        ctx.globalAlpha = 0.22;
+        ctx.beginPath();
+        ctx.arc(v.x + 0.5, v.y + 0.5, rayon, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.8;
+        ctx.strokeStyle = couleur;
+        ctx.lineWidth = 0.25;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
     if (etat !== null) {
       // Les routes entre villages : un trait pointillé.
       if (etat.villages.routes.length > 0) {
@@ -170,6 +209,28 @@ export class Rendu {
           pos: magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y, enMouvement: false },
         }))
         .sort((a, b) => a.pos.y - b.pos.y);
+      // Calques familles / foi : un anneau au sol sous chaque personne, lisible même de loin.
+      if (magasin.calque === "familles" || magasin.calque === "foi") {
+        ctx.lineWidth = 0.18;
+        for (const { p, pos } of positions) {
+          if (!visible(pos.x, pos.y)) continue;
+          ctx.strokeStyle =
+            magasin.calque === "familles" ? couleurFamille(p.nomFamille) : couleurFoi(p.foi);
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.globalAlpha = 0.35;
+          ctx.beginPath();
+          ctx.ellipse(pos.x + 0.5, pos.y + 0.85, 0.7, 0.35, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.stroke();
+        }
+        if (magasin.calque === "familles")
+          for (const b of etat.batiments) {
+            if (!visible(b.x, b.y)) continue;
+            ctx.strokeStyle = couleurFamille(b.famille);
+            ctx.strokeRect(b.x + 0.08, b.y + 0.08, 0.84, 0.84);
+          }
+      }
       for (const { p, pos } of positions) {
         if (!visible(pos.x, pos.y)) continue;
         sprites.personnage(ctx, pos.x, pos.y, {
@@ -225,6 +286,22 @@ export class Rendu {
     ctx.restore();
 
     // Mode Dieu : effets des miracles, puis halo de visée (espace écran).
+    // « Aller voir » : un repère qui pulse là où l'on vient d'arriver.
+    const repere = magasin.repere;
+    if (repere !== null) {
+      if (repere.fin <= maintenant) magasin.repere = null;
+      else {
+        const c = versEcran(cam, repere.x + 0.5, repere.y + 0.5);
+        const t = ((maintenant / 700) % 1) * 1;
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${String(1 - t)})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 8 + t * Math.max(24, cam.echelle * 3), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
     if (etat !== null) {
       for (const f of magasin.effets) this.dessinerEffet(cam, f, maintenant);
       if (magasin.modeDieu && magasin.reticule !== null) {
@@ -261,17 +338,29 @@ export class Rendu {
     }
 
     // Les villages : leur nom au-dessus de leur centre.
-    if (etat !== null && etat.villages.villages.length > 1 && cam.echelle >= 2) {
+    if (
+      etat !== null &&
+      (etat.villages.villages.length > 1 ||
+        magasin.calque === "villages" ||
+        magasin.calque === "vivres") &&
+      cam.echelle >= 2
+    ) {
       ctx.font = `bold ${String(Math.max(11, Math.min(16, cam.echelle * 2)))}px system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
       for (const v of etat.villages.villages) {
         if (!visible(v.x, v.y)) continue;
         const e = versEcran(cam, v.x + 0.5, v.y - 1);
+        const texte =
+          magasin.calque === "vivres"
+            ? `${v.nom} · ${String(v.nourriture)} vivres`
+            : magasin.calque === "villages"
+              ? `${v.nom} · ${String(v.habitants)}`
+              : v.nom;
         ctx.fillStyle = "rgba(0,0,0,0.8)";
-        ctx.fillText(v.nom, e.x + 1, e.y + 1);
+        ctx.fillText(texte, e.x + 1, e.y + 1);
         ctx.fillStyle = "#ffffff";
-        ctx.fillText(v.nom, e.x, e.y);
+        ctx.fillText(texte, e.x, e.y);
       }
     }
 

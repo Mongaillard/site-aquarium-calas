@@ -1,5 +1,5 @@
 /** Panneaux DOM : inspecteur, journal, conversations, statistiques, population, barre. */
-import type { Commande, MessageFiche, PersonneCourte } from "@sdv/protocole";
+import type { Commande, MessageFiche, PersonnageEtat, PersonneCourte } from "@sdv/protocole";
 import { VITESSES } from "@sdv/protocole";
 import type { Magasin } from "./etat.js";
 import {
@@ -28,6 +28,8 @@ export interface Interactions {
   readonly envoyer: (c: Commande) => void;
   readonly selectionner: (id: string | null) => void;
   readonly basculerSuivi: () => void;
+  /** « Aller voir » : centrer la carte sur une position du monde. */
+  readonly allerVoir: (x: number, y: number) => void;
 }
 
 function $(id: string): HTMLElement {
@@ -47,6 +49,7 @@ export class Panneaux {
   private derniereVersionBatiment = -1;
   private dernierRenduLent = 0;
   private ficheAffichee: MessageFiche | null = null;
+  private derniereCleFil = "";
 
   constructor(
     private readonly magasin: Magasin,
@@ -161,6 +164,7 @@ export class Panneaux {
   /** Met à jour les panneaux visibles ; `force` ignore le cache de version. */
   rafraichir(force = false): void {
     this.barre();
+    this.fil();
     const version = this.magasin.version;
     switch (this.ongletActif) {
       case "inspecteur":
@@ -577,19 +581,61 @@ export class Panneaux {
           ? `<div class="discret">${e(ev.details.transcription)}</div>`
           : "";
       const acteur = ev.acteur ?? (typeof ev.details.cible === "string" ? ev.details.cible : null);
+      const voir =
+        ev.position !== null
+          ? `<button class="voir" type="button" data-x="${String(ev.position.x)}" data-y="${String(ev.position.y)}" title="Aller voir sur la carte">📍</button>`
+          : "";
       lignes.push(
-        `<li class="${classe}"${acteur !== null ? ` data-id="${e(acteur)}" title="Voir la fiche"` : ""}><span class="quand">${e(quand)}</span>${e(resumerEvenement(ev, (id) => this.magasin.nom(id)))}${detail}</li>`,
+        `<li class="${classe}"${acteur !== null ? ` data-id="${e(acteur)}" title="Voir la fiche"` : ""}>${voir}<span class="quand">${e(quand)}</span>${e(resumerEvenement(ev, (id) => this.magasin.nom(id)))}${detail}</li>`,
       );
     }
     $("liste-journal").innerHTML =
       lignes.join("") || "<li class='discret'>rien pour l'instant</li>";
-    // Un clic sur une ligne ouvre la fiche de la personne concernée.
+    // Un clic sur une ligne ouvre la fiche de la personne concernée ; 📍 va voir sur la carte.
     for (const l of $("liste-journal").querySelectorAll<HTMLElement>("li[data-id]")) {
       l.addEventListener("click", () => {
         this.inter.selectionner(l.dataset.id ?? null);
         this.afficherOnglet("inspecteur");
       });
     }
+    this.brancherVoir($("liste-journal"));
+  }
+
+  /** Les boutons 📍 d'un conteneur : centrer la carte, sans ouvrir la fiche. */
+  private brancherVoir(conteneur: HTMLElement): void {
+    for (const b of conteneur.querySelectorAll<HTMLButtonElement>("button.voir")) {
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.inter.allerVoir(Number(b.dataset.x), Number(b.dataset.y));
+      });
+    }
+  }
+
+  /** Le fil des grands événements sur la carte (importance ≥ 6), les quatre derniers. */
+  private fil(): void {
+    const init = this.magasin.init;
+    const evenements = this.magasin.evenements;
+    const majeurs: typeof evenements = [];
+    for (let i = evenements.length - 1; i >= 0 && majeurs.length < 4; i--) {
+      const ev = evenements[i];
+      if (ev !== undefined && ev.importance >= 6 && ev.position !== null) majeurs.push(ev);
+    }
+    const cle = majeurs.map((ev) => `${String(ev.tick)}:${ev.type}:${ev.acteur ?? ""}`).join("|");
+    if (cle === this.derniereCleFil) return;
+    const nouveau = majeurs[0] !== undefined && this.derniereCleFil !== "";
+    this.derniereCleFil = cle;
+    const fil = $("fil");
+    fil.hidden = majeurs.length === 0;
+    fil.innerHTML = majeurs
+      .map((ev, i) => {
+        const quand = init
+          ? formaterTick(ev.tick, init.ticksParJour, init.joursParSaison)
+          : String(ev.tick);
+        const texte = resumerEvenement(ev, (id) => this.magasin.nom(id));
+        return `<li${i === 0 && nouveau ? ' class="nouveau"' : ""}><button class="voir" type="button" data-x="${String(ev.position?.x ?? 0)}" data-y="${String(ev.position?.y ?? 0)}" title="Aller voir sur la carte">📍 <span class="quand">${e(quand)}</span>${e(texte.length > 90 ? `${texte.slice(0, 88)}…` : texte)}</button></li>`;
+      })
+      .join("");
+    this.brancherVoir(fil);
   }
 
   private remplirFiltres(): void {
@@ -834,11 +880,63 @@ export class Panneaux {
       (morts.length > 0
         ? `<li class="discret">† ${morts.map((p) => `${e(p.prenom)} ${e(p.nomFamille)} (${e(p.causeDeces ?? "?")})`).join(", ")}</li>`
         : "");
-    for (const l of $("liste-population").querySelectorAll<HTMLElement>("[data-id]")) {
+    $("arbres").innerHTML = arbresDesFamilles(etat.personnages);
+    for (const l of $("population").querySelectorAll<HTMLElement>("[data-id]")) {
       l.addEventListener("click", () => {
         this.inter.selectionner(l.dataset.id ?? null);
         this.afficherOnglet("inspecteur");
       });
     }
   }
+}
+
+/**
+ * Les arbres des familles (M25) : chaque personne sans parents connus ouvre une
+ * lignée ; ses enfants s'y rangent (sous la mère quand les deux parents sont là),
+ * et ainsi de suite. Les morts restent, barrés.
+ */
+export function arbresDesFamilles(personnages: readonly PersonnageEtat[]): string {
+  const parId = new Map(personnages.map((p) => [p.id, p]));
+  const enfants = new Map<string, PersonnageEtat[]>();
+  const racines: PersonnageEtat[] = [];
+  for (const p of personnages) {
+    const parent = p.parents?.find((id) => parId.has(id));
+    if (parent === undefined) racines.push(p);
+    else {
+      const liste = enfants.get(parent) ?? [];
+      liste.push(p);
+      enfants.set(parent, liste);
+    }
+  }
+  const noeud = (p: PersonnageEtat, profondeur: number): string => {
+    const partenaire = p.partenaire === null ? undefined : parId.get(p.partenaire);
+    const fils = (enfants.get(p.id) ?? []).sort((a, b) => a.prenom.localeCompare(b.prenom));
+    const couple =
+      partenaire !== undefined
+        ? ` <span class="discret">♥ ${e(partenaire.prenom)}${partenaire.vivant ? "" : " †"}</span>`
+        : "";
+    const etat = p.vivant ? e(p.stade) : `† ${e(p.causeDeces ?? "")}`;
+    return `<li><button class="noeud${p.vivant ? "" : " mort"}" type="button" data-id="${e(p.id)}"><span class="rond" style="background:${couleurFamille(p.nomFamille)}"></span>${e(p.prenom)} ${e(p.nomFamille)} <span class="discret">${etat}</span></button>${couple}${
+      fils.length > 0 && profondeur < 8
+        ? `<ul>${fils.map((f) => noeud(f, profondeur + 1)).join("")}</ul>`
+        : ""
+    }</li>`;
+  };
+  // Une lignée par racine ; les racines d'une même famille de départ sous un même titre.
+  const parFamille = new Map<string, PersonnageEtat[]>();
+  for (const r of racines) {
+    const liste = parFamille.get(r.nomFamille) ?? [];
+    liste.push(r);
+    parFamille.set(r.nomFamille, liste);
+  }
+  return [...parFamille.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(
+      ([nom, rs]) =>
+        `<h4><span class="rond" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${couleurFamille(nom)};margin-right:6px"></span>${e(nom)}</h4><ul class="arbre">${rs
+          .sort((a, b) => a.prenom.localeCompare(b.prenom))
+          .map((r) => noeud(r, 0))
+          .join("")}</ul>`,
+    )
+    .join("");
 }

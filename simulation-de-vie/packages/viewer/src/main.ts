@@ -13,7 +13,8 @@ import {
   TAILLES_PEUPLE,
   VITESSES,
 } from "@sdv/protocole";
-import type { Outil } from "./etat.js";
+import type { Calque, Outil } from "./etat.js";
+import { CALQUES, LIBELLES_CALQUE } from "./etat.js";
 import { LIBELLES_SUJET, libelleReputation } from "./format.js";
 import type { Camera } from "./camera.js";
 import { cadrer, centrerSur, deplacer, versMonde, zoomer } from "./camera.js";
@@ -150,7 +151,39 @@ const basculerSuivi = (): void => {
   if (magasin.selection === null) return;
   magasin.suivre = !magasin.suivre;
 };
-const panneaux = new Panneaux(magasin, { envoyer, selectionner, basculerSuivi });
+/** « Aller voir » : la caméra file sur la position, un repère y pulse quelques secondes. */
+const allerVoir = (x: number, y: number): void => {
+  magasin.suivre = false;
+  cam = centrerSur(
+    { ...cam, echelle: Math.max(cam.echelle, 10) },
+    x,
+    y,
+    canvas.width,
+    canvas.height,
+  );
+  magasin.repere = { x, y, fin: performance.now() + 3000 };
+};
+const panneaux = new Panneaux(magasin, { envoyer, selectionner, basculerSuivi, allerVoir });
+
+// Calques de lecture (M25) : villages, familles, foi, vivres.
+const calquesEl = element("calques", HTMLDivElement);
+const boutonsCalque = new Map<Calque, HTMLButtonElement>();
+for (const calque of CALQUES) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = LIBELLES_CALQUE[calque];
+  b.setAttribute("aria-pressed", calque === magasin.calque ? "true" : "false");
+  b.addEventListener("click", () => {
+    choisirCalque(calque);
+  });
+  calquesEl.append(b);
+  boutonsCalque.set(calque, b);
+}
+function choisirCalque(calque: Calque): void {
+  magasin.calque = calque;
+  for (const [c, b] of boutonsCalque)
+    b.setAttribute("aria-pressed", c === calque ? "true" : "false");
+}
 
 /** Remplace le monde courant par un nouveau (graine) ou par une sauvegarde. */
 function relancer(graine: string, sauvegarde?: unknown): void {
@@ -1117,6 +1150,9 @@ window.addEventListener("keydown", (ev) => {
       break;
     case "b":
       basculerBrouillard();
+      break;
+    case "c":
+      choisirCalque(CALQUES[(CALQUES.indexOf(magasin.calque) + 1) % CALQUES.length] ?? "aucun");
       break;
     default: {
       const i = TOUCHES_POUVOIR.indexOf(ev.key);
