@@ -203,6 +203,13 @@ export function couleurVillage(id: string): string {
   return `hsl(${teinteFamille(`village:${id}`)} 65% 55%)`;
 }
 
+const EMBLEMES = ["◆", "●", "▲", "✶", "☾", "⚑", "✚", "❖"] as const;
+
+/** L'emblème d'un village (M34) : un signe stable tiré de son identifiant, à sa couleur. */
+export function emblemeVillage(id: string): string {
+  return EMBLEMES[teinteFamille(`village:${id}`) % EMBLEMES.length] ?? "◆";
+}
+
 /** Couleur des réserves d'un village : rouge quand il n'y a rien, vert à partir de trois jours de vivres par tête. */
 export function couleurVivres(nourriture: number, habitants: number): string {
   const part = Math.max(0, Math.min(1, nourriture / Math.max(1, habitants * 3)));

@@ -15,6 +15,7 @@ import {
   couleurMoral,
   couleurVillage,
   couleurVivres,
+  emblemeVillage,
 } from "./format.js";
 import * as sprites from "./sprites.js";
 
@@ -217,7 +218,12 @@ export class Rendu {
         ctx.stroke();
         ctx.setLineDash([]);
       }
-      // Bâtiments, du haut vers le bas pour les recouvrements.
+      // Bâtiments, du haut vers le bas pour les recouvrements ; un fanion à la couleur du
+      // village sur les maisons et les entrepôts quand il y a plusieurs villages (M34).
+      const villageDeFamille = new Map<string, string>();
+      if (etat.villages.villages.length > 1)
+        for (const v of etat.villages.villages)
+          for (const f of v.familles) villageDeFamille.set(f, v.id);
       const batiments = [...etat.batiments].sort((a, b) => a.y - b.y);
       for (const b of batiments) {
         if (!visible(b.x, b.y)) continue;
@@ -227,7 +233,21 @@ export class Rendu {
           maintenant,
           b.id === magasin.selectionBatiment || b.id === survolBatiment,
         );
+        const village = villageDeFamille.get(b.famille);
+        if (
+          village !== undefined &&
+          b.etat === "termine" &&
+          (b.type === "maison" || b.type === "entrepot" || b.type === "abri") &&
+          cam.echelle >= 8
+        )
+          fanion(ctx, b.x + 0.86, b.y + 0.08, couleurVillage(village), 0.32);
       }
+      // La bannière de chaque village, plantée à son centre.
+      if (etat.villages.villages.length > 1 && cam.echelle >= 4)
+        for (const v of etat.villages.villages) {
+          if (!visible(v.x, v.y)) continue;
+          fanion(ctx, v.x + 0.5, v.y + 0.2, couleurVillage(v.id), 0.7, emblemeVillage(v.id));
+        }
 
       // Personnages, triés par ordre vertical (ceux du bas devant).
       const positions = etat.personnages
@@ -569,6 +589,12 @@ export class Rendu {
         ctx.fillText(texte, e.x + 1, e.y + 1);
         ctx.fillStyle = "#ffffff";
         ctx.fillText(texte, e.x, e.y);
+        // L'emblème du village (M34), à sa couleur, devant le nom.
+        const largeur = ctx.measureText(texte).width;
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.fillText(emblemeVillage(v.id), e.x - largeur / 2 - 11, e.y + 1);
+        ctx.fillStyle = couleurVillage(v.id);
+        ctx.fillText(emblemeVillage(v.id), e.x - largeur / 2 - 12, e.y);
       }
     }
 
@@ -611,6 +637,9 @@ export class Rendu {
     // Barres de vie des combattants (M32), au-dessus de la tête, en pixels.
     if (etat !== null && cam.echelle >= 5) {
       const combattants = magasin.combattants;
+      const villageDeFamilleGlobal = new Map<string, string>();
+      for (const v of etat.villages.villages)
+        for (const f of v.familles) villageDeFamilleGlobal.set(f, v.id);
       for (const p of etat.personnages) {
         const camp = combattants.get(p.id);
         if (camp === undefined || !p.vivant) continue;
@@ -629,6 +658,11 @@ export class Rendu {
         ctx.fillRect(x, y, Math.round(w * part), 4);
         ctx.fillStyle = camp === "attaquant" ? "#ff6060" : "#6fb0ff";
         ctx.fillRect(x - 4, y, 2, 4);
+        const village = villageDeFamilleGlobal.get(p.nomFamille);
+        if (village !== undefined) {
+          ctx.fillStyle = couleurVillage(village);
+          ctx.fillRect(x + w + 2, y, 2, 4);
+        }
       }
       for (const m of magasin.membresEnBataille) {
         const pos = magasin.positionAffichee(m.id, maintenant) ?? { x: m.x, y: m.y };
@@ -1086,6 +1120,40 @@ export class Rendu {
     const x = Math.floor(m.x);
     const y = Math.floor(m.y);
     return etat.batiments.find((b) => b.x === x && b.y === y) ?? null;
+  }
+}
+
+/** Un fanion planté en (x, y) : une hampe et un triangle à la couleur donnée, un emblème si demandé. */
+function fanion(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  couleur: string,
+  hauteur: number,
+  embleme?: string,
+): void {
+  ctx.strokeStyle = "#3a2a1a";
+  ctx.lineWidth = 0.05;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y + hauteur);
+  ctx.stroke();
+  ctx.fillStyle = couleur;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + hauteur * 0.7, y + hauteur * 0.2);
+  ctx.lineTo(x, y + hauteur * 0.42);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.45)";
+  ctx.lineWidth = 0.025;
+  ctx.stroke();
+  if (embleme !== undefined) {
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `${String(hauteur * 0.26)}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(embleme, x + hauteur * 0.26, y + hauteur * 0.21);
   }
 }
 

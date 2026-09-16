@@ -107,7 +107,9 @@ sur la carte, et un raid repoussé ne pille rien. Pour en voir tout de suite : `
 ou `?raid`. Le ciel a prise dessus (M33) : **⚔️ Sonner la guerre** lance le village visé contre
 son pire voisin, **🕊️ Apaiser** arrête la bataille en cours ou fait la paix, la **Foudre** frappe
 les combattants sur le champ, un **Gardien** repousse pillards et loups, et la loi « Les
-guerres » suspend tout cela.
+guerres » suspend tout cela. Chaque village porte un **écusson** (couleur et emblème : devant
+son nom, en bannière à son centre, en fanion sur ses maisons), et quand une bataille commence la
+caméra y file avec une seconde de pause (M34, case « caméra sur les batailles » du menu).
 
 **Bâtiments et personnages en sprites (M31).** Deux planches CC0 de Kenney de plus : tente,
 maisons, grange, four, fumoir, puits et sanctuaire viennent de _Medieval RTS_ ; chaque personnage

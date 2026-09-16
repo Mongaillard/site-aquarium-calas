@@ -1342,6 +1342,21 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   paix, puis sans effet) ; loi suspendue (refus du pouvoir, paix à l'aube, rien ne se déclare) ;
   foudre sur un pillard (frappe du ciel, santé 20) et gardien qui repousse le raid.
 
+## 8 quaterdecies. Écussons et fanfare tels que réalisés (M34)
+
+- `format.ts` : `emblemeVillage(id)` (huit signes, indexés par la teinte du village) à côté de
+  `couleurVillage`. `rendu.ts` : `fanion(ctx, x, y, couleur, hauteur, embleme?)` (hampe,
+  triangle, emblème blanc) ; une bannière de 0,7 tuile au centre de chaque village dès quatre
+  pixels par tuile, un fanion de 0,32 sur maison, entrepôt et abri dès huit pixels par tuile
+  (famille → village par `villages[].familles`), l'emblème à la couleur du village devant
+  l'étiquette du nom, un liseré de village à droite de la barre de vie. Tout cela seulement
+  quand le monde compte plus d'un village.
+- `main.ts` : `fanfare(m)` après chaque état : une bataille en phase `combat` dont
+  `combatTick` est à six ticks au plus de l'état, jamais vue (`bataillesVues`), déclenche
+  `allerVoir(x, y)` et, si le monde n'est pas en pause, une commande `pause` puis `reprendre`
+  une seconde plus tard. Case `#fanfare-case` dans le menu, persistée sous `sdv.fanfare`.
+- Pas de test (rendu et câblage DOM) ; vérifié par captures.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

@@ -134,10 +134,46 @@ if (parametres.has("domaine")) domaineEntree.value = parametres.get("domaine") ?
 if (parametres.has("scenario")) scenarioEntree.value = parametres.get("scenario") ?? "";
 
 let derniereDemandeFiche = 0;
+// La fanfare de bataille (M34) : à l'assaut, la caméra file sur le lieu et le monde marque une
+// seconde de pause, si la case du menu le veut (retenue dans le navigateur).
+const fanfareCase = element("fanfare-case", HTMLInputElement);
+try {
+  fanfareCase.checked = localStorage.getItem("sdv.fanfare") !== "non";
+} catch {
+  /* stockage indisponible : la case garde sa valeur par défaut */
+}
+fanfareCase.addEventListener("change", () => {
+  try {
+    localStorage.setItem("sdv.fanfare", fanfareCase.checked ? "oui" : "non");
+  } catch {
+    /* rien */
+  }
+});
+const bataillesVues = new Set<string>();
+let reprisePrevue: ReturnType<typeof setTimeout> | null = null;
+function fanfare(m: MessageServeur): void {
+  if (m.type !== "etat") return;
+  for (const b of m.villages.batailles) {
+    if (bataillesVues.has(b.id)) continue;
+    if (b.phase !== "combat" || b.combatTick === null || m.tick - b.combatTick > 6) continue;
+    bataillesVues.add(b.id);
+    if (!fanfareCase.checked) continue;
+    allerVoir(b.x, b.y);
+    if (!m.pause && reprisePrevue === null) {
+      liaison.envoyer({ type: "pause" });
+      reprisePrevue = setTimeout(() => {
+        reprisePrevue = null;
+        liaison.envoyer({ type: "reprendre" });
+      }, 1000);
+    }
+  }
+  if (m.villages.batailles.length === 0 && bataillesVues.size > 50) bataillesVues.clear();
+}
 const recevoir = (m: MessageServeur): void => {
   const maintenant = performance.now();
   magasin.recevoir(m, maintenant);
   if (m.type === "init") camAjustee = false;
+  fanfare(m);
   if (
     m.type === "etat" &&
     magasin.selection !== null &&

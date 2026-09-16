@@ -2,6 +2,19 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M34 – Écussons et fanfare (2026-09-16)
+
+Du relief pour lire les camps d'un coup d'œil, et ne pas rater une bataille.
+
+- **Écussons de village** (dès qu'il y a plusieurs villages) : chaque village a une couleur
+  (celle du calque villages) et un **emblème** stable (◆ ● ▲ ✶ ☾ ⚑ ✚ ❖, tiré de son
+  identifiant) ; l'emblème précède son nom sur la carte, une **bannière** est plantée à son
+  centre, un **fanion** flotte sur ses maisons, entrepôts et abris (de près), et la barre de
+  vie d'un combattant porte un liseré à la couleur de son village.
+- **Fanfare de bataille** : quand un assaut commence (guerre, raid ou meute), la caméra file
+  sur le lieu et le monde marque une seconde de pause. Une case du menu ☰ (« caméra sur les
+  batailles », retenue dans le navigateur) la désactive.
+
 ## M33 – Le dieu et la guerre (2026-09-16)
 
 Le joueur a prise sur les batailles de M32.
