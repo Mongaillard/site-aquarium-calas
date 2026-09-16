@@ -28,6 +28,8 @@ function mondePlat(seed: number, initiale: number): Simulation {
     grilleUniforme(60, 60, "prairie", [{ x: 20, y: 20, biome: "eau_peu_profonde" }]),
   );
   for (const t of [...sim.troupeaux.values()]) sim.troupeaux.delete(t.id);
+  // Sans le conteur (M25) : ces scénarios mesurent la technique, pas ses épreuves.
+  sim.lois.conteur = false;
   return sim;
 }
 

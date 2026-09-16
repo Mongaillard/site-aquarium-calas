@@ -196,6 +196,25 @@ export {
 } from "./monde/creatures.js";
 export type { Creature, MondeCreatures } from "./monde/creatures.js";
 export {
+  etatConteurInitial,
+  jourDuConteur,
+  mesurerPression,
+  frapper,
+  offrir,
+  ecrireChronique,
+  DUREES,
+  PREMIER_CALME_JOURS,
+  PRESSION_CLEMENCE,
+} from "./monde/conteur.js";
+export type {
+  EtatConteur,
+  MondeConteur,
+  PhaseConteur,
+  ActeConteur,
+  ChroniqueAnnee,
+} from "./monde/conteur.js";
+export { lancerBande } from "./monde/villages.js";
+export {
   affinite,
   coutEffectif,
   niveauRequis,

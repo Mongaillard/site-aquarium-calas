@@ -2,6 +2,54 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M25 – Le jeu du ciel : sculpter, lire, légiférer, incarner, raconter (2026-09-16)
+
+La simulation devient un jeu de dieu, dans l'esprit de WorldBox pour la main sur le monde et
+d'Age of Mythology pour l'identité du ciel. Cinq chantiers, un par commit.
+
+- **Sculpter le monde et poser des peuples.** Le pinceau du ciel (terre, eau, forêt, montagne,
+  sable ; rayon 0 à 6 ; gratuit) remodèle le terrain en disque : peinture au glisser de la
+  souris, appui long au doigt. Le cœur d'une montagne est en montagne, sa lisière en collines ;
+  l'eau profonde au centre, peu profonde au bord ; chaque tuile sculptée perd son gisement et
+  en retire un nouveau selon le biome posé, les tuiles bâties sont épargnées, et les personnes
+  que l'eau surprend regagnent la rive. Les sculptures se sauvegardent avec la grille et se
+  rejouent après la regénération (sauvegarde v5). Un **monde vierge** (0 habitant, case
+  « vierge ») s'ouvre en mode Dieu, le berceau visible à quarante tuiles, l'outil « peupler »
+  en main : le premier peuple posé est gratuit, les suivants coûtent 25 ✦ et fondent chacun
+  leur village de familles neuves. Des **peuples rivaux dès le départ** (1 à 4, chacun avec
+  autant d'habitants, à quarante-huit tuiles du berceau). Commandes `sculpter` et `peupler`.
+- **Lire le monde.** Quatre calques par-dessus la carte (boutons en haut à gauche, touche `c`) :
+  villages (territoire et habitants), familles (anneau au sol de chacun, contour des
+  bâtiments), foi (du gris à l'or), vivres (les réserves de chaque village, du rouge au vert).
+  Le **fil des grands événements** (importance ≥ 6) sur la carte et un bouton 📍 sur chaque
+  ligne du journal : la caméra file sur place, un repère y pulse. Les **arbres des familles**
+  dans l'onglet Population : lignées, couples, morts barrés, un clic ouvre la fiche.
+- **Les lois du monde** (bouton ⚖️ Lois, touche `l`) : la faim tue, les maladies, les bêtes
+  attaquent, les raids, les schismes, la mort de vieillesse, le conteur ; chacune se suspend
+  et se rétablit, se journalise et se sauvegarde. Les tirages aléatoires restent alignés (une loi
+  suspendue ne tue pas, elle ne change pas le hasard).
+- **L'identité du ciel.** Un **domaine** (formulaire « ciel », ou plus tard dans la barre du
+  mode Dieu) : Moisson (le Semeur), Orage (le Tonnant), Feu (la Braise), Songes (le Veilleur).
+  Ses pouvoirs favoris coûtent 40 % de moins et s'ouvrent un palier plus tôt ; ceux du domaine
+  opposé coûtent un quart de plus et viennent plus tard. Le **rang du ciel** (le niveau de
+  culte, plus un à l'âge du cuivre) ouvre quatre paliers de pouvoirs (`NIVEAU_POUVOIR`) ; un
+  ciel sans visage garde tout au prix du catalogue. Chaque usage dans la saison renchérit le
+  pouvoir d'un quart, jusqu'au double ; la saison suivante en oublie la moitié. Les
+  **créatures** du domaine (rang 2, 30 ✦, vingt jours, une de chaque à la fois) : un gardien
+  posté qui repousse meutes et bandes à douze tuiles et rassure ; un fléau lâché qui rôde
+  autour de son poste, ronge les gisements, fait fuir le gibier et effraie. La palette montre
+  verrous, coûts effectifs et affinités ; commandes `domaine` et `creature`.
+- **Le conteur.** Le directeur de danger devient un narrateur : une courbe de tension en quatre
+  temps — calme (8–14 j, 24 au départ), montée (4–8 j), crise (une épreuve : meute, bande,
+  maladie, orage, canicule, neige, selon les lois et la saison), répit (6–10 j, un bienfait :
+  troupeau, ciel clair, guérison des malades, aubaine de gisements). Clémence : si le village
+  est déjà en peine (faim, malades, menace, deuils : la « pression » mesurée chaque aube),
+  le conteur passe au répit sans frapper. Au nouvel an, il écrit la **chronique de l'année**
+  (titre — l'année des berceaux, du deuil, des loups, des bandes… — et quelques phrases :
+  âmes, naissances, morts, unions, bâtiments, inventions, légendes, épreuves, bienfaits,
+  miracles), lue au joueur dans un dialogue (🔊 à voix haute si le navigateur sait), relisible
+  depuis la pastille 🎭 de la barre ou l'onglet Statistiques. Événements `conteur`.
+
 ## M24 – Une grande colonie sans à-coups (2026-09-13)
 
 À cinquante habitants et plus, la page marquait encore des pauses d'une demi-seconde : bâtir

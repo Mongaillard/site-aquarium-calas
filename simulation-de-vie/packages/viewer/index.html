@@ -11,6 +11,13 @@
         <div class="titre">Simulation de vie <span id="graine" class="discret"></span></div>
         <div id="horloge" class="horloge">—</div>
         <div id="meteo" class="meteo"></div>
+        <button
+          id="conteur"
+          class="conteur"
+          type="button"
+          title="Le conteur : la tension du récit (calme, montée, crise, répit). Cliquer ouvre la dernière chronique."
+          hidden
+        ></button>
         <div class="controles">
           <button id="btn-pause" title="Pause / reprendre (espace)">⏸</button>
           <button id="btn-tick" title="Avancer d'un tick (→)">+1</button>
@@ -247,6 +254,14 @@
       <ol id="liste-sauvegardes" class="liste"></ol>
       <div id="statut-sauvegardes" class="discret"></div>
       <div class="ligne"><button type="button" id="btn-fermer-sauvegardes">Fermer</button></div>
+    </dialog>
+    <dialog id="dlg-chronique" class="dialogue chronique">
+      <h2 id="chronique-titre">Chronique</h2>
+      <p id="chronique-texte"></p>
+      <div class="ligne">
+        <button type="button" id="btn-lire-chronique" title="Lire à voix haute">🔊 Écouter</button>
+        <button type="button" id="btn-fermer-chronique">Fermer</button>
+      </div>
     </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>

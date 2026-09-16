@@ -175,7 +175,56 @@ const allerVoir = (x: number, y: number): void => {
   );
   magasin.repere = { x, y, fin: performance.now() + 3000 };
 };
-const panneaux = new Panneaux(magasin, { envoyer, selectionner, basculerSuivi, allerVoir });
+// La chronique de fin d'année (M25) : un dialogue, lu à voix haute si le navigateur sait.
+const dlgChronique = element("dlg-chronique", HTMLDialogElement);
+const chroniqueTitre = element("chronique-titre", HTMLHeadingElement);
+const chroniqueTexte = element("chronique-texte", HTMLParagraphElement);
+const btnLireChronique = element("btn-lire-chronique", HTMLButtonElement);
+let derniereChroniqueVue = 0;
+function ouvrirChronique(annee: number): void {
+  const ch = magasin.etat?.conteur.chroniques.find((c) => c.annee === annee);
+  if (ch === undefined) return;
+  chroniqueTitre.textContent = `An ${String(ch.annee)} — ${ch.titre}`;
+  chroniqueTexte.textContent = ch.texte;
+  btnLireChronique.hidden = !("speechSynthesis" in window);
+  if (!dlgChronique.open) dlgChronique.showModal();
+}
+function lireChronique(): void {
+  if (!("speechSynthesis" in window)) return;
+  const texte = `${chroniqueTitre.textContent}. ${chroniqueTexte.textContent}`;
+  window.speechSynthesis.cancel();
+  const parole = new SpeechSynthesisUtterance(texte);
+  parole.lang = "fr-FR";
+  parole.rate = 0.95;
+  window.speechSynthesis.speak(parole);
+}
+btnLireChronique.addEventListener("click", lireChronique);
+element("btn-fermer-chronique", HTMLButtonElement).addEventListener("click", () => {
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  dlgChronique.close();
+});
+element("conteur", HTMLButtonElement).addEventListener("click", () => {
+  const ch = magasin.etat?.conteur.chroniques[0];
+  if (ch !== undefined) ouvrirChronique(ch.annee);
+  else panneaux.afficherOnglet("stats");
+});
+/** Une chronique toute fraîche (écrite dans la journée) s'ouvre d'elle-même, une fois. */
+function surveillerChronique(): void {
+  const etat = magasin.etat;
+  const init = magasin.init;
+  if (etat === null || init === null) return;
+  const ch = etat.conteur.chroniques[0];
+  if (ch === undefined || ch.annee <= derniereChroniqueVue) return;
+  derniereChroniqueVue = ch.annee;
+  if (etat.tick - ch.tick <= init.ticksParJour) ouvrirChronique(ch.annee);
+}
+const panneaux = new Panneaux(magasin, {
+  envoyer,
+  selectionner,
+  basculerSuivi,
+  allerVoir,
+  ouvrirChronique,
+});
 
 // Les lois du monde (M25) : un panneau de cases à cocher, l'état vient du monde.
 const btnLois = element("btn-lois", HTMLButtonElement);
@@ -245,6 +294,7 @@ function choisirCalque(calque: Calque): void {
 function relancer(graine: string, sauvegarde?: unknown): void {
   liaison.fermer();
   magasin.reinitialiser();
+  derniereChroniqueVue = 0;
   liaison = creerLiaison(graine, sauvegarde);
   liaison.connecter();
   panneaux.afficherOnglet("inspecteur");
@@ -1356,6 +1406,7 @@ function boucle(maintenant: number): void {
     panneaux.rafraichir();
     rafraichirPouvoirs();
     rafraichirLois();
+    surveillerChronique();
     sauvegardeAutomatique(maintenant);
     const questions = magasin.etat?.questions.length ?? 0;
     badgeConseils.hidden = questions === 0;

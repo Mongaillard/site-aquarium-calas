@@ -57,6 +57,21 @@ culte qui relève la faveur, et trois leçons (le ciel écoute, le ciel frappe, 
 ciel) se retiennent des prières. Le bouton « ⛶ » (touche `p`) met la carte en plein écran avec
 les commandes en menus flottants.
 
+**Le jeu du ciel (M25).** Dans la barre du mode Dieu, une seconde palette **sculpte le monde**
+(terre, eau, forêt, montagne, sable ; rayon réglable ; glisser pour peindre) et **pose des
+peuples** (gratuit dans un monde vide, 25 ✦ ensuite). Le formulaire « Nouveau monde » propose
+des **peuples rivaux** (1 à 4), un **monde vierge** (personne au départ : sculptez, puis posez
+votre peuple où vous voulez) et un **domaine du ciel** — Moisson, Orage, Feu, Songes — qui
+rend ses pouvoirs favoris moins chers et plus tôt, ceux du domaine opposé plus chers et plus
+tard, ouvre les paliers de pouvoirs au fil du rang (culte, âge du cuivre), fait payer chaque
+usage un peu plus cher dans la saison, et donne deux **créatures** (un gardien à poster, un
+fléau à lâcher ; rang 2). Le bouton « ⚖️ Lois » (touche `l`) suspend la faim, les maladies, les
+bêtes, les raids, les schismes, la vieillesse ou le conteur. Les **calques** (touche `c`) colorent la carte
+par village, famille, foi ou vivres ; le **fil** des grands événements et le bouton 📍 du
+journal mènent sur place ; l'onglet Population dessine les **arbres des familles**. Le
+**conteur** (pastille 🎭) rythme le monde — calme, montée, crise, répit — et lit au joueur la
+**chronique** de chaque année passée.
+
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la
 curiosité donnent des idées, puis des inventions (filet, piège, arc, pirogue, traîneau, fumoir,
@@ -110,8 +125,9 @@ pnpm --filter @sdv/viewer build:local   # fichiers autonomes dans packages/viewe
 Dans ce mode la simulation tourne dans la page elle-même : la même interface, les mêmes
 messages, aucun serveur. Ajoutez `?seed=123&jours=40&population=24` à l'URL pour choisir la
 graine, le nombre de jours simulés avant l'affichage et les habitants au départ (12, 24, 36 ou
-48 : le berceau gagne des mares et des gisements à proportion), ou changez la graine et les
-habitants directement dans la barre (« Nouveau monde »). Une colonie nombreuse ralentit la
+48 : le berceau gagne des mares et des gisements à proportion), `&peuples=3` pour des peuples
+rivaux, `&vierge` pour un monde sans personne, `&domaine=orage` pour le domaine du ciel, ou
+changez tout cela directement dans la barre (« Nouveau monde »). Une colonie nombreuse ralentit la
 simulation plutôt que la page : la vitesse effective s'affiche alors à côté de l'horloge. Sur un écran tactile : un doigt pour déplacer la carte, deux pour zoomer,
 toucher un personnage ou un bâtiment pour l'inspecter, bouton « ? » pour la légende, « ⋯ » pour
 la graine et les sauvegardes, poignée « ▾ » pour replier ou agrandir le panneau du bas. La page
@@ -121,7 +137,7 @@ servie par `pnpm serve` accepte aussi `?local` pour basculer dans ce mode.
 
 ```
 packages/core/src
-  monde/        grille, génération, biomes, ressources, horloge, météo, recettes, bâtiments, faune, danger, village, divin (mode Dieu)
+  monde/        grille, génération, biomes, ressources, horloge, météo, recettes, bâtiments, faune, danger, village, divin (mode Dieu), terrain (pinceaux), creatures, conteur
   agents/       identité, génome et héritage, besoins, inventaire, compétences, population, cycle de vie
   actions/      types d'actions et d'intentions, A*, planificateur, exécuteur
   cerveau/      interface Cerveau, perception, RuleBrain (règles), conseil (demander à Claude)

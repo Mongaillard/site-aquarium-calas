@@ -543,7 +543,26 @@ function bandes(monde: MondeVillages, rng: Rng): void {
   );
   if (riches.length === 0) return;
   if (!rng.chance(0.25)) return; // un jour sur quatre où c'est possible
-  const cible = rng.choisir(riches);
+  lancerBande(monde, rng, rng.choisir(riches));
+}
+
+/**
+ * Lance une bande vers un village (le plus riche, ou celui donné) : elle
+ * approche à trente tuiles. Le conteur s'en sert ; null s'il n'y a personne à
+ * piller ou si une bande court déjà.
+ */
+export function lancerBande(monde: MondeVillages, rng: Rng, village: Village | null): Bande | null {
+  const e = monde.villages;
+  const moment = monde.horloge.moment();
+  const jour = moment.jourAbsolu;
+  if (e.bandes.some((b) => b.etat !== "parti")) return null;
+  const cible =
+    village ??
+    [...e.villages]
+      .filter((v) => habitants(monde, v).length > 0)
+      .sort((a, b) => nourritureDe(monde, b) - nourritureDe(monde, a))[0];
+  if (cible === undefined) return null;
+  const saison = String(moment.annee);
   e.derniereBandeSaison = saison;
   e.compteurs.bandes += 1;
   const angle = rng.suivant() * Math.PI * 2;
@@ -568,6 +587,7 @@ function bandes(monde: MondeVillages, rng: Rng): void {
     bande.position,
   );
   for (const p of habitants(monde, cible)) stresser(p, 5);
+  return bande;
 }
 
 /** Chaque heure : les bandes avancent, négocient ou pillent, puis s'en vont. */

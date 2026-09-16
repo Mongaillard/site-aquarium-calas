@@ -764,6 +764,8 @@ export interface MessageEtat {
   readonly lois: LoisEtat;
   /** Les créatures du ciel en ce moment (M25). */
   readonly creatures: readonly CreatureEtat[];
+  /** Le conteur (M25) : phase, tension, actes, chroniques. */
+  readonly conteur: ConteurEtat;
 }
 
 export interface RelationFiche {
@@ -1149,8 +1151,49 @@ export interface CreatureEtat {
   readonly joursRestants: number;
 }
 
+/** Le conteur (M25) : la courbe de tension et ses chroniques. */
+export type PhaseConteurEtat = "calme" | "montee" | "crise" | "repit";
+export const LIBELLES_PHASE: Readonly<Record<PhaseConteurEtat, string>> = {
+  calme: "calme",
+  montee: "montée",
+  crise: "crise",
+  repit: "répit",
+};
+export interface ActeConteurEtat {
+  readonly jour: number;
+  readonly genre: string;
+  readonly bienfait: boolean;
+  readonly texte: string;
+}
+export interface ChroniqueAnneeEtat {
+  readonly annee: number;
+  readonly titre: string;
+  readonly texte: string;
+  readonly tick: number;
+}
+export interface ConteurEtat {
+  readonly phase: PhaseConteurEtat;
+  readonly tension: number;
+  readonly pression: number;
+  readonly joursDansPhase: number;
+  readonly crises: number;
+  readonly bienfaits: number;
+  /** Les derniers actes, le plus récent d'abord. */
+  readonly actes: readonly ActeConteurEtat[];
+  /** Les chroniques de fin d'année, la plus récente d'abord. */
+  readonly chroniques: readonly ChroniqueAnneeEtat[];
+}
+
 /** Les lois du monde (M25) : ce que l'observateur peut suspendre. */
-export const LOIS = ["faim", "maladies", "betes", "raids", "schismes", "vieillesse"] as const;
+export const LOIS = [
+  "faim",
+  "maladies",
+  "betes",
+  "raids",
+  "schismes",
+  "vieillesse",
+  "conteur",
+] as const;
 export type Loi = (typeof LOIS)[number];
 export type LoisEtat = Readonly<Record<Loi, boolean>>;
 
@@ -1192,11 +1235,25 @@ export const FICHES_LOI: Readonly<Record<Loi, FicheLoi>> = {
     emoji: "🕯️",
     description: "Sans elle, les anciens ne meurent plus de leur âge.",
   },
+  conteur: {
+    nom: "Le conteur",
+    emoji: "🎭",
+    description:
+      "Sans lui, plus d'épreuves ni de bienfaits scénarisés, ni de chronique : le monde suit son cours.",
+  },
 };
 
 /** Les lois telles qu'un monde naît : toutes en vigueur. */
 export function loisParDefaut(): Record<Loi, boolean> {
-  return { faim: true, maladies: true, betes: true, raids: true, schismes: true, vieillesse: true };
+  return {
+    faim: true,
+    maladies: true,
+    betes: true,
+    raids: true,
+    schismes: true,
+    vieillesse: true,
+    conteur: true,
+  };
 }
 
 /** Les pinceaux du ciel (M25) : ce qu'ils posent, dans l'ordre de la palette. */

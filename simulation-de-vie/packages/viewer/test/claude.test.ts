@@ -217,8 +217,19 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
       raids: true,
       schismes: true,
       vieillesse: true,
+      conteur: true,
     },
     creatures: [],
+    conteur: {
+      phase: "calme",
+      tension: 10,
+      pression: 0,
+      joursDansPhase: 0,
+      crises: 0,
+      bienfaits: 0,
+      actes: [],
+      chroniques: [],
+    },
   };
 }
 

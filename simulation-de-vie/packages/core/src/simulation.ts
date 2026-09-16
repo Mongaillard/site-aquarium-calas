@@ -102,6 +102,8 @@ import {
 } from "@sdv/protocole";
 import type { Domaine, GenreCreature, Loi } from "@sdv/protocole";
 import { creerCreature, ficheCreature, heureCreatures, jourCreatures } from "./monde/creatures.js";
+import { etatConteurInitial, jourDuConteur } from "./monde/conteur.js";
+import type { EtatConteur } from "./monde/conteur.js";
 import type { Creature } from "./monde/creatures.js";
 import {
   FAVEUR_EVENEMENTS,
@@ -295,7 +297,7 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
   defauts(etat.config.population, { peuples: 1 });
   if (!("lois" in brut)) brut.lois = loisParDefaut();
   defauts(brut.lois as Record<string, unknown>, loisParDefaut());
-  defauts(brut, { creatures: [], compteurCreatures: 0 });
+  defauts(brut, { creatures: [], compteurCreatures: 0, conteur: etatConteurInitial() });
   defauts(brut.faveur as Record<string, unknown>, { domaine: null, rang: 0, usages: [] });
   defauts(brut.config as Record<string, unknown>, { dieu: { domaine: null } });
   for (const p of etat.personnages) {
@@ -370,6 +372,7 @@ interface EtatSimulation {
   readonly lois: Record<Loi, boolean>;
   readonly creatures: Creature[];
   readonly compteurCreatures: number;
+  readonly conteur: EtatConteur;
 }
 
 export class Simulation implements Monde {
@@ -409,6 +412,8 @@ export class Simulation implements Monde {
   /** Les créatures du ciel (M25) : gardiens postés, fléaux lâchés. */
   readonly creatures = new Map<string, Creature>();
   private compteurCreatures = 0;
+  /** Le conteur (M25) : la courbe de tension, ses actes, ses chroniques. */
+  readonly conteur: EtatConteur = etatConteurInitial();
 
   private constructor(
     readonly config: SimConfig,
@@ -453,6 +458,7 @@ export class Simulation implements Monde {
       for (const [k, v] of etat.faveur.recharges) this.faveur.recharges.set(k, v);
       for (const c of etat.creatures) this.creatures.set(c.id, c);
       this.compteurCreatures = etat.compteurCreatures;
+      Object.assign(this.conteur, etat.conteur);
       this.questionEnCours = etat.questionEnCours;
       this.fileConseils.push(...etat.fileConseils);
       this.journal.restaurer(etat.journal);
@@ -761,6 +767,13 @@ export class Simulation implements Monde {
       { x: site.x, y: site.y },
     );
     return { ok: true, id };
+  }
+
+  /** Compteur du journal pour un type, ou un détail `type:genre` (le conteur s'en sert pour ses chroniques). */
+  compter(cle: string): number {
+    return cle.includes(":")
+      ? this.journal.compteDetail(cle)
+      : this.journal.compte(cle as TypeEvenement);
   }
 
   /** Suspend ou rétablit une loi du monde (commande `loi`). */
@@ -1266,6 +1279,7 @@ export class Simulation implements Monde {
       lois: this.lois,
       creatures: [...this.creatures.values()],
       compteurCreatures: this.compteurCreatures,
+      conteur: this.conteur,
     };
   }
 
@@ -1666,6 +1680,8 @@ export class Simulation implements Monde {
         saisonDuCiel(this.faveur);
       }
       jourDuCiel(this, this.faveur);
+      if (this.lois.conteur)
+        jourDuConteur(this, this.conteur, this.rng.fork(`conteur/${String(moment.jourAbsolu)}`));
       for (const c of jourCreatures(this.creatures, moment.jourAbsolu)) {
         const fiche = ficheCreature(c);
         this.emettre(

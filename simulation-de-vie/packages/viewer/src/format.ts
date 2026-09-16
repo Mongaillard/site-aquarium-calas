@@ -112,6 +112,7 @@ export const LIBELLES_TYPE: Readonly<Record<string, string>> = {
   village: "villages",
   raid: "bande",
   caravane: "caravane",
+  conteur: "le conteur",
   divin: "miracle",
   conseil: "conseil de Claude",
   ambition: "ambition",
@@ -626,6 +627,14 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
         default:
           return `La bande s'éloigne.`;
       }
+    case "conteur":
+      return d.genre === "chronique"
+        ? `📜 Chronique de l'an ${String(d.annee)}, ${String(d.titre)} : ${String(d.texte)}`
+        : d.genre === "crise"
+          ? `🎭 Épreuve : ${String(d.texte)}`
+          : d.genre === "bienfait"
+            ? `🎭 Bienfait : ${String(d.texte)}`
+            : `🎭 ${String(d.texte)}`;
     case "caravane":
       return d.genre === "depart"
         ? `🐐 Une caravane part de ${String(d.deNom)} vers ${String(d.versNom)} avec ${String(d.quantite)} portions${d.invention ? ` et le secret du ${String(d.invention)}` : ""}.`

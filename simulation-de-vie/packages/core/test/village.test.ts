@@ -312,6 +312,8 @@ describe("le village apprivoise : champs et métiers", () => {
     { timeout: 240000 },
     async () => {
       const sim = Simulation.creer({ seed: 7 });
+      // Sans le conteur (M25) : le scénario mesure la culture et les métiers, pas ses épreuves.
+      sim.lois.conteur = false;
       await joursAsync(sim, 240);
       expect(sim.journal.compte("semis")).toBeGreaterThan(0);
       expect(sim.journal.compteDetail("champ:mur")).toBeGreaterThan(0);

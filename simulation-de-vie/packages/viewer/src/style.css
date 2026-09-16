@@ -720,6 +720,41 @@ table.saisons td:first-child {
   background: var(--accent);
   color: #fff;
 }
+/* Le conteur (M25) : une pastille dans la barre, colorée par la phase. */
+#barre .conteur {
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: #262b33;
+  color: var(--discret);
+  border-left: 3px solid #8fd18f;
+}
+#barre .conteur.montee {
+  border-left-color: #ffd479;
+  color: #ffd479;
+}
+#barre .conteur.crise {
+  border-left-color: #ff5f5f;
+  color: #ff9c9c;
+}
+#barre .conteur.repit {
+  border-left-color: #9ad8ff;
+  color: #9ad8ff;
+}
+.dialogue.chronique h2 {
+  font-style: italic;
+}
+.dialogue.chronique p {
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 62ch;
+}
+.actes li.crise {
+  color: #ff9c9c;
+}
+.actes li.bienfait {
+  color: #9ad8ff;
+}
 /* Les lois du monde (M25) : un panneau flottant sous la barre. */
 .lois {
   position: absolute;

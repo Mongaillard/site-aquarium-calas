@@ -1,6 +1,6 @@
 /** Panneaux DOM : inspecteur, journal, conversations, statistiques, population, barre. */
 import type { Commande, MessageFiche, PersonnageEtat, PersonneCourte } from "@sdv/protocole";
-import { VITESSES } from "@sdv/protocole";
+import { LIBELLES_PHASE, VITESSES } from "@sdv/protocole";
 import type { Magasin } from "./etat.js";
 import {
   COULEURS_BIOME,
@@ -30,6 +30,8 @@ export interface Interactions {
   readonly basculerSuivi: () => void;
   /** « Aller voir » : centrer la carte sur une position du monde. */
   readonly allerVoir: (x: number, y: number) => void;
+  /** Ouvrir la chronique d'une année (dialogue, lecture à voix haute). */
+  readonly ouvrirChronique: (annee: number) => void;
 }
 
 function $(id: string): HTMLElement {
@@ -234,6 +236,12 @@ export class Panneaux {
         : "";
     $("horloge").textContent = formaterMoment(etat.moment) + bride;
     $("meteo").textContent = LIBELLES_METEO[etat.meteo] ?? etat.meteo;
+    const conteur = $("conteur");
+    const c = etat.conteur;
+    const texteConteur = `🎭 ${LIBELLES_PHASE[c.phase]} · ${String(c.tension)}`;
+    if (conteur.textContent !== texteConteur) conteur.textContent = texteConteur;
+    conteur.className = `conteur ${c.phase}`;
+    conteur.hidden = false;
     $("btn-pause").textContent = etat.pause ? "▶" : "⏸";
     $("flot-pause").textContent = etat.pause ? "▶" : "⏸";
     $("flot-horloge").textContent =
@@ -724,8 +732,25 @@ export class Panneaux {
           ? `<table class="saisons"><tr><th>savoir</th><th>porté par</th></tr>${s.savoirs.map((v) => `<tr><td title="${e(v.texte)}">${v.genre === "lecon" ? "📜" : "💡"} ${e(v.titre)}</td><td>${v.porteurs}</td></tr>`).join("")}</table>`
           : "<p class='discret'>aucune leçon ni invention encore</p>"
       }
+      <h3>Le conteur</h3>
+      <p>Phase : <b>${e(LIBELLES_PHASE[etat.conteur.phase])}</b> depuis ${etat.conteur.joursDansPhase} j · tension ${etat.conteur.tension} · pression du monde ${etat.conteur.pression} · ${etat.conteur.crises} épreuve${etat.conteur.crises > 1 ? "s" : ""}, ${etat.conteur.bienfaits} bienfait${etat.conteur.bienfaits > 1 ? "s" : ""}</p>
+      ${
+        etat.conteur.actes.length > 0
+          ? `<ul class="liste actes">${etat.conteur.actes.map((a) => `<li class="${a.bienfait ? "bienfait" : "crise"}"><span class="quand">j ${a.jour}</span>${a.bienfait ? "🎁" : "⚡"} ${e(a.texte)}</li>`).join("")}</ul>`
+          : "<p class='discret'>rien encore : le conteur laisse la colonie s'installer</p>"
+      }
+      ${
+        etat.conteur.chroniques.length > 0
+          ? `<h3>Chroniques</h3><ul class="liste">${etat.conteur.chroniques.map((ch) => `<li><b>An ${ch.annee}, ${e(ch.titre)}</b> <button class="voir chronique-lire" type="button" data-annee="${ch.annee}" title="Relire">📖</button><div class="discret">${e(ch.texte)}</div></li>`).join("")}</ul>`
+          : ""
+      }
       <h3>Par saison</h3>
       <table class="saisons"><tr><th>saison</th><th>naissances</th><th>décès</th></tr>${saisons || "<tr><td colspan='3' class='discret'>rien encore</td></tr>"}</table>`;
+    for (const b of $("stats").querySelectorAll<HTMLButtonElement>("button.chronique-lire")) {
+      b.addEventListener("click", () => {
+        this.inter.ouvrirChronique(Number(b.dataset.annee));
+      });
+    }
     for (const l of $("stats").querySelectorAll<HTMLElement>("[data-id]")) {
       l.addEventListener("click", () => {
         this.inter.selectionner(l.dataset.id ?? null);

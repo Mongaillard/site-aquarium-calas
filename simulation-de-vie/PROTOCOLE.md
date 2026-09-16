@@ -1025,6 +1025,38 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
   attribuées ; la migration conseillée passe par le catalogue (`migrer:<direction>`), le
   planificateur bâtissant sur place à seize tuiles du vieux foyer.
 
+
+## 8 quater. Le jeu du ciel tel que réalisé (M25)
+
+- **[DÉCISION]** Deux façons de jouer, sans rien enlever à la simulation : la main sur le monde
+  (WorldBox) et l'identité du ciel (Age of Mythology). Le viewer ne calcule toujours rien : il
+  envoie des commandes (`sculpter`, `peupler`, `loi`, `domaine`, `creature`) que le moteur
+  valide (`analyserCommande`) et applique ; tout se journalise (`divin`, `conteur`) et se
+  sauvegarde (version 5, migration des versions antérieures).
+- **Sculpter** : `Grille.modifierBiome` (le biome d'une tuile n'est plus figé), une couche de
+  sculptures sauvée avec la grille et rejouée après la regénération ; `SuiviClient` renvoie les
+  tuiles sculptées déjà connues du client (le viewer remplace le biome). Le pinceau découvre ce
+  qu'il touche. Les tuiles bâties sont épargnées.
+- **Peupler** : `genererGroupe` (familles neuves, identifiants qui suivent), un village par
+  peuple ; `population.peuples` pour les rivaux du départ ; un monde à 0 habitant révèle le
+  berceau et attend son premier peuple, gratuit.
+- **Lois** : `Monde.lois` (faim, maladies, betes, raids, schismes, vieillesse, conteur), lues aux points
+  d'ancrage (besoins, `tomberMalade`, contagion et épidémie, directeur de danger,
+  `aubeVillages`, mort naturelle). Les tirages ont lieu même loi suspendue : mêmes flux.
+- **Domaine, rang, paliers, coûts** : `EtatFaveur.domaine`, `rang` (culte + âge du cuivre),
+  `usages` par saison ; `niveauRequis` et `coutEffectif` dans `divin.ts` ; `FaveurEtat`
+  transporte `couts` et `verrous`. Un ciel sans visage n'a pas de verrou (les paliers sont le
+  jeu d'un domaine) ; la providence respecte verrous et coûts.
+- **Créatures** (`creatures.ts`) : un gardien (poste fixe, portée 12, chasse meutes et bandes,
+  éteint la menace), un fléau (errance 6, nuisance 4, gisements −8 %/h, sécurité −8, moral −3),
+  vingt jours ; une de chaque, rang 2, 30 ✦.
+- **Conteur** (`conteur.ts`) : phases et durées (`DUREES`), tension et pression, clémence
+  (`PRESSION_CLEMENCE` 60), épreuves et bienfaits qui passent par les mécaniques existantes
+  (menace du directeur, `lancerBande`, `tomberMalade`, `forcerMeteo`, `ajouterTroupeau`), et
+  la chronique du nouvel an bâtie sur les compteurs du journal (`compter`, types et détails).
+  Au répit et au calme, le directeur de danger garde ses propres règles (jours de grâce,
+  budget par saison) : le conteur ajoute, il ne remplace pas.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

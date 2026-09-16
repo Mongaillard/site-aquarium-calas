@@ -737,6 +737,16 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     chronique: chroniqueEtat(sim),
     villages: villagesEtat(sim),
     lois: { ...sim.lois },
+    conteur: {
+      phase: sim.conteur.phase,
+      tension: sim.conteur.tension,
+      pression: sim.conteur.pression,
+      joursDansPhase: sim.horloge.moment().jourAbsolu - sim.conteur.phaseDepuisJour,
+      crises: sim.conteur.crises,
+      bienfaits: sim.conteur.bienfaits,
+      actes: sim.conteur.actes.slice(-6).reverse(),
+      chroniques: sim.conteur.chroniques.slice(-6).reverse(),
+    },
     creatures: [...sim.creatures.values()].map((c) => {
       const fiche = ficheCreature(c);
       return {
