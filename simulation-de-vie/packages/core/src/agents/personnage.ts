@@ -114,6 +114,8 @@ export interface Drapeaux {
   refusePar: { readonly id: string; readonly tick: number } | null;
   /** Jour du dernier recueillement sur une tombe (−100 : jamais). */
   recueilliJour: number;
+  /** Engagé dans cette bataille (M32) ; null sinon. Absent des sauvegardes d'avant. */
+  bataille?: string | null;
 }
 
 /**

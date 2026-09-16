@@ -182,6 +182,7 @@ import {
   observerVillages,
 } from "./monde/villages.js";
 import type { EtatVillages } from "./monde/villages.js";
+import { aubeBatailles, tickBatailles } from "./monde/bataille.js";
 
 export interface Statistiques {
   readonly tick: number;
@@ -295,6 +296,8 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
     });
     brut.villages = villages;
   }
+  // Version 7 (M32) : les batailles tick par tick.
+  defauts(brut.villages as Record<string, unknown>, { batailles: [] });
   // Version 5 (M25) : les peuples rivaux du départ (un seul dans les mondes d'avant), les lois.
   defauts(etat.config.population, { peuples: 1 });
   if (!("lois" in brut)) brut.lois = loisParDefaut();
@@ -1434,6 +1437,7 @@ export class Simulation implements Monde {
     const effort =
       action === "recolter" ||
       action === "construire" ||
+      action === "combattre" ||
       action === "deplacer" ||
       action === "fabriquer" ||
       action === "fonder";
@@ -1681,6 +1685,7 @@ export class Simulation implements Monde {
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
     this.gererConseils();
+    tickBatailles(this);
     const ordre = this.rng.fork(`tick/${this.tick}`).melanger(this.vivants());
     for (const p of ordre) this.tickPersonnage(p);
     this.horloge.avancer(1);
@@ -1740,6 +1745,7 @@ export class Simulation implements Monde {
         this.societe.factions,
         { raids: this.lois.raids, schismes: this.lois.schismes },
       );
+      aubeBatailles(this, this.rng.fork(`batailles/${String(this.tick)}`));
     }
     if (this.tick > 0) {
       this.conseilsDuJour = 0;

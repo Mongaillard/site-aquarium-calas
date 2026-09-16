@@ -155,6 +155,7 @@ export function outilEnMain(p: Personnage): string | null {
     case "abattre":
     case "defendre":
     case "veiller":
+    case "combattre":
       return arme();
     case "construire":
     case "reparer":
@@ -973,6 +974,12 @@ export function pensee(sim: Simulation, p: Personnage): string {
       return "Je vais me recueillir sur la tombe de qui m'a appris ce que je sais.";
     case "migrer":
       return "Nous partons fonder notre village, là-bas. Encore quelques jours de marche.";
+    case "combattre": {
+      const b = sim.villages.batailles.find((x) => x.id === i.bataille);
+      return b?.phase === "combat"
+        ? "Tenir, frapper, ne pas reculer."
+        : "Nous marchons sur leur village. Qu'ils se souviennent de ce jour.";
+    }
   }
 }
 

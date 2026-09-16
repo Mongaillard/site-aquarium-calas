@@ -1,4 +1,11 @@
 /** Planificateur : intention → suite d'actions atomiques (section 6, « Planification »). */
+import {
+  CADENCE_FRAPPE,
+  RAYON_ASSAUT,
+  RAYON_CHAMP,
+  adversaireLePlusProche,
+  batailleDe,
+} from "../monde/bataille.js";
 import { niveau } from "../agents/competences.js";
 import {
   NOURRITURE,
@@ -133,25 +140,10 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       return planifierReparationOutil(monde, p, intention.objet);
     case "prier":
       return planifierPriere(monde, p);
-    case "migrer": {
-      const aller = allerPresDe(monde, p, intention.cible);
-      if (aller === null) {
-        // Trop loin pour un chemin d'un coup : on avance de vingt tuiles dans la direction.
-        const pos = p.corps.position;
-        const dx = intention.cible.x - pos.x;
-        const dy = intention.cible.y - pos.y;
-        const d = Math.max(Math.abs(dx), Math.abs(dy));
-        if (d <= 2) return ok([{ type: "attendre", ticksRestants: 3 }]);
-        const etape = {
-          x: pos.x + Math.round((dx / d) * Math.min(20, d)),
-          y: pos.y + Math.round((dy / d) * Math.min(20, d)),
-        };
-        const pas = allerPresDe(monde, p, etape);
-        if (pas === null) return echec("aucun chemin vers le nouveau village");
-        return ok([pas]);
-      }
-      return ok([aller]);
-    }
+    case "migrer":
+      return marcherVers(monde, p, intention.cible, 1, "aucun chemin vers le nouveau village");
+    case "combattre":
+      return planifierCombat(monde, p, intention.bataille);
     case "se_recueillir": {
       const aller = allerPresDe(monde, p, intention.cible);
       const recueil: Action = { type: "se_recueillir", cible: intention.cible, ticksRestants: 3 };
@@ -409,6 +401,63 @@ function allerPresDe(monde: Monde, p: Personnage, cible: Position, portee = 1): 
   });
   if (chemin === null) return null;
   return { type: "deplacer", cible: destination, chemin, progression: 0 };
+}
+
+/**
+ * Une longue marche : un chemin d'un coup si possible, sinon vingt tuiles dans la direction
+ * (migration, M17 ; troupe en marche, M32).
+ */
+function marcherVers(
+  monde: Monde,
+  p: Personnage,
+  cible: Position,
+  portee: number,
+  raison: string,
+): ResultatPlan {
+  const aller = allerPresDe(monde, p, cible, portee);
+  if (aller !== null) return ok([aller]);
+  const pos = p.corps.position;
+  const dx = cible.x - pos.x;
+  const dy = cible.y - pos.y;
+  const d = Math.max(Math.abs(dx), Math.abs(dy));
+  if (d <= Math.max(2, portee)) return ok([{ type: "attendre", ticksRestants: 3 }]);
+  const etape = {
+    x: pos.x + Math.round((dx / d) * Math.min(20, d)),
+    y: pos.y + Math.round((dy / d) * Math.min(20, d)),
+  };
+  const pas = allerPresDe(monde, p, etape);
+  if (pas === null) return echec(raison);
+  return ok([pas]);
+}
+
+/** Bataille (M32) : en marche, rejoindre le lieu ; au combat, l'adversaire le plus proche, puis frapper. */
+function planifierCombat(monde: Monde, p: Personnage, id: string): ResultatPlan {
+  const b = batailleDe(monde, id);
+  if (b === undefined || b.phase === "finie") return echec("la bataille est finie");
+  const pos = p.corps.position;
+  if (b.phase === "marche") {
+    if (Grille.distance(pos, b.lieu) <= RAYON_ASSAUT)
+      return ok([{ type: "attendre", ticksRestants: 2 }]);
+    return marcherVers(monde, p, b.lieu, RAYON_ASSAUT, "aucun chemin vers le village ennemi");
+  }
+  // Au combat : on rejoint le champ, on ne court pas après ceux qui l'ont quitté.
+  if (Grille.distance(pos, b.lieu) > RAYON_CHAMP)
+    return marcherVers(monde, p, b.lieu, RAYON_ASSAUT, "aucun chemin vers le champ de bataille");
+  const cible = adversaireLePlusProche(monde, b, p);
+  if (cible === null) return ok([{ type: "attendre", ticksRestants: 2 }]);
+  const frappe: Action = { type: "combattre", cible: cible.id, ticksRestants: CADENCE_FRAPPE };
+  if (Grille.distance(pos, cible.corps.position) <= 1) return ok([frappe]);
+  const aller = allerPresDe(monde, p, cible.corps.position, 1);
+  if (aller === null) return ok([{ type: "attendre", ticksRestants: 2 }]);
+  // Deux pas à la fois : l'adversaire bouge aussi, on ne le dépasse pas.
+  const chemin = aller.type === "deplacer" ? aller.chemin : null;
+  const etape = chemin?.[1];
+  if (chemin !== null && etape !== undefined && chemin.length > 2)
+    return ok([
+      { type: "deplacer", cible: etape, chemin: chemin.slice(0, 2), progression: 0 },
+      frappe,
+    ]);
+  return ok([aller, frappe]);
 }
 
 /** Déplacement exactement sur `cible`. */

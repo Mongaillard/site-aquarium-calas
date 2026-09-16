@@ -9,9 +9,7 @@
  * belli, deux batailles au plus, toujours une porte de sortie : le prix du
  * sang. Tout est déterministe.
  */
-import { blesser } from "../agents/corps.js";
 import { NOURRITURE, ajouter, quantite, retirer, transferer } from "../agents/inventaire.js";
-import { phenotype } from "../agents/genetique.js";
 import { possede } from "../agents/inventaire.js";
 import { relationAvec } from "../agents/personnage.js";
 import type { Personnage } from "../agents/personnage.js";
@@ -30,6 +28,7 @@ import type { Rng } from "../rng.js";
 import type { Ressource } from "./ressources.js";
 import { stresser } from "../memoire/psyche.js";
 import { JOURS_DE_GRACE } from "./danger.js";
+import type { Bataille } from "./bataille.js";
 
 // ------------------------------------------------------------------ état
 
@@ -90,6 +89,8 @@ export interface EtatVillages {
   caravanes: Caravane[];
   /** Routes empruntées au moins une fois (paires d'identifiants « a|b »). */
   routes: string[];
+  /** Les batailles en cours ou fraîchement finies (M32, `bataille.ts`). */
+  batailles: Bataille[];
   derniereBandeSaison: string;
   derniereCaravaneJour: number;
   derniereBatailleJour: number;
@@ -112,6 +113,7 @@ export function etatVillagesInitial(): EtatVillages {
     bandes: [],
     caravanes: [],
     routes: [],
+    batailles: [],
     derniereBandeSaison: "",
     derniereCaravaneJour: -100,
     derniereBatailleJour: -100,
@@ -162,7 +164,7 @@ export const SEUIL_ALLIANCE = 60;
 
 // --------------------------------------------------------------- outils
 
-function jourDe(monde: Monde): number {
+export function jourDe(monde: Monde): number {
   return monde.horloge.moment().jourAbsolu;
 }
 
@@ -196,13 +198,13 @@ export function habitants(monde: MondeVillages, v: Village): Personnage[] {
   return monde.personnages.filter((p) => p.vivant && v.familles.includes(p.identite.nomFamille));
 }
 
-function adultesDe(monde: MondeVillages, v: Village): Personnage[] {
+export function adultesDe(monde: MondeVillages, v: Village): Personnage[] {
   return habitants(monde, v).filter(
     (p) => p.corps.stade === "adulte" || p.corps.stade === "ancien",
   );
 }
 
-function stocksDe(monde: MondeVillages, v: Village): Batiment[] {
+export function stocksDe(monde: MondeVillages, v: Village): Batiment[] {
   return [...monde.batiments.values()].filter(
     (b) =>
       b.etat === "termine" &&
@@ -333,7 +335,7 @@ export function aubeVillages(
   arriveeDesMigrants(monde);
   if (lois.raids) bandes(monde, rng);
   caravanes(monde, rng);
-  diplomatie(monde, rng);
+  diplomatie(monde);
 }
 
 /**
@@ -690,7 +692,7 @@ function avancer(de: Position, vers: Position, pas: number): Position {
   return { x: Math.round(de.x + (dx / d) * pas), y: Math.round(de.y + (dy / d) * pas) };
 }
 
-function prelever(stocks: readonly Batiment[], quantiteVoulue: number): number {
+export function prelever(stocks: readonly Batiment[], quantiteVoulue: number): number {
   let pris = 0;
   for (const b of stocks) {
     if (b.stock === null) continue;
@@ -880,7 +882,7 @@ export function observerVillages(monde: MondeVillages, e: Evenement): void {
 }
 
 /** Chaque aube : l'attitude dérive vers zéro, alliances et guerres se déclarent, les batailles se livrent. */
-function diplomatie(monde: MondeVillages, rng: Rng): void {
+function diplomatie(monde: MondeVillages): void {
   const e = monde.villages;
   const jour = jourDe(monde);
   for (const r of e.relations) {
@@ -932,93 +934,15 @@ function diplomatie(monde: MondeVillages, rng: Rng): void {
       );
       for (const p of [...habitants(monde, a), ...habitants(monde, b)]) stresser(p, 10);
     } else if (r.etat === "guerre") {
-      if (r.batailles >= BATAILLES_MAX || r.attitude > -20) {
-        faireLaPaix(monde, r, a, b);
-      } else if (
-        jour - e.derniereBatailleJour >= JOURS_ENTRE_BATAILLES &&
-        jour - r.depuisJour >= 3
-      ) {
-        bataille(monde, rng, r, a, b);
-      }
+      // Les batailles se lèvent après l'aube des villages (`aubeBatailles`, M32) et se livrent
+      // tick par tick ; ici seulement la porte de sortie.
+      if (r.batailles >= BATAILLES_MAX || r.attitude > -20) faireLaPaix(monde, r, a, b);
     }
   }
-}
-
-/** Une bataille bornée : les forces se mesurent, des blessés, rarement un mort, des vivres qui changent de mains. */
-function bataille(monde: MondeVillages, rng: Rng, r: Diplomatie, a: Village, b: Village): void {
-  const e = monde.villages;
-  const jour = jourDe(monde);
-  e.derniereBatailleJour = jour;
-  r.batailles += 1;
-  e.compteurs.batailles += 1;
-  const fa = forceDe(monde, a) * (0.8 + rng.suivant() * 0.4);
-  const fb = forceDe(monde, b) * (0.8 + rng.suivant() * 0.4);
-  const [gagnant, perdant] = fa >= fb ? [a, b] : [b, a];
-  const guerriers = (v: Village): Personnage[] =>
-    adultesDe(monde, v)
-      .sort(
-        (x, y) =>
-          phenotype(y.identite.genome, "force") - phenotype(x.identite.genome, "force") ||
-          x.id.localeCompare(y.id),
-      )
-      .slice(0, 4);
-  let blesses = 0;
-  let morts = 0;
-  for (const [camp, n] of [
-    [perdant, 2],
-    [gagnant, 1],
-  ] as const) {
-    for (const p of guerriers(camp).slice(0, n)) {
-      if (camp === perdant && morts === 0 && rng.chance(0.1)) {
-        monde.tuer(p, "bataille");
-        morts += 1;
-        continue;
-      }
-      blesser(
-        monde,
-        p,
-        "coupure",
-        2,
-        rng.choisir(["bras", "jambe", "flanc"] as const),
-        `à la bataille contre ${camp === a ? b.nom : a.nom}`,
-      );
-      blesses += 1;
-    }
-  }
-  const butin = prelever(stocksDe(monde, perdant), Math.floor(nourritureDe(monde, perdant) * 0.2));
-  const stock = stocksDe(monde, gagnant)[0]?.stock ?? null;
-  if (stock !== null) ajouter(stock, "poisson_fume", Math.min(butin, 20));
-  for (const x of monde.batiments.values())
-    if (x.etat === "termine" && Grille.distance(x.position, perdant.centre) <= 8)
-      x.solidite = Math.max(5, x.solidite - 20);
-  for (const p of [...habitants(monde, a), ...habitants(monde, b)]) {
-    stresser(p, 15);
-    p.besoins.securite = clamp(p.besoins.securite - 25);
-  }
-  r.attitude = Math.max(-100, r.attitude - 10);
-  monde.emettre(
-    "village",
-    null,
-    {
-      genre: "bataille",
-      a: a.id,
-      b: b.id,
-      aNom: a.nom,
-      bNom: b.nom,
-      gagnant: gagnant.id,
-      gagnantNom: gagnant.nom,
-      blesses,
-      morts,
-      butin,
-      numero: r.batailles,
-    },
-    10,
-    perdant.centre,
-  );
 }
 
 /** La porte de sortie : le prix du sang. Le perdant donne dix portions, et l'on se parle de nouveau. */
-function faireLaPaix(monde: MondeVillages, r: Diplomatie, a: Village, b: Village): void {
+export function faireLaPaix(monde: MondeVillages, r: Diplomatie, a: Village, b: Village): void {
   const e = monde.villages;
   const jour = jourDe(monde);
   const plusFaible = forceDe(monde, a) <= forceDe(monde, b) ? a : b;

@@ -43,9 +43,11 @@ export function defenseursAutour(monde: Monde, cible: Personnage): Personnage[] 
   return resultat;
 }
 
-function arme(p: Personnage): number {
+/** Ce qu'une arme ajoute à la chance de toucher : lance, arc, hache (le cuivre mord mieux). */
+export function bonusArme(p: Personnage): number {
   const inv = p.corps.inventaire;
   if (possede(inv, "lance")) return 0.2;
+  if (possede(inv, "hache_cuivre")) return 0.15;
   if (possede(inv, "arc")) return 0.12;
   if (possede(inv, "hache_pierre")) return 0.1;
   return 0;
@@ -98,7 +100,7 @@ export function combattre(monde: Monde, meute: Troupeau, cible: Personnage): Res
     // Les défenseurs frappent.
     for (const d of defenseurs) {
       if (!d.vivant || meute.taille <= 0) continue;
-      const chance = 0.25 + arme(d) + 0.03 * niveau(d.experience.chasse);
+      const chance = 0.25 + bonusArme(d) + 0.03 * niveau(d.experience.chasse);
       if (!rng.chance(chance)) continue;
       if (rng.chance(0.4)) {
         meute.taille -= 1;

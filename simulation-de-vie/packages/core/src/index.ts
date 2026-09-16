@@ -221,6 +221,31 @@ export type {
 } from "./monde/conteur.js";
 export { lancerBande } from "./monde/villages.js";
 export {
+  batailleActive,
+  batailleDe,
+  campDe,
+  leverTroupe,
+  conclure as conclureBataille,
+  frapper as frapperEnBataille,
+  guerriersDisponibles,
+  RAYON_ASSAUT,
+  RAYON_DEFENSE,
+  RAYON_CHAMP,
+  TICKS_SANS_CONTACT,
+  DUREE_COMBAT_MAX,
+  DUREE_MARCHE_MAX,
+  CADENCE_FRAPPE,
+  GUERRIERS_MAX,
+} from "./monde/bataille.js";
+export type {
+  Bataille,
+  Camp as CampBataille,
+  Frappe,
+  PhaseBataille,
+  IssueBataille,
+  GenreBataille,
+} from "./monde/bataille.js";
+export {
   etatObjectifsInitial,
   jourDesObjectifs,
   formuler,

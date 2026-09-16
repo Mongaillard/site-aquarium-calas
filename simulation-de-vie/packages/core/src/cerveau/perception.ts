@@ -1,4 +1,5 @@
 /** Construction de la perception d'un personnage (section 10.2, sous-ensemble M2). */
+import { batailleActive } from "../monde/bataille.js";
 import { INVENTIONS, SEUIL_SAVOIR } from "../savoirs/catalogue.js";
 import type { Invention, Savoir } from "../savoirs/catalogue.js";
 import { savoirsConnus } from "../savoirs/lecons.js";
@@ -114,6 +115,8 @@ export interface PerceptionLegere {
     /** Adulte armé (lance, arc, hache) : peut défendre. */
     readonly arme?: boolean;
     readonly enfant?: boolean;
+    /** Engagé dans une bataille (M32) : on se bat avant tout. */
+    readonly bataille?: string | null;
   };
   readonly abriDisponible: boolean;
   readonly feuConnu: boolean;
@@ -147,6 +150,7 @@ export function percevoirLeger(monde: Monde, p: Personnage): PerceptionLegere {
         p.corps.stade !== "enfant" &&
         (possede(inv, "lance") || possede(inv, "arc") || possede(inv, "hache_pierre")),
       enfant: p.corps.stade === "enfant",
+      bataille: p.drapeaux.bataille ?? null,
     },
     abriDisponible: abriDisponible(monde, p) !== null,
     feuConnu: feuConnu(monde),
@@ -161,6 +165,16 @@ export function menacePercue(
 ): NonNullable<PerceptionLegere["menace"]> | null {
   const tick = monde.horloge.tick;
   const alerte = p.drapeaux.alerteJusqua > tick;
+  // Une bataille à côté (M32) : qui ne se bat pas se met à l'abri.
+  const bataille = batailleActive(monde);
+  if (
+    bataille !== null &&
+    bataille.phase === "combat" &&
+    (p.drapeaux.bataille ?? null) !== bataille.id
+  ) {
+    const d = Grille.distance(p.corps.position, bataille.lieu);
+    if (d <= 12) return { distance: d, cible: null, cibleEstMonEnfant: false };
+  }
   const rayon = rayonVision(monde, monde.horloge.moment());
   let meilleure: { distance: number; proie: string | null } | null = null;
   for (const t of monde.troupeaux.values()) {

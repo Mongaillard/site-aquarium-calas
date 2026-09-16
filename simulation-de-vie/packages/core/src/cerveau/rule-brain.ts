@@ -59,6 +59,9 @@ export class RuleBrain implements Cerveau {
 
   urgence(perception: PerceptionLegere): Intention | null {
     const b = perception.moi.besoins;
+    // Une bataille (M32) : engagé, on marche et on se bat avant tout le reste.
+    const bataille = perception.moi.bataille ?? null;
+    if (bataille !== null) return { type: "combattre", bataille };
     // Des loups : les armés secourent, les autres se mettent à l'abri.
     const menace = perception.menace ?? null;
     if (menace !== null) {

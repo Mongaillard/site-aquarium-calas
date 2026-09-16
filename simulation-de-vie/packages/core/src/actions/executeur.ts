@@ -1,4 +1,5 @@
 /** Exécution tick par tick des actions atomiques (section 6). */
+import { batailleDe, campDe, frapper } from "../monde/bataille.js";
 import { clamp } from "../agents/besoins.js";
 import { gagnerExperience, niveau } from "../agents/competences.js";
 import {
@@ -189,7 +190,27 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       action.ticksRestants -= 1;
       return action.ticksRestants <= 0 ? TERMINEE : ENCOURS;
     }
+    case "combattre":
+      return tickCombattre(monde, p, action);
   }
+}
+
+/** Un coup (M32) : la cadence s'écoule, puis la frappe si l'adversaire est encore là, à portée. */
+function tickCombattre(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "combattre" }>,
+): Resultat {
+  const b = batailleDe(monde, p.drapeaux.bataille);
+  if (b?.phase !== "combat") return TERMINEE;
+  const cible = monde.personnage(action.cible);
+  if (cible?.vivant !== true || campDe(b, cible.id) === null) return TERMINEE;
+  // L'adversaire a bougé : on replanifie sans en faire un échec.
+  if (Grille.distance(p.corps.position, cible.corps.position) > 1) return TERMINEE;
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+  frapper(monde, p, cible, b);
+  return TERMINEE;
 }
 
 function tickSoigner(

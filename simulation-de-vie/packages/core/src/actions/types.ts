@@ -79,7 +79,9 @@ export type Action =
   /** Prier le ciel, à l'autel s'il y en a un (une offrande de nourriture y est déposée). */
   | { readonly type: "prier"; readonly autel: string | null; ticksRestants: number }
   /** Se recueillir sur la tombe d'où vient une leçon. */
-  | { readonly type: "se_recueillir"; readonly cible: Position; ticksRestants: number };
+  | { readonly type: "se_recueillir"; readonly cible: Position; ticksRestants: number }
+  /** Un coup sur un adversaire de la bataille en cours (M32), après une cadence de quelques ticks. */
+  | { readonly type: "combattre"; readonly cible: string; ticksRestants: number };
 
 export type TypeAction = Action["type"];
 
@@ -112,7 +114,9 @@ export type Intention =
   | { readonly type: "prier" }
   | { readonly type: "se_recueillir"; readonly cible: Position }
   /** Schisme : marcher vers le site du nouveau village (ambition `migrer` avec destination). */
-  | { readonly type: "migrer"; readonly cible: Position };
+  | { readonly type: "migrer"; readonly cible: Position }
+  /** Bataille (M32) : marcher sur le village ennemi, puis frapper l'adversaire le plus proche. */
+  | { readonly type: "combattre"; readonly bataille: string };
 
 export type TypeIntention = Intention["type"];
 
@@ -142,6 +146,8 @@ export function decrireIntention(i: Intention): string {
       return `reparer:${i.objet}`;
     case "abattre":
       return `abattre:${i.bete}`;
+    case "combattre":
+      return `combattre:${i.bataille}`;
     default:
       return i.type;
   }
@@ -207,6 +213,8 @@ export function decrireAction(a: Action): string {
       return a.autel === null ? "prier" : `prier:${a.autel}`;
     case "se_recueillir":
       return `se_recueillir@(${a.cible.x},${a.cible.y})`;
+    case "combattre":
+      return `combattre:${a.cible}`;
   }
 }
 
