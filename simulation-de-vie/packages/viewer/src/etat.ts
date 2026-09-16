@@ -17,8 +17,8 @@ export interface Bulle {
 }
 
 /** Effet visuel d'un miracle sur la carte (une seconde environ). */
-/** Un outil du ciel : un pinceau de terrain, ou poser un peuple. */
-export type Outil = Pinceau | "peupler";
+/** Un outil du ciel : un pinceau de terrain, poser un peuple, ou invoquer une créature. */
+export type Outil = Pinceau | "peupler" | "gardien" | "fleau";
 
 /** Les calques de lecture de la carte (M25) : ce que l'on colore par-dessus le terrain. */
 export const CALQUES = ["aucun", "villages", "familles", "foi", "vivres"] as const;
@@ -234,6 +234,30 @@ export class Magasin {
               by: p.y,
               t0: maintenant,
               t1: maintenant + (saut ? 0 : duree),
+            });
+          }
+        }
+        for (const c of message.creatures) {
+          const cle = `creature:${c.id}`;
+          const t = this.trajets.get(cle);
+          if (t === undefined || Math.max(Math.abs(c.x - t.bx), Math.abs(c.y - t.by)) > 8)
+            this.trajets.set(cle, {
+              ax: c.x,
+              ay: c.y,
+              bx: c.x,
+              by: c.y,
+              t0: maintenant,
+              t1: maintenant,
+            });
+          else if (t.bx !== c.x || t.by !== c.y) {
+            const courant = this.positionAffichee(cle, maintenant) ?? { x: t.bx, y: t.by };
+            this.trajets.set(cle, {
+              ax: courant.x,
+              ay: courant.y,
+              bx: c.x,
+              by: c.y,
+              t0: maintenant,
+              t1: maintenant + duree,
             });
           }
         }

@@ -5,8 +5,19 @@
  * (souvenir, humeur) sans jamais recevoir d'ordre. Tout est journalisé sous le
  * type `divin`, pour le rejeu.
  */
-import { FICHES_POUVOIR, POUVOIRS_EXAUCANT } from "@sdv/protocole";
-import type { FaveurEtat, Pouvoir } from "@sdv/protocole";
+import {
+  COUT_ETRANGER,
+  COUT_FAVORI,
+  COUT_PAR_USAGE,
+  FICHES_DOMAINE,
+  FICHES_POUVOIR,
+  NIVEAU_POUVOIR,
+  POUVOIRS,
+  POUVOIRS_EXAUCANT,
+  RANG_MAX,
+  USAGES_MAX,
+} from "@sdv/protocole";
+import type { Domaine, FaveurEtat, Pouvoir } from "@sdv/protocole";
 import { INVENTIONS, SEUIL_SAVOIR } from "../savoirs/catalogue.js";
 import type { Invention } from "../savoirs/catalogue.js";
 import { besoinRessenti } from "../savoirs/inventions.js";
@@ -105,6 +116,7 @@ export function gardienDeLAutel(monde: Monde): Personnage | null {
  */
 export function jourDuCiel(monde: Monde, etat: EtatFaveur): void {
   etat.culte = niveauCulte(monde);
+  etat.rang = rangDuCiel(monde, etat);
   etat.max = FAVEUR_MAX + FAVEUR_MAX_PAR_CULTE * etat.culte;
   etat.valeur = Math.min(etat.valeur, etat.max);
   const T = monde.horloge.ticksParJour;
@@ -141,6 +153,12 @@ export interface EtatFaveur {
   max: number;
   /** Niveau de culte 0..3 (recalculé chaque aube). */
   culte: number;
+  /** Le domaine du ciel (M25), choisi au départ ou en cours de partie ; null tant qu'il ne l'est pas. */
+  domaine: Domaine | null;
+  /** Rang du ciel 0..3 : le culte, plus un à l'âge du cuivre (recalculé chaque aube). */
+  rang: number;
+  /** Usages de chaque pouvoir dans la saison : chacun renchérit le suivant. */
+  readonly usages: Map<Pouvoir, number>;
   readonly recharges: Map<Pouvoir, number>;
   miracles: number;
   reputation: number;
@@ -163,7 +181,73 @@ export function etatFaveurInitial(): EtatFaveur {
     exaucees: 0,
     providence: false,
     culte: 0,
+    domaine: null,
+    rang: 0,
+    usages: new Map(),
   };
+}
+
+/** Le pouvoir est-il favori du domaine (un palier plus tôt, moins cher), étranger, ou ni l'un ni l'autre ? */
+export function affinite(etat: EtatFaveur, pouvoir: Pouvoir): "favori" | "etranger" | "neutre" {
+  if (etat.domaine === null) return "neutre";
+  const fiche = FICHES_DOMAINE[etat.domaine];
+  if (fiche.pouvoirs.includes(pouvoir)) return "favori";
+  if (FICHES_DOMAINE[fiche.etranger].pouvoirs.includes(pouvoir)) return "etranger";
+  return "neutre";
+}
+
+/**
+ * Rang requis pour exercer un pouvoir, domaine compris. Un ciel sans visage
+ * garde tous ses pouvoirs au prix du catalogue : les paliers (et les créatures)
+ * sont le jeu d'un ciel qui a pris un domaine.
+ */
+export function niveauRequis(etat: EtatFaveur, pouvoir: Pouvoir): number {
+  if (etat.domaine === null) return 0;
+  const base = NIVEAU_POUVOIR[pouvoir];
+  const a = affinite(etat, pouvoir);
+  return a === "favori"
+    ? Math.max(0, base - 1)
+    : a === "etranger"
+      ? Math.min(RANG_MAX, base + 1)
+      : base;
+}
+
+/** Coût effectif d'un pouvoir : le catalogue, le domaine, puis les usages de la saison. */
+export function coutEffectif(etat: EtatFaveur, pouvoir: Pouvoir): number {
+  const a = affinite(etat, pouvoir);
+  const facteur = a === "favori" ? COUT_FAVORI : a === "etranger" ? COUT_ETRANGER : 1;
+  const usages = Math.min(USAGES_MAX, etat.usages.get(pouvoir) ?? 0);
+  return Math.max(
+    1,
+    Math.round(FICHES_POUVOIR[pouvoir].cout * facteur * (1 + COUT_PAR_USAGE * usages)),
+  );
+}
+
+/** Vrai si un vivant tient du cuivre ou un outil de cuivre : l'âge du cuivre est là. */
+export function estAgeDuCuivre(monde: Monde): boolean {
+  for (const p of monde.personnages) {
+    if (!p.vivant) continue;
+    if ((p.corps.inventaire.ressources.cuivre ?? 0) > 0) return true;
+    if (
+      p.corps.inventaire.objets.some((o) => o.type === "hache_cuivre" || o.type === "pioche_cuivre")
+    )
+      return true;
+  }
+  return false;
+}
+
+/** Le rang du ciel : le culte, plus un à l'âge du cuivre, trois au plus. */
+export function rangDuCiel(monde: Monde, etat: EtatFaveur): number {
+  return Math.min(RANG_MAX, etat.culte + (estAgeDuCuivre(monde) ? 1 : 0));
+}
+
+/** Au changement de saison : les usages s'oublient à moitié, les pouvoirs redeviennent abordables. */
+export function saisonDuCiel(etat: EtatFaveur): void {
+  for (const [p, n] of etat.usages) {
+    const reste = Math.floor(n / 2);
+    if (reste === 0) etat.usages.delete(p);
+    else etat.usages.set(p, reste);
+  }
 }
 
 /**
@@ -182,7 +266,8 @@ export function providence(monde: MondeDivin, etat: EtatFaveur): CommandePouvoir
     if (tick - priere.tick > JOURS_PRIERE * T) continue;
     for (const pouvoir of POUVOIRS_EXAUCANT[priere.sujet]) {
       const fiche = FICHES_POUVOIR[pouvoir];
-      if (!fiche.bienfait || etat.valeur < fiche.cout) continue;
+      if (!fiche.bienfait || etat.valeur < coutEffectif(etat, pouvoir)) continue;
+      if (niveauRequis(etat, pouvoir) > etat.rang) continue;
       if ((etat.recharges.get(pouvoir) ?? 0) > tick) continue;
       const commande: CommandePouvoir = {
         pouvoir,
@@ -239,6 +324,10 @@ export function faveurEtat(etat: EtatFaveur): FaveurEtat {
     exaucees: etat.exaucees,
     providence: etat.providence,
     culte: etat.culte,
+    domaine: etat.domaine,
+    rang: etat.rang,
+    couts: Object.fromEntries(POUVOIRS.map((p) => [p, coutEffectif(etat, p)])),
+    verrous: Object.fromEntries(POUVOIRS.map((p) => [p, niveauRequis(etat, p)])),
   };
 }
 
@@ -252,7 +341,12 @@ export interface CommandePouvoir {
 }
 
 export type RaisonRefus =
-  "faveur_insuffisante" | "recharge" | "cible_invalide" | "hors_monde" | "sans_effet";
+  | "faveur_insuffisante"
+  | "recharge"
+  | "cible_invalide"
+  | "hors_monde"
+  | "sans_effet"
+  | "verrouille";
 
 export type ResultatPouvoir =
   | { readonly ok: true; readonly effet: string; readonly temoin: Personnage | null }
@@ -294,7 +388,9 @@ export function exercer(
   const fiche = FICHES_POUVOIR[commande.pouvoir];
   const tick = monde.horloge.tick;
   const T = monde.horloge.ticksParJour;
-  if (etat.valeur < fiche.cout) return { ok: false, raison: "faveur_insuffisante" };
+  if (niveauRequis(etat, commande.pouvoir) > etat.rang) return { ok: false, raison: "verrouille" };
+  const cout = coutEffectif(etat, commande.pouvoir);
+  if (etat.valeur < cout) return { ok: false, raison: "faveur_insuffisante" };
   if ((etat.recharges.get(commande.pouvoir) ?? 0) > tick) return { ok: false, raison: "recharge" };
   const pos = { x: commande.x, y: commande.y };
   // Seul le monde déjà généré se laisse toucher : un miracle ne crée pas de terres.
@@ -365,7 +461,8 @@ export function exercer(
       break;
   }
   if (!resultat.ok) return resultat;
-  etat.valeur -= fiche.cout;
+  etat.valeur -= cout;
+  etat.usages.set(commande.pouvoir, (etat.usages.get(commande.pouvoir) ?? 0) + 1);
   etat.miracles += 1;
   if (fiche.rechargeJours > 0) etat.recharges.set(commande.pouvoir, tick + fiche.rechargeJours * T);
   // Les prières que ce bienfait exauce (sujet correspondant, à dix tuiles ou sur la cible).
@@ -464,7 +561,7 @@ export function exercer(
       reaction,
       attribue,
       exauces: exauces.join(", "),
-      cout: fiche.cout,
+      cout,
       auto: commande.auto === true,
     },
     commande.pouvoir === "regard" ? 1 : fiche.bienfait ? 6 : 8,

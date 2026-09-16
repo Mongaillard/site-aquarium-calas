@@ -647,6 +647,14 @@ export interface FaveurEtat {
   readonly providence: boolean;
   /** Niveau de culte 0..3 (foi moyenne des adultes) ; chaque niveau ajoute dix à la faveur maximale. */
   readonly culte: number;
+  /** Le domaine du ciel (M25), ou null tant qu'il n'est pas choisi. */
+  readonly domaine: Domaine | null;
+  /** Rang du ciel 0..3 : le culte, plus un à l'âge du cuivre. Ouvre les paliers de pouvoirs. */
+  readonly rang: number;
+  /** Par pouvoir, le coût effectif (domaine et usages de la saison compris). */
+  readonly couts: Readonly<Record<string, number>>;
+  /** Par pouvoir, le rang requis (domaine compris ; tout à 0 pour un ciel sans visage). */
+  readonly verrous: Readonly<Record<string, number>>;
 }
 
 /** Contexte d'une demande de conseil, construit par le moteur (jamais par la page). */
@@ -754,6 +762,8 @@ export interface MessageEtat {
   readonly villages: VillagesEtat;
   /** Les lois du monde en vigueur (M25). */
   readonly lois: LoisEtat;
+  /** Les créatures du ciel en ce moment (M25). */
+  readonly creatures: readonly CreatureEtat[];
 }
 
 export interface RelationFiche {
@@ -982,7 +992,162 @@ export type Commande =
   /** Poser un peuple (M25) : de nouvelles familles fondent leur village au point choisi. */
   | { readonly type: "peupler"; readonly x: number; readonly y: number; readonly taille: number }
   /** Une loi du monde (M25) : la suspendre ou la rétablir. */
-  | { readonly type: "loi"; readonly loi: Loi; readonly actif: boolean };
+  | { readonly type: "loi"; readonly loi: Loi; readonly actif: boolean }
+  /** Choisir le domaine du ciel (M25), une fois pour toutes. */
+  | { readonly type: "domaine"; readonly domaine: Domaine }
+  /** Invoquer une créature du domaine (M25) : un gardien à poster, un fléau à lâcher. */
+  | {
+      readonly type: "creature";
+      readonly genre: GenreCreature;
+      readonly x: number;
+      readonly y: number;
+    };
+
+/** Les domaines du ciel (M25, façon Age of Mythology) : une identité qui colore les pouvoirs. */
+export const DOMAINES = ["moisson", "orage", "feu", "songes"] as const;
+export type Domaine = (typeof DOMAINES)[number];
+
+export interface FicheCreature {
+  readonly nom: string;
+  readonly emoji: string;
+  readonly description: string;
+}
+
+export interface FicheDomaine {
+  readonly nom: string;
+  readonly titre: string;
+  readonly emoji: string;
+  readonly description: string;
+  /** Pouvoirs favoris : un palier plus tôt, moins chers. */
+  readonly pouvoirs: readonly Pouvoir[];
+  /** Le domaine opposé : ses pouvoirs favoris viennent plus tard et coûtent plus cher. */
+  readonly etranger: Domaine;
+  /** Les créatures du domaine : un gardien qui protège, un fléau qu'on envoie. */
+  readonly gardien: FicheCreature;
+  readonly fleau: FicheCreature;
+}
+
+export const FICHES_DOMAINE: Readonly<Record<Domaine, FicheDomaine>> = {
+  moisson: {
+    nom: "Moisson",
+    titre: "le Semeur",
+    emoji: "🌾",
+    description: "Pluies, sève, troupeaux et guérisons : un ciel qui nourrit.",
+    pouvoirs: ["pluie", "seve", "troupeau", "eclaircie", "guerison"],
+    etranger: "feu",
+    gardien: {
+      nom: "le Cerf d'or",
+      emoji: "🦌",
+      description: "Il se poste où on le pose : les meutes et les bandes rebroussent chemin.",
+    },
+    fleau: {
+      nom: "la Nuée",
+      emoji: "🦗",
+      description: "Elle rôde et dévore les gisements ; on la craint.",
+    },
+  },
+  orage: {
+    nom: "Orage",
+    titre: "le Tonnant",
+    emoji: "⚡",
+    description: "Foudre, gel, secousses : un ciel qui gronde.",
+    pouvoirs: ["foudre", "gel", "secousse", "pluie", "souffle"],
+    etranger: "songes",
+    gardien: {
+      nom: "le Griffon",
+      emoji: "🦅",
+      description: "Il veille du haut du ciel : rien d'hostile n'approche son poste.",
+    },
+    fleau: {
+      nom: "la Tourmente",
+      emoji: "🌪️",
+      description: "Un vent vivant qui disperse bêtes et réserves.",
+    },
+  },
+  feu: {
+    nom: "Feu",
+    titre: "la Braise",
+    emoji: "🔥",
+    description: "Braises, sécheresse, fièvres : un ciel qui éprouve.",
+    pouvoirs: ["braise", "secheresse", "fievre", "foudre", "loups"],
+    etranger: "moisson",
+    gardien: {
+      nom: "la Salamandre",
+      emoji: "🦎",
+      description: "Elle garde le feu du village et brûle ce qui s'en approche.",
+    },
+    fleau: {
+      nom: "le Brasier errant",
+      emoji: "☄️",
+      description: "Il ravage les gisements sur son passage.",
+    },
+  },
+  songes: {
+    nom: "Songes",
+    titre: "le Veilleur",
+    emoji: "🌙",
+    description: "Rêves, idées, épiphanies : un ciel qui murmure.",
+    pouvoirs: ["songe", "idee", "epiphanie", "regard", "guerison"],
+    etranger: "orage",
+    gardien: {
+      nom: "le Sphinx",
+      emoji: "🦁",
+      description: "Il garde son poste d'un regard : les menaces s'en détournent.",
+    },
+    fleau: {
+      nom: "le Cauchemar",
+      emoji: "👁️",
+      description: "Il hante les nuits alentour ; le moral s'effondre.",
+    },
+  },
+};
+
+/** Palier de rang requis pour chaque pouvoir (0 : dès le départ ; 3 : la dévotion). */
+export const NIVEAU_POUVOIR: Readonly<Record<Pouvoir, number>> = {
+  pluie: 0,
+  eclaircie: 0,
+  seve: 0,
+  souffle: 0,
+  guerison: 0,
+  regard: 0,
+  braise: 0,
+  foudre: 1,
+  songe: 1,
+  troupeau: 1,
+  idee: 1,
+  gel: 1,
+  secheresse: 2,
+  fievre: 2,
+  loups: 2,
+  secousse: 2,
+  epiphanie: 3,
+};
+/** Rang maximal du ciel (culte 3, ou culte 2 et l'âge du cuivre). */
+export const RANG_MAX = 3;
+/** Multiplicateur de coût des pouvoirs favoris et étrangers au domaine. */
+export const COUT_FAVORI = 0.6;
+export const COUT_ETRANGER = 1.25;
+/** Chaque usage dans la saison renchérit le pouvoir d'un quart, jusqu'au double. */
+export const COUT_PAR_USAGE = 0.25;
+export const USAGES_MAX = 4;
+
+export const GENRES_CREATURE = ["gardien", "fleau"] as const;
+export type GenreCreature = (typeof GENRES_CREATURE)[number];
+/** Faveur qu'une créature coûte, rang requis, jours qu'elle reste. */
+export const COUT_CREATURE = 30;
+export const RANG_CREATURE = 2;
+export const DUREE_CREATURE_JOURS = 20;
+
+export interface CreatureEtat {
+  readonly id: string;
+  readonly genre: GenreCreature;
+  readonly domaine: Domaine;
+  readonly nom: string;
+  readonly emoji: string;
+  readonly x: number;
+  readonly y: number;
+  readonly joursRestants: number;
+}
 
 /** Les lois du monde (M25) : ce que l'observateur peut suspendre. */
 export const LOIS = ["faim", "maladies", "betes", "raids", "schismes", "vieillesse"] as const;
@@ -1104,6 +1269,7 @@ export function analyserCommande(texte: string): Commande | null {
     rayon?: unknown;
     taille?: unknown;
     loi?: unknown;
+    domaine?: unknown;
   };
   const coordonnees = Number.isInteger(c.x) && Number.isInteger(c.y);
   const dansLeMonde =
@@ -1151,6 +1317,24 @@ export function analyserCommande(texte: string): Commande | null {
         x: c.x as number,
         y: c.y as number,
         rayon,
+      };
+    }
+    case "domaine": {
+      const domaine = c.domaine;
+      if (typeof domaine !== "string" || !(DOMAINES as readonly string[]).includes(domaine))
+        return null;
+      return { type: "domaine", domaine: domaine as Domaine };
+    }
+    case "creature": {
+      const genre = c.genre;
+      if (typeof genre !== "string" || !(GENRES_CREATURE as readonly string[]).includes(genre))
+        return null;
+      if (!dansLeMonde) return null;
+      return {
+        type: "creature",
+        genre: genre as GenreCreature,
+        x: c.x as number,
+        y: c.y as number,
       };
     }
     case "loi": {

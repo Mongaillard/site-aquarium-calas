@@ -199,6 +199,12 @@ export class Serveur {
       case "loi":
         this.sim.definirLoi(commande.loi, commande.actif);
         break;
+      case "domaine":
+        this.sim.choisirDomaine(commande.domaine);
+        break;
+      case "creature":
+        this.sim.invoquer(commande);
+        break;
     }
     this.diffuser();
   }

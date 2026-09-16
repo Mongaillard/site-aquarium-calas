@@ -253,6 +253,25 @@ export class Rendu {
         });
       }
 
+      // Les créatures du ciel (M25) : un halo au sol, un grand glyphe, leur nom.
+      for (const c of etat.creatures) {
+        if (!visible(c.x, c.y)) continue;
+        const pos = magasin.positionAffichee(`creature:${c.id}`, maintenant) ?? {
+          x: c.x,
+          y: c.y,
+          enMouvement: false,
+        };
+        const halo = c.genre === "gardien" ? "255, 224, 130" : "180, 90, 255";
+        ctx.fillStyle = `rgba(${halo}, ${String(0.22 + 0.1 * Math.sin(maintenant / 300))})`;
+        ctx.beginPath();
+        ctx.ellipse(pos.x + 0.5, pos.y + 0.9, 1.4, 0.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.font = "1.6px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(c.emoji, pos.x + 0.5, pos.y - 0.2 + Math.sin(maintenant / 500) * 0.1);
+      }
       // La faune : troupeaux et meutes sur les tuiles connues.
       for (const tr of etat.troupeaux) {
         const pos = magasin.positionAffichee(`troupeau:${tr.id}`, maintenant) ?? {
@@ -324,11 +343,17 @@ export class Rendu {
             cam,
             outil === "peupler"
               ? { emoji: "👥", rayon: 4, couleur: "#9ad8ff" }
-              : {
-                  emoji: FICHES_PINCEAU[outil].emoji,
-                  rayon: magasin.rayonPinceau,
-                  couleur: "#c8f0a0",
-                },
+              : outil === "gardien" || outil === "fleau"
+                ? {
+                    emoji: outil === "gardien" ? "🛡️" : "💀",
+                    rayon: outil === "gardien" ? 12 : 6,
+                    couleur: outil === "gardien" ? "#ffe082" : "#d9a6ff",
+                  }
+                : {
+                    emoji: FICHES_PINCEAU[outil].emoji,
+                    rayon: magasin.rayonPinceau,
+                    couleur: "#c8f0a0",
+                  },
             magasin.reticule,
             maintenant,
             true,
@@ -337,6 +362,22 @@ export class Rendu {
       }
     }
 
+    // Les créatures : leur nom et les jours qui restent.
+    if (etat !== null && cam.echelle >= 4) {
+      ctx.font = `bold ${String(Math.max(11, Math.min(14, cam.echelle * 1.5)))}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      for (const c of etat.creatures) {
+        if (!visible(c.x, c.y)) continue;
+        const pos = magasin.positionAffichee(`creature:${c.id}`, maintenant) ?? { x: c.x, y: c.y };
+        const e = versEcran(cam, pos.x + 0.5, pos.y - 1.2);
+        const texte = `${c.nom} · ${String(c.joursRestants)} j`;
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.fillText(texte, e.x + 1, e.y + 1);
+        ctx.fillStyle = c.genre === "gardien" ? "#ffe082" : "#d9a6ff";
+        ctx.fillText(texte, e.x, e.y);
+      }
+    }
     // Les villages : leur nom au-dessus de leur centre.
     if (
       etat !== null &&

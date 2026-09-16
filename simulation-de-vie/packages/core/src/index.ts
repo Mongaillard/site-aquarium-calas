@@ -182,7 +182,27 @@ export type {
   CommandeSculpter,
   CommandePeupler,
   ResultatPeuplement,
+  CommandeCreature,
+  ResultatInvocation,
 } from "./simulation.js";
+export {
+  creerCreature,
+  ficheCreature,
+  heureCreatures,
+  jourCreatures,
+  PORTEE_GARDIEN,
+  ERRANCE_FLEAU,
+  RAYON_FLEAU,
+} from "./monde/creatures.js";
+export type { Creature, MondeCreatures } from "./monde/creatures.js";
+export {
+  affinite,
+  coutEffectif,
+  niveauRequis,
+  rangDuCiel,
+  saisonDuCiel,
+  estAgeDuCuivre,
+} from "./monde/divin.js";
 export { METEOS, EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
 export type { Meteo, EffetsMeteo, EffetsSaison } from "./monde/meteo.js";
 export {

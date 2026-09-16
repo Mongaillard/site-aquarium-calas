@@ -583,6 +583,8 @@ table.saisons td:first-child {
   bottom: 10px;
   transform: translateX(-50%);
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 8px;
   max-width: calc(100% - 16px);
@@ -664,6 +666,29 @@ table.saisons td:first-child {
   top: 1px;
   font-size: 9px;
   color: var(--discret);
+}
+.pouvoir .verrou {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: rgba(20, 23, 28, 0.75);
+  font-size: 11px;
+  color: #ffd479;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 3px;
+  pointer-events: none;
+}
+.pouvoir.favori {
+  box-shadow: 0 0 0 1px #c8f0a0 inset;
+}
+.pouvoir.etranger .cout {
+  color: #ff9c5f;
+}
+.domaine-choix {
+  margin-top: 4px;
+  font-size: 12px;
 }
 .pouvoir .recharge {
   position: absolute;

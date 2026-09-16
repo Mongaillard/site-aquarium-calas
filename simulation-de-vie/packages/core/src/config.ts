@@ -6,6 +6,7 @@
 export type ModeCerveau = "llm" | "rules" | "replay";
 export type NiveauEffort = "low" | "medium" | "high" | "xhigh" | "max";
 export type CoutumeNomFamille = "pere" | "mere" | "compose";
+export type DomaineDuCiel = "moisson" | "orage" | "feu" | "songes";
 
 export interface SimConfig {
   seed: number | string;
@@ -68,6 +69,10 @@ export interface SimConfig {
     nomFamille: CoutumeNomFamille;
     vouvoiementInconnus: boolean;
   };
+  /** Le ciel (M25) : le domaine choisi au départ, ou null (à choisir en cours de partie). */
+  dieu: {
+    domaine: DomaineDuCiel | null;
+  };
 }
 
 export const CONFIG_PAR_DEFAUT: SimConfig = {
@@ -98,6 +103,7 @@ export const CONFIG_PAR_DEFAUT: SimConfig = {
   memoire: { maxSouvenirs: 300, topK: 20, demiVieRecenceJours: 1 },
   perception: { rayonJour: 6, rayonNuit: 3 },
   social: { monogamie: true, nomFamille: "pere", vouvoiementInconnus: true },
+  dieu: { domaine: null },
 };
 
 /** Configuration partielle : chaque section peut être omise ou partiellement fournie. */
@@ -121,6 +127,7 @@ export function fusionnerConfig(partielle: SimConfigPartielle = {}): SimConfig {
     memoire: { ...CONFIG_PAR_DEFAUT.memoire, ...partielle.memoire },
     perception: { ...CONFIG_PAR_DEFAUT.perception, ...partielle.perception },
     social: { ...CONFIG_PAR_DEFAUT.social, ...partielle.social },
+    dieu: { ...CONFIG_PAR_DEFAUT.dieu, ...partielle.dieu },
   };
 }
 

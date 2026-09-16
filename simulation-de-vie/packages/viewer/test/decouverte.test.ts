@@ -90,6 +90,15 @@ function etat(decouvertes: number[]): MessageEtat {
     },
     chronique: { recits: [], lieuxNommes: [], proverbes: [] },
     villages: { villages: [], relations: [], bandes: [], caravanes: [], routes: [] },
+    lois: {
+      faim: true,
+      maladies: true,
+      betes: true,
+      raids: true,
+      schismes: true,
+      vieillesse: true,
+    },
+    creatures: [],
   };
 }
 

@@ -47,6 +47,17 @@
             <option value="3">3</option>
             <option value="4">4</option>
           </select>
+          <label for="domaine-entree" class="discret">ciel</label>
+          <select
+            id="domaine-entree"
+            title="Le domaine du ciel : colore les pouvoirs et donne ses créatures"
+          >
+            <option value="">sans visage</option>
+            <option value="moisson">🌾 Moisson</option>
+            <option value="orage">⚡ Orage</option>
+            <option value="feu">🔥 Feu</option>
+            <option value="songes">🌙 Songes</option>
+          </select>
           <label
             class="discret case"
             title="Un monde sans personne : sculptez-le, puis posez votre peuple où vous voulez (mode Dieu)"
@@ -143,6 +154,16 @@
                 pouvoir (coût en bas à droite), puis touchez la carte.
               </div>
               <div id="reputation" class="reputation discret"></div>
+              <div id="domaine-choix" class="domaine-choix" hidden>
+                <label for="domaine-select" class="discret">Le ciel n'a pas de visage :</label>
+                <select id="domaine-select">
+                  <option value="">choisir un domaine…</option>
+                  <option value="moisson">🌾 Moisson, le Semeur</option>
+                  <option value="orage">⚡ Orage, le Tonnant</option>
+                  <option value="feu">🔥 Feu, la Braise</option>
+                  <option value="songes">🌙 Songes, le Veilleur</option>
+                </select>
+              </div>
             </div>
             <button id="btn-appliquer" class="btn-appliquer" type="button" hidden>✓ Ici</button>
           </div>

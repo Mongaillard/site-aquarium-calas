@@ -93,8 +93,16 @@ import { EFFETS_METEO, EFFETS_SAISON, tirerMeteo } from "./monde/meteo.js";
 import type { Meteo } from "./monde/meteo.js";
 import { Rng } from "./rng.js";
 import type { FaveurEtat, Pouvoir, QuestionConseil } from "@sdv/protocole";
-import { COUT_PEUPLE, loisParDefaut } from "@sdv/protocole";
-import type { Loi } from "@sdv/protocole";
+import {
+  COUT_CREATURE,
+  COUT_PEUPLE,
+  FICHES_DOMAINE,
+  RANG_CREATURE,
+  loisParDefaut,
+} from "@sdv/protocole";
+import type { Domaine, GenreCreature, Loi } from "@sdv/protocole";
+import { creerCreature, ficheCreature, heureCreatures, jourCreatures } from "./monde/creatures.js";
+import type { Creature } from "./monde/creatures.js";
 import {
   FAVEUR_EVENEMENTS,
   FAVEUR_OFFRANDE,
@@ -108,6 +116,7 @@ import {
   gardienDeLAutel,
   jourDuCiel,
   providence,
+  saisonDuCiel,
   saisonSansMiracle,
 } from "./monde/divin.js";
 import type { PriereEtat } from "@sdv/protocole";
@@ -226,6 +235,21 @@ export interface CommandePeupler {
   readonly taille: number;
 }
 
+/** Commande `creature` : un genre et un point. */
+export interface CommandeCreature {
+  readonly genre: GenreCreature;
+  readonly x: number;
+  readonly y: number;
+}
+
+export type ResultatInvocation =
+  | { readonly ok: true; readonly id: string }
+  | {
+      readonly ok: false;
+      readonly raison:
+        "sans_domaine" | "verrouille" | "faveur_insuffisante" | "deja_la" | "hors_monde";
+    };
+
 export type ResultatPeuplement =
   | { readonly ok: true; readonly village: string; readonly personnages: readonly string[] }
   | { readonly ok: false; readonly raison: "hors_monde" | "faveur" };
@@ -271,6 +295,9 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
   defauts(etat.config.population, { peuples: 1 });
   if (!("lois" in brut)) brut.lois = loisParDefaut();
   defauts(brut.lois as Record<string, unknown>, loisParDefaut());
+  defauts(brut, { creatures: [], compteurCreatures: 0 });
+  defauts(brut.faveur as Record<string, unknown>, { domaine: null, rang: 0, usages: [] });
+  defauts(brut.config as Record<string, unknown>, { dieu: { domaine: null } });
   for (const p of etat.personnages) {
     const q = p as unknown as Record<string, unknown>;
     defauts(q, { prestige: 0, maitre: null, banni: null });
@@ -329,6 +356,9 @@ interface EtatSimulation {
     readonly culte: number;
     readonly max: number;
     readonly recharges: [Pouvoir, number][];
+    readonly domaine: Domaine | null;
+    readonly rang: number;
+    readonly usages: [Pouvoir, number][];
   };
   readonly meteoForcee: { readonly meteo: Meteo; readonly jusquaJour: number } | null;
   readonly questionEnCours: QuestionConseil | null;
@@ -338,6 +368,8 @@ interface EtatSimulation {
   readonly chronique: EtatChronique;
   readonly villages: EtatVillages;
   readonly lois: Record<Loi, boolean>;
+  readonly creatures: Creature[];
+  readonly compteurCreatures: number;
 }
 
 export class Simulation implements Monde {
@@ -374,6 +406,9 @@ export class Simulation implements Monde {
   readonly villages: EtatVillages = etatVillagesInitial();
   /** Les lois du monde (M25) : ce que l'observateur a suspendu. */
   readonly lois: Record<Loi, boolean> = loisParDefaut();
+  /** Les créatures du ciel (M25) : gardiens postés, fléaux lâchés. */
+  readonly creatures = new Map<string, Creature>();
+  private compteurCreatures = 0;
 
   private constructor(
     readonly config: SimConfig,
@@ -411,8 +446,13 @@ export class Simulation implements Monde {
       this.faveur.providence = etat.faveur.providence;
       this.faveur.culte = etat.faveur.culte;
       this.faveur.max = etat.faveur.max;
+      this.faveur.domaine = etat.faveur.domaine;
+      this.faveur.rang = etat.faveur.rang;
+      for (const [k, v] of etat.faveur.usages) this.faveur.usages.set(k, v);
       this.meteoForcee = etat.meteoForcee;
       for (const [k, v] of etat.faveur.recharges) this.faveur.recharges.set(k, v);
+      for (const c of etat.creatures) this.creatures.set(c.id, c);
+      this.compteurCreatures = etat.compteurCreatures;
       this.questionEnCours = etat.questionEnCours;
       this.fileConseils.push(...etat.fileConseils);
       this.journal.restaurer(etat.journal);
@@ -422,6 +462,7 @@ export class Simulation implements Monde {
       Object.assign(this.lois, etat.lois);
       for (const p of this.personnages) this.cerveaux.set(p.id, new RuleBrain(p));
     } else {
+      this.faveur.domaine = config.dieu.domaine;
       this.personnages = genererPopulation(rng, config, grille);
       this.compteurPersonnages = this.personnages.length;
       if (this.personnages.length > 0)
@@ -672,6 +713,54 @@ export class Simulation implements Monde {
         ...new Set(nouveaux.map((p) => p.identite.nomFamille)),
       ]);
     return nouveaux;
+  }
+
+  /** Choisit le domaine du ciel (commande `domaine`), une fois pour toutes. */
+  choisirDomaine(domaine: Domaine): boolean {
+    if (this.faveur.domaine !== null) return false;
+    this.faveur.domaine = domaine;
+    const fiche = FICHES_DOMAINE[domaine];
+    this.emettre(
+      "divin",
+      null,
+      { pouvoir: "domaine", domaine, nom: fiche.nom, titre: fiche.titre },
+      6,
+    );
+    return true;
+  }
+
+  /** Invoque une créature du domaine (commande `creature`) : un gardien à poster, un fléau à lâcher. */
+  invoquer(commande: CommandeCreature): ResultatInvocation {
+    const domaine = this.faveur.domaine;
+    if (domaine === null) return { ok: false, raison: "sans_domaine" };
+    if (this.faveur.rang < RANG_CREATURE) return { ok: false, raison: "verrouille" };
+    if (this.faveur.valeur < COUT_CREATURE) return { ok: false, raison: "faveur_insuffisante" };
+    for (const c of this.creatures.values())
+      if (c.genre === commande.genre) return { ok: false, raison: "deja_la" };
+    const site = tuilePraticableProche(this.grille, { x: commande.x, y: commande.y }, 8);
+    if (site === null || this.grille.tuileSiGeneree(commande.x, commande.y) === null)
+      return { ok: false, raison: "hors_monde" };
+    this.compteurCreatures += 1;
+    const id = `c-${String(this.compteurCreatures)}`;
+    const c = creerCreature(
+      id,
+      commande.genre,
+      domaine,
+      { x: site.x, y: site.y },
+      this.horloge.moment().jourAbsolu,
+    );
+    this.creatures.set(id, c);
+    this.faveur.valeur -= COUT_CREATURE;
+    this.faveur.miracles += 1;
+    const fiche = ficheCreature(c);
+    this.emettre(
+      "divin",
+      null,
+      { pouvoir: commande.genre, nom: fiche.nom, emoji: fiche.emoji, cout: COUT_CREATURE, id },
+      7,
+      { x: site.x, y: site.y },
+    );
+    return { ok: true, id };
   }
 
   /** Suspend ou rétablit une loi du monde (commande `loi`). */
@@ -1163,6 +1252,9 @@ export class Simulation implements Monde {
         culte: this.faveur.culte,
         max: this.faveur.max,
         recharges: [...this.faveur.recharges.entries()],
+        domaine: this.faveur.domaine,
+        rang: this.faveur.rang,
+        usages: [...this.faveur.usages.entries()],
       },
       meteoForcee: this.meteoForcee,
       questionEnCours: this.questionEnCours,
@@ -1172,6 +1264,8 @@ export class Simulation implements Monde {
       chronique: this.chronique,
       villages: this.villages,
       lois: this.lois,
+      creatures: [...this.creatures.values()],
+      compteurCreatures: this.compteurCreatures,
     };
   }
 
@@ -1498,6 +1592,8 @@ export class Simulation implements Monde {
       providence(this, this.faveur);
       heureSociete(this);
       heureVillages(this, this.rng.fork(`villages/${String(this.tick)}`));
+      if (this.creatures.size > 0)
+        heureCreatures(this, this.creatures, this.rng.fork(`creatures/${String(this.tick)}`));
     }
     const moment = this.horloge.moment();
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
@@ -1565,8 +1661,21 @@ export class Simulation implements Monde {
     if (this.tick > 0) {
       this.conseilsDuJour = 0;
       gagnerFaveur(this.faveur, FAVEUR_PAR_JOUR);
-      if (moment.jourDeSaison === 1) saisonSansMiracle(this);
+      if (moment.jourDeSaison === 1) {
+        saisonSansMiracle(this);
+        saisonDuCiel(this.faveur);
+      }
       jourDuCiel(this, this.faveur);
+      for (const c of jourCreatures(this.creatures, moment.jourAbsolu)) {
+        const fiche = ficheCreature(c);
+        this.emettre(
+          "divin",
+          null,
+          { pouvoir: "creature_partie", genre: c.genre, nom: fiche.nom, faits: c.faits },
+          5,
+          { ...c.position },
+        );
+      }
       for (const p of this.vivants()) {
         jourCompteurs(p);
         const issue = jourAmbition(this, p);

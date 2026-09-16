@@ -160,6 +160,12 @@ export class LiaisonLocale implements Liaison {
       case "loi":
         sim.definirLoi(commande.loi, commande.actif);
         break;
+      case "domaine":
+        sim.choisirDomaine(commande.domaine);
+        break;
+      case "creature":
+        sim.invoquer(commande);
+        break;
     }
     if (this.minuteur !== null) this.diffuser();
   }

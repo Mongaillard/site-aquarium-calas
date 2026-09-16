@@ -503,6 +503,14 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
     case "divin":
       if (d.pouvoir === "sculpture")
         return `🪄 Le ciel sculpte le monde : ${String(d.tuiles)} tuile${Number(d.tuiles) > 1 ? "s" : ""} de ${LIBELLES_PINCEAU[String(d.pinceau)] ?? String(d.pinceau)} autour de (${String(d.x)}, ${String(d.y)}).`;
+      if (d.pouvoir === "domaine")
+        return `✨ Le ciel prend un visage : ${String(d.nom)}, ${String(d.titre)}.`;
+      if (d.pouvoir === "gardien" || d.pouvoir === "fleau")
+        return `${String(d.emoji)} ${d.pouvoir === "gardien" ? "Un gardien se poste" : "Un fléau est lâché"} : ${String(d.nom)} (${String(d.cout)} ✦).`;
+      if (d.pouvoir === "gardien_repousse")
+        return `🛡️ ${String(d.nom)} repousse ${d.quoi === "bande" ? `une bande de ${String(d.taille)}` : "une meute"}.`;
+      if (d.pouvoir === "creature_partie")
+        return `✨ ${String(d.nom)} s'en retourne au ciel${Number(d.faits) > 0 ? ` après ${String(d.faits)} fait${Number(d.faits) > 1 ? "s" : ""}` : ""}.`;
       if (d.pouvoir === "loi")
         return `⚖️ Le ciel ${d.actif === true ? "rétablit" : "suspend"} une loi du monde : ${LIBELLES_LOI[String(d.loi)] ?? String(d.loi)}.`;
       if (d.pouvoir === "peuple")

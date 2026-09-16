@@ -3,6 +3,7 @@
  * Tout ce que le viewer affiche passe par ici (section 13).
  */
 import {
+  ficheCreature,
   BIOMES,
   Grille,
   COMPETENCES,
@@ -736,6 +737,19 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     chronique: chroniqueEtat(sim),
     villages: villagesEtat(sim),
     lois: { ...sim.lois },
+    creatures: [...sim.creatures.values()].map((c) => {
+      const fiche = ficheCreature(c);
+      return {
+        id: c.id,
+        genre: c.genre,
+        domaine: c.domaine,
+        nom: fiche.nom,
+        emoji: fiche.emoji,
+        x: c.position.x,
+        y: c.position.y,
+        joursRestants: Math.max(0, c.finJour - sim.horloge.moment().jourAbsolu),
+      };
+    }),
   };
 }
 

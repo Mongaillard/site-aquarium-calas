@@ -1,9 +1,12 @@
 /** Point d'entrée du viewer : liaison (serveur ou locale), rendu, interactions souris et tactiles. */
 import "./style.css";
-import type { Commande, Loi, MessageServeur, Pouvoir } from "@sdv/protocole";
+import type { Commande, Domaine, Loi, MessageServeur, Pinceau, Pouvoir } from "@sdv/protocole";
 import {
+  COUT_CREATURE,
   COUT_PEUPLE,
+  FICHES_DOMAINE,
   FICHES_LOI,
+  RANG_CREATURE,
   LOIS,
   FICHES_PINCEAU,
   FICHES_POUVOIR,
@@ -54,6 +57,12 @@ const formulaireLocal = element("local", HTMLFormElement);
 const graineEntree = element("graine-entree", HTMLInputElement);
 const populationEntree = element("population-entree", HTMLSelectElement);
 const peuplesEntree = element("peuples-entree", HTMLSelectElement);
+const domaineEntree = element("domaine-entree", HTMLSelectElement);
+/** Le domaine du ciel choisi au formulaire (ou dans l'URL, `?domaine=`), ou null. */
+function domaineChoisi(): Domaine | null {
+  const v = domaineEntree.value;
+  return v === "moisson" || v === "orage" || v === "feu" || v === "songes" ? v : null;
+}
 const viergeEntree = element("vierge-entree", HTMLInputElement);
 const magasin = new Magasin();
 const rendu = new Rendu(canvas, magasin);
@@ -88,6 +97,7 @@ if (POPULATIONS.includes(populationInitiale)) populationEntree.value = String(po
 const peuplesInitiaux = Number.parseInt(parametres.get("peuples") ?? "1", 10);
 if (peuplesInitiaux >= 1 && peuplesInitiaux <= 4) peuplesEntree.value = String(peuplesInitiaux);
 if (parametres.has("vierge")) viergeEntree.checked = true;
+if (parametres.has("domaine")) domaineEntree.value = parametres.get("domaine") ?? "";
 
 let derniereDemandeFiche = 0;
 const recevoir = (m: MessageServeur): void => {
@@ -124,7 +134,7 @@ function creerLiaison(graine: string, sauvegarde?: unknown): Liaison {
       joursAvance:
         population().initiale === 0 ? 0 : Number.isFinite(joursAvance) ? joursAvance : 20,
       ticksParSeconde: 4,
-      config: { population: population() },
+      config: { population: population(), dieu: { domaine: domaineChoisi() } },
       ...(sauvegarde !== undefined ? { sauvegarde } : {}),
     },
     recevoir,
@@ -629,7 +639,7 @@ canvas.addEventListener("mousedown", (ev) => {
     ev.button === 0 &&
     magasin.modeDieu &&
     magasin.outilArme !== null &&
-    magasin.outilArme !== "peupler"
+    estPinceau(magasin.outilArme)
   ) {
     const { sx, sy } = pointCanvas(ev.clientX, ev.clientY);
     const m = versMonde(cam, sx, sy);
@@ -841,7 +851,7 @@ POUVOIRS.forEach((pouvoir, i) => {
   b.title = `${fiche.nom} (${String(fiche.cout)} ✦${fiche.rechargeJours > 0 ? `, ${String(fiche.rechargeJours)} j de recharge` : ""}) — ${fiche.description}`;
   b.setAttribute("aria-pressed", "false");
   const touche = TOUCHES_POUVOIR[i];
-  b.innerHTML = `${touche === undefined ? "" : `<span class="touche">${touche}</span>`}${fiche.emoji}<span class="cout">${String(fiche.cout)}</span><span class="recharge" hidden></span>`;
+  b.innerHTML = `${touche === undefined ? "" : `<span class="touche">${touche}</span>`}${fiche.emoji}<span class="cout">${String(fiche.cout)}</span><span class="recharge" hidden></span><span class="verrou" hidden></span>`;
   b.addEventListener("click", () => {
     armer(magasin.pouvoirArme === pouvoir ? null : pouvoir);
   });
@@ -876,7 +886,7 @@ const reglageOutil = element("reglage-outil", HTMLDivElement);
 const rayonOutilEl = element("rayon-outil", HTMLSpanElement);
 const taillePeupleEl = element("taille-peuple", HTMLSelectElement);
 const boutonsOutil = new Map<Outil, HTMLButtonElement>();
-const OUTILS: readonly Outil[] = [...PINCEAUX, "peupler"];
+const OUTILS: readonly Outil[] = [...PINCEAUX, "peupler", "gardien", "fleau"];
 for (const outil of OUTILS) {
   const b = document.createElement("button");
   b.type = "button";
@@ -886,6 +896,9 @@ for (const outil of OUTILS) {
   if (outil === "peupler") {
     b.title = `Peupler (${String(COUT_PEUPLE)} ✦, gratuit dans un monde vide) — de nouvelles familles fondent leur village où vous touchez.`;
     b.innerHTML = `👥<span class="cout">${String(COUT_PEUPLE)}</span>`;
+  } else if (outil === "gardien" || outil === "fleau") {
+    b.title = `${outil === "gardien" ? "Gardien" : "Fléau"} (${String(COUT_CREATURE)} ✦, rang ${String(RANG_CREATURE)}) — la créature du domaine du ciel.`;
+    b.innerHTML = `${outil === "gardien" ? "🛡️" : "💀"}<span class="cout">${String(COUT_CREATURE)}</span><span class="verrou" hidden></span>`;
   } else {
     const fiche = FICHES_PINCEAU[outil];
     b.title = `${fiche.nom} — ${fiche.description} Glissez pour peindre.`;
@@ -925,7 +938,7 @@ function armerOutil(outil: Outil | null): void {
   btnAppliquer.hidden = true;
   for (const [, b] of boutonsPouvoir) b.setAttribute("aria-pressed", "false");
   for (const [o, b] of boutonsOutil) b.setAttribute("aria-pressed", o === outil ? "true" : "false");
-  reglageOutil.hidden = outil === null;
+  reglageOutil.hidden = outil === null || outil === "gardien" || outil === "fleau";
   taillePeupleEl.hidden = outil !== "peupler";
   rayonOutilEl.hidden = outil === "peupler";
   for (const b of reglageOutil.querySelectorAll("button")) b.hidden = outil === "peupler";
@@ -937,13 +950,39 @@ function armerOutil(outil: Outil | null): void {
       ? "Faveur ✦ : +1 par jour, plus quand la colonie prospère ou prie. Choisissez un pouvoir (coût en bas à droite), puis touchez la carte."
       : outil === "peupler"
         ? `Peupler : touchez la carte, ${String(magasin.taillePeuple)} personnes y fondent leur village (gratuit si le monde est vide, sinon ${String(COUT_PEUPLE)} ✦).`
-        : `${FICHES_PINCEAU[outil].nom} : glissez sur la carte pour peindre (rayon ${String(magasin.rayonPinceau)}). ${FICHES_PINCEAU[outil].description}`;
+        : outil === "gardien" || outil === "fleau"
+          ? aideCreature(outil)
+          : `${FICHES_PINCEAU[outil].nom} : glissez sur la carte pour peindre (rayon ${String(magasin.rayonPinceau)}). ${FICHES_PINCEAU[outil].description}`;
 }
+/** L'aide d'un outil de créature : la fiche du domaine, ou ce qui manque. */
+function aideCreature(genre: "gardien" | "fleau"): string {
+  const f = magasin.etat?.faveur;
+  if (f?.domaine === null || f?.domaine === undefined)
+    return "Une créature demande un domaine : choisissez le visage du ciel (à droite).";
+  const fiche = FICHES_DOMAINE[f.domaine][genre];
+  const manque =
+    f.rang < RANG_CREATURE
+      ? ` Il faut le rang ${String(RANG_CREATURE)} du ciel (culte, âge du cuivre) ; vous êtes au rang ${String(f.rang)}.`
+      : "";
+  return `${fiche.emoji} ${fiche.nom} : ${fiche.description} Touchez la carte pour ${genre === "gardien" ? "la poster" : "le lâcher"} (${String(COUT_CREATURE)} ✦, vingt jours).${manque}`;
+}
+// Le choix du domaine en cours de partie (vieux mondes, ou « sans visage » au départ).
+const domaineChoix = element("domaine-choix", HTMLDivElement);
+const domaineSelect = element("domaine-select", HTMLSelectElement);
+domaineSelect.addEventListener("change", () => {
+  const v = domaineSelect.value;
+  if (v === "moisson" || v === "orage" || v === "feu" || v === "songes")
+    envoyer({ type: "domaine", domaine: v });
+  domaineSelect.value = "";
+});
 /** Un coup de pinceau à la tuile donnée (le pinceau armé, au rayon réglé). */
 function sculpterEn(x: number, y: number): void {
   const outil = magasin.outilArme;
-  if (outil === null || outil === "peupler") return;
+  if (outil === null || !estPinceau(outil)) return;
   envoyer({ type: "sculpter", pinceau: outil, x, y, rayon: magasin.rayonPinceau });
+}
+function estPinceau(outil: Outil): outil is Pinceau {
+  return (PINCEAUX as readonly string[]).includes(outil);
 }
 /** Applique l'outil armé au point écran : un coup de pinceau, ou un peuple. */
 function appliquerOutilA(sx: number, sy: number): void {
@@ -960,6 +999,19 @@ function appliquerOutilA(sx: number, sy: number): void {
     }
     envoyer({ type: "peupler", x, y, taille: magasin.taillePeuple });
     // Un peuple posé : on rend la main, le monde est habité.
+    armerOutil(null);
+  } else if (outil === "gardien" || outil === "fleau") {
+    if (
+      etat.faveur.domaine === null ||
+      etat.faveur.rang < RANG_CREATURE ||
+      etat.faveur.valeur < COUT_CREATURE ||
+      etat.creatures.some((c) => c.genre === outil) ||
+      magasin.biomeEn(x, y) < 0
+    ) {
+      secouer();
+      return;
+    }
+    envoyer({ type: "creature", genre: outil, x, y });
     armerOutil(null);
   } else {
     sculpterEn(x, y);
@@ -996,7 +1048,11 @@ function appliquerPouvoirA(sx: number, sy: number): void {
   const etat = magasin.etat;
   if (pouvoir === null || etat === null) return;
   const fiche = FICHES_POUVOIR[pouvoir];
-  if (etat.faveur.valeur < fiche.cout || (etat.faveur.recharges[pouvoir] ?? 0) > etat.tick) {
+  if (
+    etat.faveur.valeur < (etat.faveur.couts[pouvoir] ?? fiche.cout) ||
+    (etat.faveur.recharges[pouvoir] ?? 0) > etat.tick ||
+    (etat.faveur.verrous[pouvoir] ?? 0) > etat.faveur.rang
+  ) {
     secouer();
     return;
   }
@@ -1039,13 +1095,54 @@ function rafraichirPouvoirs(): void {
   const f = etat.faveur;
   faveurJauge.style.height = `${String(Math.round((100 * f.valeur) / Math.max(1, f.max)))}%`;
   faveurNum.textContent = `✦ ${String(f.valeur)}`;
+  const domaine = f.domaine === null ? null : FICHES_DOMAINE[f.domaine];
   for (const [p, b] of boutonsPouvoir) {
     const fiche = FICHES_POUVOIR[p];
     const recharge = (f.recharges[p] ?? 0) > etat.tick;
-    b.disabled = f.valeur < fiche.cout || recharge;
+    const cout = f.couts[p] ?? fiche.cout;
+    const requis = f.verrous[p] ?? 0;
+    const verrouille = requis > f.rang;
+    b.disabled = f.valeur < cout || recharge || verrouille;
     const voile = b.querySelector<HTMLElement>(".recharge");
     if (voile) voile.hidden = !recharge;
+    const verrou = b.querySelector<HTMLElement>(".verrou");
+    if (verrou) {
+      verrou.hidden = !verrouille;
+      const texte = `🔒 ${String(requis)}`;
+      if (verrou.textContent !== texte) verrou.textContent = texte;
+    }
+    const coutEl = b.querySelector<HTMLElement>(".cout");
+    if (coutEl && coutEl.textContent !== String(cout)) coutEl.textContent = String(cout);
+    const favori = domaine?.pouvoirs.includes(p) === true;
+    const etranger = domaine !== null && FICHES_DOMAINE[domaine.etranger].pouvoirs.includes(p);
+    b.classList.toggle("favori", favori);
+    b.classList.toggle("etranger", etranger);
   }
+  for (const genre of ["gardien", "fleau"] as const) {
+    const b = boutonsOutil.get(genre);
+    if (b === undefined) continue;
+    const verrouille = f.domaine === null || f.rang < RANG_CREATURE;
+    const dejaLa = etat.creatures.some((c) => c.genre === genre);
+    b.disabled = verrouille || f.valeur < COUT_CREATURE || dejaLa;
+    const verrou = b.querySelector<HTMLElement>(".verrou");
+    if (verrou) {
+      verrou.hidden = !verrouille && !dejaLa;
+      const texte = dejaLa
+        ? "déjà là"
+        : f.domaine === null
+          ? "domaine"
+          : `🔒 ${String(RANG_CREATURE)}`;
+      if (verrou.textContent !== texte) verrou.textContent = texte;
+    }
+    if (domaine !== null) {
+      const fiche = domaine[genre];
+      const emoji = b.firstChild;
+      if (emoji !== null && emoji.nodeType === Node.TEXT_NODE && emoji.textContent !== fiche.emoji)
+        emoji.textContent = fiche.emoji;
+      b.title = `${fiche.nom} (${String(COUT_CREATURE)} ✦, rang ${String(RANG_CREATURE)}) — ${fiche.description}`;
+    }
+  }
+  domaineChoix.hidden = f.domaine !== null;
   if (magasin.pouvoirArme !== null && boutonsPouvoir.get(magasin.pouvoirArme)?.disabled === true)
     desarmer();
   const peupler = boutonsOutil.get("peupler");
@@ -1056,7 +1153,7 @@ function rafraichirPouvoirs(): void {
     if (cout) cout.textContent = gratuit ? "libre" : String(COUT_PEUPLE);
   }
   btnProvidence.setAttribute("aria-pressed", f.providence ? "true" : "false");
-  reputationEl.textContent = `Réputation du ciel : ${libelleReputation(f.reputation)} · culte : ${NOMS_CULTE[f.culte] ?? "?"} · ${String(f.prieres)} prière${f.prieres > 1 ? "s" : ""}, ${String(f.exaucees)} exaucée${f.exaucees > 1 ? "s" : ""}`;
+  reputationEl.textContent = `${domaine === null ? "Ciel sans visage" : `${domaine.emoji} ${domaine.titre} (${domaine.nom.toLowerCase()})`} · rang ${String(f.rang)}/3 · réputation : ${libelleReputation(f.reputation)} · culte : ${NOMS_CULTE[f.culte] ?? "?"} · ${String(f.prieres)} prière${f.prieres > 1 ? "s" : ""}, ${String(f.exaucees)} exaucée${f.exaucees > 1 ? "s" : ""}`;
   // Les prières en attente : ce que la colonie demande au ciel, et ce qui l'exaucerait.
   const prieres = etat.prieres.slice(0, 4);
   prieresEl.hidden = prieres.length === 0;
