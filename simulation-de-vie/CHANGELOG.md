@@ -30,8 +30,21 @@ journal. Désormais elle dure, se joue sur la carte, et l'on peut la regarder.
   **chiffre des dégâts** qui monte, ☠ pour un coup mortel), et une **jauge de bataille** en
   haut de la carte (les deux camps, leur force restante, les morts ; cliquer y mène). Le fil
   raconte la levée, l'assaut, l'issue.
+- **Les raids et les loups passent par le même combat** (M32c). Une bande devant un village
+  trop faible pour un tribut ne pille plus en un tick : les pillards sont un camp **virtuel**
+  (des membres avec une position et une santé de 60, menés par le moteur : un pas vers
+  l'adversaire le plus proche, un coup à la cadence), la défense se lève comme à la guerre, et
+  le **pillage n'a lieu que s'ils l'emportent** ; repoussés, ils s'en vont bredouilles
+  (événement `raid/repousse`, compteur `raidsRepousses`, état de bande `combat` puis
+  `repousse`). Une **meute** qui atteint sa proie livre le même combat (loups à 30 de santé,
+  morsures ; la proie et ceux qui se tiennent à ses côtés se battent, les armés du village
+  accourent à dix tuiles) ; à la fin, un seul événement `combat` résume comme en M10 (issue
+  repoussés / fuite / mort, loups tués, défenseurs, blessés, victime), la meute repoussée
+  s'enfuit, celle qui a tué a mangé. Le viewer dessine pillards et loups un par un, avec leurs
+  barres de vie, pendant le combat.
 - Mode local : `?guerre` (avec `peuples=2`) déclare la guerre entre les deux premiers
-  villages et fait partir la troupe sur-le-champ, pour voir une bataille tout de suite.
+  villages et fait partir la troupe sur-le-champ ; `?raid` lance une bande de six pillards sur
+  le premier village, pour voir une bataille tout de suite.
 - Tests : levée, marche, assaut, conclusion ; déterminisme ; sauvegarde en cours de bataille ;
   côté viewer, les coups animés une seule fois, pas de rattrapage, les camps.
 

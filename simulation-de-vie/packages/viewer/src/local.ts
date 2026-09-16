@@ -3,7 +3,7 @@
  * avec exactement les mêmes messages que le serveur WebSocket. Utile sur mobile
  * et pour les pages publiées.
  */
-import { Simulation, declarerGuerre, leverTroupe } from "@sdv/core";
+import { Simulation, declarerGuerre, lancerBande, lancerRaid, leverTroupe } from "@sdv/core";
 import type { Sauvegarde, SimConfigPartielle } from "@sdv/core";
 import type { Commande, MessageEtat, MessageServeur } from "@sdv/protocole";
 import {
@@ -34,6 +34,8 @@ export interface OptionsLocales {
   readonly sauvegarde?: unknown;
   /** Après la pré-simulation, deux villages entrent en guerre (M32, `?guerre`, pour voir une bataille). */
   readonly guerre?: boolean;
+  /** Après la pré-simulation, une bande de pillards attaque le premier village (M32c, `?raid`). */
+  readonly raid?: boolean;
 }
 
 /** Une liaison qui simule (dans la page ou dans un travailleur) et sait sauvegarder. */
@@ -119,6 +121,15 @@ export class LiaisonLocale implements LiaisonSimulee {
             : null;
         if (r !== null && a !== undefined && b !== undefined)
           leverTroupe(sim, sim.rng.fork("guerre"), r, a, b);
+      }
+      if (this.options.raid === true) {
+        const v = sim.villages.villages[0];
+        const bande = v === undefined ? null : lancerBande(sim, sim.rng.fork("raid"), v);
+        if (v !== undefined && bande !== null) {
+          bande.taille = 6;
+          bande.position = { x: v.centre.x + 3, y: v.centre.y + 2 };
+          lancerRaid(sim, bande, v);
+        }
       }
       this.dernierTemps = performance.now();
       this.mesureDepuis = this.dernierTemps;

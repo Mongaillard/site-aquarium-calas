@@ -2,6 +2,7 @@
 import type {
   BatailleEtat,
   EvenementEtat,
+  MembreEtat,
   MessageEtat,
   MessageFiche,
   MessageInit,
@@ -277,6 +278,30 @@ export class Magasin {
             });
           }
         }
+        for (const b of message.villages.batailles)
+          for (const m of [...b.attaquant.membres, ...b.defenseur.membres]) {
+            const t = this.trajets.get(m.id);
+            if (t === undefined)
+              this.trajets.set(m.id, {
+                ax: m.x,
+                ay: m.y,
+                bx: m.x,
+                by: m.y,
+                t0: maintenant,
+                t1: maintenant,
+              });
+            else if (t.bx !== m.x || t.by !== m.y) {
+              const courant = this.positionAffichee(m.id, maintenant) ?? { x: t.bx, y: t.by };
+              this.trajets.set(m.id, {
+                ax: courant.x,
+                ay: courant.y,
+                bx: m.x,
+                by: m.y,
+                t0: maintenant,
+                t1: maintenant + duree,
+              });
+            }
+          }
         for (const tr of message.troupeaux) {
           const cle = `troupeau:${tr.id}`;
           const t = this.trajets.get(cle);
@@ -409,6 +434,33 @@ export class Magasin {
       for (const id of b.defenseur.guerriers) m.set(id, "defenseur");
     }
     return m;
+  }
+
+  /** Les combattants virtuels (pillards, loups) des batailles en cours, avec leur genre. */
+  get membresEnBataille(): readonly (MembreEtat & {
+    readonly genre: string;
+    readonly camp: "attaquant" | "defenseur";
+  })[] {
+    const r: (MembreEtat & { genre: string; camp: "attaquant" | "defenseur" })[] = [];
+    for (const b of this.etat?.villages.batailles ?? []) {
+      if (b.phase === "finie") continue;
+      for (const m of b.attaquant.membres) r.push({ ...m, genre: b.genre, camp: "attaquant" });
+      for (const m of b.defenseur.membres) r.push({ ...m, genre: b.genre, camp: "defenseur" });
+    }
+    return r;
+  }
+
+  /** Bandes et meutes engagées dans une bataille : dessinées membre par membre, pas en groupe. */
+  get groupesEnBataille(): ReadonlySet<string> {
+    const s = new Set<string>();
+    for (const b of this.etat?.villages.batailles ?? []) {
+      if (b.phase === "finie") continue;
+      for (const c of [b.attaquant, b.defenseur]) {
+        if (c.bande !== null) s.add(c.bande);
+        if (c.meute !== null) s.add(c.meute);
+      }
+    }
+    return s;
   }
 
   /** Personnages ayant une question de conseil ouverte. */

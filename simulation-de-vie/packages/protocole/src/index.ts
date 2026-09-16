@@ -276,8 +276,21 @@ export interface FrappeEtat {
   readonly mortelle: boolean;
 }
 
+/** Un combattant virtuel (pillard, loup) : position et santé, pour le dessin et la barre de vie. */
+export interface MembreEtat {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly sante: number;
+  readonly santeMax: number;
+}
+
 export interface CampEtat {
   readonly village: string | null;
+  /** La bande ou la meute, pour un camp virtuel. */
+  readonly bande: string | null;
+  readonly meute: string | null;
+  readonly membres: readonly MembreEtat[];
   readonly nom: string;
   /** Les combattants encore engagés. */
   readonly guerriers: readonly string[];

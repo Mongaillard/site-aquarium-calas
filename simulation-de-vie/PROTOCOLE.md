@@ -1280,6 +1280,23 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   stress 15 et sécurité −25 pour tous, attitude −10 ; événement `village/bataille` (`issue`,
   `gagnant` nullable, `blesses` = coups portés, `morts`, `butin`, `numero`, `duree`). Les
   batailles finies restent un jour dans l'état (`REMANENCE`), puis s'effacent.
+- **Camps virtuels (M32c)** : un `Camp` porte `bande` ou `meute` et des `membres`
+  (`{id, x, y, sante, santeMax, cadence}`) ; `positionDe` et `adversaireLePlusProche` lisent
+  indifféremment un personnage ou un membre, `frapper(monde, b, de, vers)` aussi (un membre
+  frappe à 0,3 de chance ; morsure des loups avec la gravité et le cuir de M10 ; un personnage
+  inflige à un membre 10 + 50 × bonus d'arme + 2 × niveau de chasse). `agirMembres` chaque
+  tick : un pas (Tchebychev, sans quitter le champ) vers l'adversaire le plus proche, puis un
+  coup à la cadence. `lancerRaid` (depuis `heureVillages`, à la place du pillage instantané,
+  quand aucune bataille ne court) : phase `combat` d'emblée, pillards à `SANTE_PILLARD = 60`,
+  bande en état `combat` (ignorée par `heureVillages`), défense levée à quarante tuiles ;
+  `conclureRaid` : vainqueurs → le pillage de M21 (`PART_PILLAGE`, bâtiment ébranlé, peur) et
+  état `pille` ; sinon état `repousse`, compteur `raidsRepousses`, événement `raid/repousse`.
+  `lancerBatailleMeute` (depuis `heureDeDanger`, à la place de `combattre`) : loups à
+  `SANTE_LOUP = 30`, défenseurs = `defenseursAutour` de la proie, retardataires à dix tuiles,
+  la meute suit le barycentre de ses membres ; `conclureMeute` : `taille` = survivants,
+  `faireFuir`, faim, un événement `combat` (`issue` repoussés / fuite / mort selon les morts,
+  `rounds` = durée / cadence, `loupsTues`, `victime`). Les troupeaux à zéro s'effacent au tick.
+  `combattre` de M10 reste (tests) mais n'est plus appelé par la simulation.
 - **Protocole** : `BatailleEtat` (`CampEtat` avec `nom`, `guerriers`, `forceInitiale`,
   `blesses`, `morts` ; `x`, `y`, `rayon` ; ticks ; `issue` ; `frappes`). `declarerGuerre`
   (exporté, `?guerre` du mode local) déclare et date la guerre pour qu'une troupe parte à
@@ -1289,7 +1306,10 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   `combattants`. `rendu.ts` : cercle du champ, anneaux de camp, élan (0,38 tuile vers
   l'adversaire sur les six premiers dixièmes), éclat à l'impact (blanc manqué, rouge porté),
   barre de vie en pixels (26 × 4, vert/jaune/rouge, tiret de camp) dès cinq pixels par tuile,
-  chiffre des dégâts qui monte et s'efface. `panneaux.ts:jauge()` → `#bataille` (titre
+  chiffre des dégâts qui monte et s'efface. Les membres virtuels (`CampEtat.membres`, avec
+  `bande`/`meute`) ont leurs trajets interpolés, se dessinent un par un (pillards gris lance au
+  poing, loups) avec anneau et barre de vie, et le groupe (bande, meute) se cache pendant la
+  bataille (`groupesEnBataille`). `panneaux.ts:jauge()` → `#bataille` (titre
   cliquable « aller voir », deux barres de force, morts), gardée trente-six ticks après la fin.
 - Tests : `core/test/bataille.test.ts` (levée, marche, assaut, conclusion, drapeaux levés,
   journal ; même graine, même bataille ; sauvegarde en cours de route), `viewer/test/bataille.test.ts`

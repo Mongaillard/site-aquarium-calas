@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Simulation, relationEntre } from "../src/index.js";
+import { Simulation, lancerBatailleMeute, lancerRaid, relationEntre } from "../src/index.js";
+import type { Troupeau } from "../src/index.js";
 import type { Personnage } from "../src/index.js";
 import { ajouterObjet } from "../src/agents/inventaire.js";
 import { SEUILS } from "../src/monde/generation.js";
@@ -119,4 +120,80 @@ describe("M32 : la bataille tick par tick", () => {
     for (let t = 0; t < 600 && bc?.phase !== "finie"; t++) copie.avancer(1);
     expect(bc?.phase).toBe("finie");
   }, 120_000);
+
+  it("un raid se joue sur la carte : les pillards repoussés s'en vont bredouilles (M32c)", () => {
+    const sim = Simulation.creer({ seed: 5, population: { initiale: 12, familles: 3 } });
+    sim.config.brain.conseilsParJour = 0;
+    sim.avancer(144);
+    const v = sim.villages.villages[0];
+    if (v === undefined) throw new Error("pas de village");
+    for (const p of sim.vivants())
+      if (p.corps.stade === "adulte")
+        ajouterObjet(p.corps.inventaire, { type: "lance", solidite: 100 });
+    sim.villages.bandes.push({
+      id: "bande-test",
+      taille: 3,
+      position: { x: v.centre.x + 2, y: v.centre.y },
+      etat: "approche",
+      cible: v.id,
+      depuisJour: sim.horloge.moment().jourAbsolu,
+      butin: 0,
+    });
+    // Un village faible aux yeux de la bande (force < 2 × taille) mais bien armé pour le combat :
+    // on force le raid directement.
+    const bande = sim.villages.bandes[0];
+    if (bande === undefined) throw new Error("pas de bande");
+    const b = lancerRaid(sim, bande, v);
+    expect(b.genre).toBe("raid");
+    expect(b.attaquant.membres).toHaveLength(3);
+    expect(bande.etat).toBe("combat");
+    expect(sim.journal.parType("raid").some((e) => e.details.genre === "assaut")).toBe(true);
+    for (let t = 0; t < 400 && b.phase !== "finie"; t++) sim.avancer(1);
+    expect(b.phase).toBe("finie");
+    expect(b.frappes.length).toBeGreaterThan(0);
+    expect(["pille", "repousse"]).toContain(bande.etat);
+    if (b.issue === "attaquant") expect(sim.villages.compteurs.pillages).toBe(1);
+    else expect(sim.villages.compteurs.raidsRepousses).toBe(1);
+    for (const p of sim.personnages) expect(p.drapeaux.bataille ?? null).toBeNull();
+  }, 60_000);
+
+  it("une meute qui atteint sa proie se bat tick par tick et un seul événement combat résume (M32c)", () => {
+    const sim = Simulation.creer({ seed: 5, population: { initiale: 12, familles: 3 } });
+    sim.config.brain.conseilsParJour = 0;
+    sim.avancer(144);
+    const proie = sim.vivants().find((p) => p.corps.stade === "adulte");
+    if (proie === undefined) throw new Error("personne");
+    const pos = proie.corps.position;
+    const loups: Troupeau = {
+      id: "meute-test",
+      espece: "loup",
+      position: { x: pos.x + 1, y: pos.y },
+      gite: { x: pos.x + 20, y: pos.y },
+      giteEte: { x: pos.x + 20, y: pos.y },
+      taille: 4,
+      mefiance: 0,
+      etat: "pature",
+      cible: null,
+      faim: 6,
+      derniereMiseBas: 0,
+      proieHumaine: proie.id,
+      enMenace: true,
+      rng: sim.rng.fork("meute-test"),
+    };
+    sim.troupeaux.set(loups.id, loups);
+    const b = lancerBatailleMeute(sim, loups, proie);
+    expect(b.genre).toBe("meute");
+    expect(b.attaquant.membres).toHaveLength(4);
+    expect(b.defenseur.guerriers).toContain(proie.id);
+    for (let t = 0; t < 300 && b.phase !== "finie"; t++) sim.avancer(1);
+    expect(b.phase).toBe("finie");
+    const combat = sim.journal.parType("combat").at(-1);
+    expect(combat).toBeDefined();
+    expect(combat?.details.contre).toBe("loups");
+    expect(["repousses", "fuite", "mort"]).toContain(combat?.details.issue);
+    expect(loups.proieHumaine).toBeNull();
+    expect(loups.enMenace).toBe(false);
+    expect(loups.taille).toBe(b.attaquant.membres.length);
+    for (const p of sim.personnages) expect(p.drapeaux.bataille ?? null).toBeNull();
+  }, 60_000);
 });

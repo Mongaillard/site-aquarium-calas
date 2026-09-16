@@ -123,6 +123,9 @@ function bataille(
     phase,
     attaquant: {
       village: "v-1",
+      bande: null,
+      meute: null,
+      membres: [],
       nom: "les Naudin",
       guerriers: ["p-1", "p-2"],
       forceInitiale: 3,
@@ -131,6 +134,9 @@ function bataille(
     },
     defenseur: {
       village: "v-2",
+      bande: null,
+      meute: null,
+      membres: [],
       nom: "les Garnier",
       guerriers: ["p-3"],
       forceInitiale: 2,

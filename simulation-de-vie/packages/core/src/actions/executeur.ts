@@ -1,5 +1,5 @@
 /** Exécution tick par tick des actions atomiques (section 6). */
-import { batailleDe, campDe, frapper } from "../monde/bataille.js";
+import { batailleDe, campDe, frapper, positionDe } from "../monde/bataille.js";
 import { clamp } from "../agents/besoins.js";
 import { gagnerExperience, niveau } from "../agents/competences.js";
 import {
@@ -203,13 +203,13 @@ function tickCombattre(
 ): Resultat {
   const b = batailleDe(monde, p.drapeaux.bataille);
   if (b?.phase !== "combat") return TERMINEE;
-  const cible = monde.personnage(action.cible);
-  if (cible?.vivant !== true || campDe(b, cible.id) === null) return TERMINEE;
+  const position = positionDe(monde, b, action.cible);
+  if (position === null || campDe(b, action.cible) === null) return TERMINEE;
   // L'adversaire a bougé : on replanifie sans en faire un échec.
-  if (Grille.distance(p.corps.position, cible.corps.position) > 1) return TERMINEE;
+  if (Grille.distance(p.corps.position, position) > 1) return TERMINEE;
   action.ticksRestants -= 1;
   if (action.ticksRestants > 0) return ENCOURS;
-  frapper(monde, p, cible, b);
+  frapper(monde, b, p.id, action.cible);
   return TERMINEE;
 }
 

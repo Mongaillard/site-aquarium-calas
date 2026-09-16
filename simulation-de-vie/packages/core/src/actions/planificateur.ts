@@ -443,11 +443,11 @@ function planifierCombat(monde: Monde, p: Personnage, id: string): ResultatPlan 
   // Au combat : on rejoint le champ, on ne court pas après ceux qui l'ont quitté.
   if (Grille.distance(pos, b.lieu) > RAYON_CHAMP)
     return marcherVers(monde, p, b.lieu, RAYON_ASSAUT, "aucun chemin vers le champ de bataille");
-  const cible = adversaireLePlusProche(monde, b, p);
+  const cible = adversaireLePlusProche(monde, b, p.id, pos);
   if (cible === null) return ok([{ type: "attendre", ticksRestants: 2 }]);
   const frappe: Action = { type: "combattre", cible: cible.id, ticksRestants: CADENCE_FRAPPE };
-  if (Grille.distance(pos, cible.corps.position) <= 1) return ok([frappe]);
-  const aller = allerPresDe(monde, p, cible.corps.position, 1);
+  if (Grille.distance(pos, cible.position) <= 1) return ok([frappe]);
+  const aller = allerPresDe(monde, p, cible.position, 1);
   if (aller === null) return ok([{ type: "attendre", ticksRestants: 2 }]);
   // Deux pas à la fois : l'adversaire bouge aussi, on ne le dépasse pas.
   const chemin = aller.type === "deplacer" ? aller.chemin : null;

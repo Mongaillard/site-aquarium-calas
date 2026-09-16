@@ -180,6 +180,7 @@ function creerLiaison(graine: string, sauvegarde?: unknown): Liaison {
       },
       ...(sauvegarde !== undefined ? { sauvegarde } : {}),
       ...(parametres.has("guerre") ? { guerre: true } : {}),
+      ...(parametres.has("raid") ? { raid: true } : {}),
     },
     recevoir,
     connexion,

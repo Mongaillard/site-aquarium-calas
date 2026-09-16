@@ -640,8 +640,12 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
           return `🏴 Une bande de ${String(d.taille)} approche de ${String(d.nom)}, attirée par les stocks.`;
         case "tribut":
           return `🏴 ${String(d.nom)} (force ${String(d.force)}) négocie : la bande de ${String(d.taille)} repart avec un tribut de ${String(d.quantite)} portions.`;
+        case "assaut":
+          return `⚔️ Une bande de ${String(d.taille)} pillards attaque ${String(d.nom)} : ${String(d.defenseurs)} défenseur${Number(d.defenseurs) > 1 ? "s" : ""} prennent les armes.`;
+        case "repousse":
+          return `🛡️ ${String(d.nom)} repousse les pillards${Number(d.pillardsTues) > 0 ? ` (${String(d.pillardsTues)} tué${Number(d.pillardsTues) > 1 ? "s" : ""})` : ""}${Number(d.morts) > 0 ? `, ${String(d.morts)} mort${Number(d.morts) > 1 ? "s" : ""}` : ""}.`;
         case "pillage":
-          return `🔥 Pillage de ${String(d.nom)} par une bande de ${String(d.taille)} : ${String(d.quantite)} portions emportées${d.batiment ? `, ${String(d.batiment)} ébranlé` : ""}.`;
+          return `🔥 Pillage de ${String(d.nom)} par une bande de ${String(d.taille)} : ${String(d.quantite)} portions emportées${d.batiment ? `, ${String(d.batiment)} ébranlé` : ""}${Number(d.morts) > 0 ? `, ${String(d.morts)} mort${Number(d.morts) > 1 ? "s" : ""}` : ""}.`;
         default:
           return `La bande s'éloigne.`;
       }

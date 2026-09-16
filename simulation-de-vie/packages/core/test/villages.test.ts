@@ -142,7 +142,9 @@ describe("le monde s'élargit (jalon 15)", () => {
     const chef2 = adultes(sim2)[0];
     if (w === undefined || chef2 === undefined) throw new Error("personne");
     entrepotPlein(sim2, chef2, 100);
-    for (const p of sim2.vivants()) if (p.id !== chef2.id) p.corps.stade = "enfant";
+    // Les autres adultes sont trop mal en point pour prendre les armes (M32c : sous quarante de
+    // santé, on ne s'enrôle pas), et le village est trop faible pour un tribut.
+    for (const p of sim2.vivants()) if (p.id !== chef2.id) p.corps.sante = 30;
     sim2.villages.bandes.push({
       id: "bande-test",
       taille: 6,
@@ -152,9 +154,15 @@ describe("le monde s'élargit (jalon 15)", () => {
       depuisJour: sim2.horloge.moment().jourAbsolu,
       butin: 0,
     });
-    for (let i = 0; i < 4; i++) heureVillages(sim2, sim2.rng.fork(`t${String(i)}`));
+    // Depuis M32c, le raid se joue tick par tick : six pillards contre un seul adulte, le
+    // village est pris et pillé.
+    for (let t = 0; t < 400 && sim2.villages.compteurs.pillages === 0; t++) sim2.avancer(1);
     expect(sim2.villages.compteurs.pillages).toBe(1);
+    expect(sim2.journal.parType("raid").some((e) => e.details.genre === "assaut")).toBe(true);
     expect(sim2.journal.parType("raid").some((e) => e.details.genre === "pillage")).toBe(true);
+    expect(sim2.villages.batailles.some((b) => b.genre === "raid" && b.issue === "attaquant")).toBe(
+      true,
+    );
   });
 
   it("une caravane porte un surplus vers un manque et fait voyager une invention ; un vol entre villages est un casus belli", () => {

@@ -245,11 +245,24 @@ export function villagesEtat(sim: Simulation): VillagesEtat {
 
 function campEtat(sim: Simulation, c: CampBataille): CampEtat {
   const nom =
-    c.village === null
-      ? "des étrangers"
-      : (sim.villages.villages.find((v) => v.id === c.village)?.nom ?? c.village);
+    c.meute !== null
+      ? "les loups"
+      : c.bande !== null
+        ? "les pillards"
+        : c.village === null
+          ? "des étrangers"
+          : (sim.villages.villages.find((v) => v.id === c.village)?.nom ?? c.village);
   return {
     village: c.village,
+    bande: c.bande,
+    meute: c.meute,
+    membres: c.membres.map((m) => ({
+      id: m.id,
+      x: m.x,
+      y: m.y,
+      sante: m.sante,
+      santeMax: m.santeMax,
+    })),
     nom,
     guerriers: [...c.guerriers],
     forceInitiale: c.forceInitiale,

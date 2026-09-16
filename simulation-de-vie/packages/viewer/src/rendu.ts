@@ -168,10 +168,11 @@ export class Rendu {
         ctx.arc(c.x + 0.7, c.y + 0.78, 0.12, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Les bandes : des silhouettes grises, lance au poing, en groupe.
+      // Les bandes : des silhouettes grises, lance au poing, en groupe (en bataille, une par une).
+      const groupesEnBataille = magasin.groupesEnBataille;
       ctx.imageSmoothingEnabled = cam.echelle < SEUIL_PIXELS;
       for (const b of etat.villages.bandes) {
-        if (!visible(b.x, b.y)) continue;
+        if (!visible(b.x, b.y) || groupesEnBataille.has(b.id)) continue;
         for (let i = 0; i < Math.min(4, b.taille); i++) {
           sprites.personnage(ctx, b.x + (i % 2) * 0.6 - 0.3, b.y + Math.floor(i / 2) * 0.5, {
             couleur: "#4a4a4a",
@@ -237,7 +238,14 @@ export class Rendu {
         }))
         .sort((a, b) => a.pos.y - b.pos.y);
       // La bataille (M32) : le champ, les anneaux de camp, les élans des coups.
-      const parId = new Map(positions.map(({ p, pos }) => [p.id, pos] as const));
+      const parId = new Map<string, { x: number; y: number }>(
+        positions.map(({ p, pos }) => [p.id, pos] as const),
+      );
+      const membres = magasin.membresEnBataille.map((m) => ({
+        m,
+        pos: magasin.positionAffichee(m.id, maintenant) ?? { x: m.x, y: m.y, enMouvement: false },
+      }));
+      for (const { m, pos } of membres) parId.set(m.id, pos);
       const combattants = magasin.combattants;
       const elans = new Map<string, { dx: number; dy: number }>();
       const impacts: { x: number; y: number; t: number; degats: number; mortelle: boolean }[] = [];
@@ -342,6 +350,56 @@ export class Rendu {
           },
         });
       }
+      // Les combattants virtuels : pillards en gris, lance au poing ; loups un par un.
+      for (const { m, pos } of membres) {
+        if (!visible(pos.x, pos.y)) continue;
+        const elan = elans.get(m.id);
+        const x = pos.x + (elan?.dx ?? 0);
+        const y = pos.y + (elan?.dy ?? 0);
+        ctx.strokeStyle =
+          m.camp === "attaquant" ? "rgba(255, 96, 96, 0.9)" : "rgba(111, 176, 255, 0.9)";
+        ctx.lineWidth = 0.12;
+        ctx.beginPath();
+        ctx.ellipse(pos.x + 0.5, pos.y + 0.9, 0.5, 0.22, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        if (m.genre === "meute") {
+          sprites.troupeau(ctx, x, y, {
+            espece: "loup",
+            taille: 1,
+            predateur: true,
+            yeux: nuit,
+            echelle: 1,
+            marche: pos.enMouvement,
+            phase: (maintenant / 300 + m.x) % 1,
+          });
+        } else {
+          const n = Number.parseInt(m.id.split(":").at(-1) ?? "0", 10) || 0;
+          sprites.personnage(ctx, x, y, {
+            couleur: "#4a4a4a",
+            contour: "#222222",
+            teint: "#b8a898",
+            cheveux: "#2a2a2a",
+            sexe: "M",
+            echelle: 0.9,
+            endormi: false,
+            marche: pos.enMouvement,
+            phase: (maintenant / 350 + n * 0.25) % 1,
+            enceinte: false,
+            selection: false,
+            survol: false,
+            couches: {
+              teint: "hâlé",
+              cheveux: "noirs",
+              sexe: "M",
+              coiffure: n,
+              couleur: "#5a5a60",
+              outil: "lance",
+              malade: false,
+              banni: false,
+            },
+          });
+        }
+      }
       ctx.imageSmoothingEnabled = true;
       // Les impacts des coups : un éclat blanc qui s'ouvre, rouge s'il a porté.
       for (const i of impacts) {
@@ -382,6 +440,7 @@ export class Rendu {
       }
       // La faune : troupeaux et meutes sur les tuiles connues.
       for (const tr of etat.troupeaux) {
+        if (groupesEnBataille.has(tr.id)) continue;
         const pos = magasin.positionAffichee(`troupeau:${tr.id}`, maintenant) ?? {
           x: tr.x,
           y: tr.y,
@@ -571,6 +630,23 @@ export class Rendu {
         ctx.fillStyle = camp === "attaquant" ? "#ff6060" : "#6fb0ff";
         ctx.fillRect(x - 4, y, 2, 4);
       }
+      for (const m of magasin.membresEnBataille) {
+        const pos = magasin.positionAffichee(m.id, maintenant) ?? { x: m.x, y: m.y };
+        if (!visible(pos.x, pos.y)) continue;
+        const e = versEcran(cam, pos.x + 0.5, pos.y - 0.05);
+        const w = 26;
+        const x = Math.round(e.x - w / 2);
+        const y = Math.round(e.y - 4);
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(x - 1, y - 1, w + 2, 6);
+        ctx.fillStyle = "#3a1414";
+        ctx.fillRect(x, y, w, 4);
+        const part = Math.max(0, Math.min(1, m.sante / Math.max(1, m.santeMax)));
+        ctx.fillStyle = part > 0.5 ? "#6fd36f" : part > 0.3 ? "#ffcf4a" : "#ff5a5a";
+        ctx.fillRect(x, y, Math.round(w * part), 4);
+        ctx.fillStyle = m.camp === "attaquant" ? "#ff6060" : "#6fb0ff";
+        ctx.fillRect(x - 4, y, 2, 4);
+      }
       // Les dégâts qui montent et s'effacent.
       ctx.font = "bold 13px system-ui, sans-serif";
       ctx.textAlign = "center";
@@ -579,9 +655,8 @@ export class Rendu {
         if (c.debut > maintenant || c.fin < maintenant || c.degats <= 0) continue;
         const t = (maintenant - c.debut) / (c.fin - c.debut);
         if (t < 0.3) continue;
-        const p = etat.personnages.find((x) => x.id === c.vers);
-        if (p === undefined) continue;
-        const pos = magasin.positionAffichee(p.id, maintenant) ?? { x: p.x, y: p.y };
+        const pos = magasin.positionAffichee(c.vers, maintenant);
+        if (pos === null) continue;
         const e = versEcran(cam, pos.x + 0.5, pos.y - 0.2);
         const y = e.y - 18 - ((t - 0.3) / 0.7) * 22;
         const alpha = 1 - (t - 0.3) / 0.7;

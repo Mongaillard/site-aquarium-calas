@@ -28,6 +28,7 @@ import type { Rng } from "../rng.js";
 import type { Ressource } from "./ressources.js";
 import { stresser } from "../memoire/psyche.js";
 import { JOURS_DE_GRACE } from "./danger.js";
+import { batailleActive, lancerRaid } from "./bataille.js";
 import type { Bataille } from "./bataille.js";
 
 // ------------------------------------------------------------------ état
@@ -57,7 +58,8 @@ export interface Diplomatie {
   depuisJour: number;
 }
 
-export type EtatBande = "approche" | "negocie" | "pille" | "parti";
+/** `combat` : le raid se joue sur la carte (M32c) ; `repousse` : la bande s'en va bredouille. */
+export type EtatBande = "approche" | "negocie" | "pille" | "combat" | "repousse" | "parti";
 
 export interface Bande {
   readonly id: string;
@@ -103,6 +105,8 @@ export interface EtatVillages {
     batailles: number;
     guerres: number;
     paix: number;
+    /** Raids repoussés par les armes (M32c) ; absent des sauvegardes d'avant. */
+    raidsRepousses?: number;
   };
 }
 
@@ -126,6 +130,7 @@ export function etatVillagesInitial(): EtatVillages {
       batailles: 0,
       guerres: 0,
       paix: 0,
+      raidsRepousses: 0,
     },
   };
 }
@@ -597,7 +602,7 @@ export function heureVillages(monde: MondeVillages, rng: Rng): void {
   const e = monde.villages;
   const jour = jourDe(monde);
   for (const b of e.bandes) {
-    if (b.etat === "parti") continue;
+    if (b.etat === "parti" || b.etat === "combat") continue;
     const cible = e.villages.find((v) => v.id === b.cible);
     if (cible === undefined) {
       b.etat = "parti";
@@ -630,36 +635,10 @@ export function heureVillages(monde: MondeVillages, rng: Rng): void {
           7,
           cible.centre,
         );
-      } else {
-        // Pillage : quatre dixièmes des vivres, un bâtiment ébranlé, la peur.
-        b.butin = prelever(stocks, Math.floor(nourriture * PART_PILLAGE));
-        const proches = [...monde.batiments.values()].filter(
-          (x) => x.etat === "termine" && Grille.distance(x.position, cible.centre) <= 10,
-        );
-        const bat = proches.length > 0 ? rng.choisir(proches) : null;
-        if (bat !== null) bat.solidite = Math.max(5, bat.solidite - 30);
-        for (const p of habitants(monde, cible)) {
-          stresser(p, 15);
-          p.besoins.securite = clamp(p.besoins.securite - 30);
-        }
-        b.etat = "pille";
-        e.compteurs.pillages += 1;
-        monde.emettre(
-          "raid",
-          null,
-          {
-            genre: "pillage",
-            bande: b.id,
-            taille: b.taille,
-            village: cible.id,
-            nom: cible.nom,
-            quantite: b.butin,
-            batiment: bat === null ? null : bat.type,
-            force: Math.round(force),
-          },
-          9,
-          cible.centre,
-        );
+      } else if (batailleActive(monde) === null) {
+        // Trop faible pour un tribut : le raid se joue sur la carte (M32c), et le pillage
+        // n'a lieu que si les pillards l'emportent.
+        lancerRaid(monde, b, cible);
       }
     } else {
       // Repartir, puis disparaître à trente tuiles.

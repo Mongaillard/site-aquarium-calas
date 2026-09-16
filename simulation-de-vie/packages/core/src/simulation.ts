@@ -77,7 +77,6 @@ import { heureBete, jourBete, jourChamp, semer, titre as titreDe } from "./monde
 import type { Bete } from "./monde/village.js";
 import { REPIT_TICKS, etatDangerInitial, heureDanger, proieAuContact } from "./monde/danger.js";
 import type { EtatDanger } from "./monde/danger.js";
-import { combattre } from "./agents/combat.js";
 import {
   ANNEES_ENTRE_EPIDEMIES,
   RAYON_SOUILLURE,
@@ -182,7 +181,12 @@ import {
   observerVillages,
 } from "./monde/villages.js";
 import type { EtatVillages } from "./monde/villages.js";
-import { aubeBatailles, tickBatailles } from "./monde/bataille.js";
+import {
+  aubeBatailles,
+  batailleActive,
+  lancerBatailleMeute,
+  tickBatailles,
+} from "./monde/bataille.js";
 
 export interface Statistiques {
   readonly tick: number;
@@ -296,8 +300,11 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
     });
     brut.villages = villages;
   }
-  // Version 7 (M32) : les batailles tick par tick.
+  // Version 7 (M32) : les batailles tick par tick, les raids repoussés.
   defauts(brut.villages as Record<string, unknown>, { batailles: [] });
+  defauts((brut.villages as { compteurs: Record<string, unknown> }).compteurs, {
+    raidsRepousses: 0,
+  });
   // Version 5 (M25) : les peuples rivaux du départ (un seul dans les mondes d'avant), les lois.
   defauts(etat.config.population, { peuples: 1 });
   if (!("lois" in brut)) brut.lois = loisParDefaut();
@@ -1686,6 +1693,7 @@ export class Simulation implements Monde {
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
     this.gererConseils();
     tickBatailles(this);
+    for (const t of this.troupeaux.values()) if (t.taille <= 0) this.troupeaux.delete(t.id);
     const ordre = this.rng.fork(`tick/${this.tick}`).melanger(this.vivants());
     for (const p of ordre) this.tickPersonnage(p);
     this.horloge.avancer(1);
@@ -1907,29 +1915,12 @@ export class Simulation implements Monde {
     if (meute === undefined) return;
     const proie = proieAuContact(this, meute);
     if (proie === null) return;
-    const tailleAvant = meute.taille;
-    const resultat = combattre(this, meute, proie);
+    if (batailleActive(this) !== null) return;
+    // M32c : le combat se joue tick par tick ; l'événement `combat` vient à sa conclusion.
     this.danger.attaques += 1;
     this.danger.menace = null;
     this.danger.repitJusqua = this.tick + REPIT_TICKS;
-    this.emettre(
-      "combat",
-      proie,
-      {
-        contre: "loups",
-        meute: meute.id,
-        loups: tailleAvant,
-        issue: resultat.issue,
-        rounds: resultat.rounds,
-        defenseurs: resultat.defenseurs,
-        loupsTues: resultat.loupsTues,
-        blesses: resultat.blesses,
-        victime: resultat.victime?.identite.prenom ?? null,
-      },
-      9,
-      proie.corps.position,
-    );
-    if (meute.taille <= 0) this.troupeaux.delete(meute.id);
+    lancerBatailleMeute(this, meute, proie);
     // Après le combat, tout le voisinage est en alerte : on se replie, on secourt.
     for (const p of this.personnages) {
       if (p.vivant && Grille.distance(p.corps.position, proie.corps.position) <= 12)
