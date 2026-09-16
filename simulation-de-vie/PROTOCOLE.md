@@ -1315,6 +1315,33 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   journal ; même graine, même bataille ; sauvegarde en cours de route), `viewer/test/bataille.test.ts`
   (coups animés une fois, échelonnés, effacés ; rattrapage muet ; camps).
 
+## 8 terdecies. Le dieu et la guerre tel que réalisé (M33)
+
+- **Pouvoirs** (`protocole` : `POUVOIRS` + `guerre`, `apaiser` ; fiches ; `NIVEAU_POUVOIR`
+  2 et 1 ; `FICHES_DOMAINE` : `guerre` favori du Feu, `apaiser` des Songes) ; `divin.ts` :
+  `sonnerLaGuerre(monde, pos, rng)` — `villageLePlusProche` (trente tuiles), le pire voisin par
+  attitude puis distance, `declarerGuerre` puis `leverTroupe(…, attaquantForce = a)` (nouveau
+  paramètre : le village visé attaque, quel que soit le rapport de forces) ; refus
+  `sans_effet` si la loi dort, si une bataille court, s'il n'y a qu'un village ;
+  `apaiser(monde, pos)` — `conclure(b, "treve")` sur la bataille active (tout genre), sinon
+  `faireLaPaix` sur chaque relation en guerre du village le plus proche, sinon `sans_effet`.
+  Après un `foudre` réussi, `frappeDuCiel(monde, pos)` : sur la bataille active en combat, tout
+  combattant à deux tuiles reçoit une frappe `de: "ciel"` (membre : −40 de santé, retiré à
+  zéro ; personnage : 20 consignés, la brûlure venant du pouvoir lui-même), et l'effet s'en
+  fait l'écho.
+- **Gardien** : `gardienRepousse(monde, creatures)` au tick, après `tickBatailles` : un gardien
+  à dix tuiles du lieu d'un raid ou d'une meute en combat conclut en faveur des défenseurs,
+  `faits += 1`, événement `divin` de pouvoir `gardien_repousse`.
+- **Loi `guerres`** (`LOIS`, `FICHES_LOI`, `loisParDefaut`, migration par défaut) : `aubeVillages`
+  reçoit `lois.guerres` ; `diplomatie` ne déclare rien et fait la paix des guerres en cours
+  quand elle dort ; `aubeBatailles` n'est pas appelée.
+- Viewer : `dessinerEffet` pour `guerre` et `apaiser` ; la barre des pouvoirs et la liste des
+  lois se construisent des catalogues, rien d'autre à câbler.
+- Tests (`guerre-divine.test.ts`) : Sonner la guerre (guerre déclarée, troupe en marche, le
+  village visé attaque, sans effet pendant la bataille) ; Apaiser (trêve, drapeaux levés, puis
+  paix, puis sans effet) ; loi suspendue (refus du pouvoir, paix à l'aube, rien ne se déclare) ;
+  foudre sur un pillard (frappe du ciel, santé 20) et gardien qui repousse le raid.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

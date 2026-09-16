@@ -2,6 +2,26 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M33 – Le dieu et la guerre (2026-09-16)
+
+Le joueur a prise sur les batailles de M32.
+
+- **Deux pouvoirs** : **⚔️ Sonner la guerre** (16 ✦, rang 2, favori du Feu ; recharge six
+  jours) — le village le plus proche de la tuile visée entre en guerre avec son pire voisin
+  (l'attitude la plus basse, puis le plus proche) et sa troupe part sur-le-champ ; sans effet
+  si une bataille court déjà ou si la loi des guerres dort. **🕊️ Apaiser** (10 ✦, rang 1,
+  favori des Songes ; recharge trois jours) — la bataille en cours s'arrête en trêve (les
+  pillards s'en vont les mains vides, la meute renonce) ; sans bataille, le village le plus
+  proche fait la paix (le prix du sang) avec chacun de ses ennemis.
+- **Les pouvoirs en bataille** : la **Foudre** tombée sur le champ frappe aussi les
+  combattants virtuels à deux tuiles (quarante de dégâts à un pillard ou un loup, en plus de la
+  brûlure que les personnages reçoivent déjà) et consigne le coup au nom du ciel, animé comme
+  les autres ; un **Gardien** posté à dix tuiles d'un raid ou d'une meute en plein combat les
+  repousse (événement `divin/gardien_repousse`, un fait de plus au gardien).
+- **Loi « Les guerres »** (⚖️) : suspendue, aucun village ne déclare la guerre, aucune troupe
+  ne se lève, et les guerres en cours se règlent par la paix à l'aube.
+- Viewer : effets des deux pouvoirs sur la carte (anneau rouge et ⚔️ ; anneau blanc et 🕊️).
+
 ## M32 – La guerre se voit : batailles tick par tick, animées (2026-09-16)
 
 Une bataille entre villages se résolvait d'un coup à l'aube, hors écran : on la lisait dans le

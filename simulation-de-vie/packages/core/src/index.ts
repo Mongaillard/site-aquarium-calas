@@ -230,6 +230,8 @@ export {
   guerriersDisponibles,
   lancerRaid,
   lancerBatailleMeute,
+  frappeDuCiel,
+  gardienRepousse,
   positionDe as positionEnBataille,
   SANTE_PILLARD,
   SANTE_LOUP,

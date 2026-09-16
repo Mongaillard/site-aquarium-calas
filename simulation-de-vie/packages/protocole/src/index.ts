@@ -468,6 +468,8 @@ export const POUVOIRS = [
   "fievre",
   "secousse",
   "epiphanie",
+  "guerre",
+  "apaiser",
 ] as const;
 export type Pouvoir = (typeof POUVOIRS)[number];
 
@@ -608,6 +610,28 @@ export const FICHES_POUVOIR: Readonly<Record<Pouvoir, FichePouvoir>> = {
     rechargeJours: 5,
     bienfait: false,
     description: "Une meute affamée arrive ici et menacera le village dès ce soir.",
+  },
+  guerre: {
+    nom: "Sonner la guerre",
+    emoji: "⚔️",
+    cout: 16,
+    cible: "tuile",
+    rayon: 0,
+    rechargeJours: 6,
+    bienfait: false,
+    description:
+      "Le village le plus proche entre en guerre avec son pire voisin et sa troupe part sur-le-champ.",
+  },
+  apaiser: {
+    nom: "Apaiser",
+    emoji: "🕊️",
+    cout: 10,
+    cible: "tuile",
+    rayon: 8,
+    rechargeJours: 3,
+    bienfait: true,
+    description:
+      "La bataille en cours s'arrête, chacun rentre ; sans bataille, le village le plus proche fait la paix.",
   },
   gel: {
     nom: "Gel précoce",
@@ -1131,7 +1155,7 @@ export const FICHES_DOMAINE: Readonly<Record<Domaine, FicheDomaine>> = {
     titre: "la Braise",
     emoji: "🔥",
     description: "Braises, sécheresse, fièvres : un ciel qui éprouve.",
-    pouvoirs: ["braise", "secheresse", "fievre", "foudre", "loups"],
+    pouvoirs: ["braise", "secheresse", "fievre", "foudre", "loups", "guerre"],
     etranger: "moisson",
     gardien: {
       nom: "la Salamandre",
@@ -1149,7 +1173,7 @@ export const FICHES_DOMAINE: Readonly<Record<Domaine, FicheDomaine>> = {
     titre: "le Veilleur",
     emoji: "🌙",
     description: "Rêves, idées, épiphanies : un ciel qui murmure.",
-    pouvoirs: ["songe", "idee", "epiphanie", "regard", "guerison"],
+    pouvoirs: ["songe", "idee", "epiphanie", "regard", "guerison", "apaiser"],
     etranger: "orage",
     gardien: {
       nom: "le Sphinx",
@@ -1183,6 +1207,8 @@ export const NIVEAU_POUVOIR: Readonly<Record<Pouvoir, number>> = {
   loups: 2,
   secousse: 2,
   epiphanie: 3,
+  guerre: 2,
+  apaiser: 1,
 };
 /** Rang maximal du ciel (culte 3, ou culte 2 et l'âge du cuivre). */
 export const RANG_MAX = 3;
@@ -1410,6 +1436,7 @@ export const LOIS = [
   "schismes",
   "vieillesse",
   "conteur",
+  "guerres",
 ] as const;
 export type Loi = (typeof LOIS)[number];
 export type LoisEtat = Readonly<Record<Loi, boolean>>;
@@ -1458,6 +1485,12 @@ export const FICHES_LOI: Readonly<Record<Loi, FicheLoi>> = {
     description:
       "Sans lui, plus d'épreuves ni de bienfaits scénarisés, ni de chronique : le monde suit son cours.",
   },
+  guerres: {
+    nom: "Les guerres",
+    emoji: "⚔️",
+    description:
+      "Sans elles, aucun village ne déclare la guerre, et celles en cours se règlent par la paix à l'aube.",
+  },
 };
 
 /** Les lois telles qu'un monde naît : toutes en vigueur. */
@@ -1470,6 +1503,7 @@ export function loisParDefaut(): Record<Loi, boolean> {
     schismes: true,
     vieillesse: true,
     conteur: true,
+    guerres: true,
   };
 }
 

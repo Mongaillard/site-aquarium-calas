@@ -929,6 +929,32 @@ export class Rendu {
         ctx.stroke();
         break;
       }
+      case "guerre": {
+        ctx.strokeStyle = `rgba(255, 96, 96, ${String(1 - t)})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, Math.max(6, r * 2 * t), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255, 220, 200, ${String(1 - t)})`;
+        ctx.font = "20px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("⚔️", c.x, c.y - 16 - t * 20);
+        break;
+      }
+      case "apaiser": {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${String(0.8 * (1 - t))})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, Math.max(6, r * (0.4 + t)), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255, 255, 255, ${String(1 - t)})`;
+        ctx.font = "18px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🕊️", c.x + 8, c.y - 14 - t * 24);
+        break;
+      }
       case "songe": {
         ctx.fillStyle = `rgba(200, 180, 255, ${String(1 - t)})`;
         ctx.font = "16px system-ui, sans-serif";

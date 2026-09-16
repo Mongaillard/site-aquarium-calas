@@ -184,6 +184,7 @@ import type { EtatVillages } from "./monde/villages.js";
 import {
   aubeBatailles,
   batailleActive,
+  gardienRepousse,
   lancerBatailleMeute,
   tickBatailles,
 } from "./monde/bataille.js";
@@ -308,6 +309,8 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
   // Version 5 (M25) : les peuples rivaux du départ (un seul dans les mondes d'avant), les lois.
   defauts(etat.config.population, { peuples: 1 });
   if (!("lois" in brut)) brut.lois = loisParDefaut();
+  // Version 7 (M33) : la loi des guerres.
+  defauts(brut.lois as Record<string, unknown>, { guerres: true });
   defauts(brut.lois as Record<string, unknown>, loisParDefaut());
   defauts(brut, { creatures: [], compteurCreatures: 0, conteur: etatConteurInitial() });
   defauts(brut.config as Record<string, unknown>, { jeu: { scenario: null } });
@@ -1693,6 +1696,7 @@ export class Simulation implements Monde {
     if (moment.heure === 21 && moment.minute === 0) this.soiree();
     this.gererConseils();
     tickBatailles(this);
+    if (this.creatures.size > 0) gardienRepousse(this, this.creatures.values());
     for (const t of this.troupeaux.values()) if (t.taille <= 0) this.troupeaux.delete(t.id);
     const ordre = this.rng.fork(`tick/${this.tick}`).melanger(this.vivants());
     for (const p of ordre) this.tickPersonnage(p);
@@ -1751,9 +1755,9 @@ export class Simulation implements Monde {
         this.rng.fork(`villages/aube/${String(this.tick)}`),
         this.societe.tension,
         this.societe.factions,
-        { raids: this.lois.raids, schismes: this.lois.schismes },
+        { raids: this.lois.raids, schismes: this.lois.schismes, guerres: this.lois.guerres },
       );
-      aubeBatailles(this, this.rng.fork(`batailles/${String(this.tick)}`));
+      if (this.lois.guerres) aubeBatailles(this, this.rng.fork(`batailles/${String(this.tick)}`));
     }
     if (this.tick > 0) {
       this.conseilsDuJour = 0;

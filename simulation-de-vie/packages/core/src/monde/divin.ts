@@ -6,6 +6,14 @@
  * type `divin`, pour le rejeu.
  */
 import {
+  batailleActive,
+  conclure as conclureBataille,
+  frappeDuCiel,
+  leverTroupe,
+} from "./bataille.js";
+import { declarerGuerre, faireLaPaix, relationEntre } from "./villages.js";
+import type { Village } from "./villages.js";
+import {
   COUT_ETRANGER,
   COUT_FAVORI,
   COUT_PAR_USAGE,
@@ -459,6 +467,21 @@ export function exercer(
       resultat =
         cible === undefined ? { ok: false, raison: "cible_invalide" } : epiphanie(monde, cible);
       break;
+    case "guerre":
+      resultat = sonnerLaGuerre(monde, pos, rng);
+      break;
+    case "apaiser":
+      resultat = apaiser(monde, pos);
+      break;
+  }
+  if (resultat.ok && commande.pouvoir === "foudre") {
+    // Sur un champ de bataille (M33), la foudre frappe aussi les combattants virtuels.
+    const touches = frappeDuCiel(monde, pos);
+    if (touches > 0)
+      resultat = {
+        ...resultat,
+        effet: `${resultat.effet}, ${String(touches)} combattant${touches > 1 ? "s" : ""} foudroyé${touches > 1 ? "s" : ""}`,
+      };
   }
   if (!resultat.ok) return resultat;
   etat.valeur -= cout;
@@ -639,6 +662,83 @@ function loups(monde: MondeDivin, pos: Position): ResultatPouvoir {
     ok: true,
     effet: "une meute affamée rôde, elle viendra ce soir",
     temoin: temoinProche(monde, pos, RAYON_TEMOIN),
+  };
+}
+
+/** Le village le plus proche d'une position, à trente tuiles au plus. */
+function villageLePlusProche(monde: Monde, pos: Position): Village | null {
+  let meilleur: Village | null = null;
+  let d = 30;
+  for (const v of monde.villages.villages) {
+    const dist = Grille.distance(v.centre, pos);
+    if (dist <= d) {
+      d = dist;
+      meilleur = v;
+    }
+  }
+  return meilleur;
+}
+
+/** Sonner la guerre (M33) : le village visé entre en guerre avec son pire voisin, troupe levée. */
+function sonnerLaGuerre(monde: MondeDivin, pos: Position, rng: Rng): ResultatPouvoir {
+  if (!monde.lois.guerres) return { ok: false, raison: "sans_effet" };
+  const a = villageLePlusProche(monde, pos);
+  if (a === null) return { ok: false, raison: "cible_invalide" };
+  const autres = monde.villages.villages.filter((v) => v.id !== a.id);
+  if (autres.length === 0 || batailleActive(monde) !== null)
+    return { ok: false, raison: "sans_effet" };
+  // Le pire voisin : l'attitude la plus basse, puis le plus proche.
+  const b = [...autres].sort(
+    (x, y) =>
+      relationEntre(monde.villages, a.id, x.id).attitude -
+        relationEntre(monde.villages, a.id, y.id).attitude ||
+      Grille.distance(a.centre, x.centre) - Grille.distance(a.centre, y.centre),
+  )[0];
+  if (b === undefined) return { ok: false, raison: "sans_effet" };
+  const r = declarerGuerre(monde, a, b, "le ciel l'a voulu");
+  if (r === null) return { ok: false, raison: "sans_effet" };
+  const bataille = leverTroupe(monde, rng, r, a, b, a);
+  return {
+    ok: true,
+    effet:
+      bataille === null
+        ? `${a.nom} entre en guerre avec ${b.nom}, mais personne n'est en état de partir`
+        : `${a.nom} entre en guerre avec ${b.nom} : ${String(bataille.attaquant.guerriers.length)} guerriers se mettent en marche`,
+    temoin: temoinProche(monde, a.centre, RAYON_TEMOIN),
+  };
+}
+
+/** Apaiser (M33) : la bataille en cours s'arrête ; sinon le village le plus proche fait la paix. */
+function apaiser(monde: MondeDivin, pos: Position): ResultatPouvoir {
+  const b = batailleActive(monde);
+  if (b !== null) {
+    conclureBataille(monde, b, "treve");
+    return {
+      ok: true,
+      effet:
+        b.genre === "guerre"
+          ? "les armes tombent, chacun rentre chez soi"
+          : b.genre === "raid"
+            ? "les pillards s'en vont les mains vides"
+            : "la meute renonce et s'éloigne",
+      temoin: temoinProche(monde, b.lieu, RAYON_TEMOIN),
+    };
+  }
+  const v = villageLePlusProche(monde, pos);
+  if (v === null) return { ok: false, raison: "cible_invalide" };
+  const guerres = monde.villages.relations.filter(
+    (r) => r.etat === "guerre" && (r.a === v.id || r.b === v.id),
+  );
+  if (guerres.length === 0) return { ok: false, raison: "sans_effet" };
+  for (const r of guerres) {
+    const a = monde.villages.villages.find((x) => x.id === r.a);
+    const c = monde.villages.villages.find((x) => x.id === r.b);
+    if (a !== undefined && c !== undefined) faireLaPaix(monde, r, a, c);
+  }
+  return {
+    ok: true,
+    effet: `${v.nom} fait la paix`,
+    temoin: temoinProche(monde, v.centre, RAYON_TEMOIN),
   };
 }
 

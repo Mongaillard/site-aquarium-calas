@@ -307,12 +307,20 @@ export function leverTroupe(
   r: Diplomatie,
   a: Village,
   b: Village,
+  attaquantForce: Village | null = null,
 ): Bataille | null {
   const e = monde.villages;
   if (batailleActive(monde) !== null) return null;
   const fa = forceDe(monde, a) * (0.8 + rng.suivant() * 0.4);
   const fb = forceDe(monde, b) * (0.8 + rng.suivant() * 0.4);
-  const [att, def] = fa >= fb ? [a, b] : [b, a];
+  const [att, def] =
+    attaquantForce !== null
+      ? attaquantForce.id === a.id
+        ? [a, b]
+        : [b, a]
+      : fa >= fb
+        ? [a, b]
+        : [b, a];
   const disponibles = guerriersDisponibles(monde, att);
   const n = Math.min(GUERRIERS_MAX, Math.max(2, Math.ceil(disponibles.length * 0.6)));
   const guerriers = disponibles.slice(0, n);
@@ -708,6 +716,63 @@ export function tickBatailles(monde: Monde): void {
     e.batailles = e.batailles.filter(
       (b) => b.phase !== "finie" || tick - (b.finTick ?? tick) < REMANENCE,
     );
+}
+
+/**
+ * La foudre du ciel (M33) tombe sur le champ de bataille : le combattant le plus proche de la
+ * tuile, à deux tuiles, est frappé (un membre virtuel perd quarante ; un personnage a déjà sa
+ * brûlure par le pouvoir lui-même). Le coup est consigné au nom du ciel pour l'animation.
+ */
+export function frappeDuCiel(monde: Monde, pos: Position): number {
+  const b = batailleActive(monde);
+  if (b?.phase !== "combat") return 0;
+  let touches = 0;
+  for (const camp of [b.attaquant, b.defenseur]) {
+    for (const id of [...camp.guerriers]) {
+      const p = positionDe(monde, b, id);
+      if (p === null || Grille.distance(p, pos) > 2) continue;
+      const m = membreDe(b, id);
+      let degats = 0;
+      if (m !== null) {
+        degats = 40;
+        m.sante -= degats;
+        camp.blesses += 1;
+        if (m.sante <= 0) {
+          camp.membres = camp.membres.filter((x) => x.id !== m.id);
+          camp.guerriers = camp.guerriers.filter((x) => x !== m.id);
+          camp.morts += 1;
+        }
+      } else {
+        degats = 20;
+      }
+      b.frappes.push({ tick: monde.horloge.tick, de: "ciel", vers: id, degats, mortelle: false });
+      touches += 1;
+    }
+  }
+  if (b.frappes.length > FRAPPES_GARDEES) b.frappes.splice(0, b.frappes.length - FRAPPES_GARDEES);
+  return touches;
+}
+
+/** Un gardien du ciel posté à dix tuiles d'un raid ou d'une meute en plein combat les repousse. */
+export function gardienRepousse(
+  monde: Monde,
+  gardiens: Iterable<{ readonly genre: string; readonly position: Position; faits: number }>,
+): void {
+  const b = batailleActive(monde);
+  if (b?.phase !== "combat" || b.genre === "guerre") return;
+  for (const g of gardiens) {
+    if (g.genre !== "gardien" || Grille.distance(g.position, b.lieu) > 10) continue;
+    g.faits += 1;
+    monde.emettre(
+      "divin",
+      null,
+      { pouvoir: "gardien_repousse", bataille: b.id, genre: b.genre },
+      7,
+      b.lieu,
+    );
+    conclure(monde, b, "defenseur");
+    return;
+  }
 }
 
 /** La fin : les flags tombent, puis les suites propres à chaque genre. */

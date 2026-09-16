@@ -104,7 +104,10 @@ chiffres de dégâts, blessés qui se retirent, morts rares — avec une **jauge
 haut de l'écran. Le village pris perd des vivres, la rancune monte, et la paix se fait au
 prix du sang. Les **raids** de pillards et les **attaques de loups** se jouent de la même façon,
 sur la carte, et un raid repoussé ne pille rien. Pour en voir tout de suite : `?peuples=2&guerre`
-ou `?raid`.
+ou `?raid`. Le ciel a prise dessus (M33) : **⚔️ Sonner la guerre** lance le village visé contre
+son pire voisin, **🕊️ Apaiser** arrête la bataille en cours ou fait la paix, la **Foudre** frappe
+les combattants sur le champ, un **Gardien** repousse pillards et loups, et la loi « Les
+guerres » suspend tout cela.
 
 **Bâtiments et personnages en sprites (M31).** Deux planches CC0 de Kenney de plus : tente,
 maisons, grange, four, fumoir, puits et sanctuaire viennent de _Medieval RTS_ ; chaque personnage

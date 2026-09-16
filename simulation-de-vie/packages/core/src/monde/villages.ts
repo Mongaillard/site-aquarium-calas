@@ -328,7 +328,11 @@ export function aubeVillages(
   rng: Rng,
   tension: number,
   factions: readonly { nom: string; familles: readonly string[] }[],
-  lois: { readonly raids: boolean; readonly schismes: boolean } = { raids: true, schismes: true },
+  lois: { readonly raids: boolean; readonly schismes: boolean; readonly guerres?: boolean } = {
+    raids: true,
+    schismes: true,
+    guerres: true,
+  },
 ): void {
   const e = monde.villages;
   for (const v of e.villages) recentrer(monde, v);
@@ -340,7 +344,7 @@ export function aubeVillages(
   arriveeDesMigrants(monde);
   if (lois.raids) bandes(monde, rng);
   caravanes(monde, rng);
-  diplomatie(monde);
+  diplomatie(monde, lois.guerres ?? true);
 }
 
 /**
@@ -861,7 +865,7 @@ export function observerVillages(monde: MondeVillages, e: Evenement): void {
 }
 
 /** Chaque aube : l'attitude dérive vers zéro, alliances et guerres se déclarent, les batailles se livrent. */
-function diplomatie(monde: MondeVillages): void {
+function diplomatie(monde: MondeVillages, guerres: boolean): void {
   const e = monde.villages;
   const jour = jourDe(monde);
   for (const r of e.relations) {
@@ -899,7 +903,15 @@ function diplomatie(monde: MondeVillages): void {
         6,
         a.centre,
       );
-    } else if (r.etat === "paix" && r.attitude <= SEUIL_GUERRE && r.casusBelli !== null) {
+    } else if (r.etat === "guerre" && !guerres) {
+      // Loi suspendue : les guerres en cours se règlent par la paix.
+      faireLaPaix(monde, r, a, b);
+    } else if (
+      guerres &&
+      r.etat === "paix" &&
+      r.attitude <= SEUIL_GUERRE &&
+      r.casusBelli !== null
+    ) {
       r.etat = "guerre";
       r.batailles = 0;
       r.depuisJour = jour;
