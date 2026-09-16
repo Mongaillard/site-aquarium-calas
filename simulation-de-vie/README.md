@@ -78,6 +78,13 @@ trois villages en paix, cent âmes) et les **prophéties** que le ciel formule p
 (accomplies, elles rapportent de la faveur). La simulation tourne dans un **Web Worker** : la
 page reste fluide à deux cents habitants (quatre peuples de quarante-huit, chacun son berceau).
 
+**De vraies tuiles (M27).** Pins, pommiers, buissons à baies, tas de pierre et d'argile, amas de
+gemmes et mousserons viennent de deux planches CC0 de Kenney (domaine public, aucune attribution
+requise ; voir `packages/viewer/src/assets/tuiles/CREDITS.md`) plutôt que d'un dessin vectoriel ;
+bâtiments et gisements sans icône nette (poisson, gibier, fibres) restent en vectoriel. La page
+publiée reste un fichier unique : les planches s'embarquent en URL `data:`, sans image externe à
+charger.
+
 Chaque décès laisse une leçon : la famille et les témoins retiennent une morale (gravée sur la
 tombe) qui change leurs décisions et se transmet par le dialogue. Un besoin répété et de la
 curiosité donnent des idées, puis des inventions (filet, piège, arc, pirogue, traîneau, fumoir,

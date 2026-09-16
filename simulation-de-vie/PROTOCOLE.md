@@ -1077,6 +1077,29 @@ L'ordre M5/M6 peut être inversé si vous voulez voir le monde avant de brancher
 - **Distribution** : manifeste, icône SVG et service worker dans `public/` (enregistré seulement
   en https hors de claude.ai) ; `dist:itch` fait le zip d'itch.io.
 
+## 8 sexies. De vraies tuiles libres de droits telles que réalisées (M27)
+
+M26 notait que les banques d'images libres de droits n'étaient pas joignables depuis
+l'environnement ; l'utilisateur a déposé deux planches Kenney directement dans la session, ce
+qui a levé le blocage.
+
+- **Assets** (`assets/tuiles/`) : deux planches CC0 telles que téléchargées (aucune retouche),
+  `roguelike/roguelikeSheet_transparent.png` (57×31 tuiles de 16 px, pas de 17 px) et
+  `tiny-town/tilemap_packed.png` (12×11 tuiles de 16 px, sans pas) ; crédits et licence dans
+  `assets/tuiles/CREDITS.md`.
+- **Atlas** (`atlas.ts`) : chaque planche s'importe en `?inline` (force une URL `data:` quelle
+  que soit sa taille, cf. `vite-env.d.ts`) et se charge une fois dans une `Image` ; `atlasPret()`
+  vaut vrai une fois les deux décodées. `tuile(ctx, feuille, col, row, x, y, w, h)` découpe et
+  dessine une case ; les fonctions exportées (`pin`, `pommier`, `buissonBaies`, `tasDePierre`,
+  `tasDArgile`, `gemmes`, `mousserons`) fixent juste les coordonnées de grille et la taille.
+- **Intégration** : `fond.ts` (forêt, collines givrées) et `sprites.ts` (`gisement()` pour
+  pierre, argile, minerai, baies) appellent l'atlas à la place des anciennes formes vectorielles
+  pour ces éléments précis ; bâtiments et gisements sans icône Kenney nette (poisson, gibier,
+  fibres) restent en vectoriel. **[DÉCISION]** Le chargement étant asynchrone,
+  `Rendu.fondMorceau()` ne met un morceau en cache que si `atlasPret()` — sinon le fond se
+  redessine (sans les tuiles) à chaque image jusqu'au décodage, pour ne jamais figer un rendu
+  incomplet.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

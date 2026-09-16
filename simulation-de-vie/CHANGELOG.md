@@ -2,6 +2,25 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M27 – De vraies tuiles libres de droits (2026-09-16)
+
+M26 notait que les banques d'images libres de droits n'étaient pas joignables depuis
+l'environnement ; l'utilisateur a déposé directement deux planches Kenney dans la session, ce
+qui a levé le blocage.
+
+- **Deux planches CC0 de Kenney** ajoutées telles quelles à `packages/viewer/src/assets/tuiles/`
+  (domaine public, aucune attribution requise) : le _Roguelike/RPG pack_ (57×31 tuiles de 16 px)
+  et _Tiny Town_ (12×11 tuiles de 16 px). Détail et liens dans `assets/tuiles/CREDITS.md`.
+- **Un atlas** (`atlas.ts`) découpe ces planches par coordonnées de grille et les pose comme
+  textures ponctuelles au-dessus du fond vectoriel : pins et pommiers (forêt, collines
+  givrées), tas de pierre et d'argile, buissons à baies, amas de gemmes, mousserons — à la
+  place des formes dessinées à la main pour ces éléments précis. Bâtiments et gisements sans
+  icône Kenney nette (poisson, gibier, fibres) restent en vectoriel.
+  Chaque planche s'importe en `?inline` : elle finit en URL `data:` dans le script comme le
+  reste du rendu, donc la page publiée reste un seul fichier sans image externe à charger.
+  Le chargement des images étant asynchrone, un morceau de carte ne se met en cache qu'une fois
+  les deux planches décodées, pour ne jamais figer un fond dessiné avant leur arrivée.
+
 ## M26 – Un monde plus réaliste, des buts, deux cents habitants, une application (2026-09-16)
 
 Les points 6 à 8 de l'analyse « en faire un jeu », et une refonte du rendu demandée en premier.
