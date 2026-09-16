@@ -113,6 +113,7 @@ export const LIBELLES_TYPE: Readonly<Record<string, string>> = {
   raid: "bande",
   caravane: "caravane",
   conteur: "le conteur",
+  but: "buts",
   divin: "miracle",
   conseil: "conseil de Claude",
   ambition: "ambition",
@@ -627,6 +628,17 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
         default:
           return `La bande s'éloigne.`;
       }
+    case "but":
+      if (d.genre === "succes") return `🏅 Succès : ${String(d.emoji)} ${String(d.nom)}.`;
+      if (d.genre === "scenario")
+        return d.issue === "gagne"
+          ? `🏆 Scénario réussi : ${String(d.nom)} !`
+          : `💀 Scénario perdu : ${String(d.nom)}.`;
+      return d.issue === "ouverte"
+        ? `🔮 Prophétie : ${String(d.texte)}`
+        : d.issue === "accomplie"
+          ? `🔮 Prophétie accomplie (+${String(d.faveur)} ✦) : ${String(d.texte)}`
+          : `🔮 Prophétie manquée : ${String(d.texte)}`;
     case "conteur":
       return d.genre === "chronique"
         ? `📜 Chronique de l'an ${String(d.annee)}, ${String(d.titre)} : ${String(d.texte)}`

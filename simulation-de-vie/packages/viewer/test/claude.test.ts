@@ -220,6 +220,7 @@ function etat(personnages: PersonnageEtat[], evenements: EvenementEtat[]): Messa
       conteur: true,
     },
     creatures: [],
+    buts: { succes: [], scenario: null, propheties: [] },
     conteur: {
       phase: "calme",
       tension: 10,

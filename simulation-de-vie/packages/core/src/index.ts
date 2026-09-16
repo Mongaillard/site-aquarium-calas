@@ -215,6 +215,21 @@ export type {
 } from "./monde/conteur.js";
 export { lancerBande } from "./monde/villages.js";
 export {
+  etatObjectifsInitial,
+  jourDesObjectifs,
+  formuler,
+  FAVEUR_PROPHETIE,
+  CHANCE_PROPHETIE,
+  TOUS_SUCCES,
+} from "./monde/objectifs.js";
+export type {
+  EtatObjectifs,
+  MondeObjectifs,
+  Prophetie,
+  EtatScenario,
+  SuccesDebloque,
+} from "./monde/objectifs.js";
+export {
   affinite,
   coutEffectif,
   niveauRequis,

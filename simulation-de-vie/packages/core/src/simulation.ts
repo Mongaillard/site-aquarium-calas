@@ -103,6 +103,9 @@ import {
 import type { Domaine, GenreCreature, Loi } from "@sdv/protocole";
 import { creerCreature, ficheCreature, heureCreatures, jourCreatures } from "./monde/creatures.js";
 import { etatConteurInitial, jourDuConteur } from "./monde/conteur.js";
+import { FAVEUR_PROPHETIE, etatObjectifsInitial, jourDesObjectifs } from "./monde/objectifs.js";
+import type { EtatObjectifs } from "./monde/objectifs.js";
+import { FICHES_SCENARIO, FICHES_SUCCES } from "@sdv/protocole";
 import type { EtatConteur } from "./monde/conteur.js";
 import type { Creature } from "./monde/creatures.js";
 import {
@@ -298,6 +301,8 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
   if (!("lois" in brut)) brut.lois = loisParDefaut();
   defauts(brut.lois as Record<string, unknown>, loisParDefaut());
   defauts(brut, { creatures: [], compteurCreatures: 0, conteur: etatConteurInitial() });
+  defauts(brut.config as Record<string, unknown>, { jeu: { scenario: null } });
+  defauts(brut, { objectifs: etatObjectifsInitial(null, etat.config.vie.joursParAnnee) });
   defauts(brut.faveur as Record<string, unknown>, { domaine: null, rang: 0, usages: [] });
   defauts(brut.config as Record<string, unknown>, { dieu: { domaine: null } });
   for (const p of etat.personnages) {
@@ -373,6 +378,7 @@ interface EtatSimulation {
   readonly creatures: Creature[];
   readonly compteurCreatures: number;
   readonly conteur: EtatConteur;
+  readonly objectifs: EtatObjectifs;
 }
 
 export class Simulation implements Monde {
@@ -414,6 +420,8 @@ export class Simulation implements Monde {
   private compteurCreatures = 0;
   /** Le conteur (M25) : la courbe de tension, ses actes, ses chroniques. */
   readonly conteur: EtatConteur = etatConteurInitial();
+  /** Les buts (M26) : succès, scénario, prophéties. */
+  readonly objectifs: EtatObjectifs;
 
   private constructor(
     readonly config: SimConfig,
@@ -422,6 +430,8 @@ export class Simulation implements Monde {
     readonly grille: Grille,
     etat: EtatSimulation | null = null,
   ) {
+    this.objectifs =
+      etat?.objectifs ?? etatObjectifsInitial(config.jeu.scenario, config.vie.joursParAnnee);
     if (etat !== null) {
       // Restauration : tout vient de la sauvegarde, rien n'est généré.
       this.personnages = etat.personnages;
@@ -767,6 +777,65 @@ export class Simulation implements Monde {
       { x: site.x, y: site.y },
     );
     return { ok: true, id };
+  }
+
+  /** Créatures invoquées depuis le début du monde (succès). */
+  get creaturesInvoquees(): number {
+    return this.compteurCreatures;
+  }
+
+  /** Générations vivantes ou passées, d'après la généalogie (succès). */
+  generations(): number {
+    return this.genealogie().generations;
+  }
+
+  /** À l'aube : succès, scénario, prophéties, et ce qu'on en dit au journal. */
+  private jourDesButs(): void {
+    const effet = jourDesObjectifs(
+      this,
+      this.objectifs,
+      this.rng.fork(`objectifs/${String(this.horloge.moment().jourAbsolu)}`),
+    );
+    for (const id of effet.succes) {
+      const fiche = FICHES_SUCCES[id];
+      this.emettre("but", null, { genre: "succes", id, nom: fiche.nom, emoji: fiche.emoji }, 8);
+    }
+    const sc = this.objectifs.scenario;
+    if (effet.scenario !== null && sc !== null)
+      this.emettre(
+        "but",
+        null,
+        { genre: "scenario", id: sc.id, nom: FICHES_SCENARIO[sc.id].nom, issue: effet.scenario },
+        10,
+      );
+    for (const p of effet.propheties) {
+      if (p.etat === "accomplie") gagnerFaveur(this.faveur, FAVEUR_PROPHETIE);
+      this.emettre(
+        "but",
+        null,
+        {
+          genre: "prophetie",
+          id: p.id,
+          texte: p.texte,
+          issue: p.etat,
+          faveur: p.etat === "accomplie" ? FAVEUR_PROPHETIE : 0,
+        },
+        p.etat === "accomplie" ? 8 : 6,
+      );
+    }
+    if (effet.nouvelle !== null)
+      this.emettre(
+        "but",
+        null,
+        {
+          genre: "prophetie",
+          id: effet.nouvelle.id,
+          texte: effet.nouvelle.texte,
+          issue: "ouverte",
+          faveur: 0,
+        },
+        7,
+      );
   }
 
   /** Compteur du journal pour un type, ou un détail `type:genre` (le conteur s'en sert pour ses chroniques). */
@@ -1280,6 +1349,7 @@ export class Simulation implements Monde {
       creatures: [...this.creatures.values()],
       compteurCreatures: this.compteurCreatures,
       conteur: this.conteur,
+      objectifs: this.objectifs,
     };
   }
 
@@ -1682,6 +1752,7 @@ export class Simulation implements Monde {
       jourDuCiel(this, this.faveur);
       if (this.lois.conteur)
         jourDuConteur(this, this.conteur, this.rng.fork(`conteur/${String(moment.jourAbsolu)}`));
+      this.jourDesButs();
       for (const c of jourCreatures(this.creatures, moment.jourAbsolu)) {
         const fiche = ficheCreature(c);
         this.emettre(

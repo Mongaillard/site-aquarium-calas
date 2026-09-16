@@ -90,6 +90,7 @@ export const TYPES_EVENEMENT = [
   "raid",
   "caravane",
   "conteur",
+  "but",
 ] as const;
 export type TypeEvenement = (typeof TYPES_EVENEMENT)[number];
 

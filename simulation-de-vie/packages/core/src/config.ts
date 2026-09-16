@@ -73,6 +73,10 @@ export interface SimConfig {
   dieu: {
     domaine: DomaineDuCiel | null;
   };
+  /** Le jeu (M26) : un scénario choisi au départ, ou null (partie libre). */
+  jeu: {
+    scenario: "an_dix" | "cuivre_an_cinq" | "une_legende" | "trois_villages" | "cent_ames" | null;
+  };
 }
 
 export const CONFIG_PAR_DEFAUT: SimConfig = {
@@ -104,6 +108,7 @@ export const CONFIG_PAR_DEFAUT: SimConfig = {
   perception: { rayonJour: 6, rayonNuit: 3 },
   social: { monogamie: true, nomFamille: "pere", vouvoiementInconnus: true },
   dieu: { domaine: null },
+  jeu: { scenario: null },
 };
 
 /** Configuration partielle : chaque section peut être omise ou partiellement fournie. */
@@ -128,6 +133,7 @@ export function fusionnerConfig(partielle: SimConfigPartielle = {}): SimConfig {
     perception: { ...CONFIG_PAR_DEFAUT.perception, ...partielle.perception },
     social: { ...CONFIG_PAR_DEFAUT.social, ...partielle.social },
     dieu: { ...CONFIG_PAR_DEFAUT.dieu, ...partielle.dieu },
+    jeu: { ...CONFIG_PAR_DEFAUT.jeu, ...partielle.jeu },
   };
 }
 

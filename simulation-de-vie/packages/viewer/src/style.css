@@ -720,6 +720,58 @@ table.saisons td:first-child {
   background: var(--accent);
   color: #fff;
 }
+/* Les buts (M26) : scénario, prophéties, grille des succès. */
+.scenario {
+  border-left: 3px solid #ffd479;
+  padding: 8px 10px;
+  margin: 6px 0;
+  background: rgba(255, 212, 121, 0.08);
+  border-radius: 0 8px 8px 0;
+}
+.scenario.gagne {
+  border-left-color: var(--ok);
+}
+.scenario.perdu {
+  border-left-color: var(--alerte);
+}
+.scenario .jauge {
+  margin-top: 6px;
+}
+.succes-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+.succes {
+  background: #232936;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.succes .titre {
+  font-weight: 600;
+  font-size: 13px;
+}
+.succes.verrou {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.succes .quand {
+  display: block;
+  color: var(--discret);
+  font-size: 11px;
+}
+.propheties li.accomplie {
+  color: var(--ok);
+}
+.propheties li.manquee {
+  color: var(--discret);
+  text-decoration: line-through;
+}
+.propheties li.ouverte {
+  color: #ffd479;
+}
 /* Le conteur (M25) : une pastille dans la barre, colorée par la phase. */
 #barre .conteur {
   padding: 2px 8px;

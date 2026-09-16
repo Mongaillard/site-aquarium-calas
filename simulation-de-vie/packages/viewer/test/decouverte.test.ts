@@ -100,6 +100,7 @@ function etat(decouvertes: number[]): MessageEtat {
       conteur: true,
     },
     creatures: [],
+    buts: { succes: [], scenario: null, propheties: [] },
     conteur: {
       phase: "calme",
       tension: 10,

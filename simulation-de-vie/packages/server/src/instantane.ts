@@ -68,7 +68,9 @@ import type {
   PersonneCourte,
   SavoirStat,
   Statistiques,
+  ButsEtat,
 } from "@sdv/protocole";
+import { FICHES_SCENARIO, FICHES_SUCCES, SUCCES } from "@sdv/protocole";
 
 export function messageInit(sim: Simulation): MessageInit {
   return {
@@ -185,6 +187,38 @@ export function villagesEtat(sim: Simulation): VillagesEtat {
 }
 
 /** La mémoire collective, pour la page « Légendes » et la carte. */
+/** Les buts (M26) : tous les succès (débloqués ou non), le scénario, les prophéties. */
+export function butsEtat(sim: Simulation): ButsEtat {
+  const o = sim.objectifs;
+  const jours = new Map(o.succes.map((s) => [s.id, s.jour]));
+  const sc = o.scenario;
+  return {
+    succes: SUCCES.map((id) => ({
+      id,
+      nom: FICHES_SUCCES[id].nom,
+      emoji: FICHES_SUCCES[id].emoji,
+      description: FICHES_SUCCES[id].description,
+      jour: jours.get(id) ?? null,
+    })),
+    scenario:
+      sc === null
+        ? null
+        : {
+            id: sc.id,
+            nom: FICHES_SCENARIO[sc.id].nom,
+            description: FICHES_SCENARIO[sc.id].description,
+            etat: sc.etat,
+            progres: sc.progres,
+            texte: sc.texte,
+            finJour: sc.finJour,
+            jourIssue: sc.jourIssue,
+          },
+    propheties: [...o.propheties]
+      .reverse()
+      .map((p) => ({ id: p.id, texte: p.texte, jour: p.jour, finJour: p.finJour, etat: p.etat })),
+  };
+}
+
 export function chroniqueEtat(sim: Simulation): ChroniqueEtat {
   const c = sim.chronique;
   return {
@@ -737,6 +771,7 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     chronique: chroniqueEtat(sim),
     villages: villagesEtat(sim),
     lois: { ...sim.lois },
+    buts: butsEtat(sim),
     conteur: {
       phase: sim.conteur.phase,
       tension: sim.conteur.tension,

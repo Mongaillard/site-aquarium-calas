@@ -48,6 +48,7 @@ export class Panneaux {
   private derniereVersionConversations = -1;
   private derniereVersionVillage = -1;
   private derniereVersionLegendes = -1;
+  private derniereVersionButs = -1;
   private derniereVersionBatiment = -1;
   private dernierRenduLent = 0;
   private ficheAffichee: MessageFiche | null = null;
@@ -205,6 +206,12 @@ export class Panneaux {
         if (force || version !== this.derniereVersionLegendes) {
           this.legendes();
           this.derniereVersionLegendes = version;
+        }
+        break;
+      case "buts":
+        if (force || version !== this.derniereVersionButs) {
+          this.buts();
+          this.derniereVersionButs = version;
         }
         break;
       case "population":
@@ -609,14 +616,50 @@ export class Panneaux {
     this.brancherVoir($("liste-journal"));
   }
 
-  /** Les boutons 📍 d'un conteneur : centrer la carte, sans ouvrir la fiche. */
+  /** Les boutons 📍 d'un conteneur : centrer la carte, sans ouvrir la fiche (ou ouvrir un onglet). */
   private brancherVoir(conteneur: HTMLElement): void {
     for (const b of conteneur.querySelectorAll<HTMLButtonElement>("button.voir")) {
       b.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        this.inter.allerVoir(Number(b.dataset.x), Number(b.dataset.y));
+        const onglet = b.dataset.onglet;
+        if (onglet !== undefined) this.afficherOnglet(onglet);
+        else this.inter.allerVoir(Number(b.dataset.x), Number(b.dataset.y));
       });
     }
+  }
+
+  /** L'onglet Buts : le scénario et sa jauge, les prophéties, la grille des succès. */
+  private buts(): void {
+    const etat = this.magasin.etat;
+    const init = this.magasin.init;
+    if (etat === null || init === null) return;
+    const b = etat.buts;
+    const jour = (j: number): string =>
+      formaterTick(j * init.ticksParJour, init.ticksParJour, init.joursParSaison).replace(
+        /,.*$/,
+        "",
+      );
+    const sc = b.scenario;
+    const scenario =
+      sc === null
+        ? "<p class='discret'>Partie libre : aucun scénario (choisissez-en un au formulaire « Nouveau monde »).</p>"
+        : `<div class="scenario ${sc.etat}"><b>${sc.etat === "gagne" ? "🏆 " : sc.etat === "perdu" ? "💀 " : "🎯 "}${e(sc.nom)}</b> <span class="discret">— ${e(sc.description)} Limite : ${e(jour(sc.finJour))}.</span><div class="jauges"><span>${sc.etat === "en_cours" ? "progrès" : sc.etat === "gagne" ? "réussi" : "perdu"}</span><div class="jauge ${sc.etat === "perdu" ? "critique" : ""}"><i style="width:${String(Math.round(sc.progres * 100))}%${sc.etat === "gagne" ? ";background:#7dffa0" : ""}"></i></div><span class="num">${String(Math.round(sc.progres * 100))}%</span></div><div class="discret">${e(sc.texte)}${sc.jourIssue !== null ? ` (${e(jour(sc.jourIssue))})` : ""}</div></div>`;
+    const propheties =
+      b.propheties.length > 0
+        ? `<ul class="liste propheties">${b.propheties.map((p) => `<li class="${p.etat}">${p.etat === "accomplie" ? "✅" : p.etat === "manquee" ? "✖" : "🔮"} ${e(p.texte)} <span class="discret">(${e(jour(p.jour))} → ${e(jour(p.finJour))})</span></li>`).join("")}</ul>`
+        : "<p class='discret'>aucune prophétie encore : le ciel en formule au premier jour d'une saison, une fois sur deux</p>";
+    const debloques = b.succes.filter((x) => x.jour !== null).length;
+    const succes = `<div class="succes-grille">${b.succes
+      .map(
+        (x) =>
+          `<div class="succes ${x.jour === null ? "verrou" : ""}" title="${e(x.description)}"><div class="titre">${x.emoji} ${e(x.nom)}</div>${e(x.description)}${x.jour !== null ? `<span class="quand">${e(jour(x.jour))}</span>` : ""}</div>`,
+      )
+      .join("")}</div>`;
+    $("buts").innerHTML = `
+      <h2>Buts</h2>
+      <h3>Scénario</h3>${scenario}
+      <h3>Prophéties</h3>${propheties}
+      <h3>Succès · ${String(debloques)}/${String(b.succes.length)}</h3>${succes}`;
   }
 
   /** Le fil des grands événements sur la carte (importance ≥ 6), les quatre derniers. */
@@ -626,7 +669,8 @@ export class Panneaux {
     const majeurs: typeof evenements = [];
     for (let i = evenements.length - 1; i >= 0 && majeurs.length < 4; i--) {
       const ev = evenements[i];
-      if (ev !== undefined && ev.importance >= 6 && ev.position !== null) majeurs.push(ev);
+      if (ev !== undefined && ev.importance >= 6 && (ev.position !== null || ev.importance >= 8))
+        majeurs.push(ev);
     }
     const cle = majeurs.map((ev) => `${String(ev.tick)}:${ev.type}:${ev.acteur ?? ""}`).join("|");
     if (cle === this.derniereCleFil) return;
@@ -640,7 +684,10 @@ export class Panneaux {
           ? formaterTick(ev.tick, init.ticksParJour, init.joursParSaison)
           : String(ev.tick);
         const texte = resumerEvenement(ev, (id) => this.magasin.nom(id));
-        return `<li${i === 0 && nouveau ? ' class="nouveau"' : ""}><button class="voir" type="button" data-x="${String(ev.position?.x ?? 0)}" data-y="${String(ev.position?.y ?? 0)}" title="Aller voir sur la carte">📍 <span class="quand">${e(quand)}</span>${e(texte.length > 90 ? `${texte.slice(0, 88)}…` : texte)}</button></li>`;
+        const court = e(texte.length > 90 ? `${texte.slice(0, 88)}…` : texte);
+        return ev.position === null
+          ? `<li${i === 0 && nouveau ? ' class="nouveau"' : ""}><button class="voir but" type="button" data-onglet="buts" title="Voir les buts"><span class="quand">${e(quand)}</span>${court}</button></li>`
+          : `<li${i === 0 && nouveau ? ' class="nouveau"' : ""}><button class="voir" type="button" data-x="${String(ev.position.x)}" data-y="${String(ev.position.y)}" title="Aller voir sur la carte">📍 <span class="quand">${e(quand)}</span>${court}</button></li>`;
       })
       .join("");
     this.brancherVoir(fil);

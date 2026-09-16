@@ -1,6 +1,14 @@
 /** Point d'entrée du viewer : liaison (serveur ou locale), rendu, interactions souris et tactiles. */
 import "./style.css";
-import type { Commande, Domaine, Loi, MessageServeur, Pinceau, Pouvoir } from "@sdv/protocole";
+import type {
+  Commande,
+  Domaine,
+  Loi,
+  MessageServeur,
+  Pinceau,
+  Pouvoir,
+  Scenario,
+} from "@sdv/protocole";
 import {
   COUT_CREATURE,
   COUT_PEUPLE,
@@ -15,6 +23,7 @@ import {
   POUVOIRS,
   POUVOIRS_EXAUCANT,
   RAYON_PINCEAU_MAX,
+  SCENARIOS,
   TAILLES_PEUPLE,
   VITESSES,
 } from "@sdv/protocole";
@@ -58,6 +67,12 @@ const graineEntree = element("graine-entree", HTMLInputElement);
 const populationEntree = element("population-entree", HTMLSelectElement);
 const peuplesEntree = element("peuples-entree", HTMLSelectElement);
 const domaineEntree = element("domaine-entree", HTMLSelectElement);
+const scenarioEntree = element("scenario-entree", HTMLSelectElement);
+/** Le scénario choisi au formulaire (ou dans l'adresse, `?scenario=`), ou null : partie libre. */
+function scenarioChoisi(): Scenario | null {
+  const v = scenarioEntree.value;
+  return (SCENARIOS as readonly string[]).includes(v) ? (v as Scenario) : null;
+}
 /** Le domaine du ciel choisi au formulaire (ou dans l'URL, `?domaine=`), ou null. */
 function domaineChoisi(): Domaine | null {
   const v = domaineEntree.value;
@@ -98,6 +113,7 @@ const peuplesInitiaux = Number.parseInt(parametres.get("peuples") ?? "1", 10);
 if (peuplesInitiaux >= 1 && peuplesInitiaux <= 4) peuplesEntree.value = String(peuplesInitiaux);
 if (parametres.has("vierge")) viergeEntree.checked = true;
 if (parametres.has("domaine")) domaineEntree.value = parametres.get("domaine") ?? "";
+if (parametres.has("scenario")) scenarioEntree.value = parametres.get("scenario") ?? "";
 
 let derniereDemandeFiche = 0;
 const recevoir = (m: MessageServeur): void => {
@@ -134,7 +150,11 @@ function creerLiaison(graine: string, sauvegarde?: unknown): Liaison {
       joursAvance:
         population().initiale === 0 ? 0 : Number.isFinite(joursAvance) ? joursAvance : 20,
       ticksParSeconde: 4,
-      config: { population: population(), dieu: { domaine: domaineChoisi() } },
+      config: {
+        population: population(),
+        dieu: { domaine: domaineChoisi() },
+        jeu: { scenario: scenarioChoisi() },
+      },
       ...(sauvegarde !== undefined ? { sauvegarde } : {}),
     },
     recevoir,

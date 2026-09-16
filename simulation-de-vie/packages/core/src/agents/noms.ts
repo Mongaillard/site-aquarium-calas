@@ -91,6 +91,30 @@ export const NOMS_FAMILLE: readonly string[] = [
   "Weber",
 ];
 
+/** Noms de renfort (M26) : pour les peuples posés quand les premiers noms sont tous portés. */
+export const NOMS_FAMILLE_RENFORT: readonly string[] = [
+  "Arnaud",
+  "Barbier",
+  "Chauvin",
+  "Dumas",
+  "Étienne",
+  "Ferrand",
+  "Girard",
+  "Hubert",
+  "Imbert",
+  "Jacquet",
+  "Klein",
+  "Lacroix",
+  "Morel",
+  "Noël",
+  "Ollivier",
+  "Picard",
+  "Renard",
+  "Simon",
+  "Tanguy",
+  "Vasseur",
+];
+
 export const TRAITS_POSSIBLES: readonly string[] = [
   "bavard",
   "taciturne",

@@ -196,6 +196,8 @@ export function decrireEvenement(
         : null;
     case "capture":
       return temoin ? `${qui} a ramené un ${String(d.nom)} vivant.` : null;
+    case "but":
+      return null;
     case "conteur":
       // Le conteur agit par ce qu'il déclenche (meute, orage, guérison) : ce sont ces événements-là qu'on retient.
       return null;

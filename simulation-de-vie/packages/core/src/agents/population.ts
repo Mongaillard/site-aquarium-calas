@@ -3,7 +3,7 @@ import type { SimConfig } from "../config.js";
 import { INFO_BIOME } from "../monde/biomes.js";
 import type { Grille, Position } from "../monde/grille.js";
 import type { Rng } from "../rng.js";
-import { NOMS_FAMILLE } from "./noms.js";
+import { NOMS_FAMILLE, NOMS_FAMILLE_RENFORT } from "./noms.js";
 import { creerPersonnage } from "./personnage.js";
 import type { Personnage } from "./personnage.js";
 
@@ -59,9 +59,14 @@ export interface OptionsGroupe {
 export function famillesLibres(rng: Rng, portes: ReadonlySet<string>, n: number): string[] {
   const libres = rng.melanger(NOMS_FAMILLE.filter((f) => !portes.has(f)));
   const choisies = libres.slice(0, n);
-  // Plus de familles demandées que de noms libres : des branches numérotées.
-  for (let k = 0; choisies.length < n; k++)
-    choisies.push(`${NOMS_FAMILLE[k % NOMS_FAMILLE.length] ?? "Sansnom"}-${String(k + 2)}`);
+  // Puis les noms de renfort, dans l'ordre tiré au sort.
+  for (const f of rng.melanger(NOMS_FAMILLE_RENFORT.filter((x) => !portes.has(x))))
+    if (choisies.length < n) choisies.push(f);
+  // Plus de familles demandées que de noms libres : des branches numérotées, jamais déjà portées.
+  for (let k = 0; choisies.length < n && k < 10_000; k++) {
+    const nom = `${NOMS_FAMILLE[k % NOMS_FAMILLE.length] ?? "Sansnom"}-${String(Math.floor(k / NOMS_FAMILLE.length) + 2)}`;
+    if (!portes.has(nom) && !choisies.includes(nom)) choisies.push(nom);
+  }
   return choisies;
 }
 

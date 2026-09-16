@@ -65,6 +65,18 @@
             <option value="feu">🔥 Feu</option>
             <option value="songes">🌙 Songes</option>
           </select>
+          <label for="scenario-entree" class="discret">but</label>
+          <select
+            id="scenario-entree"
+            title="Un scénario à réussir avant une année limite (ou partie libre)"
+          >
+            <option value="">partie libre</option>
+            <option value="an_dix">Passez l'an dix</option>
+            <option value="cuivre_an_cinq">Le cuivre avant l'an cinq</option>
+            <option value="une_legende">Faites naître une légende</option>
+            <option value="trois_villages">Trois villages en paix</option>
+            <option value="cent_ames">Cent âmes</option>
+          </select>
           <label
             class="discret case"
             title="Un monde sans personne : sculptez-le, puis posez votre peuple où vous voulez (mode Dieu)"
@@ -202,6 +214,7 @@
             <button data-onglet="village">Village</button>
             <button data-onglet="legendes">Légendes</button>
             <button data-onglet="population">Population</button>
+            <button data-onglet="buts">Buts</button>
           </nav>
           <section id="inspecteur" class="onglet actif">
             <p class="discret">
@@ -228,6 +241,7 @@
           <section id="stats" class="onglet"></section>
           <section id="village" class="onglet"></section>
           <section id="legendes" class="onglet"></section>
+          <section id="buts" class="onglet"></section>
           <section id="population" class="onglet">
             <details id="familles" class="familles">
               <summary>Arbres des familles</summary>

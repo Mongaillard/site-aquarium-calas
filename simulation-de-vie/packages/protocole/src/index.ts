@@ -766,6 +766,8 @@ export interface MessageEtat {
   readonly creatures: readonly CreatureEtat[];
   /** Le conteur (M25) : phase, tension, actes, chroniques. */
   readonly conteur: ConteurEtat;
+  /** Les buts (M26) : succès, scénario, prophéties. */
+  readonly buts: ButsEtat;
 }
 
 export interface RelationFiche {
@@ -1149,6 +1151,163 @@ export interface CreatureEtat {
   readonly x: number;
   readonly y: number;
   readonly joursRestants: number;
+}
+
+/** Les buts (M26) : succès, scénarios, prophéties. */
+export const SUCCES = [
+  "un_toit",
+  "premier_feu",
+  "dix_berceaux",
+  "an_deux",
+  "an_cinq",
+  "an_dix",
+  "vingt_ames",
+  "cinquante_ames",
+  "cent_ames",
+  "troisieme_generation",
+  "age_du_cuivre",
+  "une_legende",
+  "une_coutume",
+  "second_village",
+  "une_alliance",
+  "priere_exaucee",
+  "main_du_ciel",
+  "creature",
+  "loups_repousses",
+  "raid_repousse",
+] as const;
+export type Succes = (typeof SUCCES)[number];
+
+export interface FicheSucces {
+  readonly nom: string;
+  readonly emoji: string;
+  readonly description: string;
+}
+
+export const FICHES_SUCCES: Readonly<Record<Succes, FicheSucces>> = {
+  un_toit: { nom: "Un toit", emoji: "🏠", description: "Le premier bâtiment est achevé." },
+  premier_feu: {
+    nom: "Le premier feu",
+    emoji: "🔥",
+    description: "Un feu de camp brûle au village.",
+  },
+  dix_berceaux: { nom: "Dix berceaux", emoji: "👶", description: "Dix enfants sont nés." },
+  an_deux: { nom: "L'an deux", emoji: "🌱", description: "La colonie passe sa première année." },
+  an_cinq: { nom: "L'an cinq", emoji: "🌳", description: "Cinq années, et des vivants." },
+  an_dix: { nom: "L'an dix", emoji: "🏛️", description: "Dix années : le village est installé." },
+  vingt_ames: { nom: "Vingt âmes", emoji: "👥", description: "Vingt habitants vivent ensemble." },
+  cinquante_ames: { nom: "Cinquante âmes", emoji: "🏘️", description: "Cinquante habitants." },
+  cent_ames: { nom: "Cent âmes", emoji: "🏙️", description: "Cent habitants : une petite cité." },
+  troisieme_generation: {
+    nom: "La troisième génération",
+    emoji: "🧬",
+    description: "Des petits-enfants des fondateurs sont nés.",
+  },
+  age_du_cuivre: {
+    nom: "L'âge du cuivre",
+    emoji: "⛏️",
+    description: "Le premier cuivre est fondu.",
+  },
+  une_legende: { nom: "Une légende", emoji: "📖", description: "Un récit est devenu légende." },
+  une_coutume: { nom: "Une coutume", emoji: "📜", description: "Une leçon est devenue coutume." },
+  second_village: {
+    nom: "Le second village",
+    emoji: "🏕️",
+    description: "Deux villages sur la carte.",
+  },
+  une_alliance: { nom: "Une alliance", emoji: "🤝", description: "Deux villages se sont alliés." },
+  priere_exaucee: { nom: "Une prière exaucée", emoji: "🙏", description: "Le ciel a répondu." },
+  main_du_ciel: { nom: "La main du ciel", emoji: "✨", description: "Dix miracles." },
+  creature: { nom: "La créature", emoji: "🦌", description: "Un gardien ou un fléau est venu." },
+  loups_repousses: {
+    nom: "Face aux loups",
+    emoji: "🐺",
+    description: "Trois combats contre les meutes.",
+  },
+  raid_repousse: {
+    nom: "La bande repart",
+    emoji: "🛡️",
+    description: "Une bande a quitté le village.",
+  },
+};
+
+export const SCENARIOS = [
+  "an_dix",
+  "cuivre_an_cinq",
+  "une_legende",
+  "trois_villages",
+  "cent_ames",
+] as const;
+export type Scenario = (typeof SCENARIOS)[number];
+
+export interface FicheScenario {
+  readonly nom: string;
+  readonly description: string;
+  /** Année limite (le scénario est perdu au premier jour de cette année). */
+  readonly anneesLimite: number;
+}
+
+export const FICHES_SCENARIO: Readonly<Record<Scenario, FicheScenario>> = {
+  an_dix: {
+    nom: "Passez l'an dix",
+    description: "Qu'il reste des vivants à l'an dix.",
+    anneesLimite: 10,
+  },
+  cuivre_an_cinq: {
+    nom: "Le cuivre avant l'an cinq",
+    description: "Fondre le premier cuivre avant l'an cinq.",
+    anneesLimite: 5,
+  },
+  une_legende: {
+    nom: "Faites naître une légende",
+    description: "Qu'un récit devienne légende avant l'an trois.",
+    anneesLimite: 3,
+  },
+  trois_villages: {
+    nom: "Trois villages en paix",
+    description: "Trois villages sur la carte, sans guerre, avant l'an huit.",
+    anneesLimite: 8,
+  },
+  cent_ames: {
+    nom: "Cent âmes",
+    description: "Cent habitants avant l'an douze.",
+    anneesLimite: 12,
+  },
+};
+
+export interface SuccesEtat {
+  readonly id: Succes;
+  readonly nom: string;
+  readonly emoji: string;
+  readonly description: string;
+  /** Jour du déblocage, ou null. */
+  readonly jour: number | null;
+}
+
+export interface ScenarioEtat {
+  readonly id: Scenario;
+  readonly nom: string;
+  readonly description: string;
+  readonly etat: "en_cours" | "gagne" | "perdu";
+  readonly progres: number;
+  readonly texte: string;
+  readonly finJour: number;
+  readonly jourIssue: number | null;
+}
+
+export interface ProphetieEtat {
+  readonly id: string;
+  readonly texte: string;
+  readonly jour: number;
+  readonly finJour: number;
+  readonly etat: "ouverte" | "accomplie" | "manquee";
+}
+
+export interface ButsEtat {
+  readonly succes: readonly SuccesEtat[];
+  readonly scenario: ScenarioEtat | null;
+  /** Les prophéties, la plus récente d'abord. */
+  readonly propheties: readonly ProphetieEtat[];
 }
 
 /** Le conteur (M25) : la courbe de tension et ses chroniques. */
