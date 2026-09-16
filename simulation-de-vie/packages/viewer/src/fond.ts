@@ -9,7 +9,8 @@
  */
 import { COULEURS_BIOME } from "./format.js";
 import type { MorceauVue } from "./etat.js";
-import { arbre, bruit, herbe, rocher } from "./sprites.js";
+import { bruit, herbe } from "./sprites.js";
+import { mousserons, pin, pommier, tasDePierre } from "./atlas.js";
 
 /** Pixels par tuile du fond pré-rendu. */
 export const RESOLUTION_FOND = 24;
@@ -137,27 +138,32 @@ export function construireFondMorceau(
           ctx.beginPath();
           ctx.ellipse(x + 0.5, y + 0.95, 0.5, 0.18, 0, 0, Math.PI * 2);
           ctx.fill();
-          arbre(ctx, x + (bruit(x, y, 2) - 0.5) * 0.35, y, 0.95 + b * 0.4, Math.floor(b * 3));
+          // Le pin de la planche Kenney domine le couvert ; un pommier de temps en temps
+          // (une frondaison rouge tachetée) casse la monotonie, comme dans une vraie forêt mêlée.
+          const principal = bruit(x, y, 9) > 0.8 ? pommier : pin;
+          principal(ctx, x + (bruit(x, y, 2) - 0.5) * 0.35, y, 0.95 + b * 0.4, Math.floor(b * 3));
           if (b > 0.45)
-            arbre(
+            pin(
               ctx,
               x + 0.35 + (bruit(x, y, 6) - 0.5) * 0.3,
               y - 0.3,
               0.7,
               Math.floor(bruit(x, y, 3) * 3),
             );
-          if (b < 0.2) arbre(ctx, x - 0.3, y + 0.15, 0.6, 2);
+          if (b < 0.2) pin(ctx, x - 0.3, y + 0.15, 0.6, 2);
+          // Un mousseron, rarement, au pied d'un arbre.
+          if (bruit(x, y, 11) > 0.95) mousserons(ctx, x - 0.28, y + 0.3, 0.45);
           break;
         }
         case "montagne":
           pic(ctx, x, y, b);
           break;
         case "colline":
-          if (b > 0.55) rocher(ctx, x + 0.35, y + 0.35, 0.5, "#8f865a");
-          if (b > 0.9) arbre(ctx, x + 0.1, y + 0.1, 0.55, 1);
+          if (b > 0.55) tasDePierre(ctx, x + 0.5, y + 0.55, 0.55, Math.floor(bruit(x, y, 40) * 3));
+          if (b > 0.9) pin(ctx, x + 0.1, y + 0.1, 0.55, 1);
           break;
         case "prairie":
-          if (b > 0.985) arbre(ctx, x, y, 0.8, Math.floor(bruit(x, y, 3) * 3));
+          if (b > 0.985) pommier(ctx, x, y, 0.8, Math.floor(bruit(x, y, 3) * 3));
           break;
         default:
           break;

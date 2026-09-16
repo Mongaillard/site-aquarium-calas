@@ -3,6 +3,8 @@
  * déjà mis à l'échelle : 1 = une tuile). Aucune image externe.
  */
 
+import { buissonBaies, gemmes, pin, tasDArgile, tasDePierre } from "./atlas.js";
+
 export type Ctx = CanvasRenderingContext2D;
 
 /** Hachage stable d'une position, pour varier les décors sans hasard. */
@@ -110,32 +112,15 @@ export function gisement(
         ctx.fillRect(x + 0.2, y + 0.57, 0.08, 0.1);
         ctx.fillRect(x + 0.3, y + 0.72, 0.08, 0.1);
       } else {
-        arbre(ctx, x, y, 1.05 * t + 0.1, 1);
+        pin(ctx, x, y, 1.05 * t + 0.1, 1);
       }
       break;
     case "pierre":
-      rocher(ctx, x + 0.05, y + 0.1, 0.9 * t, "#b0b0b0");
-      rocher(ctx, x + 0.45, y + 0.4, 0.5 * t, "#8c8c8c");
+      tasDePierre(ctx, x + 0.5, y + 0.6, 0.5 + 0.35 * t, Math.floor(bruit(x, y, 40) * 3));
       break;
-    case "baies": {
-      ctx.fillStyle = "#3f8f3a";
-      ctx.beginPath();
-      ctx.arc(x + 0.5, y + 0.6, 0.32 * t, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#e0306a";
-      const points: readonly (readonly [number, number])[] = [
-        [-0.12, -0.05],
-        [0.1, 0.02],
-        [0, 0.12],
-        [-0.02, -0.16],
-      ];
-      for (const [dx, dy] of points) {
-        ctx.beginPath();
-        ctx.arc(x + 0.5 + dx * t, y + 0.6 + dy * t, 0.06 * t, 0, Math.PI * 2);
-        ctx.fill();
-      }
+    case "baies":
+      buissonBaies(ctx, x + 0.5, y + 0.6, 0.5 + 0.35 * t, Math.floor(bruit(x, y, 41) * 3));
       break;
-    }
     case "poisson":
       ctx.fillStyle = "#cfefff";
       ctx.beginPath();
@@ -170,33 +155,10 @@ export function gisement(
       herbe(ctx, x, y, "#d6e04b");
       break;
     case "minerai":
-      // Une roche veinée de vert : le cuivre affleure.
-      ctx.fillStyle = "#8a8f8c";
-      ctx.beginPath();
-      ctx.moveTo(x + 0.25, y + 0.8);
-      ctx.lineTo(x + 0.4, y + 0.45);
-      ctx.lineTo(x + 0.62, y + 0.38);
-      ctx.lineTo(x + 0.8, y + 0.8);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = "#5e9c8a";
-      ctx.lineWidth = Math.max(1, 0.06 * t);
-      ctx.beginPath();
-      ctx.moveTo(x + 0.42, y + 0.72);
-      ctx.lineTo(x + 0.58, y + 0.5);
-      ctx.moveTo(x + 0.55, y + 0.75);
-      ctx.lineTo(x + 0.68, y + 0.58);
-      ctx.stroke();
+      gemmes(ctx, x + 0.5, y + 0.6, 0.5 + 0.35 * t);
       break;
     case "argile":
-      ctx.fillStyle = "#c46a2b";
-      ctx.beginPath();
-      ctx.ellipse(x + 0.5, y + 0.7, 0.32 * t, 0.16 * t, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#a8551f";
-      ctx.beginPath();
-      ctx.ellipse(x + 0.5, y + 0.66, 0.18 * t, 0.08 * t, 0, 0, Math.PI * 2);
-      ctx.fill();
+      tasDArgile(ctx, x + 0.5, y + 0.6, 0.5 + 0.35 * t, Math.floor(bruit(x, y, 42) * 3));
       break;
     default:
       ctx.fillStyle = "#ffffff";

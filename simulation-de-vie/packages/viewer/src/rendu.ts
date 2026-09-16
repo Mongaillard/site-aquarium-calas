@@ -7,6 +7,7 @@ import { Brouillard, COULEUR_INCONNU } from "./brouillard.js";
 import type { Magasin, MorceauVue } from "./etat.js";
 import { cleMorceau } from "./etat.js";
 import { construireFondMorceau } from "./fond.js";
+import { atlasPret } from "./atlas.js";
 import {
   couleurFamille,
   couleurFoi,
@@ -60,7 +61,10 @@ export class Rendu {
     const canvas = construireFondMorceau(m, taille, nomsBiomes, (x, y) =>
       this.magasin.biomeEn(x, y),
     );
-    this.fonds.set(m, { canvas, version });
+    // Tant que les tuiles Kenney ne sont pas décodées, le fond se dessine sans elles (les
+    // aplats vectoriels restent) mais ne se met pas en cache : le morceau se refait dès
+    // qu'elles le sont, sans quoi un fond incomplet resterait figé jusqu'à la découverte suivante.
+    if (atlasPret()) this.fonds.set(m, { canvas, version });
     return canvas;
   }
 
