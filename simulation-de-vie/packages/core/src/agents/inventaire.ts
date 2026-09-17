@@ -199,10 +199,18 @@ export function userObjet(inv: Inventaire, type: TypeObjet): boolean {
   return false;
 }
 
-/** Ressources comestibles et valeur nutritive (faim rendue par unité). */
+/**
+ * Ressources comestibles et valeur nutritive : ce que rassasie une unité, en points de faim (on en perd cinquante par jour).
+ * **[DÉCISION]** Le grain se mange (M44) : c'était la seule ressource qu'on
+ * récoltait sans pouvoir la manger, si bien qu'un champ ne nourrissait personne et
+ * que l'agriculture ne servait à rien. Il rassasie moins qu'un poisson et se
+ * garde presque un an (`VIE_NOURRITURE`), ce qui en fait la seule nourriture qui
+ * passe l'hiver — et la seule qu'on doive choisir entre manger et semer.
+ */
 export const NOURRITURE: Partial<Record<Ressource, number>> = {
   baies: 15,
   repas_cuit: 25,
+  graines: 30,
   poisson: 35,
   gibier: 45,
   poisson_fume: 50,

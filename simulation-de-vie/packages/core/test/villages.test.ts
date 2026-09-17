@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../src/simulation.js";
 import type { Personnage } from "../src/agents/personnage.js";
+import { INFO_BIOME } from "../src/monde/biomes.js";
 import { ajouter } from "../src/agents/inventaire.js";
 import { relationAvec } from "../src/agents/personnage.js";
 import {
@@ -25,13 +26,27 @@ function adultes(sim: Simulation): Personnage[] {
   return sim.vivants().filter((p) => p.corps.stade === "adulte");
 }
 
+/**
+ * Tuile libre la plus proche d'une position : depuis M44 une famille cultive
+ * autant de champs que de bouches, si bien que la case d'à côté est souvent prise.
+ */
+function tuileLibre(sim: Simulation, autour: Personnage): { x: number; y: number } {
+  const { x, y } = autour.corps.position;
+  for (let r = 1; r <= 8; r++)
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const t = sim.grille.tuileOuNull(x + dx, y + dy);
+        if (t?.batiment !== null || t.gisement !== null) continue;
+        if (!INFO_BIOME[t.biome].constructible) continue;
+        return { x: x + dx, y: y + dy };
+      }
+  throw new Error("aucune tuile libre autour");
+}
+
 /** Un entrepôt terminé, plein de poisson fumé, pour la famille de `p`. */
 function entrepotPlein(sim: Simulation, p: Personnage, poisson: number): void {
-  const b = sim.fonderChantier(
-    "entrepot",
-    { x: p.corps.position.x + 1, y: p.corps.position.y + 1 },
-    p,
-  );
+  const b = sim.fonderChantier("entrepot", tuileLibre(sim, p), p);
   b.etat = "termine";
   b.travailRestant = 0;
   if (b.stock !== null) ajouter(b.stock, "poisson_fume", poisson);

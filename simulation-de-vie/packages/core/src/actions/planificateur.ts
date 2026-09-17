@@ -300,21 +300,29 @@ function planifierRechauffement(monde: Monde, p: Personnage): ResultatPlan {
 }
 
 /**
- * Meilleure nourriture que le personnage sait aller chercher : poisson (canne),
- * baies, et en dernier recours le gibier, qu'il faut encore attraper.
+ * Meilleure nourriture que le personnage sait aller chercher : le grain d'un champ
+ * mûr d'abord, puis le poisson (canne), les baies, et en dernier recours le gibier,
+ * qu'il faut encore attraper.
+ *
+ * **[DÉCISION]** Le grain passe devant (M44) : c'est le seul qu'on a semé et gardé,
+ * il ne se régénère pas et il pourrit sur pied si l'on ne va pas le chercher — alors
+ * qu'un banc de poisson attendra. Sans cette ligne, un champ mûr n'était récolté par
+ * personne, et l'agriculture restait lettre morte.
  */
 export function meilleureNourritureConnue(p: Personnage): Ressource | null {
   const inv = p.corps.inventaire;
   let gibier = false;
   let poisson = false;
   let baies = false;
+  let grain = false;
   for (const l of p.connaissance.values()) {
     if (l.quantiteVue < 1 || !outilSatisfait(inv, l.outilRequis)) continue;
     if (l.type === "gibier") gibier = true;
     else if (l.type === "poisson") poisson = true;
     else if (l.type === "baies") baies = true;
+    else if (l.type === "graines") grain = true;
   }
-  return poisson ? "poisson" : baies ? "baies" : gibier ? "gibier" : null;
+  return grain ? "graines" : poisson ? "poisson" : baies ? "baies" : gibier ? "gibier" : null;
 }
 
 /**

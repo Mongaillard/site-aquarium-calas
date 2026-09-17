@@ -216,7 +216,7 @@ describe("le village apprivoise : capture et élevage", () => {
 });
 
 describe("le village apprivoise : champs et métiers", () => {
-  it("un champ semé pousse en quatre stades, mûrit en gisement de baies, gèle l'hiver et s'épuise sans jachère", () => {
+  it("un champ semé pousse en quatre stades, mûrit en gisement de grain, gèle l'hiver et s'épuise sans jachère", () => {
     const sim = mondePlat(9, 2);
     const p = sim.personnages[0];
     if (!p) throw new Error("vide");
@@ -238,7 +238,7 @@ describe("le village apprivoise : champs et métiers", () => {
     expect(champ.culture).not.toBeNull();
     expect(semer(champ)).toBe(true);
     expect(semer(champ)).toBe(false);
-    // Quatre stades, un tous les douze jours ; mûr, la tuile porte des baies à récolter.
+    // Quatre stades, un tous les douze jours ; mûr, la tuile porte du grain à récolter (M44).
     const genres: string[] = [];
     for (let j = 0; j < JOURS_PAR_STADE * 4 + 2; j++)
       for (const e of jourChamp(sim, champ, 0)) genres.push(e.genre);
@@ -246,7 +246,7 @@ describe("le village apprivoise : champs et métiers", () => {
     expect(genres).toContain("mur");
     expect(champ.culture?.stade).toBe(4);
     const tuile = sim.grille.tuile(34, 30);
-    expect(tuile.gisement?.type).toBe("baies");
+    expect(tuile.gisement?.type).toBe("graines");
     expect(tuile.gisement?.quantite).toBe(RENDEMENT_CHAMP);
     expect(champ.culture?.recoltes).toBe(1);
     // La récolte vide le gisement et rend le champ à semer ; le paysan apprend.

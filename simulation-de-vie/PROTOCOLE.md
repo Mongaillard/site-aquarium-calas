@@ -1640,6 +1640,40 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   éteint contre trois, 15 morts de froid contre 27, 67 morts en tout contre 87. Restent en tête
   l'infection (12), la faim (11) et la carence (8).
 
+## 8 duovicies. Le grain et le surplus agricole (M44)
+
+- **Céréales sauvages** (`monde/ressources.ts`) : `GISEMENTS_PAR_BIOME.prairie` porte un gisement
+  `graines` (probabilité 0,09, 4 à 10 unités, `tauxRegen` 0,4, sans outil). **[DÉCISION]** Les
+  graines ne venaient que d'une chance sur dix en cueillant des baies, et comme le poisson nourrit
+  mieux que la baie, personne ne cueillait : deux cent cinquante baies l'an pour tout un village,
+  donc une trentaine de graines, donc pas un champ semé. Ce gisement **change le tirage des
+  mondes** : toutes les graines de monde donnent un terrain différent d'avant M44.
+- **Le grain se mange** (`agents/inventaire.ts`) : `NOURRITURE.graines = 30`, entre le repas cuit
+  (25) et le poisson (35), avec `VIE_NOURRITURE.graines = 300` déjà en place — la seule nourriture
+  qui passe l'hiver, et la seule qu'on doive choisir entre manger et semer. C'était la seule
+  ressource qu'on récoltait sans pouvoir la manger.
+- **Rendement** (`monde/village.ts`) : `RENDEMENT_CHAMP` passe de 24 à **300**, et un champ mûr
+  pose un gisement `graines` (et non `baies`) sur sa tuile. À quinze points la baie, l'ancienne
+  récolte valait sept jours de vivres pour une personne, une fois l'an, quand un village de seize
+  consomme deux cent quatre-vingt-dix mille points dans l'année.
+- **Autant de champs que de bouches** (`prochainBatimentNecessaire`) : la condition passe de
+  « aucun champ dans la famille » à « moins de champs que de membres ». L'agriculture devient un
+  métier qui se développe plutôt qu'un jardin d'agrément.
+- **On va récolter le champ mûr** (`meilleureNourritureConnue`) : le grain passe **devant** le
+  poisson. Il ne se régénère pas et pourrit sur pied, alors qu'un banc de poisson attendra ; sans
+  cette ligne, un champ mûr n'était récolté par personne.
+- **Tests** (`grain.test.ts`, 6) : le grain se mange, rassasie moins qu'un poisson et se garde le
+  plus longtemps de toutes les nourritures ; la prairie porte des céréales sauvages sans outil et
+  qui repoussent ; un champ mûr devient un gisement de grain ; un champ mûr passe devant un banc
+  de poisson ; une famille de trois logée et pourvue décide un second champ ; le rendement baisse
+  sans jachère mais reste d'un autre ordre qu'avant M44.
+- **Mesures.** Sur un an, quatre graines : quinze à vingt-deux champs (contre zéro à deux),
+  quarante-cinq à cinquante-deux récoltes, grain à 45–77 % des vivres. Sur cinq ans, graine 9 :
+  19 → 24 habitants et un plateau dès l'an deux sans le grain ; 21 → 33 et toujours en hausse
+  avec, pour 26 naissances contre 19 et 42 champs contre 3. Sur la graine 2, le monde s'éteint à
+  l'an trois **avec comme sans** (onze naissances, vingt-trois morts dans les deux cas) : les
+  effondrements à cinq ans sont un sujet à part.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

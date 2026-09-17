@@ -129,6 +129,19 @@ jamais existé — la chaîne n'a pas de fin, donc l'arbre des inventions non pl
 **Inventions** montre tout : l'arbre des matières, ce que chaque trouvaille change, l'ennui qui
 l'a fait naître, qui l'a trouvée et combien de prototypes ont raté.
 
+**Le grain, et l'agriculture qui sert enfin à quelque chose (M44).** Un champ mûr donnait
+vingt-quatre baies une fois l'an — sept jours de vivres pour une personne, quand un village de
+seize en consomme l'équivalent de six mille. Les graines ne venaient que d'une chance sur dix en
+cueillant des baies, que personne ne cueillait puisque le poisson nourrit mieux : **le poisson
+faisait 96 % des vivres et il n'y avait zéro à deux champs par monde**. Désormais la prairie porte
+des **céréales sauvages** qu'on cueille avant de les semer, le **grain se mange** (trente points,
+et il se garde trois cents jours — la seule nourriture qui passe l'hiver, et la seule qu'on doive
+choisir entre manger et semer), un champ rend **trois cents unités** au lieu de vingt-quatre, une
+famille cultive **autant de champs que de bouches à nourrir**, et un champ mûr passe devant le
+poisson quand on cherche à manger. Résultat mesuré : quinze à vingt-deux champs par monde, le
+grain fait **45 à 77 %** des vivres, et sur cinq ans la population passe d'un plateau à
+vingt-quatre à **trente-trois et encore en hausse**.
+
 **On ne gèle plus en route (M43).** Les vingt-sept morts de froid mesurés étaient tous
 « éveillés, dehors », souvent avec vingt couchages libres à la maison : on rentrait sous 25 points
 de chaleur que l'abri soit à deux pas ou à vingt, alors qu'une nuit d'hiver coûte un point par pas.

@@ -445,11 +445,16 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
     enclosDe(monde, p.identite.nomFamille) === null
   )
     return "enclos";
-  // Des graines en main ou au stock à la belle saison : un champ.
+  // Des graines en main ou au stock à la belle saison : un champ — et autant de
+  // champs qu'il y a de bouches à nourrir. **[DÉCISION]** Un seul champ par famille
+  // jusqu'à M44 : à trois mille six cents points de faim la récolte annuelle contre
+  // dix-huit mille qu'une personne consomme dans l'année, une famille ne pouvait pas
+  // vivre de la terre, quoi qu'elle y mette de travail. L'agriculture devient un
+  // métier qui se développe, plutôt qu'un jardin d'agrément.
   const saison = monde.horloge.moment().saison;
   if (
     (saison === "printemps" || saison === "ete") &&
-    !acces.some((b) => b.type === "champ") &&
+    acces.filter((b) => b.type === "champ").length < membresFamille(monde, p).length &&
     grainesAccessibles(monde, p) >= 4
   )
     return "champ";

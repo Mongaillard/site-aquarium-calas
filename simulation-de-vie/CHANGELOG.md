@@ -2,6 +2,64 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M44 – Le grain : l'agriculture devient une vraie source de vivres (2026-09-17)
+
+Premier pas de la route vers une époque plus tardive : sans surplus, une colonie ne dépasse pas
+la vingtaine, et sans population il n'y a ni métiers, ni ville, ni industrie.
+
+**Ce que la mesure a trouvé.** Sur quatre mondes d'un an : population moyenne **16,0 à 16,3**, et
+**cinquante points de faim par personne et par jour — exactement ce qu'on consomme**. Le poisson
+faisait **96 %** des vivres (huit mille poissons contre deux cent cinquante baies). Les champs :
+**zéro à deux par monde**, rarement semés, souvent gelés.
+
+**Pourquoi.** Une chaîne de causes, dont aucune n'était un réglage :
+
+1. **Un champ mûr donnait vingt-quatre baies**, une fois l'an — trois cent soixante points de
+   faim, soit **sept jours de vivres pour une personne**, quand un village de seize en consomme
+   deux cent quatre-vingt-dix mille dans l'année. Le champ était un ornement.
+2. **Les graines ne venaient que d'une chance sur dix en cueillant des baies.** Comme le poisson
+   nourrit mieux que la baie, personne ne cueillait : deux cent cinquante baies l'an pour tout un
+   village, donc une trentaine de graines, donc pas un champ.
+3. **Une famille n'avait droit qu'à un champ**, quoi qu'elle y mette de travail.
+4. **Le grain ne se mangeait pas** : c'était la seule ressource qu'on récoltait sans pouvoir la
+   manger.
+
+**Ce qui change.**
+
+- **La prairie porte des céréales sauvages** (`graines`, une tuile sur onze, sans outil, qui
+  repoussent). On cueille l'épi sauvage avant de le semer, comme il s'est fait.
+- **Le grain se mange** : trente points de faim l'unité — moins qu'un poisson (trente-cinq) — et
+  il se garde **trois cents jours**. C'est la seule nourriture qui passe l'hiver, et la seule
+  qu'on doive choisir entre manger et semer.
+- **Un champ mûr rend du grain**, et non des baies : `RENDEMENT_CHAMP` passe de 24 à **300**.
+- **Autant de champs que de bouches à nourrir** dans une famille, au lieu d'un seul.
+- **Un champ mûr passe devant le poisson** quand on cherche à manger : il ne se régénère pas et
+  il pourrit sur pied, alors qu'un banc de poisson attendra. Sans cette ligne, un champ mûr
+  n'était récolté par personne.
+
+**Mesuré.** Sur un an, l'économie change du tout au tout : **quinze à vingt-deux champs** par
+monde au lieu de zéro à deux, quarante-cinq à cinquante-deux récoltes, et le grain fait **45 à
+77 %** des vivres. Sur cinq ans, là où c'est visible (graine 9) :
+
+|                        | sans le grain                 | avec le grain                |
+| ---------------------- | ----------------------------- | ---------------------------- |
+| habitants à l'an 1     | 19                            | 21                           |
+| à l'an 3               | 23                            | 27                           |
+| à l'an 5               | **24** (stable depuis l'an 2) | **33** (et encore en hausse) |
+| naissances en cinq ans | 19                            | 26                           |
+| champs                 | 3                             | 42                           |
+
+**Ce que la mesure dit aussi, et qu'il faut dire.** Le plafond de la vingtaine n'était pas une
+disette : ils mangeaient déjà tout ce qu'ils récoltaient. Le grain ne les nourrit pas _plus_, il
+leur donne une réserve qui passe l'hiver, et c'est cela qui débloque la croissance. Et sur la
+graine 2, le monde s'éteint à l'an trois **avec comme sans le grain** (onze naissances, vingt-trois
+morts dans les deux cas) : l'horizon de cinq ans fait apparaître des effondrements qu'une seule
+année cachait. C'est le sujet suivant.
+
+**Les mondes changent.** Ajouter un gisement à la prairie déplace le tirage : toutes les graines
+de monde donnent désormais un terrain différent d'avant M44. Les parties sauvegardées, elles,
+gardent le leur.
+
 ## M43 – Le froid : on ne gèle plus en route (2026-09-17)
 
 M42 avait laissé le froid premier tueur. Les vingt-sept morts de froid mesurés sur douze mondes

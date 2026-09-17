@@ -72,6 +72,14 @@ export const GISEMENTS_PAR_BIOME: Record<Biome, readonly ProfilGisement[]> = {
   plage: [{ type: "argile", probabilite: 0.12, min: 3, max: 8, tauxRegen: 0.1, outilRequis: null }],
   prairie: [
     { type: "baies", probabilite: 0.1, min: 2, max: 6, tauxRegen: 0.5, outilRequis: null },
+    // Les céréales sauvages (M44). **[DÉCISION]** Les graines ne venaient que d'une
+    // chance sur dix en cueillant des baies, et comme le poisson nourrit mieux que
+    // la baie, personne ne cueillait : deux cent cinquante baies l'an pour tout un
+    // village, donc presque pas de graines, donc pas un champ semé et une agriculture
+    // qui ne démarrait jamais. On cueille l'épi sauvage avant de le semer, comme il
+    // s'est fait. Ce gisement change le tirage des mondes : toutes les graines de
+    // monde donnent désormais un terrain différent d'avant M44.
+    { type: "graines", probabilite: 0.09, min: 4, max: 10, tauxRegen: 0.4, outilRequis: null },
     { type: "herbes", probabilite: 0.06, min: 2, max: 5, tauxRegen: 0.5, outilRequis: null },
     { type: "fibres", probabilite: 0.25, min: 3, max: 8, tauxRegen: 1, outilRequis: null },
     { type: "bois", probabilite: 0.04, min: 1, max: 2, tauxRegen: 0.2, outilRequis: null },

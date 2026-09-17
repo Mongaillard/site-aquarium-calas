@@ -290,7 +290,14 @@ export interface Culture {
 
 export const GRAINES_PAR_SEMIS = 4;
 export const JOURS_PAR_STADE = 12;
-export const RENDEMENT_CHAMP = 24;
+/**
+ * Ce qu'un champ mûr met dans sa tuile, en unités de grain. **[DÉCISION]** Vingt-quatre
+ * jusqu'à M44, soit — à quinze points de faim la baie — sept jours de vivres pour une
+ * personne, une fois l'an, quand un village de seize en consomme deux cent quatre-vingt-dix
+ * mille points dans l'année : le champ était un ornement. La valeur est calibrée par la
+ * mesure, non choisie ; voir le CHANGELOG de M44.
+ */
+export const RENDEMENT_CHAMP = 300;
 
 export function cultureInitiale(): Culture {
   return { seme: false, stade: 0, jours: 0, recoltes: 0, jachere: false };
@@ -350,10 +357,10 @@ export function jourChamp(monde: Monde, champ: Batiment, competence: number): Ev
       c.stade += 1;
       if (c.stade === 1) evenements.push({ genre: "levee", champ });
       if (c.stade === 4) {
-        // Mûr : la tuile devient un gisement de baies cultivées, à récolter.
+        // Mûr : la tuile devient un gisement de grain, qu'on mange ou qu'on sème (M44).
         const quantite = rendement(c, competence);
         tuile.gisement = {
-          type: "baies",
+          type: "graines",
           quantite,
           max: quantite,
           tauxRegen: 0,
