@@ -40,6 +40,17 @@ _Tiny Farm_.
 - Les champs gardent leurs sillons d'avant, qui se lisent de loin comme un champ ; ce sont les
   **plants** qui viennent de la planche, et ils grossissent avec le stade.
 
+**Défricher pour se faire de la place (M39d).** Un arbre abattu laissait sa souche, et la tuile
+restait interdite à la construction : un village enserré par la forêt ne pouvait plus rien bâtir.
+
+- Nouvelle action **défricher** : à côté d'une tuile qu'un gisement occupe, et avec l'outil qu'il
+  demande (la hache pour un arbre, la pioche pour la roche), on l'arrache. Ce qui restait tombe
+  dans les poches (six unités au plus), et **si c'était de la forêt, la tuile s'ouvre en
+  prairie**.
+- Quand il n'y a plus de site pour bâtir, on ne renonce plus : on va dégager la tuile **la plus
+  maigre et la plus proche** du foyer. Un village grandit donc sur la forêt, au lieu de s'arrêter.
+- Événement `defrichage` dans le fil et dans les souvenirs.
+
 **L'interface prend des cadres de pixels (M39c).** Sixième planche CC0, l'_UI Pack Pixel
 Adventure_ de Kenney : les boutons d'icônes (le menu, la lecture, les pouvoirs du ciel, l'aide,
 la fermeture du volet) et les jauges de bataille portent des cadres en neuf tranches.

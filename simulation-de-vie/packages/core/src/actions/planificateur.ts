@@ -85,6 +85,8 @@ export function planifier(monde: Monde, p: Personnage, intention: Intention): Re
       return planifierConstruction(monde, p);
     case "fabriquer":
       return planifierFabrication(monde, p, intention.recette);
+    case "defricher":
+      return planifierDefrichage(monde, p, intention.cible);
     case "stocker":
       return planifierStockage(monde, p);
     case "parler":
@@ -952,7 +954,12 @@ export function libererPlace(monde: Monde, p: Personnage, garder: readonly Resso
 /** Choix d'un site puis fondation du chantier. */
 function planifierFondation(monde: Monde, p: Personnage, type: TypeBatiment): ResultatPlan {
   const site = choisirSite(monde, p, type);
-  if (site === null) return echec(`aucun site pour ${type}`);
+  // Plus de place : on dégage une tuile qu'un gisement occupe (M39d).
+  if (site === null) {
+    const aDegager = siteADefricher(monde, p);
+    if (aDegager !== null) return planifierDefrichage(monde, p, aDegager);
+    return echec(`aucun site pour ${type}`);
+  }
   const plan: Action[] = [];
   const aller = allerPresDe(monde, p, site);
   if (aller) plan.push(aller);
@@ -1182,4 +1189,46 @@ export function destinationPourAtteindre(
 
 function distanceCarree(a: Position, b: Position): number {
   return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+}
+
+/** Dégager une tuile : on y va, puis on arrache ce qui l'occupe (M39d). */
+function planifierDefrichage(monde: Monde, p: Personnage, cible: Position): ResultatPlan {
+  const t = monde.grille.tuileOuNull(cible.x, cible.y);
+  if (t?.gisement == null) return echec("rien à dégager");
+  if (!outilSatisfait(p.corps.inventaire, t.gisement.outilRequis))
+    return echec(`il faut ${t.gisement.outilRequis ?? "un outil"} pour dégager`);
+  const plan: Action[] = [];
+  const aller = allerPresDe(monde, p, cible);
+  if (aller) plan.push(aller);
+  plan.push({ type: "defricher", cible, ticksRestants: null });
+  return ok(plan);
+}
+
+/**
+ * La tuile à dégager quand il n'y a plus de place à bâtir (M39d) : la plus
+ * proche du centre de la famille dont on peut arracher ce qui l'occupe.
+ */
+export function siteADefricher(monde: Monde, p: Personnage): Position | null {
+  const acces = batimentsAccessibles(monde, p);
+  const centre = acces[0]?.position ?? p.corps.position;
+  let meilleure: Position | null = null;
+  let score = Infinity;
+  for (let dy = -6; dy <= 6; dy++) {
+    for (let dx = -6; dx <= 6; dx++) {
+      const x = centre.x + dx;
+      const y = centre.y + dy;
+      const t = monde.grille.tuileOuNull(x, y);
+      if (t?.gisement == null) continue;
+      if (t.batiment !== null) continue;
+      if (!INFO_BIOME[t.biome].constructible) continue;
+      if (!outilSatisfait(p.corps.inventaire, t.gisement.outilRequis)) continue;
+      // On ne rase pas un gisement encore riche : on prend le plus maigre, le plus proche.
+      const s = Grille.distance(centre, { x, y }) + t.gisement.quantite * 0.35;
+      if (s < score) {
+        score = s;
+        meilleure = { x, y };
+      }
+    }
+  }
+  return meilleure;
 }

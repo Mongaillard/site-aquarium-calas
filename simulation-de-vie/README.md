@@ -136,7 +136,11 @@ s'égrène plus en anneaux empilés, elle se raccorde d'un pan à l'autre, et on
 mangeoire, posés là où il y a de la place, et les bêtes se tiennent dedans. Les **champs
 poussent** sous les yeux (sol labouré, pousse, jeune plant, plante mûre) et chacun cultive autre
 chose que son voisin. Chaque **espèce a sa silhouette** : mouton et vache viennent de la planche
-_Tiny Farm_ de Kenney, le cerf, le sanglier, le lièvre et le loup sont dessinés.
+_Tiny Farm_ de Kenney, le cerf, le sanglier, le lièvre et le loup sont dessinés. Les boutons d'icônes et les jauges
+portent des cadres de pixels (_UI Pack Pixel Adventure_). Et l'on peut enfin **défricher** :
+quand il n'y a plus de place à bâtir, on arrache la souche ou le tas de pierres qui occupe une
+tuile, et un coin de forêt s'ouvre en prairie — un village grandit désormais sur la forêt au
+lieu de s'arrêter devant elle.
 
 **Bâtiments et personnages en sprites (M31).** Deux planches CC0 de Kenney de plus : tente,
 maisons, grange, four, fumoir, puits et sanctuaire viennent de _Medieval RTS_ ; chaque personnage

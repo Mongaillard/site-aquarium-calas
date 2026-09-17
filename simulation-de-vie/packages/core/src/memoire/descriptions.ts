@@ -351,6 +351,10 @@ export function decrireEvenement(
     }
     case "invention":
       return temoin ? `J'ai vu ${qui} réussir son ${String(d.nom ?? "invention")}.` : null;
+    case "defrichage":
+      return temoin
+        ? `${qui} a dégagé ${d.ouvert === true ? "un coin de forêt" : "une place"}${lieu(e)}.`
+        : `J'ai dégagé ${d.ouvert === true ? "un coin de forêt : on pourra bâtir ici" : "une place"}${lieu(e)}.`;
     case "matiere":
       return temoin
         ? `${qui} a tiré du four une matière nouvelle : ${String(d.nom ?? "on ne sait quoi")}.`

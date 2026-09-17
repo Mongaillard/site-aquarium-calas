@@ -1510,6 +1510,16 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   pixelated`) sur `#hud > button`, `#pouvoirs button`, `#outils button`,
   `#btn-fermer-panneau`, `#aide` et `#bataille .barre`. **[DÉCISION]** Rien d'autre : sur le
   volet et les listes, le cadre mange le contraste.
+- **Défricher** (M39d) : action et intention `defricher { cible }`. `tickDefricher` exige d'être
+  à une tuile, l'outil du gisement (`outilSatisfait`), une tuile non bâtie ;
+  `TICKS_DEFRICHAGE = 14` moins le niveau de récolte ; ramasse six unités au plus du gisement,
+  puis `modifierBiome(..., "prairie")` si c'était de la forêt (il retire le gisement au passage),
+  sinon retire le gisement seul ; événement `defrichage` (`ressource`, `quantite`, `ouvert`).
+  `planifierFondation` se rabat sur `siteADefricher` quand `choisirSite` ne trouve rien :
+  la tuile la plus proche du foyer, pondérée par ce qui reste au gisement
+  (`distance + quantite × 0,35`) — **[DÉCISION]** on ne rase pas un gisement encore riche.
+  Tests (`defrichage.test.ts`, 4) : l'outil et la distance ; la tuile dégagée, la forêt ouverte
+  et le bois ramassé ; un tas de pierres qui ne change pas le sol ; le choix du plus maigre.
 - **Tests** (`enceinte.test.ts`, 5) : le centre est celui du village ; le rayon contient ce qu'on
   a bâti sans dépasser sa borne ; l'anneau est continu, sans doublon, et rattrapé d'un pas au
   plus ; le portail attend que le mur tienne, se taille une fois, du côté de l'eau ; les bêtes du

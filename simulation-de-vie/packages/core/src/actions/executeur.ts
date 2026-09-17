@@ -41,6 +41,9 @@ import {
   portsDe,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
+/** Ticks pour dégager une tuile, au niveau zéro de récolte. */
+export const TICKS_DEFRICHAGE = 14;
+
 import { estIdTrouvaille, SEUIL_SAVOIR } from "../savoirs/catalogue.js";
 import {
   bonusPorte,
@@ -121,6 +124,8 @@ export function executerTick(monde: Monde, p: Personnage, action: Action): Resul
       return tickDeplacer(monde, p, action);
     case "recolter":
       return tickRecolter(monde, p, action);
+    case "defricher":
+      return tickDefricher(monde, p, action);
     case "boire":
       return tickBoire(monde, p, action);
     case "manger":
@@ -1332,6 +1337,57 @@ function tickFabriquerTrouvaille(
   }
   gagnerExperience(p.experience, "artisanat", 3);
   monde.emettre("fabrication", p, { recette: t.nom }, 5);
+  return TERMINEE;
+}
+
+/**
+ * Défricher une tuile (M39d) : on arrache la souche, le tas de pierres ou le
+ * buisson qui l'occupe, et si c'était de la forêt, la tuile s'ouvre en prairie.
+ * Ce qui restait au gisement se ramasse au passage. C'est ainsi qu'un village
+ * se fait de la place quand il n'en a plus.
+ */
+function tickDefricher(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "defricher" }>,
+): Resultat {
+  const t = monde.grille.tuileOuNull(action.cible.x, action.cible.y);
+  if (t === null) return echec("hors du monde");
+  if (p.corps.stade === "enfant") return echec("trop jeune pour défricher");
+  if (Grille.distance(p.corps.position, action.cible) > 1) return echec("trop loin");
+  const gisement = t.gisement;
+  if (gisement === null) return echec("rien à dégager");
+  if (t.batiment !== null) return echec("la tuile est bâtie");
+  // Il faut l'outil du gisement (la hache pour un arbre, la pioche pour la roche).
+  if (!outilSatisfait(p.corps.inventaire, gisement.outilRequis))
+    return echec(`il faut ${gisement.outilRequis ?? "un outil"}`);
+  const niv = niveau(p.experience.recolte);
+  action.ticksRestants ??= Math.max(4, Math.round(TICKS_DEFRICHAGE - niv * 0.6));
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+
+  // Ce qui restait tombe dans les poches, dans la limite de la place.
+  const reste = Math.floor(gisement.quantite);
+  const pris = reste > 0 ? ajouter(p.corps.inventaire, gisement.type, Math.min(reste, 6)) : 0;
+  const ouvert = t.biome === "foret";
+  // `modifierBiome` retire le gisement au passage ; sinon on l'ôte à la main.
+  if (ouvert) monde.grille.modifierBiome(action.cible.x, action.cible.y, "prairie");
+  else t.gisement = null;
+  gagnerExperience(p.experience, "recolte", 4);
+  monde.emettre(
+    "defrichage",
+    p,
+    { ressource: gisement.type, quantite: pris, ouvert },
+    ouvert ? 5 : 3,
+    action.cible,
+  );
+  p.memoire.ajouter(
+    monde.horloge.tick,
+    "action",
+    ouvert ? "J'ai ouvert un coin de forêt : on pourra bâtir ici." : "J'ai dégagé la place.",
+    ouvert ? 6 : 3,
+    [],
+  );
   return TERMINEE;
 }
 

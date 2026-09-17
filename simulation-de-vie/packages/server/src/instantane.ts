@@ -1009,6 +1009,8 @@ export function pensee(sim: Simulation, p: Personnage): string {
     }
     case "fabriquer":
       return `Je vais fabriquer ${i.recette.replace(/_/g, " ")}.`;
+    case "defricher":
+      return "Il n'y a plus de place : je dégage ce coin-là.";
     case "stocker":
       return "Je range tout ça au stock, on en aura besoin.";
     case "parler":

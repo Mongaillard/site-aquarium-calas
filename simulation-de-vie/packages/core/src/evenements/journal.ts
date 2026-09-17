@@ -10,6 +10,7 @@ export const TYPES_EVENEMENT = [
   "action_echouee",
   "recolte",
   "gisement_epuise",
+  "defrichage",
   "repas",
   "endormi",
   "reveil",

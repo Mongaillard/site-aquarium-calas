@@ -451,6 +451,10 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
         : `${qui} se dit : « ${String(d.probleme)} » Et si c'était un ${String(d.nom)} ?`;
     case "invention":
       return `${qui} réussit son ${String(d.nom)} : la famille sait désormais le faire.`;
+    case "defrichage":
+      return d.ouvert === true
+        ? `${qui} ouvre un coin de forêt : on pourra bâtir ici.`
+        : `${qui} dégage la place (${String(d.ressource)}).`;
     case "matiere":
       return `${qui} tire du four une matière que personne n'avait vue : le ${String(d.nom)}.`;
     case "prototype_rate":

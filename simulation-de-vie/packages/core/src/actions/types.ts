@@ -22,6 +22,7 @@ export type Action =
       readonly recette: NomRecette | IdTrouvaille;
       ticksRestants: number | null;
     }
+  | { readonly type: "defricher"; readonly cible: Position; ticksRestants: number | null }
   | { readonly type: "fonder"; readonly batimentType: TypeBatiment; readonly cible: Position }
   | { readonly type: "construire"; readonly batimentId: string; ticksTravail: number }
   | {
@@ -99,6 +100,7 @@ export type Intention =
   | { readonly type: "attendre"; readonly ticks: number }
   | { readonly type: "construire" }
   | { readonly type: "fabriquer"; readonly recette: NomRecette | IdTrouvaille }
+  | { readonly type: "defricher"; readonly cible: Position }
   | { readonly type: "stocker" }
   | { readonly type: "parler"; readonly cible: string }
   | { readonly type: "offrir"; readonly cible: string; readonly ressource: Ressource }
@@ -133,6 +135,8 @@ export function decrireIntention(i: Intention): string {
       return `attendre:${i.ticks}`;
     case "fabriquer":
       return `fabriquer:${i.recette}`;
+    case "defricher":
+      return `defricher:${i.cible.x},${i.cible.y}`;
     case "parler":
       return `parler:${i.cible}`;
     case "offrir":
@@ -174,6 +178,8 @@ export function decrireAction(a: Action): string {
       return `attendre:${a.ticksRestants}`;
     case "fabriquer":
       return `fabriquer:${a.recette}`;
+    case "defricher":
+      return `defricher:${a.cible.x},${a.cible.y}`;
     case "fonder":
       return `fonder:${a.batimentType}@(${a.cible.x},${a.cible.y})`;
     case "construire":
