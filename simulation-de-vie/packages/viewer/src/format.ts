@@ -636,6 +636,8 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
             return `⚔️ Bataille ${String(d.numero)} entre ${String(d.aNom)} et ${String(d.bNom)} : chacun rentre chez soi (${bilan}).`;
           return `⚔️ Bataille ${String(d.numero)} entre ${String(d.aNom)} et ${String(d.bNom)} : ${String(d.gagnantNom)} l'emporte (${bilan}, ${String(d.butin)} portions${Number(d.outils) > 0 ? ` et ${String(d.outils)} outil${Number(d.outils) > 1 ? "s" : ""}` : ""} pris${d.pris === true ? ", le village est pris" : ""}).`;
         }
+        case "revolte":
+          return `✊ Révolte : les ${String(d.famille)} (${String(d.partants)} personnes) quittent ${String(d.deNom)} pour reprendre ${String(d.nom)}.`;
         case "conquete":
           return `🏴 ${String(d.aNom)} conquiert ${String(d.bNom)} : ${String(d.habitants)} personnes (${String(d.familles).replace(/,/g, ", ")}) rejoignent le vainqueur, la tête basse.`;
         case "paix":

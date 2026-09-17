@@ -330,6 +330,15 @@ export interface VillagesEtat {
   readonly routes: readonly (readonly [number, number, number, number])[];
   /** Les batailles (M32) en cours ou fraîchement finies. */
   readonly batailles: readonly BatailleEtat[];
+  /** Les familles conquises qui n'ont pas repris leur village (M37). */
+  readonly vaincus: readonly VaincuEtat[];
+}
+
+export interface VaincuEtat {
+  readonly famille: string;
+  readonly ancienNom: string;
+  readonly vainqueur: string;
+  readonly jour: number;
 }
 
 /** Une coutume du village : une leçon que tout adulte suit. */

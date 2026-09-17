@@ -901,6 +901,9 @@ export class Panneaux {
     const villages = vv.villages.length
       ? `<table class="saisons"><tr><th>village</th><th>familles</th><th>habitants</th><th>vivres</th><th>force</th></tr>${vv.villages.map((v) => `<tr><td>${e(v.nom)}${v.origine === "schisme" ? ` <span class="discret">(schisme, ${e(quand(v.fondeJour))})</span>` : ""}${v.enRoute > 0 ? ` <span class="discret">· ${v.enRoute} en route</span>` : ""}</td><td>${e(v.familles.join(", "))}</td><td>${v.habitants}</td><td>${v.nourriture}</td><td>${v.force}</td></tr>`).join("")}</table>`
       : "";
+    const vaincus = vv.vaincus.length
+      ? `<p class="discret">🏴 Vaincus qui rongent leur frein : ${vv.vaincus.map((v) => `les ${e(v.famille)} (${e(v.ancienNom)}, chez ${e(nomVillage(v.vainqueur))} depuis ${e(quand(v.jour))})`).join(" · ")}</p>`
+      : "";
     const relationsV = vv.relations.length
       ? `<ul class="liste">${vv.relations.map((r) => `<li>${r.etat === "guerre" ? "⚔️" : r.etat === "alliance" ? "🤝" : "☮️"} <b>${e(nomVillage(r.a))}</b> et <b>${e(nomVillage(r.b))}</b> : ${e(r.etat)}, attitude ${r.attitude}${r.casusBelli ? ` · casus belli : ${e(r.casusBelli)}` : ""}${r.batailles > 0 ? ` · ${r.batailles} bataille${r.batailles > 1 ? "s" : ""}` : ""}</li>`).join("")}</ul>`
       : vv.villages.length > 1
@@ -918,7 +921,7 @@ export class Panneaux {
     ].join("");
     $("village").innerHTML = `
       <h2>Le village au ${e(quand(jour))}</h2>
-      <h3>Villages</h3>${villages}${relationsV}${mouvements ? `<div class="puces">${mouvements}</div>` : ""}
+      <h3>Villages</h3>${villages}${vaincus}${relationsV}${mouvements ? `<div class="puces">${mouvements}</div>` : ""}
       <div class="jauges"><span>tension</span><div class="jauge ${tensionClasse}"><i style="width:${s.tension}%"></i></div><span class="num">${s.tension}</span></div>
       <div class="discret">${tensionTexte}${s.stocksOuverts ? " · les stocks sont ouverts à tous" : ""}${s.bannis.length ? ` · banni${s.bannis.length > 1 ? "s" : ""} : ${s.bannis.map(personne).join(", ")}` : ""}</div>
       ${veillee}

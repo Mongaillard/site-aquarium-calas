@@ -240,6 +240,12 @@ export function villagesEtat(sim: Simulation): VillagesEtat {
       issue: b.issue,
       frappes: b.frappes.map((f) => ({ ...f })),
     })),
+    vaincus: (e.vaincus ?? []).map((v) => ({
+      famille: v.famille,
+      ancienNom: v.ancienNom,
+      vainqueur: v.vainqueur,
+      jour: v.jour,
+    })),
   };
 }
 

@@ -183,6 +183,7 @@ import {
 import type { EtatVillages } from "./monde/villages.js";
 import {
   aubeBatailles,
+  aubeRevoltes,
   batailleActive,
   gardienRepousse,
   lancerBatailleMeute,
@@ -307,7 +308,8 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
     raidsRepousses: 0,
     conquetes: 0,
   });
-  defauts(brut.villages as Record<string, unknown>, { derniereConqueteJour: -1000 });
+  defauts(brut.villages as Record<string, unknown>, { derniereConqueteJour: -1000, vaincus: [] });
+  defauts((brut.villages as { compteurs: Record<string, unknown> }).compteurs, { revoltes: 0 });
   // Version 5 (M25) : les peuples rivaux du départ (un seul dans les mondes d'avant), les lois.
   defauts(etat.config.population, { peuples: 1 });
   if (!("lois" in brut)) brut.lois = loisParDefaut();
@@ -1760,6 +1762,7 @@ export class Simulation implements Monde {
         { raids: this.lois.raids, schismes: this.lois.schismes, guerres: this.lois.guerres },
       );
       if (this.lois.guerres) aubeBatailles(this, this.rng.fork(`batailles/${String(this.tick)}`));
+      aubeRevoltes(this);
     }
     if (this.tick > 0) {
       this.conseilsDuJour = 0;

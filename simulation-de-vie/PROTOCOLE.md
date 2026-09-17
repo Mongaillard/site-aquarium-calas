@@ -1384,6 +1384,33 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   route, ambitions, événement, compteur) ; `peutConquerir` refuse une seconde conquête dans
   l'année et un vaincu trop fort.
 
+## 8 sedecies. La rancune des vaincus telle que réalisée (M37)
+
+- `conquerir(monde, gagnant, perdant, vainqueurs)` reçoit les guerriers du camp gagnant : chaque
+  habitant conquis prend `relationAvec(p, id).rancune += RANCUNE_CONQUETE (40)` envers chacun
+  d'eux ; puis pour chaque famille du vaincu, `villages.vaincus` reçoit `{ famille,
+  ancienVillage, ancienNom, site, vainqueur, jour }` (type `Vaincu`, exposé au viewer en
+  `VaincuEtat { famille, ancienNom, vainqueur, jour }`).
+- `peutSeRevolter(monde, v)` : `jour − v.jour ≥ JOURS_AVANT_REVOLTE (60)` ; la famille est
+  encore dans `vainqueur.familles` ; `vainqueur.enRoute` vide et aucune bataille active ; au
+  moins trois adultes vivants de la famille ; et `societe.tension ≥ TENSION_REVOLTE (60)` ou
+  force des siens (2 par lance ou arc, 1 sinon) `≥ RAPPORT_REVOLTE (0,5) ×` force du reste du
+  village ; moins de huit villages. Une entrée dont la famille a disparu ou dont le vainqueur
+  n'existe plus est purgée.
+- `revolter(monde, v)` : nouveau village `v-N` au nom `ancienNom` et au site d'avant, familles
+  de l'entrée (et toute autre entrée du même ancien village chez le même vainqueur) retirées
+  du vainqueur ; chaque habitant reçoit une ambition `migrer` vers le site (comme un schisme),
+  `enRoute` du nouveau village ; `relationEntre` attitude −60, casus belli « la conquête » ;
+  `societe.tension − 20` ; `compteurs.revoltes` ; événement `village/revolte` (`village`,
+  `nom`, `de`, `deNom`, `famille`, `partants`, site). `aubeRevoltes(monde)` (appelé à chaque
+  aube par `nouveauJour`) purge et déclenche au plus une révolte.
+- Viewer : texte `revolte`, paragraphe « 🏴 Vaincus qui rongent leur frein » du panneau
+  Villages. Sauvegarde : `defauts(brut.villages, { vaincus: [] })`, `compteurs.revoltes`.
+- Tests (`bataille.test.ts`, « M37 ») : conquête → entrée `vaincus` (nom et site), rancune ≥ 40
+  envers un guerrier vainqueur, pas de révolte avant le délai ; entrée vieillie et tension à
+  100 → `revolter` recrée le village au nom et au site d'avant, familles passées, ambitions,
+  relation −60 et casus belli, événement, compteur.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

@@ -50,7 +50,8 @@ import {
   stocksDe,
   villageDe,
 } from "./villages.js";
-import type { Bande, Diplomatie, Village } from "./villages.js";
+import type { Bande, Diplomatie, Vaincu, Village } from "./villages.js";
+import { relationAvec } from "../agents/personnage.js";
 
 export type GenreBataille = "guerre" | "raid" | "meute";
 export type PhaseBataille = "marche" | "combat" | "finie";
@@ -144,6 +145,12 @@ export const PART_RAZZIA = 0.2;
 /** Conquête (M35) : le vaincu deux fois plus faible, une conquête par an au plus. */
 export const RAPPORT_CONQUETE = 2;
 export const JOURS_ENTRE_CONQUETES = 360;
+/** La rancune (M37) : ce qu'un conquis garde contre chaque guerrier vainqueur ; le temps de
+ * ruminer avant une révolte ; ce qu'il faut de tension ou de force pour la tenter. */
+export const RANCUNE_CONQUETE = 40;
+export const JOURS_AVANT_REVOLTE = 60;
+export const TENSION_REVOLTE = 60;
+export const RAPPORT_REVOLTE = 0.5;
 
 export function batailleDe(monde: Monde, id: string | null | undefined): Bataille | undefined {
   if (id === null || id === undefined) return undefined;
@@ -861,7 +868,12 @@ function conclureGuerre(monde: Monde, b: Bataille, issue: IssueBataille): void {
     b.lieu,
   );
   if (pris && gagnant !== null && perdant !== null && peutConquerir(monde, gagnant, perdant))
-    conquerir(monde, gagnant, perdant);
+    conquerir(
+      monde,
+      gagnant,
+      perdant,
+      gagnant === att ? b.attaquant.guerriers : b.defenseur.guerriers,
+    );
 }
 
 /**
@@ -925,7 +937,12 @@ export function peutConquerir(monde: Monde, gagnant: Village, perdant: Village):
  * marchant vers un site à côté de son centre (la migration de M17), sans prestige, la peur au
  * ventre, et la tension du village monte.
  */
-export function conquerir(monde: Monde, gagnant: Village, perdant: Village): void {
+export function conquerir(
+  monde: Monde,
+  gagnant: Village,
+  perdant: Village,
+  vainqueurs: readonly string[] = [],
+): void {
   const e = monde.villages;
   const tick = monde.horloge.tick;
   const T = monde.horloge.ticksParJour;
@@ -933,6 +950,11 @@ export function conquerir(monde: Monde, gagnant: Village, perdant: Village): voi
   const site = siteLibre(monde, gagnant.centre, 6) ?? { ...gagnant.centre };
   for (const p of gens) {
     p.prestige = 0;
+    // La rancune (M37) : contre chacun de ceux qui ont pris le village.
+    for (const id of vainqueurs) {
+      const r = relationAvec(p, id);
+      r.rancune = Math.min(100, r.rancune + RANCUNE_CONQUETE);
+    }
     stresser(p, 20);
     p.besoins.securite = clamp(p.besoins.securite - 30);
     if (p.ambition !== null && p.ambition.issue === "en_cours") p.ambition.issue = "abandonnee";
@@ -963,6 +985,16 @@ export function conquerir(monde: Monde, gagnant: Village, perdant: Village): voi
     gagnant.enRoute.push(p.id);
   }
   gagnant.familles.push(...perdant.familles.filter((f) => !gagnant.familles.includes(f)));
+  e.vaincus ??= [];
+  for (const famille of perdant.familles)
+    e.vaincus.push({
+      famille,
+      ancienVillage: perdant.id,
+      ancienNom: perdant.nom,
+      site: { ...perdant.centre },
+      vainqueur: gagnant.id,
+      jour: jourDe(monde),
+    });
   e.villages = e.villages.filter((v) => v.id !== perdant.id);
   e.relations = e.relations.filter((r) => r.a !== perdant.id && r.b !== perdant.id);
   for (const bande of e.bandes)
@@ -1076,4 +1108,126 @@ function conclureMeute(monde: Monde, b: Bataille, issue: IssueBataille): void {
     9,
     b.lieu,
   );
+}
+
+/** Les adultes d'une famille conquise, tels qu'ils vivent chez le vainqueur. */
+function adultesDeFamille(monde: Monde, famille: string): Personnage[] {
+  return monde.personnages.filter(
+    (p) =>
+      p.vivant &&
+      p.identite.nomFamille === famille &&
+      (p.corps.stade === "adulte" || p.corps.stade === "ancien"),
+  );
+}
+
+/**
+ * Une famille vaincue peut se révolter (M37) soixante jours après la conquête, si elle
+ * compte au moins trois adultes et si, ou bien la tension du village est haute, ou bien sa
+ * force vaut la moitié de celle du reste du village.
+ */
+export function peutSeRevolter(monde: Monde, v: Vaincu): boolean {
+  const e = monde.villages;
+  if (jourDe(monde) - v.jour < JOURS_AVANT_REVOLTE) return false;
+  const vainqueur = villageDId(monde, v.vainqueur);
+  if (!vainqueur?.familles.includes(v.famille)) return false;
+  if (vainqueur.enRoute.length > 0 || batailleActive(monde) !== null) return false;
+  const siens = adultesDeFamille(monde, v.famille);
+  if (siens.length < 3) return false;
+  if (monde.societe.tension >= TENSION_REVOLTE) return true;
+  let forceSiens = 0;
+  for (const p of siens)
+    forceSiens +=
+      possede(p.corps.inventaire, "lance") || possede(p.corps.inventaire, "arc") ? 2 : 1;
+  const forceAutres = forceDe(monde, vainqueur) - forceSiens;
+  return forceSiens >= forceAutres * RAPPORT_REVOLTE && e.villages.length < 8;
+}
+
+/**
+ * La révolte : la famille reprend son ancien village — elle en repart fonder un sur l'ancien
+ * site, sous l'ancien nom, et la rancune devient un casus belli.
+ */
+export function revolter(monde: Monde, v: Vaincu): Village | null {
+  const e = monde.villages;
+  const vainqueur = villageDId(monde, v.vainqueur);
+  if (vainqueur === null) return null;
+  const tick = monde.horloge.tick;
+  const T = monde.horloge.ticksParJour;
+  const jour = jourDe(monde);
+  e.compteurs.villages += 1;
+  e.compteurs.revoltes = (e.compteurs.revoltes ?? 0) + 1;
+  const nouveau: Village = {
+    id: `v-${String(e.compteurs.villages)}`,
+    nom: v.ancienNom,
+    familles: [v.famille],
+    centre: { ...v.site },
+    fondeJour: jour,
+    origine: "schisme",
+    enRoute: [],
+  };
+  vainqueur.familles = vainqueur.familles.filter((f) => f !== v.famille);
+  e.villages.push(nouveau);
+  e.vaincus = (e.vaincus ?? []).filter((x) => x !== v);
+  const gens = monde.personnages.filter((p) => p.vivant && p.identite.nomFamille === v.famille);
+  for (const p of gens) {
+    if (p.ambition !== null && p.ambition.issue === "en_cours") p.ambition.issue = "abandonnee";
+    p.ambition = {
+      genre: "migrer",
+      cible: nouveau.id,
+      origine: { ...vainqueur.centre },
+      destination: { ...v.site },
+      but: `reprendre ${v.ancienNom}`,
+      pensee: "Assez courbé l'échine. Nous rentrons chez nous, et qu'ils viennent nous en déloger.",
+      depuis: tick,
+      jusqua: tick + 60 * T,
+      issue: "en_cours",
+      lieuxAuDepart: p.connaissance.size,
+    };
+    p.projet = null;
+    p.plan = [];
+    p.actionEnCours = null;
+    p.intention = null;
+    p.prestige += 5;
+    stresser(p, -10);
+    p.memoire.ajouter(
+      tick,
+      "plan",
+      `Nous reprenons ${v.ancienNom}. ${vainqueur.nom} nous le paiera.`,
+      9,
+      [],
+      v.site,
+    );
+    nouveau.enRoute.push(p.id);
+  }
+  const r = relationEntre(e, vainqueur.id, nouveau.id);
+  r.attitude = -60;
+  r.casusBelli = "la conquête";
+  r.depuisJour = jour;
+  monde.societe.tension = Math.max(0, monde.societe.tension - 20);
+  monde.emettre(
+    "village",
+    null,
+    {
+      genre: "revolte",
+      village: nouveau.id,
+      nom: nouveau.nom,
+      de: vainqueur.id,
+      deNom: vainqueur.nom,
+      famille: v.famille,
+      partants: gens.length,
+      x: v.site.x,
+      y: v.site.y,
+    },
+    10,
+    vainqueur.centre,
+  );
+  return nouveau;
+}
+
+/** L'aube : la première famille vaincue en état de se révolter reprend son village. */
+export function aubeRevoltes(monde: Monde): void {
+  for (const v of [...(monde.villages.vaincus ?? [])]) {
+    if (!peutSeRevolter(monde, v)) continue;
+    revolter(monde, v);
+    return;
+  }
 }

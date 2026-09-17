@@ -2,6 +2,26 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M37 – La rancune des vaincus (2026-09-17)
+
+Une conquête (M35) fondait les familles du vaincu dans le village vainqueur, sans trace. Elles
+se souviennent désormais.
+
+- **La rancune** : chaque habitant conquis prend 40 de rancune envers chaque guerrier vainqueur
+  (`RANCUNE_CONQUETE`), qui pèse ensuite sur ses dialogues et ses choix comme toute rancune.
+- **La mémoire des vaincus** : `villages.vaincus` garde, par famille conquise, l'ancien village
+  (son nom, son site), le vainqueur et le jour. Le panneau Villages les liste (« 🏴 Vaincus qui
+  rongent leur frein »).
+- **La révolte** : au bout de soixante jours (`JOURS_AVANT_REVOLTE`), si la famille est encore
+  chez le vainqueur, hors marche et hors bataille, compte au moins trois adultes et que la tension
+  atteint 60 (`TENSION_REVOLTE`) ou que sa force vaut la moitié du reste du village
+  (`RAPPORT_REVOLTE`), elle repart **reprendre son ancien village** : nouveau village au nom et
+  au site d'avant, familles et ambitions `migrer` comme pour un schisme, attitude −60 entre les
+  deux (casus belli « la conquête », donc guerre en vue), tension −20, événement
+  `village/revolte` (« ✊ Révolte : les X quittent Y pour reprendre Z. »), compteur `revoltes`.
+  Huit villages au plus. Une révolte par aube.
+- Sauvegarde : valeurs par défaut sur les mondes d'avant (`vaincus: []`, `revoltes: 0`).
+
 ## M36 – Finitions (2026-09-16)
 
 - **Fond net de près** : au-delà de 36 px par tuile, le fond de carte se redessine à 48 px par

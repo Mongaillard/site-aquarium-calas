@@ -84,6 +84,16 @@ export interface Caravane {
   readonly departJour: number;
 }
 
+/** Une famille conquise (M37) : d'où elle vient, à qui elle en veut, et depuis quand. */
+export interface Vaincu {
+  readonly famille: string;
+  readonly ancienVillage: string;
+  readonly ancienNom: string;
+  readonly site: Position;
+  readonly vainqueur: string;
+  readonly jour: number;
+}
+
 export interface EtatVillages {
   villages: Village[];
   relations: Diplomatie[];
@@ -93,6 +103,8 @@ export interface EtatVillages {
   routes: string[];
   /** Les batailles en cours ou fraîchement finies (M32, `bataille.ts`). */
   batailles: Bataille[];
+  /** Les familles conquises qui n'ont pas encore repris leur village (M37) ; absent avant. */
+  vaincus?: Vaincu[];
   derniereBandeSaison: string;
   derniereCaravaneJour: number;
   derniereBatailleJour: number;
@@ -111,6 +123,8 @@ export interface EtatVillages {
     raidsRepousses?: number;
     /** Villages conquis (M35) ; absent des sauvegardes d'avant. */
     conquetes?: number;
+    /** Révoltes de vaincus qui ont repris leur village (M37). */
+    revoltes?: number;
   };
 }
 
@@ -122,6 +136,7 @@ export function etatVillagesInitial(): EtatVillages {
     caravanes: [],
     routes: [],
     batailles: [],
+    vaincus: [],
     derniereBandeSaison: "",
     derniereCaravaneJour: -100,
     derniereBatailleJour: -100,
@@ -137,6 +152,7 @@ export function etatVillagesInitial(): EtatVillages {
       paix: 0,
       raidsRepousses: 0,
       conquetes: 0,
+      revoltes: 0,
     },
   };
 }

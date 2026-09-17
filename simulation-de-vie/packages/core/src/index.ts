@@ -234,6 +234,13 @@ export {
   gardienRepousse,
   peutConquerir,
   conquerir,
+  peutSeRevolter,
+  revolter,
+  aubeRevoltes,
+  RANCUNE_CONQUETE,
+  JOURS_AVANT_REVOLTE,
+  TENSION_REVOLTE,
+  RAPPORT_REVOLTE,
   PART_PILLAGE_PRIS,
   PART_RAZZIA,
   RAPPORT_CONQUETE,
@@ -534,6 +541,7 @@ export {
 } from "./monde/villages.js";
 export type {
   EtatVillages,
+  Vaincu,
   Village,
   Diplomatie,
   EtatDiplomatie,

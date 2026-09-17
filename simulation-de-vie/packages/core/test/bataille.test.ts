@@ -4,7 +4,10 @@ import {
   lancerBatailleMeute,
   lancerRaid,
   peutConquerir,
+  peutSeRevolter,
+  relationAvec,
   relationEntre,
+  revolter,
 } from "../src/index.js";
 import type { Troupeau } from "../src/index.js";
 import type { Personnage } from "../src/index.js";
@@ -269,3 +272,63 @@ describe("M32 : la bataille tick par tick", () => {
     expect(peutConquerir(sim, gagnant, autre)).toBe(false);
   }, 120_000);
 });
+
+describe("M37 : la rancune des vaincus", () => {
+  it("les conquis gardent rancune, puis se révoltent et reprennent leur village", () => {
+    const { sim, a, b, defenseurs } = deuxVillagesEnGuerre(11);
+    const perdant = sim.villages.villages.find((v) => v.id === b);
+    const gagnant = sim.villages.villages.find((v) => v.id === a);
+    if (perdant === undefined || gagnant === undefined) throw new Error("villages");
+    const ancienSite = { ...perdant.centre };
+    const famille = defenseurs[0]?.identite.nomFamille;
+    if (famille === undefined) throw new Error("personne");
+    for (const p of defenseurs) {
+      p.corps.inventaire.objets = [];
+      p.corps.sante = 30;
+    }
+    sim.avancer(1);
+    const bataille = sim.villages.batailles[0];
+    for (let t = 0; t < 600 && bataille?.phase !== "finie"; t++) sim.avancer(1);
+    expect(sim.villages.villages.map((v) => v.id)).toEqual([a]);
+    const vaincu = sim.villages.vaincus?.find((v) => v.famille === famille);
+    expect(vaincu).toBeDefined();
+    if (vaincu === undefined) return;
+    expect(vaincu.ancienNom).toBe(perdant.nom);
+    expect(vaincu.site).toEqual(ancienSite);
+    // La rancune : chaque conquis en veut à chaque guerrier vainqueur.
+    const guerrier = bataille?.attaquant.guerriers[0] ?? sim.vivants()[0]?.id ?? "";
+    for (const p of defenseurs.filter((x) => x.vivant))
+      expect(relationAvec(p, guerrier).rancune).toBeGreaterThanOrEqual(40);
+    // Trop tôt, trop faibles : pas de révolte.
+    expect(peutSeRevolter(sim, vaincu)).toBe(false);
+    // Soixante jours plus tard, la tension au plus haut, trois adultes valides : la révolte.
+    for (const p of defenseurs) p.corps.sante = 100;
+    gagnant.enRoute = [];
+    const entree = { ...vaincu, jour: vaincu.jour - 61 };
+    sim.villages.vaincus = [entree];
+    sim.societe.tension = 100;
+    expect(peutSeRevolter(sim, entree)).toBe(adultesVivants(defenseurs) >= 3);
+    if (adultesVivants(defenseurs) < 3) return;
+    const nouveau = revolter(sim, entree);
+    expect(nouveau).not.toBeNull();
+    expect(nouveau?.nom).toBe(perdant.nom);
+    expect(nouveau?.centre).toEqual(ancienSite);
+    expect(gagnant.familles).not.toContain(famille);
+    expect(sim.villages.villages).toHaveLength(2);
+    expect(sim.villages.vaincus).toHaveLength(0);
+    for (const p of defenseurs.filter((x) => x.vivant)) {
+      expect(p.ambition?.genre).toBe("migrer");
+      expect(nouveau?.enRoute).toContain(p.id);
+    }
+    const r = relationEntre(sim.villages, a, nouveau?.id ?? "");
+    expect(r.attitude).toBe(-60);
+    expect(r.casusBelli).toBe("la conquête");
+    expect(sim.journal.parType("village").some((e) => e.details.genre === "revolte")).toBe(true);
+    expect(sim.villages.compteurs.revoltes).toBe(1);
+  }, 120_000);
+});
+
+function adultesVivants(gens: readonly Personnage[]): number {
+  return gens.filter((p) => p.vivant && (p.corps.stade === "adulte" || p.corps.stade === "ancien"))
+    .length;
+}
