@@ -6,7 +6,8 @@
  */
 import type { Monde } from "../monde.js";
 import type { Ressource } from "../monde/ressources.js";
-import { NOURRITURE, possede, retirerObjet } from "./inventaire.js";
+import { NOURRITURE, possede, retirerObjet, retirerObjetExact } from "./inventaire.js";
+import { objetDuLevier } from "../savoirs/grammaire.js";
 import { phenotype } from "./genetique.js";
 import { gagnerExperience, niveau } from "./competences.js";
 import type { Personnage } from "./personnage.js";
@@ -357,6 +358,21 @@ export function soignerAvec(monde: Monde, soignant: Personnage, cible: Personnag
   const tick = monde.horloge.tick;
   const blessures = cible.corps.etat.blessures;
   const plaie = blessures.find((b) => b.saigne);
+  // Un pansement né de la grammaire (M38) vaut un bandage, et referme mieux.
+  const soinGrammaire = objetDuLevier(monde.trouvailles, inv, "soin");
+  if (plaie !== undefined && soinGrammaire !== null) {
+    const t = monde.trouvailles.trouvailles.get(soinGrammaire.trouvaille ?? "");
+    retirerObjetExact(inv, soinGrammaire);
+    plaie.saigne = false;
+    plaie.bandee = true;
+    // Un bon pansement assainit la plaie du même geste.
+    if (t !== undefined && t.gain >= 0.5 && plaie.infectee) {
+      plaie.infectee = false;
+      plaie.cataplasme = true;
+    }
+    gagnerExperience(soignant.experience, "soin", 6);
+    return t?.nom ?? "pansement";
+  }
   if (plaie !== undefined && possede(inv, "bandage")) {
     retirerObjet(inv, "bandage");
     plaie.saigne = false;

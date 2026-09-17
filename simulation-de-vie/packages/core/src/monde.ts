@@ -20,6 +20,7 @@ import { betesDe, enclosDe } from "./monde/village.js";
 import type { Rng } from "./rng.js";
 import type { EtatSociete } from "./social/societe.js";
 import type { EtatChronique } from "./memoire/legendes.js";
+import type { EtatTrouvailles } from "./savoirs/grammaire.js";
 import type { EtatVillages } from "./monde/villages.js";
 
 export interface Monde {
@@ -62,6 +63,8 @@ export interface Monde {
   readonly chronique: EtatChronique;
   /** Les villages (jalon 15) : schismes, bandes, caravanes, diplomatie. */
   readonly villages: EtatVillages;
+  /** Ce que le monde a trouvé (M38) : matières dérivées et trouvailles. */
+  readonly trouvailles: EtatTrouvailles;
 }
 
 /**

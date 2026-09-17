@@ -13,6 +13,7 @@ import {
   LECONS,
   SEUIL_SAVOIR,
   cleMorceau,
+  estIdTrouvaille,
   estLecon,
   titreSavoir,
   avancementGrossesse,
@@ -796,13 +797,21 @@ export function ambitionFiche(sim: Simulation, p: Personnage): AmbitionFiche | n
   };
 }
 
-function texteSavoir(id: Savoir): string {
+function texteSavoir(sim: Simulation, id: Savoir): string {
+  if (estIdTrouvaille(id)) {
+    const t = sim.trouvailles.trouvailles.get(id);
+    return t === undefined ? "une idée" : `Un ${t.nom} : ${Math.round(t.gain * 100)} % de mieux.`;
+  }
   return estLecon(id) ? LECONS[id].morale : INVENTIONS[id].confidence;
 }
 
 /** Savoirs connus d'au moins un vivant, les plus répandus d'abord. */
 export function savoirsDuVillage(sim: Simulation): SavoirStat[] {
-  const ids = [...Object.keys(LECONS), ...Object.keys(INVENTIONS)] as Savoir[];
+  const ids = [
+    ...Object.keys(LECONS),
+    ...Object.keys(INVENTIONS),
+    ...sim.trouvailles.trouvailles.keys(),
+  ] as Savoir[];
   const resultat: SavoirStat[] = [];
   for (const id of ids) {
     const porteurs = sim
@@ -812,8 +821,8 @@ export function savoirsDuVillage(sim: Simulation): SavoirStat[] {
     resultat.push({
       id,
       genre: estLecon(id) ? "lecon" : "invention",
-      titre: titreSavoir(id),
-      texte: texteSavoir(id),
+      titre: titreSavoir(id, (t) => sim.trouvailles.trouvailles.get(t)?.nom ?? null),
+      texte: texteSavoir(sim, id),
       porteurs,
     });
   }
@@ -1130,8 +1139,8 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
     savoirs: [...p.savoirs.entries()].map(([id, s]) => ({
       id,
       genre: estLecon(id) ? "lecon" : "invention",
-      titre: titreSavoir(id),
-      texte: texteSavoir(id),
+      titre: titreSavoir(id, (t) => sim.trouvailles.trouvailles.get(t)?.nom ?? null),
+      texte: texteSavoir(sim, id),
       force: s.force,
       origine: s.origine,
     })),

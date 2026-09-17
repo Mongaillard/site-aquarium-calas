@@ -163,6 +163,14 @@ export function retirerObjet(inv: Inventaire, type: TypeObjet): boolean {
   return true;
 }
 
+/** Retire cet objet précis (par identité, pas par type) ; vrai s'il y était. */
+export function retirerObjetExact(inv: Inventaire, objet: Objet): boolean {
+  const i = inv.objets.indexOf(objet);
+  if (i < 0) return false;
+  inv.objets.splice(i, 1);
+  return true;
+}
+
 export function ajouterObjet(inv: Inventaire, objet: Objet): boolean {
   if (placeLibre(inv) <= 0) return false;
   inv.objets.push(objet);

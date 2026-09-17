@@ -2,6 +2,7 @@
 import type { TypeBatiment } from "../monde/batiments.js";
 import type { Position } from "../monde/grille.js";
 import type { NomRecette, TypeObjet } from "../monde/recettes.js";
+import type { IdTrouvaille } from "../savoirs/catalogue.js";
 import type { Ressource } from "../monde/ressources.js";
 
 export type Action =
@@ -16,7 +17,11 @@ export type Action =
   | { readonly type: "manger"; readonly ressource: Ressource; ticksRestants: number | null }
   | { readonly type: "dormir"; ticksDormis: number }
   | { readonly type: "attendre"; ticksRestants: number }
-  | { readonly type: "fabriquer"; readonly recette: NomRecette; ticksRestants: number | null }
+  | {
+      readonly type: "fabriquer";
+      readonly recette: NomRecette | IdTrouvaille;
+      ticksRestants: number | null;
+    }
   | { readonly type: "fonder"; readonly batimentType: TypeBatiment; readonly cible: Position }
   | { readonly type: "construire"; readonly batimentId: string; ticksTravail: number }
   | {
@@ -93,7 +98,7 @@ export type Intention =
   | { readonly type: "explorer" }
   | { readonly type: "attendre"; readonly ticks: number }
   | { readonly type: "construire" }
-  | { readonly type: "fabriquer"; readonly recette: NomRecette }
+  | { readonly type: "fabriquer"; readonly recette: NomRecette | IdTrouvaille }
   | { readonly type: "stocker" }
   | { readonly type: "parler"; readonly cible: string }
   | { readonly type: "offrir"; readonly cible: string; readonly ressource: Ressource }

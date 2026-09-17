@@ -181,6 +181,8 @@ import {
   observerVillages,
 } from "./monde/villages.js";
 import type { EtatVillages } from "./monde/villages.js";
+import { MATIERES_BRUTES, bonusPorte, bonusSu, etatTrouvaillesNeuf } from "./savoirs/grammaire.js";
+import type { EtatTrouvailles } from "./savoirs/grammaire.js";
 import {
   aubeBatailles,
   aubeRevoltes,
@@ -310,6 +312,15 @@ function migrer(etat: EtatSimulation, version: number): EtatSimulation {
   });
   defauts(brut.villages as Record<string, unknown>, { derniereConqueteJour: -1000, vaincus: [] });
   defauts((brut.villages as { compteurs: Record<string, unknown> }).compteurs, { revoltes: 0 });
+  // Version 8 (M38) : la grammaire d'invention ; les mondes d'avant n'ont rien trouvé.
+  if (!("trouvailles" in brut)) brut.trouvailles = etatTrouvaillesNeuf();
+  else {
+    const e = brut.trouvailles as Record<string, unknown>;
+    defauts(e, { nomsPris: new Set<string>() });
+    // Les matières brutes viennent du code, pas de la sauvegarde : elles peuvent changer.
+    const matieres = e.matieres as Map<string, unknown>;
+    for (const f of MATIERES_BRUTES) if (!matieres.has(f.id)) matieres.set(f.id, f);
+  }
   // Version 5 (M25) : les peuples rivaux du départ (un seul dans les mondes d'avant), les lois.
   defauts(etat.config.population, { peuples: 1 });
   if (!("lois" in brut)) brut.lois = loisParDefaut();
@@ -392,6 +403,7 @@ interface EtatSimulation {
   readonly societe: EtatSociete;
   readonly chronique: EtatChronique;
   readonly villages: EtatVillages;
+  readonly trouvailles: EtatTrouvailles;
   readonly lois: Record<Loi, boolean>;
   readonly creatures: Creature[];
   readonly compteurCreatures: number;
@@ -431,6 +443,8 @@ export class Simulation implements Monde {
   readonly chronique: EtatChronique = etatChroniqueInitial();
   /** Les villages (jalon 15) : schismes, bandes, caravanes, diplomatie. */
   readonly villages: EtatVillages = etatVillagesInitial();
+  /** Ce que le monde a trouvé (M38) : les matières dérivées et les trouvailles. */
+  readonly trouvailles: EtatTrouvailles = etatTrouvaillesNeuf();
   /** Les lois du monde (M25) : ce que l'observateur a suspendu. */
   readonly lois: Record<Loi, boolean> = loisParDefaut();
   /** Les créatures du ciel (M25) : gardiens postés, fléaux lâchés. */
@@ -493,6 +507,7 @@ export class Simulation implements Monde {
       Object.assign(this.societe, etat.societe);
       Object.assign(this.chronique, etat.chronique);
       Object.assign(this.villages, etat.villages);
+      Object.assign(this.trouvailles, etat.trouvailles);
       Object.assign(this.lois, etat.lois);
       for (const p of this.personnages) this.cerveaux.set(p.id, new RuleBrain(p));
     } else {
@@ -1362,6 +1377,7 @@ export class Simulation implements Monde {
       societe: this.societe,
       chronique: this.chronique,
       villages: this.villages,
+      trouvailles: this.trouvailles,
       lois: this.lois,
       creatures: [...this.creatures.values()],
       compteurCreatures: this.compteurCreatures,
@@ -1968,7 +1984,15 @@ export class Simulation implements Monde {
     const froid = moment.saison === "hiver" ? 4 : moment.saison === "automne" ? 2.5 : 1;
     for (const b of this.batiments.values()) {
       if (b.stock === null || b.etat !== "termine") continue;
-      const conservation = froid * (b.type === "entrepot" ? 2 : 1);
+      // Ce que la famille sait conserver (M38) allonge la garde de ses stocks.
+      const su = bonusSu(
+        this.trouvailles,
+        this.vivants()
+          .filter((p) => p.identite.nomFamille === b.famille)
+          .map((p) => p.savoirs.keys()),
+        "conservation",
+      );
+      const conservation = froid * (b.type === "entrepot" ? 2 : 1) * su;
       for (const perte of pourrir(b.stock, conservation)) {
         if (perte.ressource === "poisson") {
           for (const p of this.vivants())
@@ -1985,7 +2009,10 @@ export class Simulation implements Monde {
       }
     }
     for (const p of this.vivants()) {
-      for (const perte of pourrir(p.corps.inventaire, froid)) {
+      for (const perte of pourrir(
+        p.corps.inventaire,
+        froid * bonusPorte(this.trouvailles, p.corps.inventaire, "conservation"),
+      )) {
         if (perte.ressource === "poisson")
           p.drapeaux.nourritureGateeJusqua = this.tick + 20 * this.horloge.ticksParJour;
         this.emettre(
@@ -2256,6 +2283,8 @@ export class Simulation implements Monde {
       perteChaleur *= 0.7;
     }
     if (possede(p.corps.inventaire, "vetement_cuir")) perteChaleur *= 0.6;
+    // Ce qu'on porte de chaud, né de la grammaire (M38).
+    perteChaleur /= bonusPorte(this.trouvailles, p.corps.inventaire, "chaleur");
     const surCouche = p.corps.endormi && abriIci !== null && possede(p.corps.inventaire, "couche");
     if (surCouche) perteChaleur *= 0.8;
 

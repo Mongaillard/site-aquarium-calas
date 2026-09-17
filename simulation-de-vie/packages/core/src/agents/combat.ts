@@ -6,6 +6,8 @@
  * Un seul événement résume le combat.
  */
 import { Grille } from "../monde/grille.js";
+import { bonusPorte } from "../savoirs/grammaire.js";
+import type { EtatTrouvailles } from "../savoirs/grammaire.js";
 import type { Monde } from "../monde.js";
 import type { Troupeau } from "../monde/faune.js";
 import { faireFuir } from "../monde/faune.js";
@@ -43,14 +45,20 @@ export function defenseursAutour(monde: Monde, cible: Personnage): Personnage[] 
   return resultat;
 }
 
-/** Ce qu'une arme ajoute à la chance de toucher : lance, arc, hache (le cuivre mord mieux). */
-export function bonusArme(p: Personnage): number {
+/**
+ * Ce qu'une arme ajoute à la chance de toucher : lance, arc, hache (le cuivre
+ * mord mieux). Une arme née de la grammaire (M38) compte pour son gain, et c'est
+ * la meilleure des deux qui sert.
+ */
+export function bonusArme(p: Personnage, trouvailles?: EtatTrouvailles): number {
   const inv = p.corps.inventaire;
-  if (possede(inv, "lance")) return 0.2;
-  if (possede(inv, "hache_cuivre")) return 0.15;
-  if (possede(inv, "arc")) return 0.12;
-  if (possede(inv, "hache_pierre")) return 0.1;
-  return 0;
+  const grammaire = trouvailles === undefined ? 0 : bonusPorte(trouvailles, inv, "combat") - 1;
+  let catalogue = 0;
+  if (possede(inv, "lance")) catalogue = 0.2;
+  else if (possede(inv, "hache_cuivre")) catalogue = 0.15;
+  else if (possede(inv, "arc")) catalogue = 0.12;
+  else if (possede(inv, "hache_pierre")) catalogue = 0.1;
+  return Math.max(catalogue, grammaire);
 }
 
 /**
@@ -100,7 +108,7 @@ export function combattre(monde: Monde, meute: Troupeau, cible: Personnage): Res
     // Les défenseurs frappent.
     for (const d of defenseurs) {
       if (!d.vivant || meute.taille <= 0) continue;
-      const chance = 0.25 + bonusArme(d) + 0.03 * niveau(d.experience.chasse);
+      const chance = 0.25 + bonusArme(d, monde.trouvailles) + 0.03 * niveau(d.experience.chasse);
       if (!rng.chance(chance)) continue;
       if (rng.chance(0.4)) {
         meute.taille -= 1;

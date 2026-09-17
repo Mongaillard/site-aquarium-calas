@@ -158,6 +158,43 @@ export { RuleBrain, SEUILS_URGENCE, SEUILS_ENVIE } from "./cerveau/rule-brain.js
 export { Journal, TYPES_EVENEMENT } from "./evenements/journal.js";
 export { LECONS, INVENTIONS, SEUIL_SAVOIR, estLecon, titreSavoir } from "./savoirs/catalogue.js";
 export type { Lecon, Invention, Savoir, SavoirAcquis, Domaine } from "./savoirs/catalogue.js";
+export { estIdTrouvaille } from "./savoirs/catalogue.js";
+export type { IdTrouvaille } from "./savoirs/catalogue.js";
+// La grammaire d'invention (M38) : matières, procédés, fonctions, trouvailles.
+export {
+  FONCTION,
+  FONCTIONS,
+  LEVIERS,
+  MATIERES_BRUTES,
+  PROCEDE,
+  PROCEDES,
+  bonusPorte,
+  bonusSu,
+  combinaisonValide,
+  composerTrouvaille,
+  deriverMatiere,
+  etatTrouvaillesNeuf,
+  ingredientsDe,
+  levierDeRecolte,
+  matiereDe,
+  meilleureQue,
+  objetDeTrouvaille,
+  objetDuLevier,
+  recetteDeTrouvaille,
+  retenirTrouvaille,
+  trouvaillesConnues,
+} from "./savoirs/grammaire.js";
+export type {
+  EtatTrouvailles,
+  FicheFonction,
+  FicheMatiere,
+  FicheProcede,
+  Fonction,
+  Levier,
+  Procede,
+  Propriete,
+  Trouvaille,
+} from "./savoirs/grammaire.js";
 export { apprendre, connait, savoirsConnus, tirerLecons, apprenants } from "./savoirs/lecons.js";
 export { inventer } from "./savoirs/inventions.js";
 export {

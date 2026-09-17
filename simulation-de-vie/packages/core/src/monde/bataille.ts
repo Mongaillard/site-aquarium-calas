@@ -555,7 +555,7 @@ export function frapper(monde: Monde, b: Bataille, de: string, vers: string): Fr
   const loups = b.genre === "meute" && campAtt.meute !== null;
   let chance =
     attaquant !== undefined
-      ? 0.35 + bonusArme(attaquant) + 0.03 * niveau(attaquant.experience.chasse)
+      ? 0.35 + bonusArme(attaquant, monde.trouvailles) + 0.03 * niveau(attaquant.experience.chasse)
       : 0.3;
   if (cibleP !== undefined) {
     if (possede(cibleP.corps.inventaire, "vetement_cuir")) chance -= 0.05;
@@ -600,7 +600,9 @@ export function frapper(monde: Monde, b: Bataille, de: string, vers: string): Fr
       degats =
         attaquant === undefined
           ? 10
-          : 10 + Math.round(bonusArme(attaquant) * 50) + 2 * niveau(attaquant.experience.chasse);
+          : 10 +
+            Math.round(bonusArme(attaquant, monde.trouvailles) * 50) +
+            2 * niveau(attaquant.experience.chasse);
       cible.sante -= degats;
       campCible.blesses += 1;
       if (cible.sante <= 0) {

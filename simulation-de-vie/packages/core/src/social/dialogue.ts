@@ -5,7 +5,7 @@
  * renvoie la même structure.
  */
 import { possede } from "../agents/inventaire.js";
-import { INVENTIONS, LECONS, estLecon } from "../savoirs/catalogue.js";
+import { INVENTIONS, LECONS, estIdTrouvaille, estLecon } from "../savoirs/catalogue.js";
 import type { Savoir } from "../savoirs/catalogue.js";
 import { NOURRITURE, nourritureDisponible, quantite } from "../agents/inventaire.js";
 import { relationAvec } from "../agents/personnage.js";
@@ -228,7 +228,7 @@ export function composerDialogue(monde: Monde, a: Personnage, b: Personnage): Di
 
   if (transmission !== null) {
     const { de, vers, s } = transmission;
-    dire(de, phraseSavoir(s.savoir, s.origine, tu));
+    dire(de, phraseSavoir(monde, s.savoir, s.origine, tu));
     dire(vers, tu ? "Je m'en souviendrai." : "Je m'en souviendrai.");
     effets.push({ type: "savoir", de: de.id, vers: vers.id, savoir: s.savoir, origine: s.origine });
     sujet = "savoir";
@@ -314,7 +314,12 @@ function savoirAPartager(
   return null;
 }
 
-function phraseSavoir(savoir: Savoir, origine: string | null, tu: boolean): string {
+function phraseSavoir(monde: Monde, savoir: Savoir, origine: string | null, tu: boolean): string {
+  if (estIdTrouvaille(savoir)) {
+    const t = monde.trouvailles.trouvailles.get(savoir);
+    const quoi = t === undefined ? "quelque chose" : `un ${t.nom}`;
+    return tu ? `Tu sais quoi ? J'ai fait ${quoi}.` : `Vous savez quoi ? J'ai fait ${quoi}.`;
+  }
   if (estLecon(savoir)) {
     const morale = LECONS[savoir].morale;
     return origine !== null

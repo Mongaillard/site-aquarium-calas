@@ -22,6 +22,8 @@ export const TYPES_OBJET = [
   "flute",
   "cataplasme",
   "attelle",
+  /** Une chose née de la grammaire d'invention (M38) : c'est `trouvaille` qui dit laquelle. */
+  "trouvaille",
 ] as const;
 export type TypeObjet = (typeof TYPES_OBJET)[number];
 
@@ -31,6 +33,8 @@ export interface Objet {
   solidite: number;
   /** Réparations déjà faites (deux au plus). */
   reparations?: number;
+  /** Identifiant de la trouvaille (M38), pour un objet de type `trouvaille`. */
+  trouvaille?: string;
 }
 
 /** Un outil ébréché se répare deux fois, pas plus. */
@@ -306,6 +310,8 @@ export function recette(nom: NomRecette): Recette {
 
 /** Solidité initiale d'un objet fabriqué (nombre d'usages pour un outil). */
 export const SOLIDITE_INITIALE: Record<TypeObjet, number> = {
+  // Une trouvaille porte sa propre solidité (M38) ; celle-ci ne sert que de secours.
+  trouvaille: 60,
   hache_pierre: 40,
   pioche: 40,
   hache_cuivre: 160,

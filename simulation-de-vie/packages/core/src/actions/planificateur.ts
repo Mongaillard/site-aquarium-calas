@@ -49,6 +49,9 @@ import { partenaireDe } from "../social/couple.js";
 import { relationAvec } from "../agents/personnage.js";
 import { trouverChemin, trouverCheminVers } from "./chemin.js";
 import { connait } from "../savoirs/lecons.js";
+import { estIdTrouvaille } from "../savoirs/catalogue.js";
+import type { IdTrouvaille, Savoir } from "../savoirs/catalogue.js";
+import { recetteDeTrouvaille } from "../savoirs/grammaire.js";
 import { cleLieu } from "../agents/personnage.js";
 import { PROFILS } from "../monde/faune.js";
 import { directionVoulue } from "../cerveau/conseil.js";
@@ -1046,11 +1049,20 @@ export function sitePortuaire(monde: Monde, p: Personnage): Position | null {
 }
 
 /** Fabrication : réunir les ingrédients, rejoindre l'atelier si besoin, fabriquer. */
-function planifierFabrication(monde: Monde, p: Personnage, nom: NomRecette): ResultatPlan {
-  const recette = RECETTES[nom];
+function planifierFabrication(
+  monde: Monde,
+  p: Personnage,
+  nom: NomRecette | IdTrouvaille,
+): ResultatPlan {
+  // Une trouvaille de la grammaire (M38) porte sa propre recette.
+  const trouvee = estIdTrouvaille(nom) ? monde.trouvailles.trouvailles.get(nom) : undefined;
+  if (estIdTrouvaille(nom) && trouvee === undefined) return echec("cette idée n'existe pas");
+  const recette =
+    trouvee !== undefined ? recetteDeTrouvaille(trouvee) : RECETTES[nom as NomRecette];
   const inv = p.corps.inventaire;
-  const invention = inventionDeRecette(nom);
-  if (invention !== undefined && !connait(p, invention)) return echec("je ne sais pas faire cela");
+  const requis: Savoir | undefined =
+    trouvee !== undefined ? trouvee.id : inventionDeRecette(nom as NomRecette);
+  if (requis !== undefined && !connait(p, requis)) return echec("je ne sais pas faire cela");
   if (niveau(p.experience[recette.competence]) < recette.niveauRequis) {
     return echec(`niveau ${recette.niveauRequis} requis en ${recette.competence}`);
   }

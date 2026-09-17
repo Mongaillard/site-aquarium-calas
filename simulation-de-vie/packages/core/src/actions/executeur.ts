@@ -15,6 +15,7 @@ import {
   outilSatisfait,
   estGate,
   objet,
+  retirerObjetExact,
 } from "../agents/inventaire.js";
 import { cleLieu, relationAvec } from "../agents/personnage.js";
 import type { Personnage, SujetPriere } from "../agents/personnage.js";
@@ -40,6 +41,14 @@ import {
   portsDe,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
+import { estIdTrouvaille, SEUIL_SAVOIR } from "../savoirs/catalogue.js";
+import {
+  bonusPorte,
+  levierDeRecolte,
+  objetDeTrouvaille,
+  objetDuLevier,
+  recetteDeTrouvaille,
+} from "../savoirs/grammaire.js";
 import { seRecueillir } from "../social/societe.js";
 import { rever } from "../memoire/psyche.js";
 import { nommerLaPeche } from "../memoire/legendes.js";
@@ -482,9 +491,11 @@ function tickParler(
       }
       case "savoir": {
         if (apprendre(vers, effet.savoir, 1, effet.origine, tick)) {
-          const titre = estLecon(effet.savoir)
-            ? LECONS[effet.savoir].morale
-            : INVENTIONS[effet.savoir].confidence;
+          const titre = estIdTrouvaille(effet.savoir)
+            ? (monde.trouvailles.trouvailles.get(effet.savoir)?.nom ?? "une idée")
+            : estLecon(effet.savoir)
+              ? LECONS[effet.savoir].morale
+              : INVENTIONS[effet.savoir].confidence;
           vers.memoire.ajouter(
             tick,
             "reflexion",
@@ -749,11 +760,18 @@ function tickRecolter(
   const outilDeCuivre =
     (outil === "hache_pierre" && possede(p.corps.inventaire, "hache_cuivre")) ||
     (outil === "pioche" && possede(p.corps.inventaire, "pioche_cuivre"));
+  // Une trouvaille (M38) qui sert cette récolte ajoute son gain.
+  const levier = levierDeRecolte(gisement.type);
+  const outilTrouve =
+    levier === null ? null : objetDuLevier(monde.trouvailles, p.corps.inventaire, levier);
+  const gainTrouvaille =
+    levier === null ? 1 : bonusPorte(monde.trouvailles, p.corps.inventaire, levier);
   const parAction = Math.max(
     1,
     Math.floor(
       (1 + Math.floor(niv / 2)) *
         (outilDeCuivre ? 3 : outil === "hache_pierre" || auFilet ? 2 : 1) *
+        gainTrouvaille *
         manipulation,
     ),
   );
@@ -795,6 +813,15 @@ function tickRecolter(
               : outil;
   if (outilUse !== null && userObjet(p.corps.inventaire, outilUse)) {
     monde.emettre("outil_casse", p, { outil }, 3);
+  }
+  // Ce qu'on a vraiment eu en main s'use aussi.
+  if (outilTrouve !== null) {
+    outilTrouve.solidite -= 1;
+    if (outilTrouve.solidite <= 0) {
+      const nom = monde.trouvailles.trouvailles.get(outilTrouve.trouvaille ?? "")?.nom ?? "outil";
+      retirerObjetExact(p.corps.inventaire, outilTrouve);
+      monde.emettre("outil_casse", p, { outil: nom }, 3);
+    }
   }
   const connu = p.connaissance.get(cleLieu(action.cible.x, action.cible.y));
   if (connu) connu.quantiteVue = gisement.quantite;
@@ -1151,6 +1178,7 @@ function tickFabriquer(
   p: Personnage,
   action: Extract<Action, { type: "fabriquer" }>,
 ): Resultat {
+  if (estIdTrouvaille(action.recette)) return tickFabriquerTrouvaille(monde, p, action);
   const recette = RECETTES[action.recette];
   if (p.corps.stade === "enfant") return echec("trop jeune pour fabriquer");
   const invention = inventionDeRecette(action.recette);
@@ -1224,6 +1252,71 @@ function tickFabriquer(
   return TERMINEE;
 }
 
+/**
+ * Fabriquer une trouvaille de la grammaire (M38). Mêmes règles que le catalogue :
+ * il faut en avoir eu l'idée, le niveau, les matières et l'atelier ; un premier
+ * exemplaire peut rater, et la réussite change l'idée en savoir éprouvé, qui se
+ * transmet ensuite comme les autres.
+ */
+function tickFabriquerTrouvaille(
+  monde: Monde,
+  p: Personnage,
+  action: Extract<Action, { type: "fabriquer" }>,
+): Resultat {
+  const t = monde.trouvailles.trouvailles.get(action.recette);
+  if (t === undefined) return echec("cette idée n'existe pas");
+  if (p.corps.stade === "enfant") return echec("trop jeune pour fabriquer");
+  const forceIdee = p.savoirs.get(t.id)?.force ?? 0;
+  if (forceIdee < SEUIL_SAVOIR) return echec("je ne sais pas faire cela");
+  const recette = recetteDeTrouvaille(t);
+  const niv = niveau(p.experience.artisanat);
+  if (niv < recette.niveauRequis)
+    return echec(`niveau ${recette.niveauRequis} requis en artisanat`);
+  for (const [r, n] of Object.entries(recette.ingredients) as [Ressource, number][]) {
+    if (quantite(p.corps.inventaire, r) < n) return echec(`il manque ${r}`);
+  }
+  if (
+    recette.atelier !== null &&
+    atelierAdjacent(monde, p.corps.position, recette.atelier) === null
+  )
+    return echec(`atelier requis : ${recette.atelier}`);
+  action.ticksRestants ??= Math.max(
+    1,
+    Math.round(recette.duree * (1 - 0.05 * (niv - recette.niveauRequis))),
+  );
+  action.ticksRestants -= 1;
+  if (action.ticksRestants > 0) return ENCOURS;
+
+  for (const [r, n] of Object.entries(recette.ingredients) as [Ressource, number][]) {
+    retirer(p.corps.inventaire, r, n);
+  }
+  // Le premier exemplaire tient rarement du premier coup.
+  if (forceIdee < 1 && p.rng.chance(0.35)) {
+    t.essais += 1;
+    monde.emettre("prototype_rate", p, { invention: t.id, nom: t.nom }, 4);
+    p.memoire.ajouter(
+      monde.horloge.tick,
+      "action",
+      `Mon ${t.nom} n'a pas tenu. Je recommencerai autrement.`,
+      4,
+      [],
+    );
+    return TERMINEE;
+  }
+  if (!ajouterObjet(p.corps.inventaire, objetDeTrouvaille(t))) return echec("inventaire plein");
+  if (t.levier === "portage") p.corps.inventaire.capacite += Math.round(6 * (1 + t.gain));
+  if (forceIdee < 1) {
+    apprendre(p, t.id, 1, p.identite.prenom, monde.horloge.tick);
+    for (const m of membresFamille(monde, p))
+      apprendre(m, t.id, 1, p.identite.prenom, monde.horloge.tick);
+    monde.emettre("invention", p, { invention: t.id, nom: t.nom, domaine: t.fonction }, 9);
+    p.memoire.ajouter(monde.horloge.tick, "reflexion", `Ça marche ! Un ${t.nom}.`, 9, []);
+  }
+  gagnerExperience(p.experience, "artisanat", 3);
+  monde.emettre("fabrication", p, { recette: t.nom }, 5);
+  return TERMINEE;
+}
+
 function tickFonder(
   monde: Monde,
   p: Personnage,
@@ -1268,7 +1361,9 @@ function tickConstruire(
 
     // 2. Travailler.
     const niv = niveau(p.experience.construction);
-    b.travailRestant -= 1 + 0.1 * niv;
+    // Ce qu'on a en main pour bâtir (M38) fait avancer d'autant plus vite.
+    b.travailRestant -=
+      (1 + 0.1 * niv) * bonusPorte(monde.trouvailles, p.corps.inventaire, "batisse");
     action.ticksTravail += 1;
     gagnerExperience(p.experience, "construction", 1);
     if (b.travailRestant > 0)

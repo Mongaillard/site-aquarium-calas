@@ -172,13 +172,22 @@ export const INVENTIONS = {
 } as const satisfies Record<string, FicheInvention>;
 export type Invention = keyof typeof INVENTIONS;
 
-export type Savoir = Lecon | Invention;
+/** Une trouvaille de la grammaire (M38) : `t:<n>`. */
+export type IdTrouvaille = `t:${string}`;
+
+export type Savoir = Lecon | Invention | IdTrouvaille;
 
 export function estLecon(s: Savoir): s is Lecon {
   return s in LECONS;
 }
 
-export function titreSavoir(s: Savoir): string {
+/** Une trouvaille de la grammaire d'invention (M38), par opposition au catalogue. */
+export function estIdTrouvaille(s: string): s is IdTrouvaille {
+  return s.startsWith("t:");
+}
+
+export function titreSavoir(s: Savoir, nomTrouvaille?: (id: string) => string | null): string {
+  if (estIdTrouvaille(s)) return nomTrouvaille?.(s) ?? s;
   return estLecon(s) ? LECONS[s].titre : INVENTIONS[s].nom;
 }
 
