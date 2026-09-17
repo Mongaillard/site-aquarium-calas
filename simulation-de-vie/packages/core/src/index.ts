@@ -125,6 +125,7 @@ export {
   stadeDepuisAge,
   capaciteInventaire,
   cleLieu,
+  estLieuEau,
   ageAnnees,
 } from "./agents/personnage.js";
 export type {

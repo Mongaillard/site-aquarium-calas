@@ -1569,6 +1569,39 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   l'événement `defrichage` porte `marais: true`. `planifierFondation` route un site à gisement
   **ou** en marais vers `planifierDefrichage`, qui accepte les deux.
 
+## 8 vicies. La soif : l'eau qu'on retient et le puits qui n'attend plus (M42)
+
+- **Mémoire des lieux** (`agents/personnage.ts`) : `LieuConnu.eau?: boolean` et
+  `estLieuEau(l)` (`l.type === "eau" || l.eau === true`). **[DÉCISION]** `type` ne tient qu'une
+  ressource, et un bord de lac porte presque toujours un banc de poisson : la tuile était retenue
+  comme « poisson », `lieuxConnusTries(p, "eau")` rendait une liste vide, et `planifierBoire`
+  échouait sur « aucun point d'eau connu » — 209 fois sur la graine 7, à quatre tuiles du lac.
+  Le champ est optionnel : les mondes d'avant M42 se relisent tels quels, et la première
+  observation le repose.
+- **Observation** (`cerveau/perception.ts`) : `observer` calcule `estTuileEau(t)` une fois et pose
+  `eau` sur **toutes** les branches (gibier, gisement neuf, gisement mis à jour) ; une tuile d'eau
+  sans rien dessus redevient un lieu `"eau"` même si l'on gardait un banc de poisson épuisé.
+- **Lectures unifiées** : `lieuxConnusTries` (pour `"eau"` seulement), `riveConnue`,
+  `lieuxEauConnus`, `siteDuPortail`, le partage de lieux au dialogue et le déclencheur de la
+  pirogue passent tous par `estLieuEau`.
+- **Élagage** (`elaguerConnaissance`) : l'eau rejoint le minerai parmi les lieux qu'on n'oublie
+  jamais — on meurt de soif en trois jours, et un lieu d'eau oublié ne se retrouve qu'en explorant.
+- **Puits** (`monde.ts`) : `distanceEauConnue(p)` (`Infinity` si l'on n'en connaît aucun) et
+  `puitsProche(monde, pos, RAYON_PUITS = 24)`. `prochainBatimentNecessaire` décide `puits` quand
+  il n'y en a pas à portée **et** que la leçon `puits_pres_du_village` est sue **ou** que
+  une eau connue à `DISTANCE_EAU_POUR_PUITS = 12` ou plus (une distance **finie** : tant qu'on ne connaît aucune eau, on va la chercher plutôt que de creuser vingt pierres à l'aveugle). **[DÉCISION]** Douze : en deçà,
+  l'aller-retour tient dans la journée ; au-delà, une saison de froid ou de maladie suffit à faire
+  mourir de soif. Et un puits par quartier, non un pour toute la carte : la règle d'avant laissait
+  un village lointain sans recours.
+- **Tests** (`soif.test.ts`, 5) : une tuile d'eau à banc de poisson reste connue comme poisson
+  *et* donne à boire ; on sait aller boire à ce lac-là au lieu d'échouer ; un lieu d'eau survit à
+  un élagage de mille lieux plus récents ; l'eau à quarante tuiles décide un puits sans leçon, une
+  fois la famille logée, chauffée et pourvue d'un stock ; l'eau à quatre tuiles n'en décide pas, et
+  un puits voisin dispense du second.
+- **Mesure** (12 graines, 360 jours, conteur allumé) : 146 survivants contre 101, trois mondes
+  éteints contre quatre, **9 morts de soif contre 38**, 8 puits achevés contre 1. Le froid
+  (24 morts) devient le premier tueur.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

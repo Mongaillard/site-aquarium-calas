@@ -381,6 +381,10 @@ export function observer(monde: Monde, p: Personnage, rayon: number): void {
     monde.grille.decouvrirIndex(m, i);
     const cle = cleLieu(t.x, t.y);
     const betes = troupeauxIci.get(cle);
+    // Une tuile d'eau donne à boire quoi qu'elle porte par ailleurs (M42) : le banc
+    // de poisson du bord de lac écrasait la mémoire de l'eau, et l'on mourait de
+    // soif à quatre pas d'un lac qu'on n'avait jamais noté comme eau.
+    const eau = estTuileEau(t) ? true : undefined;
     if (betes !== undefined) {
       connaissance.set(cle, {
         x: t.x,
@@ -389,12 +393,14 @@ export function observer(monde: Monde, p: Personnage, rayon: number): void {
         outilRequis: "lance",
         quantiteVue: betes,
         tickVu: tick,
+        eau,
       });
     } else if (t.gisement) {
       const connu = connaissance.get(cle);
       if (connu?.type === t.gisement.type && connu.outilRequis === t.gisement.outilRequis) {
         connu.quantiteVue = t.gisement.quantite;
         connu.tickVu = tick;
+        connu.eau = eau;
       } else {
         connaissance.set(cle, {
           x: t.x,
@@ -403,10 +409,13 @@ export function observer(monde: Monde, p: Personnage, rayon: number): void {
           outilRequis: t.gisement.outilRequis,
           quantiteVue: t.gisement.quantite,
           tickVu: tick,
+          eau,
         });
       }
-    } else if (estTuileEau(t)) {
-      if (!connaissance.has(cle)) {
+    } else if (eau === true) {
+      // Sans rien dessus, la tuile d'eau est un point d'eau tout court : on repose
+      // l'entrée même si l'on gardait un banc de poisson maintenant épuisé.
+      if (connaissance.get(cle)?.type !== "eau") {
         connaissance.set(cle, {
           x: t.x,
           y: t.y,
@@ -414,6 +423,7 @@ export function observer(monde: Monde, p: Personnage, rayon: number): void {
           outilRequis: null,
           quantiteVue: Infinity,
           tickVu: tick,
+          eau: true,
         });
       }
     } else if (connaissance.has(cle)) {

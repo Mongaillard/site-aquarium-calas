@@ -51,6 +51,19 @@ export interface LieuConnu {
   readonly outilRequis: Outil | null;
   quantiteVue: number;
   tickVu: number;
+  /**
+   * La tuile est de l'eau, quoi qu'elle porte par ailleurs (M42). **[DÉCISION]**
+   * `type` ne tient qu'une ressource, et un bord de lac porte presque toujours un
+   * banc de poisson : la tuile était donc retenue comme « poisson » et l'on
+   * mourait de soif à quatre pas d'un lac qu'on n'avait jamais noté comme eau.
+   * Absent des mondes d'avant M42 ; la prochaine observation le repose.
+   */
+  eau?: boolean | undefined;
+}
+
+/** Ce lieu donne-t-il à boire : noté comme eau, ou tuile d'eau portant autre chose (M42). */
+export function estLieuEau(l: LieuConnu): boolean {
+  return l.type === "eau" || l.eau === true;
 }
 
 /** Lieux connus au-delà desquels on oublie les plus anciennement vus (la carte les rend). */
@@ -60,9 +73,10 @@ export const LIEUX_CONNUS_MAX = 500;
 export function elaguerConnaissance(p: Personnage, max = LIEUX_CONNUS_MAX): number {
   const surplus = p.connaissance.size - max;
   if (surplus <= 0) return 0;
-  // Le minerai est rare et loin : on ne l'oublie pas.
+  // Le minerai est rare et loin : on ne l'oublie pas. L'eau non plus (M42) : on en
+  // meurt en trois jours, et un lieu d'eau oublié ne se retrouve qu'en explorant.
   const parAnciennete = [...p.connaissance.entries()]
-    .filter(([, l]) => l.type !== "minerai")
+    .filter(([, l]) => l.type !== "minerai" && !estLieuEau(l))
     .sort((a, b) => a[1].tickVu - b[1].tickVu);
   for (let i = 0; i < surplus; i++) {
     const e = parAnciennete[i];

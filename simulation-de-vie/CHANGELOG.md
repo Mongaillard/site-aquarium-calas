@@ -2,6 +2,47 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M42 – La soif : on ne meurt plus au bord d'un lac (2026-09-17)
+
+La mesure de M41 avait mis au jour le vrai tueur : **un monde sur trois s'éteignait**, et la
+soif faisait 38 morts sur 91. Deux causes, aucune n'étant une question d'équilibrage.
+
+**Le banc de poisson effaçait l'eau.** Un lieu mémorisé ne tient qu'**une** ressource, et un
+bord de lac porte presque toujours un banc de poisson : la tuile était donc retenue comme
+« poisson », jamais comme « eau ». Sur la graine 7, **209 tentatives de boire** échouaient sur
+« aucun point d'eau connu » alors que le lac était à **quatre tuiles** du village. On mourait de
+soif en vue de l'eau.
+
+- Un lieu connu porte désormais un drapeau **« c'est de l'eau »**, quoi qu'il porte par ailleurs :
+  le poisson reste connu comme poisson pour aller pêcher, et la tuile donne à boire.
+- **Un point d'eau ne s'oublie plus** quand la mémoire déborde (cinq cents lieux) : on en meurt en
+  trois jours, et un lieu d'eau oublié ne se retrouve qu'en explorant. Seul le minerai avait ce
+  privilège.
+- Les six endroits qui demandaient « où est l'eau ? » (aller boire, choisir la rive, le côté du
+  portail, le partage au dialogue, l'idée de la pirogue) passent par la même lecture.
+
+**Le puits attendait un mort.** Il ne se décidait qu'une fois la leçon `puits_pres_du_village`
+retenue — et cette leçon ne s'apprend qu'**en enterrant quelqu'un mort de soif**.
+
+- Une famille creuse un puits dès que l'eau connue est à plus de **douze tuiles**, sans attendre
+  ce mort-là. En deçà, l'aller-retour tient dans une journée et la soif ne tue pas. Tant qu'on ne
+  connaît aucune eau, on va la chercher : creuser à l'aveugle au premier jour coûterait vingt
+  pierres que la colonie n'a pas encore.
+- **[DÉCISION]** Un puits par quartier (24 tuiles) et non un pour toute la carte : la règle d'avant
+  laissait un village lointain sans recours parce qu'un autre avait creusé le sien.
+
+Mesuré sur les douze mêmes mondes de trois cent soixante jours, conteur allumé :
+
+|                       | avant M41 | après M41 | après M42 |
+| --------------------- | --------- | --------- | --------- |
+| survivants            | 111       | 101       | **146**   |
+| mondes éteints sur 12 | 3         | 4         | **3**     |
+| morts de soif         | 36        | 38        | **9**     |
+| puits achevés         | 1         | 1         | **8**     |
+
+Le **froid** devient le premier tueur (24 morts) et c'est lui qui emporte les trois mondes qui
+s'éteignent encore : ce sera le sujet du prochain jalon.
+
 ## M41 – Les idées aboutissent, et le mur ferme vraiment (2026-09-17)
 
 **Les idées en l'air.** L'onglet Inventions se remplissait d'idées que personne n'essayait

@@ -102,6 +102,10 @@ describe("demander à Claude : déclencheurs, file et anti-spam", () => {
     sim.avancer(10);
     expect(sim.questionEnCours).toBeNull();
     sim.avancerJusquaAube();
+    // Depuis M42, ces gens savent aller boire : leurs actions réussissent, leurs échecs
+    // retombent à zéro et la file les lâche au matin. On les remet en peine, puisque ce
+    // qu'on mesure ici est le budget d'une question par jour, non leur infortune.
+    for (const c of candidats) c.echecsConsecutifs = 5;
     sim.avancer(2);
     expect(sim.questionEnCours).not.toBeNull();
     expect(sim.questionEnCours?.personnageId).not.toBe(q.personnageId);

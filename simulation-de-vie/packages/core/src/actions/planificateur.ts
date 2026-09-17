@@ -16,6 +16,7 @@ import {
   outilSatisfait,
   objet,
 } from "../agents/inventaire.js";
+import { estLieuEau } from "../agents/personnage.js";
 import type { LieuConnu, Personnage } from "../agents/personnage.js";
 import { PLANS_BATIMENT, materiauxManquants } from "../monde/batiments.js";
 import type { Batiment, TypeBatiment } from "../monde/batiments.js";
@@ -485,7 +486,8 @@ function riveConnue(monde: Monde, p: Personnage, x: number, y: number): boolean 
       const t = monde.grille.tuileOuNull(x + dx, y + dy);
       if (t === null || !estEau(monde, t.x, t.y)) continue;
       if (t.batiment !== null && PLANS_BATIMENT[t.batiment.type].sourceEau) return true;
-      if (p.connaissance.get(cleLieu(t.x, t.y))?.type === "eau") return true;
+      const l = p.connaissance.get(cleLieu(t.x, t.y));
+      if (l !== undefined && estLieuEau(l)) return true;
     }
   return false;
 }
@@ -1152,8 +1154,10 @@ function planifierStockage(monde: Monde, p: Personnage): ResultatPlan {
 /** Lieux connus d'un type, du plus proche au plus lointain (distance de Tchebychev). */
 export function lieuxConnusTries(p: Personnage, type: Ressource): LieuConnu[] {
   const pos = p.corps.position;
+  // Pour l'eau, une tuile d'eau compte même si l'on y a noté un banc de poisson (M42).
+  const retenu = type === "eau" ? estLieuEau : (l: LieuConnu): boolean => l.type === type;
   return [...p.connaissance.values()]
-    .filter((l) => l.type === type)
+    .filter(retenu)
     .sort(
       (a, b) =>
         Grille.distance(pos, a) - Grille.distance(pos, b) ||

@@ -3,6 +3,7 @@
  * puis un prototype, qui peut rater, avant que le savoir ne se répande.
  */
 import { placeLibre, possede, quantite } from "../agents/inventaire.js";
+import { estLieuEau } from "../agents/personnage.js";
 import type { Personnage } from "../agents/personnage.js";
 import { batimentsAccessibles } from "../monde.js";
 import type { Monde } from "../monde.js";
@@ -27,7 +28,7 @@ export function besoinRessenti(monde: Monde, p: Personnage, invention: Invention
       return lieux.some((l) => l.type === "gibier" && l.quantiteVue >= 1) && !possede(inv, "lance");
     case "pirogue":
       return (
-        lieux.filter((l) => l.type === "eau").length >= 25 &&
+        lieux.filter(estLieuEau).length >= 25 &&
         p.identite.personnalite.ouverture > 0.5 &&
         monde.horloge.moment().jourAbsolu >= 20
       );

@@ -2,6 +2,7 @@
  * Vue du monde partagée par les sous-systèmes (actions, cerveaux, planificateur)
  * sans dépendre de la classe `Simulation` (évite les imports circulaires).
  */
+import { estLieuEau } from "./agents/personnage.js";
 import type { Personnage } from "./agents/personnage.js";
 import type { SimConfig } from "./config.js";
 import type { Loi } from "@sdv/protocole";
@@ -112,10 +113,35 @@ export function portsDe(monde: Monde): Position[] {
   return ports;
 }
 
+/**
+ * Distance au point d'eau connu le plus proche, `Infinity` si l'on n'en connaît
+ * aucun (M42) : c'est ce qui décide qu'un puits vaut vingt pierres.
+ */
+export function distanceEauConnue(p: Personnage): number {
+  let d = Infinity;
+  for (const l of p.connaissance.values()) {
+    if (!estLieuEau(l)) continue;
+    const q = Grille.distance(p.corps.position, l);
+    if (q < d) d = q;
+  }
+  return d;
+}
+
+/**
+ * Y a-t-il déjà un puits (bâti ou en chantier) à portée ? **[DÉCISION]** On regarde
+ * le voisinage et non le monde entier (M42) : un puits unique pour toute la carte
+ * laissait un village lointain sans recours.
+ */
+export function puitsProche(monde: Monde, pos: Position, rayon = RAYON_PUITS): boolean {
+  for (const b of monde.batiments.values())
+    if (b.type === "puits" && Grille.distance(b.position, pos) <= rayon) return true;
+  return false;
+}
+
 /** Lieux d'eau que connaît une personne : la mesure de « l'eau est partout autour ». */
 export function lieuxEauConnus(p: Personnage): number {
   let n = 0;
-  for (const l of p.connaissance.values()) if (l.type === "eau") n++;
+  for (const l of p.connaissance.values()) if (estLieuEau(l)) n++;
   return n;
 }
 
@@ -348,11 +374,16 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
     return "feu_de_camp";
   if (feuAAlimenter(monde, p) !== null) return "feu_de_camp";
   if (!acces.some((b) => PLANS_BATIMENT[b.type].capaciteStock > 0)) return "entrepot";
-  if (
-    (p.savoirs.get("puits_pres_du_village")?.force ?? 0) >= 0.6 &&
-    ![...monde.batiments.values()].some((b) => b.type === "puits")
-  )
-    return "puits";
+  // Un puits : parce qu'on a retenu la leçon d'un mort de soif, ou — depuis M42 —
+  // parce que l'eau est trop loin pour qu'on tienne, **sans attendre ce mort-là**.
+  if (!puitsProche(monde, p.corps.position) && !acces.some((b) => b.type === "puits")) {
+    if ((p.savoirs.get("puits_pres_du_village")?.force ?? 0) >= 0.6) return "puits";
+    // **[DÉCISION]** Il faut connaître une eau, et qu'elle soit loin. Tant qu'on n'en
+    // connaît aucune, on va la chercher : creuser vingt pierres au premier jour, avant
+    // même d'avoir regardé autour, coûte à la colonie ce qu'elle n'a pas encore.
+    const dEau = distanceEauConnue(p);
+    if (Number.isFinite(dEau) && dEau >= DISTANCE_EAU_POUR_PUITS) return "puits";
+  }
   if (famille >= 3 && !acces.some((b) => b.type === "maison")) return "maison";
   // Un chantier décidé par le village : on y contribue une fois la famille logée, nourrie et au sec.
   const commun = acces.find((b) => b.commun === true && b.etat === "chantier");
@@ -423,6 +454,15 @@ export const DISTANCE_MIGRATION = 16;
 export const LIEUX_EAU_POUR_PORT = 25;
 /** Un port sert à tout un village : pas deux à moins de cette distance. */
 export const RAYON_PORT = 40;
+/** Un puits sert son quartier : pas deux à moins de cette distance (M42). */
+export const RAYON_PUITS = 24;
+/**
+ * Au-delà de cette distance au point d'eau connu le plus proche, un puits valait
+ * ses vingt pierres (M42). **[DÉCISION]** Douze : en deçà, l'aller-retour tient
+ * dans une journée et la soif ne tue pas ; au-delà, une famille y passe ses
+ * journées, et une saison de froid ou de maladie suffit à la faire mourir de soif.
+ */
+export const DISTANCE_EAU_POUR_PUITS = 12;
 
 /** Rayon minimal de l'enceinte ; elle s'élargit pour contenir le village. */
 export const RAYON_ENCEINTE = 3;
@@ -610,7 +650,7 @@ export function siteDuPortail(monde: Monde, p: Personnage): Position | null {
   let vise = p.corps.position;
   let dEau = Infinity;
   for (const l of p.connaissance.values()) {
-    if (l.type !== "eau") continue;
+    if (!estLieuEau(l)) continue;
     const d = Grille.distance(centre, l);
     if (d < dEau) {
       dEau = d;

@@ -8,7 +8,7 @@ import { possede } from "../agents/inventaire.js";
 import { INVENTIONS, LECONS, estIdTrouvaille, estLecon } from "../savoirs/catalogue.js";
 import type { Savoir } from "../savoirs/catalogue.js";
 import { NOURRITURE, nourritureDisponible, quantite } from "../agents/inventaire.js";
-import { relationAvec } from "../agents/personnage.js";
+import { estLieuEau, relationAvec } from "../agents/personnage.js";
 import type { LieuConnu, Personnage } from "../agents/personnage.js";
 import { abriDisponible, batimentsAccessibles, dormeurs } from "../monde.js";
 import type { Monde } from "../monde.js";
@@ -103,8 +103,7 @@ export function lieuxAPartager(de: Personnage, vers: Personnage, max: number): L
   for (const [cle, lieu] of de.connaissance) {
     if (vers.connaissance.has(cle)) continue;
     if (NOMS_LIEUX[lieu.type] === undefined || lieu.quantiteVue < 1) continue;
-    if (lieu.type === "eau" && [...vers.connaissance.values()].some((l) => l.type === "eau"))
-      continue;
+    if (estLieuEau(lieu) && [...vers.connaissance.values()].some(estLieuEau)) continue;
     utiles.push(lieu);
   }
   const pos = vers.corps.position;

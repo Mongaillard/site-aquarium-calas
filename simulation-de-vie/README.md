@@ -129,6 +129,17 @@ jamais existé — la chaîne n'a pas de fin, donc l'arbre des inventions non pl
 **Inventions** montre tout : l'arbre des matières, ce que chaque trouvaille change, l'ennui qui
 l'a fait naître, qui l'a trouvée et combien de prototypes ont raté.
 
+**On ne meurt plus de soif au bord d'un lac (M42).** Un monde sur trois s'éteignait, et la soif
+était le premier tueur. Elle ne tenait pas à l'équilibrage : un lieu mémorisé ne portait qu'une
+ressource, et comme un bord de lac porte presque toujours un banc de poisson, la tuile était
+retenue comme « poisson » et jamais comme « eau » — on mourait de soif à **quatre tuiles** d'un
+lac, après deux cents tentatives de boire refusées faute de « point d'eau connu ». Un lieu connu
+porte maintenant un drapeau « c'est de l'eau » en plus de ce qu'il donne, et un point d'eau ne
+s'oublie plus jamais. Quant au puits, il ne se décidait qu'après avoir enterré quelqu'un mort de
+soif : une famille le creuse désormais dès que l'eau est à plus de douze tuiles, et chaque
+quartier peut avoir le sien. Sur douze mondes de trois cent soixante jours : **146 survivants au
+lieu de 101, neuf morts de soif au lieu de trente-huit.**
+
 **Les idées aboutissent, et le mur ferme vraiment (M41).** L'onglet Inventions se remplissait
 d'idées que personne n'essayait jamais. On va désormais **chercher au stock de la famille** ce
 qui manque à sa propre idée — mais seulement quand on ne manque de rien soi-même —, une idée vit
