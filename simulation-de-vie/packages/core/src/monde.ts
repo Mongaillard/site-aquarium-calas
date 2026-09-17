@@ -437,16 +437,58 @@ export const PART_ENCEINTE_POUR_PORTAIL = 0.6;
  * le village, pas une maison : c'est ce qui la rend lisible sur la carte.
  */
 export function centreEnceinte(monde: Monde, p: Personnage): Position | null {
-  for (const v of monde.villages.villages)
-    if (v.familles.includes(p.identite.nomFamille)) return v.centre;
-  const abri = batimentsAccessibles(monde, p)
-    .filter((b) => b.etat === "termine" && PLANS_BATIMENT[b.type].abri)
-    .sort((a, b) => a.id.localeCompare(b.id))[0];
-  return abri?.position ?? null;
+  return enceinteDe(monde, p)?.centre ?? null;
 }
 
-/** Le rayon qu'il faut pour que l'anneau contienne ce qu'on a bâti autour du centre. */
+/**
+ * L'enceinte du village de cette personne : celle qui est déjà tracée, ou celle
+ * qu'on trace maintenant — et alors on la retient, pour qu'elle ne bouge plus.
+ */
+export function enceinteDe(
+  monde: Monde,
+  p: Personnage,
+): { readonly centre: Position; readonly rayon: number } | null {
+  const village = monde.villages.villages.find((v) => v.familles.includes(p.identite.nomFamille));
+  if (village?.enceinte !== undefined) return village.enceinte;
+  const centre =
+    village?.centre ??
+    batimentsAccessibles(monde, p)
+      .filter((b) => b.etat === "termine" && PLANS_BATIMENT[b.type].abri)
+      .sort((a, b) => a.id.localeCompare(b.id))[0]?.position;
+  if (centre === undefined) return null;
+  const enceinte = { centre: { x: centre.x, y: centre.y }, rayon: rayonEnceinte(monde, centre) };
+  if (village !== undefined) village.enceinte = enceinte;
+  return enceinte;
+}
+
+/**
+ * Le rayon de l'anneau. **[DÉCISION]** Une fois des pieux dressés autour de ce
+ * centre, c'est leur rayon qui vaut, pour toujours : sinon le village grandit,
+ * le rayon avec lui, et l'on dresse un second anneau plus large en laissant le
+ * premier debout — ce sont ces anneaux empilés qui donnaient des pieux partout.
+ * Sans pieu encore, on prend de quoi contenir ce qu'on a bâti.
+ */
 export function rayonEnceinte(monde: Monde, centre: Position): number {
+  // Le rayon déjà choisi : celui où se tient le plus de pieux.
+  const parRayon = new Map<number, number>();
+  for (const b of monde.batiments.values()) {
+    if (b.type !== "palissade" && b.type !== "portail") continue;
+    const d = Math.max(Math.abs(b.position.x - centre.x), Math.abs(b.position.y - centre.y));
+    if (d < RAYON_ENCEINTE - 1 || d > RAYON_ENCEINTE_MAX + 1) continue;
+    parRayon.set(d, (parRayon.get(d) ?? 0) + 1);
+  }
+  let choisi = 0;
+  let mieux = 0;
+  for (const [d, n] of parRayon) {
+    // Un pieu rattrapé d'un pas compte pour l'anneau qu'il borde.
+    const rayon = Math.max(RAYON_ENCEINTE, Math.min(RAYON_ENCEINTE_MAX, d));
+    const total = n + (parRayon.get(rayon) ?? 0);
+    if (total > mieux) {
+      mieux = total;
+      choisi = rayon;
+    }
+  }
+  if (choisi > 0) return choisi;
   let loin = 0;
   for (const b of monde.batiments.values()) {
     if (b.type === "palissade" || b.type === "portail" || b.type === "champ") continue;
@@ -516,9 +558,9 @@ function enceinteDressee(monde: Monde, anneau: readonly Position[]): Position[] 
  * bâtit. `null` quand l'anneau est clos.
  */
 export function tuileEnceinteManquante(monde: Monde, p: Personnage): Position | null {
-  const centre = centreEnceinte(monde, p);
-  if (centre === null) return null;
-  const anneau = tuilesEnceinte(monde, centre, rayonEnceinte(monde, centre));
+  const e = enceinteDe(monde, p);
+  if (e === null) return null;
+  const anneau = tuilesEnceinte(monde, e.centre, e.rayon);
   let meilleure: Position | null = null;
   let distance = Infinity;
   for (const pos of anneau) {
@@ -540,9 +582,10 @@ export function tuileEnceinteManquante(monde: Monde, p: Personnage): Position | 
  * tant que l'anneau est trop ajouré, ou s'il a déjà son portail.
  */
 export function siteDuPortail(monde: Monde, p: Personnage): Position | null {
-  const centre = centreEnceinte(monde, p);
-  if (centre === null) return null;
-  const anneau = tuilesEnceinte(monde, centre, rayonEnceinte(monde, centre));
+  const e = enceinteDe(monde, p);
+  if (e === null) return null;
+  const centre = e.centre;
+  const anneau = tuilesEnceinte(monde, centre, e.rayon);
   if (anneau.length === 0) return null;
   const dressees = enceinteDressee(monde, anneau);
   if (dressees.length < anneau.length * PART_ENCEINTE_POUR_PORTAIL) return null;

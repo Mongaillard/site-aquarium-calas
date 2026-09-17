@@ -11,6 +11,7 @@
  */
 import roguelikeUrl from "./assets/tuiles/roguelike/roguelikeSheet_transparent.png?inline";
 import tinyTownUrl from "./assets/tuiles/tiny-town/tilemap_packed.png?inline";
+import tinyFarmUrl from "./assets/tuiles/tiny-farm/tilemap_packed.png?inline";
 import medievalUrl from "./assets/tuiles/medieval-rts/medievalRTS_spritesheet.png?inline";
 import personnagesUrl from "./assets/tuiles/roguelike-characters/roguelikeChar_transparent.png?inline";
 
@@ -34,12 +35,14 @@ function charger(url: string, tuile: number, pas: number): Feuille {
 
 const roguelike = charger(roguelikeUrl, 16, 17);
 const tinyTown = charger(tinyTownUrl, 16, 16);
+/** Tiny Farm (M39b) : cultures par stade, bétail, sacs et étals. */
+const tinyFarm = charger(tinyFarmUrl, 16, 16);
 const medieval = charger(medievalUrl, 0, 0);
 const personnages = charger(personnagesUrl, 16, 17);
 
-/** Vrai une fois les quatre planches décodées : avant, mieux vaut ne rien mettre en cache. */
+/** Vrai une fois les cinq planches décodées : avant, mieux vaut ne rien mettre en cache. */
 export function atlasPret(): boolean {
-  return roguelike.prete && tinyTown.prete && medieval.prete && personnages.prete;
+  return roguelike.prete && tinyTown.prete && medieval.prete && personnages.prete && tinyFarm.prete;
 }
 
 /** Dessine la tuile (col, row) d'une feuille dans le carré [x, y, w, h] (repère monde). */
@@ -336,4 +339,67 @@ export function spritePersonnage(c: CouchesPersonnage): HTMLCanvasElement | null
   }
   cache.set(cle, canvas);
   return canvas;
+}
+
+/* ---------- Tiny Farm (M39b) : cultures, sol labouré, bétail ---------- */
+
+/** Les cinq cultures de la planche, une ligne chacune : on varie selon le champ. */
+const CULTURES: readonly number[] = [0, 2, 3, 4, 5];
+/** Les trois colonnes d'une culture : pousse, jeune, mûre. */
+const STADES: readonly number[] = [4, 5, 6];
+
+/** Le sol labouré d'un champ (M39b) ; faux si la planche n'est pas prête. */
+export function solLaboure(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): boolean {
+  if (!tinyFarm.prete) return false;
+  tuile(ctx, tinyFarm, 0, 4, x, y, w, h);
+  return true;
+}
+
+/**
+ * La culture d'un champ selon son stade (1 à 4) ; `variante` choisit la plante,
+ * pour que deux champs voisins ne poussent pas la même chose. Faux si la planche
+ * n'est pas prête, ou si le champ n'est pas encore levé.
+ */
+export function culture(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  stade: number,
+  variante: number,
+): boolean {
+  if (!tinyFarm.prete || stade < 1) return false;
+  const ligne = CULTURES[Math.abs(variante) % CULTURES.length] ?? 5;
+  const colonne = STADES[Math.min(STADES.length - 1, stade - 1)] ?? 6;
+  tuile(ctx, tinyFarm, colonne, ligne, x, y, w, h);
+  return true;
+}
+
+/** Les bêtes que la planche sait dessiner : mouton et vache. */
+const BETES_FERME: Readonly<Record<string, readonly [number, number]>> = {
+  mouflon: [0, 10],
+  aurochs: [1, 10],
+};
+
+/** Une bête de ferme en sprite (M39b) ; faux pour une espèce que la planche ignore. */
+export function beteFerme(
+  ctx: CanvasRenderingContext2D,
+  espece: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): boolean {
+  if (!tinyFarm.prete) return false;
+  const t = BETES_FERME[espece];
+  if (t === undefined) return false;
+  tuile(ctx, tinyFarm, t[0], t[1], x, y, w, h);
+  return true;
 }

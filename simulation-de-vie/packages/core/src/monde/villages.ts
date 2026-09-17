@@ -43,6 +43,12 @@ export interface Village {
   readonly origine: "fondation" | "schisme";
   /** Départs en cours : qui doit encore arriver. */
   enRoute: string[];
+  /**
+   * L'enceinte (M39a), figée dès qu'on décide de la dresser : le centre du
+   * village bouge quand il grandit, et sans cela l'anneau se décalerait,
+   * laissant debout les pieux de l'ancien tracé. Absente des mondes d'avant.
+   */
+  enceinte?: { readonly centre: Position; readonly rayon: number };
 }
 
 export type EtatDiplomatie = "paix" | "alliance" | "guerre";

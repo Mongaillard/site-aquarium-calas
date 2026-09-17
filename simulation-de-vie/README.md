@@ -129,6 +129,15 @@ jamais existé — la chaîne n'a pas de fin, donc l'arbre des inventions non pl
 **Inventions** montre tout : l'arbre des matières, ce que chaque trouvaille change, l'ennui qui
 l'a fait naître, qui l'a trouvée et combien de prototypes ont raté.
 
+**Les champs poussent, les bêtes ont une allure, les murs entourent le village (M39).** L'enceinte
+de pieux se centre désormais sur le **village** et son tracé est figé une fois choisi : elle ne
+s'égrène plus en anneaux empilés, elle se raccorde d'un pan à l'autre, et on y taille un
+**portail** du côté de l'eau. Les **enclos** sont de vrais parcs clos, avec portillon et
+mangeoire, posés là où il y a de la place, et les bêtes se tiennent dedans. Les **champs
+poussent** sous les yeux (sol labouré, pousse, jeune plant, plante mûre) et chacun cultive autre
+chose que son voisin. Chaque **espèce a sa silhouette** : mouton et vache viennent de la planche
+_Tiny Farm_ de Kenney, le cerf, le sanglier, le lièvre et le loup sont dessinés.
+
 **Bâtiments et personnages en sprites (M31).** Deux planches CC0 de Kenney de plus : tente,
 maisons, grange, four, fumoir, puits et sanctuaire viennent de _Medieval RTS_ ; chaque personnage
 se compose en couches de _Roguelike Characters_ — corps par teint, tunique teintée à la couleur

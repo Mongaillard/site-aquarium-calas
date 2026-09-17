@@ -2,6 +2,42 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M39 – Les champs poussent, les bêtes ont une allure, les murs entourent le village (2026-09-17)
+
+**L'enceinte entoure le village (M39a).** Les pieux semblaient posés au hasard, et pour deux
+raisons : l'anneau se centrait sur le plus ancien abri d'une famille, et son rayon suivait la
+croissance du village — on dressait donc un anneau plus large chaque fois, en laissant les
+précédents debout.
+
+- L'enceinte se centre sur le **village** et son rayon (3 à 7) tient à ce qu'on y a bâti ; une
+  fois décidée, elle est **figée** sur le village : le centre peut bouger, le mur ne bouge plus.
+- L'anneau se parcourt dans le sens des aiguilles d'une montre, et toute tuile qu'on ne peut pas
+  bâtir est **rattrapée d'un pas** vers l'intérieur puis l'extérieur : le mur reste continu au
+  lieu de s'égrener. L'eau et la montagne ferment d'elles-mêmes.
+- Nouveau bâtiment **portail** (bois 3, fibres 2) : les trois cinquièmes de l'anneau dressés, on
+  y taille une porte, du côté de l'eau connue la plus proche. Un seul par anneau ; il compte
+  comme un mur contre les loups.
+- Un **enclos** se pose là où il y a de la place autour (le parc doit tenir), et les bêtes se
+  répartissent sur les huit cases du piquet au lieu de s'empiler sur une seule.
+
+**Les champs, les bêtes et les clôtures (M39b).** Une cinquième planche CC0 de Kenney,
+_Tiny Farm_.
+
+- **Les champs poussent** : sol labouré, puis la culture selon son stade — une pousse, un jeune
+  plant, une plante mûre. Chaque champ cultive autre chose que son voisin (carottes, maïs,
+  tomates, choux, blé), tiré de son identifiant.
+- **La palissade se lit comme un mur** : un faisceau de pieux taillés et une lisse vers chaque
+  voisin, si bien que les pans se raccordent au lieu de flotter chacun dans son carré. Le
+  portail montre ses deux montants, son linteau et ses battants entrebâillés.
+- **L'enclos est un vrai parc** : une clôture close de trois tuiles de côté autour du piquet,
+  avec son portillon au sud et une mangeoire ; les bêtes se tiennent dedans.
+- **Les bêtes ont chacune leur allure** : le mouton et la vache viennent de la planche ; le cerf
+  (haut sur pattes, l'encolure dressée, les bois ramifiés), le sanglier (bas, la bosse en avant,
+  le groin au sol, les soies hérissées), le lièvre (ramassé, les oreilles droites, la queue en
+  pompon) et le loup (long, l'échine droite, la queue basse, le museau tendu) sont dessinés.
+- Une **planche d'essai** (`packages/viewer/essai/index.html`) affiche tous ces dessins côte à
+  côte : c'est ainsi qu'on les juge sans chercher dans une partie.
+
 ## M38 – Les inventions sans catalogue (2026-09-17)
 
 Le moteur connaissait douze inventions, écrites à la main, et rien d'autre ne pouvait

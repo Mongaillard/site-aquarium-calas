@@ -15,3 +15,14 @@ Deux planches CC0 de plus, pour les bâtiments et les personnages.
 - **Roguelike Characters** (2.0), par Kenney (kenney.nl). https://kenney.nl/assets/roguelike-characters — `roguelike-characters/roguelikeChar_transparent.png`, grille de 54×12 tuiles de 16×16, pas de 17 px : corps, tuniques, cheveux, outils, en couches.
 
 Licence des deux : Creative Commons Zero (CC0) — http://creativecommons.org/publicdomain/zero/1.0/
+
+# Ferme (M39b)
+
+Une planche CC0 de plus, pour les cultures et le bétail.
+
+- **Tiny Farm**, par Kenney (kenney.nl). https://kenney.nl/assets/tiny-farm —
+  `tiny-farm/tilemap_packed.png`, grille de 12×11 tuiles de 16×16, sans pas : sol labouré
+  (colonne 0, ligne 4), cinq cultures en trois stades (colonnes 4 à 6, lignes 0, 2, 3, 4, 5),
+  mouton (0, 10) et vache (1, 10).
+
+Licence : Creative Commons Zero (CC0) — http://creativecommons.org/publicdomain/zero/1.0/

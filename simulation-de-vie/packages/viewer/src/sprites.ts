@@ -3,7 +3,17 @@
  * déjà mis à l'échelle : 1 = une tuile). Aucune image externe.
  */
 
-import { buissonBaies, gemmes, pin, spritePersonnage, tasDArgile, tasDePierre } from "./atlas.js";
+import {
+  beteFerme,
+  buissonBaies,
+  culture,
+  gemmes,
+  pin,
+  solLaboure,
+  spritePersonnage,
+  tasDArgile,
+  tasDePierre,
+} from "./atlas.js";
 import type { CouchesPersonnage } from "./atlas.js";
 
 export type Ctx = CanvasRenderingContext2D;
@@ -424,35 +434,91 @@ export function port(ctx: Ctx, x: number, y: number): void {
   ctx.fillRect(x + 0.47, y + 0.02, 0.05, 0.2);
 }
 
-export function palissade(ctx: Ctx, x: number, y: number): void {
-  ctx.fillStyle = "#7a5a2e";
-  for (let i = 0; i < 4; i++) ctx.fillRect(x + 0.1 + i * 0.22, y + 0.3, 0.12, 0.6);
-  ctx.fillRect(x + 0.05, y + 0.5, 0.9, 0.08);
+/** Les côtés par lesquels un pan de mur en rejoint un autre. */
+export interface Liens {
+  readonly n: boolean;
+  readonly s: boolean;
+  readonly e: boolean;
+  readonly o: boolean;
 }
 
-/** Enclos : quatre pieux et deux lisses, une porte au sud. */
-export function enclos(ctx: Ctx, x: number, y: number): void {
-  ctx.strokeStyle = "#a0783c";
-  ctx.lineWidth = 0.06;
-  ctx.strokeRect(x + 0.1, y + 0.15, 0.8, 0.75);
-  ctx.beginPath();
-  ctx.moveTo(x + 0.1, y + 0.5);
-  ctx.lineTo(x + 0.9, y + 0.5);
-  ctx.stroke();
-  ctx.fillStyle = "#7a5a2e";
-  for (const [px, py] of [
-    [0.1, 0.15],
-    [0.9, 0.15],
-    [0.1, 0.9],
-    [0.9, 0.9],
-  ] as const)
-    ctx.fillRect(x + px - 0.05, y + py - 0.12, 0.1, 0.18);
+/**
+ * Palissade (M39b) : un faisceau de pieux, et une lisse vers chaque voisin —
+ * le mur se lit alors comme un mur, et non comme des pieux semés.
+ */
+export function palissade(ctx: Ctx, x: number, y: number, liens: Liens): void {
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.fillRect(x + 0.18, y + 0.84, 0.64, 0.12);
+  // Les lisses, d'abord : elles passent derrière les pieux.
+  ctx.fillStyle = "#6b4e28";
+  if (liens.o) ctx.fillRect(x, y + 0.42, 0.55, 0.1);
+  if (liens.e) ctx.fillRect(x + 0.45, y + 0.42, 0.55, 0.1);
+  if (liens.n) ctx.fillRect(x + 0.45, y, 0.1, 0.55);
+  if (liens.s) ctx.fillRect(x + 0.45, y + 0.45, 0.1, 0.55);
+  // Le faisceau de pieux, taillés en pointe.
+  const pieux = 3;
+  for (let i = 0; i < pieux; i++) {
+    const px = x + 0.18 + (i * 0.64) / pieux;
+    const l = 0.64 / pieux - 0.02;
+    ctx.fillStyle = i % 2 === 0 ? "#8a6836" : "#7a5a2e";
+    ctx.fillRect(px, y + 0.26, l, 0.62);
+    ctx.fillStyle = i % 2 === 0 ? "#a0783c" : "#916c34";
+    ctx.beginPath();
+    ctx.moveTo(px, y + 0.26);
+    ctx.lineTo(px + l / 2, y + 0.12);
+    ctx.lineTo(px + l, y + 0.26);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = "#5a4020";
+  ctx.fillRect(x + 0.18, y + 0.56, 0.64, 0.06);
+}
+
+/** Portail (M39a) : deux montants, un linteau, et deux battants ouverts. */
+export function portail(ctx: Ctx, x: number, y: number): void {
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.fillRect(x, y + 0.86, 1, 0.12);
+  // Les montants, plus hauts que le mur.
+  ctx.fillStyle = "#6b4e28";
+  ctx.fillRect(x + 0.02, y + 0.08, 0.14, 0.82);
+  ctx.fillRect(x + 0.84, y + 0.08, 0.14, 0.82);
+  // Le linteau.
+  ctx.fillStyle = "#8a6836";
+  ctx.fillRect(x + 0.02, y + 0.06, 0.96, 0.12);
+  // Deux battants entrebâillés, vers l'intérieur.
+  ctx.fillStyle = "#a0783c";
+  ctx.strokeStyle = "#5a4020";
+  ctx.lineWidth = 0.035;
+  for (const sens of [-1, 1]) {
+    const bx = sens < 0 ? x + 0.16 : x + 0.62;
+    ctx.fillRect(bx, y + 0.3, 0.22, 0.56);
+    ctx.strokeRect(bx, y + 0.3, 0.22, 0.56);
+    ctx.beginPath();
+    ctx.moveTo(bx, y + 0.84);
+    ctx.lineTo(bx + 0.22, y + 0.32);
+    ctx.stroke();
+  }
 }
 
 const COULEURS_STADE = ["#9c7a4a", "#a8c56a", "#7fb04f", "#c9c04a", "#e0b23a"] as const;
 
-/** Champ : des sillons, dont la couleur dit le stade (terre nue, levée, pousse, épis, mûr). */
-export function champ(ctx: Ctx, x: number, y: number, seme: boolean, stade: number): void {
+/**
+ * Champ (M39b) : le sol labouré de la planche Tiny Farm, puis la culture selon
+ * son stade — une pousse, un jeune plant, une plante mûre. `variante` change la
+ * plante d'un champ à l'autre. Le dessin vectoriel reste en secours.
+ */
+export function champ(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  seme: boolean,
+  stade: number,
+  variante = 0,
+): void {
+  if (solLaboure(ctx, x, y, 1, 1)) {
+    if (seme) culture(ctx, x, y, 1, 1, Math.max(0, Math.min(3, stade)), variante);
+    return;
+  }
   ctx.fillStyle = "#6b4a2c";
   ctx.fillRect(x + 0.05, y + 0.05, 0.9, 0.9);
   ctx.fillStyle = seme ? (COULEURS_STADE[Math.max(0, Math.min(4, stade))] ?? "#9c7a4a") : "#7d5a38";
@@ -462,6 +528,62 @@ export function champ(ctx: Ctx, x: number, y: number, seme: boolean, stade: numb
     for (let i = 0; i < 4; i++)
       for (let j = 0; j < 3; j++) ctx.fillRect(x + 0.2 + j * 0.28, y + 0.1 + i * 0.22, 0.06, 0.06);
   }
+}
+
+/**
+ * Le parc d'un enclos (M39b) : une clôture close de trois tuiles de côté autour
+ * du piquet, avec un portillon au sud. Elle déborde sur les huit cases voisines,
+ * qui sont libres : c'est là que les bêtes se tiennent.
+ */
+export function parc(ctx: Ctx, x: number, y: number): void {
+  const g = x - 1;
+  const h = y - 1;
+  const cote = 3;
+  const poteau = (px: number, py: number): void => {
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillRect(px - 0.07, py + 0.5, 0.16, 0.1);
+    ctx.fillStyle = "#7a5a2e";
+    ctx.fillRect(px - 0.06, py - 0.02, 0.12, 0.56);
+    ctx.fillStyle = "#a0783c";
+    ctx.fillRect(px - 0.06, py - 0.02, 0.12, 0.08);
+  };
+  const lisse = (x1: number, x2: number, py: number): void => {
+    ctx.fillStyle = "#a0783c";
+    ctx.fillRect(x1, py + 0.12, x2 - x1, 0.07);
+    ctx.fillRect(x1, py + 0.32, x2 - x1, 0.07);
+  };
+  const lisseV = (py1: number, py2: number, px: number): void => {
+    ctx.fillStyle = "#a0783c";
+    ctx.fillRect(px - 0.035, py1, 0.07, py2 - py1);
+    ctx.fillRect(px - 0.035 + 0.2, py1, 0.07, py2 - py1);
+  };
+  // Les quatre côtés, le sud ouvert au milieu pour le portillon.
+  lisse(g + 0.1, g + cote - 0.1, h + 0.05);
+  lisseV(h + 0.1, h + cote - 0.1, g + 0.1);
+  lisseV(h + 0.1, h + cote - 0.1, g + cote - 0.3);
+  lisse(g + 0.1, g + 1.1, h + cote - 0.35);
+  lisse(g + 1.9, g + cote - 0.1, h + cote - 0.35);
+  for (let i = 0; i <= cote; i++) {
+    poteau(g + i, h + 0.05);
+    poteau(g + i, h + cote - 0.35);
+    poteau(g + 0.1, h + i - 0.15);
+    poteau(g + cote - 0.1, h + i - 0.15);
+  }
+  // Le portillon, entrebâillé.
+  ctx.fillStyle = "#b98c48";
+  ctx.strokeStyle = "#5a4020";
+  ctx.lineWidth = 0.03;
+  ctx.fillRect(g + 1.12, h + cote - 0.42, 0.34, 0.26);
+  ctx.strokeRect(g + 1.12, h + cote - 0.42, 0.34, 0.26);
+  ctx.beginPath();
+  ctx.moveTo(g + 1.12, h + cote - 0.16);
+  ctx.lineTo(g + 1.46, h + cote - 0.42);
+  ctx.stroke();
+  // La mangeoire, au pied du piquet.
+  ctx.fillStyle = "#8a6836";
+  ctx.fillRect(x + 0.28, y + 0.58, 0.44, 0.16);
+  ctx.fillStyle = "#c9b06a";
+  ctx.fillRect(x + 0.32, y + 0.56, 0.36, 0.06);
 }
 
 /** Autel : une dalle de pierre, deux montants, une petite flamme. */
@@ -827,56 +949,207 @@ const ROBES: Readonly<Record<string, { corps: string; ventre: string; taille: nu
   loup: { corps: "#6f6f74", ventre: "#a5a5aa", taille: 0.9 },
 };
 
-/** Une bête : corps, tête, pattes, et selon l'espèce des bois, des cornes ou des oreilles. */
+/**
+ * Une bête (M39b). Le mouton et la vache viennent de la planche Tiny Farm ; les
+ * quatre autres sont dessinées, chacune avec sa silhouette : le cerf haut sur
+ * pattes, l'encolure dressée et les bois ramifiés ; le sanglier bas, la bosse en
+ * avant et le groin au sol ; le lièvre ramassé sur son arrière-train, les
+ * oreilles droites ; le loup long, l'échine droite, la queue basse.
+ */
 function bete(ctx: Ctx, cx: number, sol: number, espece: string, s: number, pas: number): void {
   const robe = ROBES[espece] ?? ROBES.cerf ?? { corps: "#8b5a2b", ventre: "#c9a27a", taille: 1 };
   const k = s * robe.taille;
-  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
   ctx.beginPath();
-  ctx.ellipse(cx, sol, 0.28 * k, 0.07 * k, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, sol, 0.26 * k, 0.07 * k, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Pattes.
-  ctx.fillStyle = robe.corps;
-  ctx.fillRect(cx - 0.2 * k, sol - 0.22 * k, 0.07 * k, 0.22 * k + pas);
-  ctx.fillRect(cx + 0.12 * k, sol - 0.22 * k, 0.07 * k, 0.22 * k - pas);
-  // Corps.
-  ctx.beginPath();
-  ctx.ellipse(cx, sol - 0.3 * k, 0.3 * k, 0.16 * k, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = robe.ventre;
-  ctx.beginPath();
-  ctx.ellipse(cx, sol - 0.25 * k, 0.22 * k, 0.07 * k, 0, 0, Math.PI);
-  ctx.fill();
-  // Tête, à droite.
-  ctx.fillStyle = robe.corps;
-  ctx.beginPath();
-  ctx.ellipse(cx + 0.32 * k, sol - 0.42 * k, 0.11 * k, 0.09 * k, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = 0.03 * k;
-  ctx.strokeStyle = robe.corps;
-  if (espece === "cerf") {
+  // Le mouton et la vache ont leur sprite ; il tient dans une tuile.
+  const cote = 0.92 * s * Math.min(1.15, robe.taille);
+  if (beteFerme(ctx, espece, cx - cote / 2, sol - cote * 0.92, cote, cote)) return;
+
+  const corps = robe.corps;
+  const ventre = robe.ventre;
+  const trait = "rgba(0,0,0,0.3)";
+  const patte = (dx: number, haut: number, bas: number, large = 0.055): void => {
+    ctx.fillStyle = corps;
+    ctx.fillRect(cx + dx * k, sol - haut * k, large * k, (haut - bas) * k);
+  };
+
+  if (espece === "sanglier") {
+    patte(-0.2, 0.16, -0.02 + pas / k);
+    patte(0.12, 0.16, -0.02 - pas / k);
+    ctx.fillStyle = corps;
     ctx.beginPath();
-    ctx.moveTo(cx + 0.3 * k, sol - 0.5 * k);
-    ctx.lineTo(cx + 0.22 * k, sol - 0.68 * k);
-    ctx.moveTo(cx + 0.26 * k, sol - 0.6 * k);
-    ctx.lineTo(cx + 0.16 * k, sol - 0.66 * k);
-    ctx.moveTo(cx + 0.36 * k, sol - 0.5 * k);
-    ctx.lineTo(cx + 0.42 * k, sol - 0.68 * k);
+    ctx.moveTo(cx - 0.3 * k, sol - 0.18 * k);
+    ctx.quadraticCurveTo(cx - 0.24 * k, sol - 0.46 * k, cx - 0.02 * k, sol - 0.46 * k);
+    ctx.quadraticCurveTo(cx + 0.16 * k, sol - 0.46 * k, cx + 0.24 * k, sol - 0.3 * k);
+    ctx.lineTo(cx + 0.38 * k, sol - 0.22 * k);
+    ctx.lineTo(cx + 0.24 * k, sol - 0.14 * k);
+    ctx.quadraticCurveTo(cx - 0.06 * k, sol - 0.1 * k, cx - 0.3 * k, sol - 0.18 * k);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = trait;
+    ctx.lineWidth = 0.02 * k;
     ctx.stroke();
-  } else if (espece === "aurochs" || espece === "mouflon") {
+    ctx.fillStyle = ventre;
+    ctx.fillRect(cx + 0.3 * k, sol - 0.22 * k, 0.09 * k, 0.06 * k);
+    ctx.fillStyle = "#f0e8da";
     ctx.beginPath();
-    ctx.moveTo(cx + 0.28 * k, sol - 0.5 * k);
-    ctx.quadraticCurveTo(cx + 0.2 * k, sol - 0.62 * k, cx + 0.3 * k, sol - 0.62 * k);
-    ctx.moveTo(cx + 0.38 * k, sol - 0.5 * k);
-    ctx.quadraticCurveTo(cx + 0.46 * k, sol - 0.62 * k, cx + 0.36 * k, sol - 0.62 * k);
+    ctx.moveTo(cx + 0.28 * k, sol - 0.17 * k);
+    ctx.lineTo(cx + 0.36 * k, sol - 0.24 * k);
+    ctx.lineTo(cx + 0.3 * k, sol - 0.15 * k);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = ventre;
+    ctx.lineWidth = 0.025 * k;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const bx = cx - 0.16 * k + i * 0.08 * k;
+      ctx.moveTo(bx, sol - 0.44 * k);
+      ctx.lineTo(bx + 0.015 * k, sol - 0.54 * k);
+    }
     ctx.stroke();
-  } else if (espece === "lievre" || espece === "loup") {
-    ctx.fillRect(cx + 0.26 * k, sol - 0.58 * k, 0.04 * k, 0.12 * k);
-    ctx.fillRect(cx + 0.34 * k, sol - 0.58 * k, 0.04 * k, 0.12 * k);
-  } else if (espece === "sanglier") {
-    ctx.fillStyle = "#f0e6d8";
-    ctx.fillRect(cx + 0.4 * k, sol - 0.4 * k, 0.05 * k, 0.04 * k);
+    return;
   }
+
+  if (espece === "lievre") {
+    // Arrière-train rond, buste dressé, deux longues oreilles.
+    ctx.fillStyle = corps;
+    ctx.beginPath();
+    ctx.ellipse(cx - 0.1 * k, sol - 0.16 * k, 0.19 * k, 0.15 * k, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx + 0.08 * k, sol - 0.26 * k, 0.13 * k, 0.12 * k, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = ventre;
+    ctx.beginPath();
+    ctx.ellipse(cx - 0.06 * k, sol - 0.09 * k, 0.14 * k, 0.05 * k, 0, 0, Math.PI);
+    ctx.fill();
+    // La tête et les oreilles.
+    ctx.fillStyle = corps;
+    ctx.beginPath();
+    ctx.ellipse(cx + 0.2 * k, sol - 0.4 * k, 0.1 * k, 0.085 * k, -0.25, 0, Math.PI * 2);
+    ctx.fill();
+    for (const [dx, incl] of [
+      [0.13, -0.28],
+      [0.22, -0.05],
+    ] as const) {
+      ctx.beginPath();
+      ctx.ellipse(cx + dx * k, sol - 0.58 * k, 0.032 * k, 0.13 * k, incl, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#f4efe6";
+    ctx.beginPath();
+    ctx.arc(cx - 0.26 * k, sol - 0.2 * k, 0.055 * k, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#2a2118";
+    ctx.beginPath();
+    ctx.arc(cx + 0.24 * k, sol - 0.42 * k, 0.022 * k, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  if (espece === "loup") {
+    patte(-0.24, 0.24, 0.0 + pas / k);
+    patte(-0.16, 0.24, 0.0 - pas / k);
+    patte(0.12, 0.24, 0.0 - pas / k);
+    patte(0.2, 0.24, 0.0 + pas / k);
+    // La queue, basse et fournie.
+    ctx.fillStyle = corps;
+    ctx.beginPath();
+    ctx.moveTo(cx - 0.26 * k, sol - 0.36 * k);
+    ctx.quadraticCurveTo(cx - 0.46 * k, sol - 0.34 * k, cx - 0.44 * k, sol - 0.14 * k);
+    ctx.quadraticCurveTo(cx - 0.36 * k, sol - 0.26 * k, cx - 0.24 * k, sol - 0.28 * k);
+    ctx.closePath();
+    ctx.fill();
+    // Le tronc : échine droite, poitrail profond, ventre remonté.
+    ctx.beginPath();
+    ctx.moveTo(cx - 0.28 * k, sol - 0.4 * k);
+    ctx.lineTo(cx + 0.2 * k, sol - 0.42 * k);
+    ctx.quadraticCurveTo(cx + 0.3 * k, sol - 0.4 * k, cx + 0.28 * k, sol - 0.28 * k);
+    ctx.quadraticCurveTo(cx + 0.02 * k, sol - 0.2 * k, cx - 0.22 * k, sol - 0.26 * k);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = ventre;
+    ctx.beginPath();
+    ctx.ellipse(cx - 0.02 * k, sol - 0.26 * k, 0.15 * k, 0.04 * k, 0, 0, Math.PI);
+    ctx.fill();
+    // La tête, basse et tendue, le museau pointu.
+    ctx.fillStyle = corps;
+    ctx.beginPath();
+    ctx.moveTo(cx + 0.2 * k, sol - 0.5 * k);
+    ctx.lineTo(cx + 0.34 * k, sol - 0.5 * k);
+    ctx.lineTo(cx + 0.46 * k, sol - 0.4 * k);
+    ctx.lineTo(cx + 0.3 * k, sol - 0.34 * k);
+    ctx.lineTo(cx + 0.2 * k, sol - 0.38 * k);
+    ctx.closePath();
+    ctx.fill();
+    for (const dx of [0.2, 0.3]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * k, sol - 0.5 * k);
+      ctx.lineTo(cx + (dx + 0.025) * k, sol - 0.64 * k);
+      ctx.lineTo(cx + (dx + 0.075) * k, sol - 0.5 * k);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = "#2a2a2e";
+    ctx.beginPath();
+    ctx.arc(cx + 0.45 * k, sol - 0.41 * k, 0.025 * k, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  // Le cerf.
+  patte(-0.22, 0.34, 0.0 + pas / k, 0.045);
+  patte(-0.14, 0.34, 0.0 - pas / k, 0.045);
+  patte(0.12, 0.34, 0.0 - pas / k, 0.045);
+  patte(0.19, 0.34, 0.0 + pas / k, 0.045);
+  ctx.fillStyle = corps;
+  ctx.beginPath();
+  ctx.moveTo(cx - 0.26 * k, sol - 0.48 * k);
+  ctx.lineTo(cx + 0.18 * k, sol - 0.5 * k);
+  ctx.quadraticCurveTo(cx + 0.28 * k, sol - 0.48 * k, cx + 0.26 * k, sol - 0.34 * k);
+  ctx.quadraticCurveTo(cx + 0.0 * k, sol - 0.28 * k, cx - 0.22 * k, sol - 0.34 * k);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = ventre;
+  ctx.beginPath();
+  ctx.ellipse(cx - 0.02 * k, sol - 0.33 * k, 0.16 * k, 0.04 * k, 0, 0, Math.PI);
+  ctx.fill();
+  // L'encolure, dressée, et la tête.
+  ctx.fillStyle = corps;
+  ctx.beginPath();
+  ctx.moveTo(cx + 0.14 * k, sol - 0.5 * k);
+  ctx.lineTo(cx + 0.24 * k, sol - 0.78 * k);
+  ctx.lineTo(cx + 0.34 * k, sol - 0.76 * k);
+  ctx.lineTo(cx + 0.26 * k, sol - 0.46 * k);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 0.34 * k, sol - 0.8 * k, 0.09 * k, 0.06 * k, -0.35, 0, Math.PI * 2);
+  ctx.fill();
+  // Les bois.
+  ctx.strokeStyle = "#d9c69b";
+  ctx.lineWidth = 0.03 * k;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx + 0.28 * k, sol - 0.86 * k);
+  ctx.lineTo(cx + 0.2 * k, sol - 1.06 * k);
+  ctx.moveTo(cx + 0.24 * k, sol - 0.97 * k);
+  ctx.lineTo(cx + 0.12 * k, sol - 1.0 * k);
+  ctx.moveTo(cx + 0.36 * k, sol - 0.86 * k);
+  ctx.lineTo(cx + 0.44 * k, sol - 1.04 * k);
+  ctx.moveTo(cx + 0.41 * k, sol - 0.96 * k);
+  ctx.lineTo(cx + 0.52 * k, sol - 0.99 * k);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.fillStyle = "#2a2118";
+  ctx.beginPath();
+  ctx.arc(cx + 0.38 * k, sol - 0.82 * k, 0.02 * k, 0, Math.PI * 2);
+  ctx.fill();
+  // La queue courte, claire.
+  ctx.fillStyle = ventre;
+  ctx.fillRect(cx - 0.29 * k, sol - 0.5 * k, 0.055 * k, 0.1 * k);
 }
 
 /** Un troupeau : une à trois bêtes serrées, et le nombre quand il dépasse trois. */

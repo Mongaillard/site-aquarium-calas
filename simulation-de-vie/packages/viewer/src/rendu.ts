@@ -231,6 +231,10 @@ export class Rendu {
       if (etat.villages.villages.length > 1)
         for (const v of etat.villages.villages)
           for (const f of v.familles) villageDeFamille.set(f, v.id);
+      // L'index des pans de mur : une palissade se raccorde à ses voisines (M39b).
+      this.murs.clear();
+      for (const b of etat.batiments)
+        if (b.type === "palissade" || b.type === "portail") this.murs.add(`${b.x},${b.y}`);
       const batiments = [...etat.batiments].sort((a, b) => a.y - b.y);
       for (const b of batiments) {
         if (!visible(b.x, b.y)) continue;
@@ -1017,6 +1021,19 @@ export class Rendu {
     ctx.restore();
   }
 
+  /** Positions des pans de mur de la trame courante (palissades et portails). */
+  private readonly murs = new Set<string>();
+
+  /** Par où ce pan de mur en rejoint un autre. */
+  private liensMur(x: number, y: number): sprites.Liens {
+    return {
+      n: this.murs.has(`${x},${y - 1}`),
+      s: this.murs.has(`${x},${y + 1}`),
+      e: this.murs.has(`${x + 1},${y}`),
+      o: this.murs.has(`${x - 1},${y}`),
+    };
+  }
+
   private dessinerBatiment(
     b: BatimentEtat,
     nuit: boolean,
@@ -1073,7 +1090,10 @@ export class Rendu {
         if (!rts("puits", 0.55)) sprites.puits(ctx, b.x, b.y);
         break;
       case "palissade":
-        sprites.palissade(ctx, b.x, b.y);
+        sprites.palissade(ctx, b.x, b.y, this.liensMur(b.x, b.y));
+        break;
+      case "portail":
+        sprites.portail(ctx, b.x, b.y);
         break;
       case "tombe":
         sprites.tombe(ctx, b.x, b.y);
@@ -1085,10 +1105,18 @@ export class Rendu {
         if (!rts("sanctuaire", 0.95)) sprites.autel(ctx, b.x, b.y, maintenant);
         break;
       case "enclos":
-        sprites.enclos(ctx, b.x, b.y);
+        // Le parc déborde sur les huit cases voisines : c'est là que les bêtes se tiennent.
+        sprites.parc(ctx, b.x, b.y);
         break;
       case "champ":
-        sprites.champ(ctx, b.x, b.y, b.culture?.seme ?? false, b.culture?.stade ?? 0);
+        sprites.champ(
+          ctx,
+          b.x,
+          b.y,
+          b.culture?.seme ?? false,
+          b.culture?.stade ?? 0,
+          varianteDe(b.id),
+        );
         break;
       case "port":
         sprites.port(ctx, b.x, b.y);
@@ -1185,6 +1213,13 @@ function cleDe(m: MorceauVue): number {
 const SEUIL_PIXELS = 14;
 
 /** Une coiffure 0..2 stable par identifiant, pour que les têtes ne se ressemblent pas toutes. */
+/** La plante d'un champ (M39b), tirée de son identifiant : deux champs voisins diffèrent. */
+function varianteDe(id: string): number {
+  let h = 11;
+  for (let i = 0; i < id.length; i++) h = (Math.imul(h, 33) + id.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 function coiffureDe(id: string): number {
   let h = 7;
   for (let i = 0; i < id.length; i++) h = (Math.imul(h, 31) + id.charCodeAt(i)) | 0;

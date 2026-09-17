@@ -1474,6 +1474,42 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   matière tirée du four qui coûte ce qu'on y met, et une colonie sur deux cents jours qui trouve,
   rate et finit par réussir) ; `instantane.test.ts` (2 : l'état envoyé au viewer).
 
+## 8 octodecies. L'enceinte, les enclos et les sprites de ferme tels que réalisés (M39)
+
+- **Enceinte** (`monde.ts`) : `enceinteDe(monde, p)` rend l'enceinte du village de la personne,
+  et la **fige** dans `Village.enceinte = { centre, rayon }` au premier appel — **[DÉCISION]**
+  sans cela le centre du village bouge quand il grandit, le rayon aussi, et l'on dresse un
+  nouvel anneau en laissant l'ancien debout : ce sont ces anneaux empilés qui donnaient des
+  pieux partout. `rayonEnceinte` prend le rayon où se tient déjà le plus de pieux, sinon de quoi
+  contenir ce qu'on a bâti (`RAYON_ENCEINTE = 3` à `RAYON_ENCEINTE_MAX = 7`).
+  `tuilesEnceinte(monde, centre, rayon)` parcourt l'anneau dans le sens des aiguilles d'une
+  montre et **rattrape d'un pas** (intérieur puis extérieur) toute tuile qu'on ne peut pas bâtir,
+  sans doublon ; l'eau et la montagne ferment d'elles-mêmes et ne sont pas rattrapées.
+  `tuileEnceinteManquante` rend la plus proche du bâtisseur.
+- **Portail** : bâtiment `portail` (bois 3, fibres 2, travail 5, ascii `=`).
+  `siteDuPortail(monde, p)` attend `PART_ENCEINTE_POUR_PORTAIL = 0,6` de l'anneau dressé, refuse
+  s'il en existe déjà un, et choisit le pan le plus proche de l'eau connue du centre.
+  `prochainBatimentNecessaire` rend `palissade` tant qu'il manque un pan, puis `portail`. Il
+  compte comme un mur pour `enclos()` (tout bâtiment terminé ferme), et les bâtiments ne
+  bloquent pas les déplacements : un anneau clos n'enferme personne.
+- **Enclos** : le site préfère une tuile aux voisines libres (`(8 − libres) × 3` au score), pour
+  que le parc de trois tuiles de côté tienne. `placeAuParc` répartit les bêtes sur les huit
+  cases du piquet, dans l'ordre de leurs identifiants.
+- **Sprites de ferme** (`atlas.ts`, planche *Tiny Farm*, 12×11 tuiles de 16 px sans pas) :
+  `solLaboure` (0, 4), `culture(stade 1..3, variante)` (colonnes 4 à 6, lignes 0, 2, 3, 4, 5),
+  `beteFerme` (mouton (0, 10), vache (1, 10)). `atlasPret()` attend les cinq planches.
+- **Dessins** (`sprites.ts`) : `champ(..., variante)` pose le sol puis la culture ;
+  `palissade(ctx, x, y, liens)` prend les côtés par lesquels le mur se raccorde (`rendu.ts`
+  indexe les pans de la trame dans `murs` et les lit par `liensMur`) ; `portail` ; `parc` (une
+  clôture close de trois tuiles de côté, portillon au sud, mangeoire au piquet) ; `bete` choisit
+  le sprite de ferme s'il existe, sinon dessine l'espèce (cerf, sanglier, lièvre, loup).
+- **Planche d'essai** : `packages/viewer/essai/index.html` (source `src/essai/planche.ts`),
+  bâtie à part (`vite build essai`), affiche champs, murs, parc et bêtes côte à côte.
+- **Tests** (`enceinte.test.ts`, 5) : le centre est celui du village ; le rayon contient ce qu'on
+  a bâti sans dépasser sa borne ; l'anneau est continu, sans doublon, et rattrapé d'un pas au
+  plus ; le portail attend que le mur tienne, se taille une fois, du côté de l'eau ; les bêtes du
+  parc se répartissent autour du piquet. Le test des murs de M10 suit la nouvelle règle.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue
