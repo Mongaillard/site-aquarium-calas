@@ -49,6 +49,7 @@ import {
   objetDuLevier,
   recetteDeTrouvaille,
 } from "../savoirs/grammaire.js";
+import { apprendreMatiere } from "../savoirs/recherche.js";
 import { seRecueillir } from "../social/societe.js";
 import { rever } from "../memoire/psyche.js";
 import { nommerLaPeche } from "../memoire/legendes.js";
@@ -490,6 +491,7 @@ function tickParler(
         break;
       }
       case "savoir": {
+        if (estIdTrouvaille(effet.savoir)) apprendreMatiere(monde, vers, effet.savoir);
         if (apprendre(vers, effet.savoir, 1, effet.origine, tick)) {
           const titre = estIdTrouvaille(effet.savoir)
             ? (monde.trouvailles.trouvailles.get(effet.savoir)?.nom ?? "une idée")
@@ -859,7 +861,9 @@ function tickChasser(
   const inv = p.corps.inventaire;
   if (!outilSatisfait(inv, "lance")) return echec("outil requis : lance");
   const arc = possede(inv, "arc");
-  const portee = arc ? 6 : 3;
+  // Une arme de chasse née de la grammaire (M38) porte plus loin et touche mieux.
+  const armeTrouvee = objetDuLevier(monde.trouvailles, inv, "recolte_gibier");
+  const portee = arc || armeTrouvee !== null ? 6 : 3;
   if (Grille.distance(p.corps.position, t.position) > portee) {
     const lieu = p.connaissance.get(cleLieu(t.position.x, t.position.y));
     if (lieu !== undefined) lieu.quantiteVue = t.taille;
@@ -881,6 +885,7 @@ function tickChasser(
         (a.intention?.type === "recolter" && a.intention.ressource === "gibier")),
   ).length;
   const auPiege = possede(inv, "piege") && !possede(inv, "lance") && !arc;
+  const gainChasse = bonusPorte(monde.trouvailles, inv, "recolte_gibier") - 1;
   const probabilite = Math.max(
     0.05,
     Math.min(
@@ -888,6 +893,7 @@ function tickChasser(
       profil.reussiteBase +
         0.06 * niv +
         (arc ? 0.15 : 0) +
+        Math.min(0.25, gainChasse * 0.2) +
         (auPiege ? (t.espece === "lievre" || t.espece === "sanglier" ? 0.15 : 0.05) : 0) +
         0.2 * Math.min(2, rabatteurs) -
         0.3 * t.mefiance -
@@ -924,6 +930,14 @@ function tickChasser(
     }
   }
   const reussie = p.rng.chance(probabilite);
+  if (reussie && armeTrouvee !== null) {
+    armeTrouvee.solidite -= 1;
+    if (armeTrouvee.solidite <= 0) {
+      const nom = monde.trouvailles.trouvailles.get(armeTrouvee.trouvaille ?? "")?.nom ?? "arme";
+      retirerObjetExact(inv, armeTrouvee);
+      monde.emettre("outil_casse", p, { outil: nom }, 3);
+    }
+  }
   if (reussie) {
     const betes = arc && niv >= 3 && t.taille >= 2 && p.rng.chance(0.3) ? 2 : 1;
     t.taille -= betes;
@@ -1287,10 +1301,8 @@ function tickFabriquerTrouvaille(
   action.ticksRestants -= 1;
   if (action.ticksRestants > 0) return ENCOURS;
 
-  for (const [r, n] of Object.entries(recette.ingredients) as [Ressource, number][]) {
-    retirer(p.corps.inventaire, r, n);
-  }
-  // Le premier exemplaire tient rarement du premier coup.
+  // Le premier exemplaire tient rarement du premier coup : le temps est perdu,
+  // mais les matières restent, et l'on recommencera.
   if (forceIdee < 1 && p.rng.chance(0.35)) {
     t.essais += 1;
     monde.emettre("prototype_rate", p, { invention: t.id, nom: t.nom }, 4);
@@ -1303,12 +1315,18 @@ function tickFabriquerTrouvaille(
     );
     return TERMINEE;
   }
+  for (const [r, n] of Object.entries(recette.ingredients) as [Ressource, number][]) {
+    retirer(p.corps.inventaire, r, n);
+  }
   if (!ajouterObjet(p.corps.inventaire, objetDeTrouvaille(t))) return echec("inventaire plein");
   if (t.levier === "portage") p.corps.inventaire.capacite += Math.round(6 * (1 + t.gain));
   if (forceIdee < 1) {
     apprendre(p, t.id, 1, p.identite.prenom, monde.horloge.tick);
-    for (const m of membresFamille(monde, p))
+    apprendreMatiere(monde, p, t.id);
+    for (const m of membresFamille(monde, p)) {
       apprendre(m, t.id, 1, p.identite.prenom, monde.horloge.tick);
+      apprendreMatiere(monde, m, t.id);
+    }
     monde.emettre("invention", p, { invention: t.id, nom: t.nom, domaine: t.fonction }, 9);
     p.memoire.ajouter(monde.horloge.tick, "reflexion", `Ça marche ! Un ${t.nom}.`, 9, []);
   }

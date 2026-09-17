@@ -1,8 +1,9 @@
 /** Construction de la perception d'un personnage (section 10.2, sous-ensemble M2). */
 import { batailleActive } from "../monde/bataille.js";
-import { INVENTIONS, SEUIL_SAVOIR } from "../savoirs/catalogue.js";
-import type { Invention, Savoir } from "../savoirs/catalogue.js";
+import { INVENTIONS, SEUIL_SAVOIR, estIdTrouvaille } from "../savoirs/catalogue.js";
+import type { IdTrouvaille, Invention, Savoir } from "../savoirs/catalogue.js";
 import { savoirsConnus } from "../savoirs/lecons.js";
+import { niveau } from "../agents/competences.js";
 import {
   aDeLaFievre,
   capacites,
@@ -14,6 +15,7 @@ import {
 } from "../agents/corps.js";
 import type { TypeObjet } from "../monde/recettes.js";
 import { REPARATIONS_MAX, SEUIL_REPARATION } from "../monde/recettes.js";
+import type { Atelier } from "../monde/recettes.js";
 import type { Besoins } from "../agents/besoins.js";
 import type { Personnalite } from "../agents/identite.js";
 import {
@@ -39,7 +41,7 @@ import {
 } from "../monde.js";
 import type { Monde } from "../monde.js";
 import type { TypeBatiment } from "../monde/batiments.js";
-import { materiauxManquants } from "../monde/batiments.js";
+import { PLANS_BATIMENT, materiauxManquants } from "../monde/batiments.js";
 import { Grille } from "../monde/grille.js";
 import type { Position } from "../monde/grille.js";
 import type { Moment, Saison } from "../monde/horloge.js";
@@ -272,6 +274,8 @@ export interface Perception {
     readonly savoirs: ReadonlySet<Savoir>;
     /** Inventions dont j'ai l'idée mais pas encore le prototype réussi. */
     readonly ideesEnCours: readonly Invention[];
+    /** Trouvailles (M38) que je sais faire, dont j'ai les matières, et que je n'ai pas sur moi. */
+    readonly trouvaillesAFaire: readonly IdTrouvaille[];
     readonly possede: (objet: TypeObjet) => boolean;
     readonly cuir: number;
     /** Bêtes de la famille (identifiant de la première, et nombre). */
@@ -540,6 +544,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
       ideesEnCours: [...p.savoirs.entries()]
         .filter(([k, v]) => k in INVENTIONS && v.force >= SEUIL_SAVOIR && v.force < 1)
         .map(([k]) => k as Invention),
+      trouvaillesAFaire: trouvaillesAFaire(monde, p),
       possede: (objet) => possede(inv, objet),
       cuir: quantite(inv, "cuir"),
       betail: betailFamilial(monde, p),
@@ -640,4 +645,48 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
     saison: moment.saison,
     souvenirsRecents: p.memoire.depuis(monde.horloge.tick - monde.horloge.ticksParJour),
   };
+}
+
+/**
+ * Les trouvailles (M38) qu'une personne devrait faire maintenant : elle en a
+ * l'idée ou le savoir, elle n'en porte pas déjà une, et les matières sont à
+ * portée (en poche ou dans un stock accessible). La meilleure d'abord.
+ */
+function trouvaillesAFaire(monde: Monde, p: Personnage): IdTrouvaille[] {
+  const inv = p.corps.inventaire;
+  const niv = niveau(p.experience.artisanat);
+  const candidates: { id: IdTrouvaille; gain: number }[] = [];
+  for (const [cle, acquis] of p.savoirs) {
+    if (!estIdTrouvaille(cle) || acquis.force < SEUIL_SAVOIR) continue;
+    const t = monde.trouvailles.trouvailles.get(cle);
+    if (t === undefined) continue;
+    if (inv.objets.some((o) => o.trouvaille === t.id)) continue;
+    // On ne se lance pas dans ce qu'on ne sait pas encore mener.
+    if (niv < t.niveauRequis) continue;
+    if (t.atelier !== null && !atelierAPortee(monde, p, t.atelier)) continue;
+
+    // On fabrique avec ce qu'on a déjà en poche : une idée attend son heure plutôt
+    // que de faire courir après les matières, sinon on bricole au lieu de manger.
+    let possible = true;
+    for (const [r, n] of Object.entries(t.ingredients) as [Ressource, number][]) {
+      if (quantite(inv, r) < n) {
+        possible = false;
+        break;
+      }
+    }
+    if (possible) candidates.push({ id: t.id, gain: t.gain });
+  }
+  candidates.sort((a, b) => b.gain - a.gain || (a.id < b.id ? -1 : 1));
+  return candidates.map((c) => c.id);
+}
+
+/** Un atelier de ce genre, achevé (et allumé pour un feu), accessible d'ici. */
+function atelierAPortee(monde: Monde, p: Personnage, atelier: Atelier): boolean {
+  for (const b of batimentsAccessibles(monde, p)) {
+    if (b.etat !== "termine") continue;
+    if (PLANS_BATIMENT[b.type].atelier !== atelier) continue;
+    if (atelier === "feu" && !b.allume) continue;
+    return true;
+  }
+  return false;
 }

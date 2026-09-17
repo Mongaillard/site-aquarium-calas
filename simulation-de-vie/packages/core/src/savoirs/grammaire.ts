@@ -64,7 +64,7 @@ export const MATIERES_BRUTES: readonly FicheMatiere[] = [
   m("argile", "argile", "argile", 20, 25, 55, 60, 10, "#b06a44"),
   m("cuir", "cuir", "cuir", 15, 40, 70, 80, 20, "#7a4a2a"),
   m("corde", "corde", "corde", 8, 30, 35, 90, 14, "#a88c4a"),
-  m("minerai", "minerai", "minerai brut", 40, 30, 15, 10, 30, "#6f7f5a"),
+  m("minerai", "minerai", "minerai brut", 28, 25, 15, 10, 30, "#6f7f5a"),
   m("cuivre", "cuivre", "cuivre", 60, 65, 15, 55, 45, "#b87333"),
 ];
 
@@ -179,7 +179,7 @@ export const PROCEDE: Record<Procede, FicheProcede> = {
     tenue: 1.6,
     isolation: 1.2,
     souplesse: 0.4,
-    exige: { propriete: "souplesse", seuil: 40 },
+    exige: { propriete: "isolation", seuil: 50 },
     derive: false,
   },
   fondre: {
@@ -449,18 +449,18 @@ const NOMS_METAUX = [
 ] as const;
 
 const RACINES = [
-  "aube",
-  "cendre",
-  "crible",
-  "fauve",
-  "givre",
-  "lame",
-  "meule",
-  "roche",
-  "sombre",
-  "vive",
+  "aub",
+  "cendr",
+  "clair",
+  "fauv",
+  "givr",
+  "lam",
+  "meul",
+  "roch",
+  "sombr",
+  "vif",
 ] as const;
-const SUFFIXES = ["ain", "ite", "ure", "on", "elle", "ois"] as const;
+const SUFFIXES = ["ain", "ite", "ure", "ier", "al", "in"] as const;
 
 /** Un nom de matière qui n'a pas encore servi. */
 function nommerMatiere(e: EtatTrouvailles, rng: Rng): string {
@@ -593,7 +593,8 @@ const NOMS_OBJET: Record<Fonction, Partial<Record<Procede, string>> & { readonly
 function nommerTrouvaille(fonction: Fonction, procede: Procede, matiere: FicheMatiere): string {
   const noms = NOMS_OBJET[fonction];
   const base = noms[procede] ?? noms.defaut;
-  return `${base} de ${matiere.nom}`;
+  const voyelle = /^[aeiouyâàéèêëîïôöûü]/i.test(matiere.nom);
+  return `${base} ${voyelle ? "d'" : "de "}${matiere.nom}`;
 }
 
 /** Le triplet tient-il debout ? Une matière molle ne fait pas une hache. */
@@ -608,7 +609,7 @@ export function combinaisonValide(
   if (p.derive) return false;
   if (p.exige !== null && matiere[p.exige.propriete] < p.exige.seuil) return false;
   // Il faut que la matière serve vraiment à ça.
-  return valeurBrute(fonction, procede, matiere) >= 25;
+  return valeurBrute(fonction, procede, matiere) >= 40;
 }
 
 /** La propriété qui décide, une fois le procédé passé dessus : 0..100. */
@@ -632,10 +633,12 @@ export function composerTrouvaille(
   const f = FONCTION[fonction];
   const p = PROCEDE[procede];
   const part = valeurBrute(fonction, procede, matiere) / 100;
-  const gain = Math.round(f.gainMax * part * part * 100) / 100;
+  // Une matière brute ne donne qu'une part du gain possible ; la chaîne fait le reste.
+  const avancement = 0.55 + 0.45 * Math.min(1, matiere.rang / 3);
+  const gain = Math.round(f.gainMax * part * part * avancement * 100) / 100;
   const tenue = Math.min(100, matiere.tenue * p.tenue);
-  const id: IdTrouvaille = `t:${e.prochain}`;
-  e.prochain += 1;
+  // L'identifiant vient du triplet : deux personnes qui ont la même idée ont la même.
+  const id: IdTrouvaille = `t:${fonction}.${procede}.${matiere.id}`;
   return {
     id,
     nom: nommerTrouvaille(fonction, procede, matiere),

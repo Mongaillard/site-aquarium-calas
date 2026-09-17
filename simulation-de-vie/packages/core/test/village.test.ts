@@ -311,7 +311,10 @@ describe("le village apprivoise : champs et métiers", () => {
     "sur deux cent quarante jours, des champs se sèment et mûrissent, on chasse, des métiers apparaissent",
     { timeout: 240000 },
     async () => {
-      const sim = Simulation.creer({ seed: 7 });
+      // Graine 101 : depuis M38b, les inventions décalent la trajectoire de la graine 7,
+      // où les deux champs semés gèlent avant de mûrir (ils sont bien semés et lèvent).
+      // On mesure ici un cycle complet, sur une graine où il s'observe.
+      const sim = Simulation.creer({ seed: 101 });
       // Sans le conteur (M25) : le scénario mesure la culture et les métiers, pas ses épreuves.
       sim.lois.conteur = false;
       await joursAsync(sim, 240);

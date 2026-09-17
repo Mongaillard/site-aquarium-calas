@@ -182,6 +182,7 @@ import {
 } from "./monde/villages.js";
 import type { EtatVillages } from "./monde/villages.js";
 import { MATIERES_BRUTES, bonusPorte, bonusSu, etatTrouvaillesNeuf } from "./savoirs/grammaire.js";
+import { chercher, melanger } from "./savoirs/recherche.js";
 import type { EtatTrouvailles } from "./savoirs/grammaire.js";
 import {
   aubeBatailles,
@@ -643,9 +644,48 @@ export class Simulation implements Monde {
       this.emettre("idee", p, { invention: idee, nom: INVENTIONS[idee].nom }, 6);
       p.memoire.ajouter(this.tick, "reflexion", `J'ai une idée. ${INVENTIONS[idee].idee}`, 7, []);
       p.drapeaux.soirsSansIdee = 0;
-    } else {
-      p.drapeaux.soirsSansIdee = besoinSansIdee(this, p) ? p.drapeaux.soirsSansIdee + 1 : 0;
+      return;
     }
+    // Rien au catalogue : la grammaire (M38b). Un problème, une matière, un procédé.
+    const trouvee = chercher(this, p);
+    if (trouvee !== null) {
+      const { trouvaille, probleme } = trouvee;
+      this.emettre(
+        "idee",
+        p,
+        { invention: trouvaille.id, nom: trouvaille.nom, probleme: probleme.plainte },
+        6,
+      );
+      p.memoire.ajouter(
+        this.tick,
+        "reflexion",
+        `${probleme.plainte} Et si je faisais un ${trouvaille.nom} ?`,
+        7,
+        [],
+      );
+      p.drapeaux.soirsSansIdee = 0;
+      return;
+    }
+    // Devant un four, on mêle pour voir : c'est ainsi que naissent les matières.
+    const matiere = melanger(this, p);
+    if (matiere !== null) {
+      this.emettre(
+        "matiere",
+        p,
+        { matiere: matiere.id, nom: matiere.nom, procede: matiere.procede ?? "" },
+        8,
+      );
+      p.memoire.ajouter(
+        this.tick,
+        "reflexion",
+        `Du four est sorti quelque chose que je n'avais jamais vu. Je l'appellerai ${matiere.nom}.`,
+        8,
+        [],
+      );
+      p.drapeaux.soirsSansIdee = 0;
+      return;
+    }
+    p.drapeaux.soirsSansIdee = besoinSansIdee(this, p) ? p.drapeaux.soirsSansIdee + 1 : 0;
   }
 
   // ------------------------------------------------------------ sculpter et peupler

@@ -43,6 +43,7 @@ export const TYPES_EVENEMENT = [
   "lecon",
   "idee",
   "invention",
+  "matiere",
   "prototype_rate",
   "jeu",
   "claude",

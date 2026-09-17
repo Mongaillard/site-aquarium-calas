@@ -193,6 +193,8 @@ export interface Personnage {
   readonly connaissance: Map<string, LieuConnu>;
   /** Leçons et inventions retenues, avec leur force et leur origine. */
   readonly savoirs: Map<Savoir, SavoirAcquis>;
+  /** Matières dérivées qu'elle sait faire (M38b) ; absent des mondes d'avant. */
+  matieresSues?: Set<string>;
   /** Pensée intérieure soufflée par Claude (M5), valable une journée. */
   penseeClaude: { texte: string; tick: number } | null;
   /** Ambition en cours ou dernière issue (conseil de Claude). */

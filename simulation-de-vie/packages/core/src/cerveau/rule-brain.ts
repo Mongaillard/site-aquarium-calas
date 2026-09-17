@@ -522,6 +522,16 @@ export class RuleBrain implements Cerveau {
           utile: perception.cuivreAccessible >= 1 && !perception.moi.possede("hache_cuivre"),
         },
       ];
+      // Une trouvaille (M38) : ce qu'on a imaginé soi-même, ou qu'on nous a appris.
+      // On fait la meilleure d'abord ; le premier exemplaire rate souvent.
+      // Ce qu'on peut faire sur-le-champ, avec ce qu'on a en poche.
+      const aFaire = perception.moi.trouvaillesAFaire[0];
+      if (aFaire !== undefined) {
+        candidats.push({
+          intention: { type: "fabriquer", recette: aFaire },
+          score: 0.42 + personnalite.ouverture * 0.25 + personnalite.conscience * 0.15,
+        });
+      }
       for (const { invention, utile } of equipement) {
         if (!utile || !sait(invention) || perception.moi.ideesEnCours.includes(invention)) continue;
         if (invention === "fumoir") continue; // le fumoir est un bâtiment, pas un objet

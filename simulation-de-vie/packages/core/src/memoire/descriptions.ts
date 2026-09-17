@@ -351,6 +351,10 @@ export function decrireEvenement(
     }
     case "invention":
       return temoin ? `J'ai vu ${qui} réussir son ${String(d.nom ?? "invention")}.` : null;
+    case "matiere":
+      return temoin
+        ? `${qui} a tiré du four une matière nouvelle : ${String(d.nom ?? "on ne sait quoi")}.`
+        : null;
     case "blessure":
       return temoin
         ? `${qui} s'est blessé${e_} ${String(d.contexte ?? "")}.`
