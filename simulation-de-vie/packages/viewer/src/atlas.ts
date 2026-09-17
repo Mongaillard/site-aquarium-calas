@@ -348,19 +348,6 @@ const CULTURES: readonly number[] = [0, 2, 3, 4, 5];
 /** Les trois colonnes d'une culture : pousse, jeune, mûre. */
 const STADES: readonly number[] = [4, 5, 6];
 
-/** Le sol labouré d'un champ (M39b) ; faux si la planche n'est pas prête. */
-export function solLaboure(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): boolean {
-  if (!tinyFarm.prete) return false;
-  tuile(ctx, tinyFarm, 0, 4, x, y, w, h);
-  return true;
-}
-
 /**
  * La culture d'un champ selon son stade (1 à 4) ; `variante` choisit la plante,
  * pour que deux champs voisins ne poussent pas la même chose. Faux si la planche

@@ -26,3 +26,13 @@ Une planche CC0 de plus, pour les cultures et le bétail.
   mouton (0, 10) et vache (1, 10).
 
 Licence : Creative Commons Zero (CC0) — http://creativecommons.org/publicdomain/zero/1.0/
+
+# Interface (M39c)
+
+- **UI Pack — Pixel Adventure**, par Kenney (kenney.nl).
+  https://kenney.nl/assets/ui-pack-pixel-adventure — quatre tuiles de 32×32 recopiées dans
+  `src/assets/ui/` : `bouton.png` (tuile 28), `bouton-actif.png` (35), `jauge.png` (70),
+  posées en neuf tranches (`border-image`, découpe à 8 px) sur les boutons d'icônes et les
+  jauges. `cadre.png` (9) reste disponible pour les cadres.
+
+Licence : Creative Commons Zero (CC0) — http://creativecommons.org/publicdomain/zero/1.0/

@@ -1505,6 +1505,11 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   le sprite de ferme s'il existe, sinon dessine l'espèce (cerf, sanglier, lièvre, loup).
 - **Planche d'essai** : `packages/viewer/essai/index.html` (source `src/essai/planche.ts`),
   bâtie à part (`vite build essai`), affiche champs, murs, parc et bêtes côte à côte.
+- **Interface** (M39c, `style.css`) : quatre tuiles de l'*UI Pack Pixel Adventure* dans
+  `src/assets/ui/`, posées en `border-image` (découpe à 8 px, `fill`, `image-rendering:
+  pixelated`) sur `#hud > button`, `#pouvoirs button`, `#outils button`,
+  `#btn-fermer-panneau`, `#aide` et `#bataille .barre`. **[DÉCISION]** Rien d'autre : sur le
+  volet et les listes, le cadre mange le contraste.
 - **Tests** (`enceinte.test.ts`, 5) : le centre est celui du village ; le rayon contient ce qu'on
   a bâti sans dépasser sa borne ; l'anneau est continu, sans doublon, et rattrapé d'un pas au
   plus ; le portail attend que le mur tienne, se taille une fois, du côté de l'eau ; les bêtes du

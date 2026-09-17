@@ -37,6 +37,14 @@ _Tiny Farm_.
   pompon) et le loup (long, l'échine droite, la queue basse, le museau tendu) sont dessinés.
 - Une **planche d'essai** (`packages/viewer/essai/index.html`) affiche tous ces dessins côte à
   côte : c'est ainsi qu'on les juge sans chercher dans une partie.
+- Les champs gardent leurs sillons d'avant, qui se lisent de loin comme un champ ; ce sont les
+  **plants** qui viennent de la planche, et ils grossissent avec le stade.
+
+**L'interface prend des cadres de pixels (M39c).** Sixième planche CC0, l'_UI Pack Pixel
+Adventure_ de Kenney : les boutons d'icônes (le menu, la lecture, les pouvoirs du ciel, l'aide,
+la fermeture du volet) et les jauges de bataille portent des cadres en neuf tranches.
+**[DÉCISION]** On s'en tient là : passé sur le volet, les puces de calque et les listes, ce
+cadre mange le contraste et rend le texte dense illisible — l'essai a été fait, puis défait.
 
 ## M38 – Les inventions sans catalogue (2026-09-17)
 

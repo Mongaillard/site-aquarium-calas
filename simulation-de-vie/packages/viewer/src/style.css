@@ -1425,3 +1425,58 @@ table.saisons td:first-child {
   opacity: 0.85;
   margin-top: 0.15rem;
 }
+
+/* ---------------------------------------------------------------------------
+ * Habillage Kenney « UI Pack Pixel Adventure » (M39c). Des cadres en neuf
+ * tranches : le bord de la tuile de 32 px se découpe à 8 px, le centre remplit.
+ *
+ * **[DÉCISION]** On n'en habille que les boutons d'icônes et les jauges. Passé
+ * sur le volet, les puces de calque et les listes, ce cadre mange le contraste
+ * et rend le texte dense illisible : l'essai est dans l'historique.
+ * ------------------------------------------------------------------------ */
+:root {
+  --bouton: url("./assets/ui/bouton.png");
+  --bouton-actif: url("./assets/ui/bouton-actif.png");
+  --jauge-cadre: url("./assets/ui/jauge.png");
+}
+
+/* Les commandes de la barre du haut et les pouvoirs du ciel : des icônes. */
+#hud > button,
+#pouvoirs button,
+#outils button,
+#btn-fermer-panneau,
+#aide {
+  border: 8px solid transparent;
+  border-image: var(--bouton) 8 fill repeat;
+  border-radius: 0;
+  background: none;
+  image-rendering: pixelated;
+}
+#hud > button:hover,
+#pouvoirs button:hover,
+#outils button:hover,
+#btn-fermer-panneau:hover,
+#aide:hover {
+  border-image: var(--bouton-actif) 8 fill repeat;
+  background: none;
+}
+#hud > button.actif,
+#pouvoirs button.actif,
+#outils button.actif {
+  border-image: var(--bouton-actif) 8 fill repeat;
+  background: none;
+  color: var(--texte);
+}
+#hud > button > *,
+#pouvoirs button > *,
+#outils button > * {
+  image-rendering: auto;
+}
+
+/* La jauge de bataille : un cadre de jauge autour des deux camps. */
+#bataille .barre {
+  border: 6px solid transparent;
+  border-image: var(--jauge-cadre) 8 fill repeat;
+  border-radius: 0;
+  image-rendering: pixelated;
+}

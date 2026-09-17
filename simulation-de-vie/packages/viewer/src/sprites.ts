@@ -9,7 +9,6 @@ import {
   culture,
   gemmes,
   pin,
-  solLaboure,
   spritePersonnage,
   tasDArgile,
   tasDePierre,
@@ -503,9 +502,9 @@ export function portail(ctx: Ctx, x: number, y: number): void {
 const COULEURS_STADE = ["#9c7a4a", "#a8c56a", "#7fb04f", "#c9c04a", "#e0b23a"] as const;
 
 /**
- * Champ (M39b) : le sol labouré de la planche Tiny Farm, puis la culture selon
- * son stade — une pousse, un jeune plant, une plante mûre. `variante` change la
- * plante d'un champ à l'autre. Le dessin vectoriel reste en secours.
+ * Champ (M39b) : les sillons d'avant, qui se lisent de loin comme un champ, et
+ * par-dessus quelques plants de la planche Tiny Farm quand la culture a levé —
+ * on voit alors pousser ce qui pousse.
  */
 export function champ(
   ctx: Ctx,
@@ -515,19 +514,27 @@ export function champ(
   stade: number,
   variante = 0,
 ): void {
-  if (solLaboure(ctx, x, y, 1, 1)) {
-    if (seme) culture(ctx, x, y, 1, 1, Math.max(0, Math.min(3, stade)), variante);
-    return;
-  }
   ctx.fillStyle = "#6b4a2c";
   ctx.fillRect(x + 0.05, y + 0.05, 0.9, 0.9);
   ctx.fillStyle = seme ? (COULEURS_STADE[Math.max(0, Math.min(4, stade))] ?? "#9c7a4a") : "#7d5a38";
   for (let i = 0; i < 4; i++) ctx.fillRect(x + 0.1, y + 0.12 + i * 0.22, 0.8, 0.1);
-  if (seme && stade >= 3) {
-    ctx.fillStyle = "#f2d16b";
-    for (let i = 0; i < 4; i++)
-      for (let j = 0; j < 3; j++) ctx.fillRect(x + 0.2 + j * 0.28, y + 0.1 + i * 0.22, 0.06, 0.06);
-  }
+  if (!seme || stade < 1) return;
+  // Trois plants sur les sillons ; ils grossissent avec le stade.
+  const niveau = Math.max(1, Math.min(3, stade));
+  const taille = 0.3 + 0.12 * niveau;
+  const places: readonly [number, number][] = [
+    [0.22, 0.16],
+    [0.56, 0.38],
+    [0.3, 0.62],
+  ];
+  let pose = false;
+  for (const [px, py] of places)
+    pose = culture(ctx, x + px - taille / 2, y + py - taille / 2, taille, taille, niveau, variante);
+  if (pose || stade < 3) return;
+  // Sans la planche, les grains d'avant disent la maturité.
+  ctx.fillStyle = "#f2d16b";
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 3; j++) ctx.fillRect(x + 0.2 + j * 0.28, y + 0.1 + i * 0.22, 0.06, 0.06);
 }
 
 /**
