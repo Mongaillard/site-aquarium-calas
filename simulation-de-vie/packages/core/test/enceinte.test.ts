@@ -11,6 +11,7 @@ import {
   tuilesEnceinte,
 } from "../src/monde.js";
 import { Grille } from "../src/monde/grille.js";
+import { enclos } from "../src/monde/danger.js";
 
 function colonie(seed = 4): { sim: Simulation; p: Personnage } {
   const sim = Simulation.creer({ seed, population: { initiale: 8, familles: 2 } });
@@ -92,6 +93,24 @@ describe("M39a : l'enceinte entoure le village", () => {
       portail.travailRestant = 0;
     }
     expect(siteDuPortail(sim, p)).toBeNull();
+  });
+
+  it("un anneau complet protège vraiment, même large (M41)", () => {
+    const { sim, p } = colonie();
+    const centre = centreEnceinte(sim, p);
+    if (centre === null) throw new Error("pas de centre");
+    // À ciel ouvert, on n'est pas enclos.
+    expect(enclos(sim, centre)).toBe(false);
+    // On dresse tout l'anneau, quel que soit son rayon.
+    let garde = 0;
+    for (let pos = tuileEnceinteManquante(sim, p); pos !== null && garde < 80; garde++) {
+      sim.fonderChantier("palissade", pos, p).etat = "termine";
+      pos = tuileEnceinteManquante(sim, p);
+    }
+    expect(tuileEnceinteManquante(sim, p)).toBeNull();
+    // Le mur tient : celui qui est dedans est protégé, quel que soit le rayon.
+    expect(rayonEnceinte(sim, centre)).toBeGreaterThanOrEqual(RAYON_ENCEINTE);
+    expect(enclos(sim, centre)).toBe(true);
   });
 
   it("les bêtes du parc se répartissent autour du piquet", () => {

@@ -998,7 +998,9 @@ export class Panneaux {
       parLevier.set(x.levier, [...liste, x]);
     }
     const eprouvees = t.trouvailles.filter((x) => x.porteurs > 0);
-    const idees = t.trouvailles.filter((x) => x.porteurs === 0);
+    // Une idée qu'on poursuit n'est pas une idée oubliée (M41).
+    const enCours = t.trouvailles.filter((x) => x.porteurs === 0 && x.porteursIdee > 0);
+    const oubliees = t.trouvailles.filter((x) => x.porteurs === 0 && x.porteursIdee === 0);
 
     const ligne = (x: (typeof t.trouvailles)[number]): string => {
       const cout = Object.entries(x.ingredients)
@@ -1016,7 +1018,13 @@ export class Panneaux {
           ${x.inventeur === null ? "trouvée on ne sait par qui" : `trouvée par ${e(x.inventeur)}, ${e(quand(x.jour))}`}
           ${x.essais > 0 ? ` · ${x.essais} prototype${x.essais > 1 ? "s" : ""} raté${x.essais > 1 ? "s" : ""}` : ""}
           · ${e(x.procede)} ${e(x.matiereNom)}${cout === "" ? "" : ` · ${e(cout)}`}
-          · ${x.porteurs} savent la faire, ${x.enMain} en main
+          · ${
+            x.porteurs > 0
+              ? `${x.porteurs} savent la faire, ${x.enMain} en main`
+              : x.porteursIdee > 0
+                ? `${x.porteursIdee} l'${x.porteursIdee > 1 ? "ont" : "a"} en tête`
+                : "plus personne ne s'en souvient"
+          }
         </div>
       </li>`;
     };
@@ -1038,8 +1046,13 @@ export class Panneaux {
           : "<p class='discret'>Rien encore : les idées viennent des ennuis, et il faut les réussir.</p>"
       }
       ${
-        idees.length > 0
-          ? `<h3>Idées en l'air</h3><p class="discret">Imaginées, jamais réussies, ou dont plus personne ne se souvient.</p><ol class="liste inventions">${idees.map(ligne).join("")}</ol>`
+        enCours.length > 0
+          ? `<h3>Idées en chantier</h3><p class="discret">Quelqu'un les a en tête et cherche de quoi les faire. Une idée jamais réalisée s'efface au bout de trois mois.</p><ol class="liste inventions">${enCours.map(ligne).join("")}</ol>`
+          : ""
+      }
+      ${
+        oubliees.length > 0
+          ? `<h3>Idées perdues</h3><p class="discret">Imaginées, jamais réussies, et plus personne ne s'en souvient. Le monde finit par les oublier tout à fait.</p><ol class="liste inventions">${oubliees.map(ligne).join("")}</ol>`
           : ""
       }`;
   }

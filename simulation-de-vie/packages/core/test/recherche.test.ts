@@ -2,8 +2,44 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../src/index.js";
 import type { Personnage } from "../src/index.js";
 import { ajouter } from "../src/agents/inventaire.js";
-import { chercher, melanger, problemes } from "../src/savoirs/recherche.js";
-import { matiereDe } from "../src/savoirs/grammaire.js";
+import {
+  JOURS_IDEE,
+  chercher,
+  matieresAPortee,
+  melanger,
+  oublierTrouvailles,
+  problemes,
+} from "../src/savoirs/recherche.js";
+import {
+  MATIERES_BRUTES,
+  composerTrouvaille,
+  matiereDe,
+  objetDeTrouvaille,
+  retenirTrouvaille,
+} from "../src/savoirs/grammaire.js";
+import type { FicheMatiere, Fonction, Procede, Trouvaille } from "../src/savoirs/grammaire.js";
+import type { EtatTrouvailles } from "../src/savoirs/grammaire.js";
+import { ajouter, ajouterObjet } from "../src/agents/inventaire.js";
+import { apprendre } from "../src/savoirs/lecons.js";
+
+/** Une matière du registre, ou l'échec du test. */
+function mat(e: EtatTrouvailles, id: string): FicheMatiere {
+  const f = matiereDe(e, id);
+  if (f === null) throw new Error(`matière inconnue : ${id}`);
+  return f;
+}
+
+/** Une trouvaille du triplet, ou l'échec du test. */
+function compose(
+  e: EtatTrouvailles,
+  fonction: Fonction,
+  procede: Procede,
+  matiere: FicheMatiere,
+): Trouvaille {
+  const t = composerTrouvaille(e, fonction, procede, matiere);
+  if (t === null) throw new Error("triplet refusé");
+  return t;
+}
 import { joursAsync } from "./utils.js";
 
 /** Un adulte curieux, cobaye des recherches. */
@@ -110,7 +146,7 @@ describe("M38b : du problème à l'idée", () => {
     if (idee === null) return;
     const acquis = p.savoirs.get(idee.trouvaille.id);
     if (acquis === undefined) throw new Error("idée perdue");
-    acquis.depuis = sim.tick - 31 * sim.horloge.ticksParJour;
+    acquis.depuis = sim.tick - (JOURS_IDEE + 1) * sim.horloge.ticksParJour;
     chercher(sim, p);
     expect(p.savoirs.has(idee.trouvaille.id)).toBe(false);
   });
@@ -165,4 +201,52 @@ describe("M38b : du problème à l'idée", () => {
       }
     },
   );
+});
+
+describe("M41 : les idées aboutissent", () => {
+  it("une idée vit trois mois, pas un", () => {
+    expect(JOURS_IDEE).toBe(90);
+  });
+
+  it("dit si les matières sont à portée : en poche ou au stock de la famille", () => {
+    const sim = colonie();
+    const p = curieux(sim);
+    const t = composerTrouvaille(
+      sim.trouvailles,
+      "couper",
+      "tailler",
+      matiereDe(sim.trouvailles, "cuivre") ?? MATIERES_BRUTES[0],
+    );
+    expect(t).not.toBeNull();
+    if (t === null) return;
+    p.corps.inventaire.ressources = {};
+    expect(matieresAPortee(sim, p, t)).toBe(false);
+    // Au stock de la famille : c'est à portée, on ira le chercher.
+    const entrepot = sim.fonderChantier("entrepot", { ...p.corps.position }, p);
+    entrepot.etat = "termine";
+    entrepot.travailRestant = 0;
+    if (entrepot.stock === null) throw new Error("pas de stock");
+    for (const [r, n] of Object.entries(t.ingredients))
+      ajouter(entrepot.stock, r as "cuivre", n * 2);
+    expect(matieresAPortee(sim, p, t)).toBe(true);
+  });
+
+  it("le monde oublie les trouvailles que plus personne ne connaît, et garde les autres", () => {
+    const sim = colonie();
+    const p = curieux(sim);
+    const perdue = compose(sim.trouvailles, "couper", "tailler", mat(sim.trouvailles, "pierre"));
+    const gardee = compose(sim.trouvailles, "creuser", "tailler", mat(sim.trouvailles, "cuivre"));
+    const portee = compose(sim.trouvailles, "frapper", "tailler", mat(sim.trouvailles, "pierre"));
+    for (const t of [perdue, gardee, portee]) retenirTrouvaille(sim.trouvailles, t);
+    // L'une est encore en tête, l'autre est dans une poche, la troisième n'est à personne.
+    apprendre(p, gardee.id, 0.6, p.identite.prenom, sim.tick);
+    ajouterObjet(p.corps.inventaire, objetDeTrouvaille(portee));
+    // Trop neuves pour être oubliées.
+    expect(oublierTrouvailles(sim)).toBe(0);
+    for (const t of [perdue, gardee, portee]) t.jour = -200;
+    expect(oublierTrouvailles(sim)).toBe(1);
+    expect(sim.trouvailles.trouvailles.has(perdue.id)).toBe(false);
+    expect(sim.trouvailles.trouvailles.has(gardee.id)).toBe(true);
+    expect(sim.trouvailles.trouvailles.has(portee.id)).toBe(true);
+  });
 });

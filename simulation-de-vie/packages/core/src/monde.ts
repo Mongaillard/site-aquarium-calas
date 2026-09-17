@@ -500,10 +500,15 @@ export function rayonEnceinte(monde: Monde, centre: Position): number {
 
 /**
  * Les tuiles de l'anneau, dans le sens des aiguilles d'une montre. Une tuile
- * qu'on ne peut pas bâtir (un gisement, un bâtiment) est **rattrapée** d'un pas
- * vers l'intérieur puis vers l'extérieur, pour que le mur reste continu au lieu
- * de se trouer : c'est ce qui donnait des pieux éparpillés. L'eau et la montagne
- * ferment d'elles-mêmes et ne sont pas rattrapées.
+ * qu'un bâtiment occupe, ou qu'on ne peut pas bâtir sans être fermée pour autant
+ * (un marais, un gué), est **rattrapée** de un ou deux pas vers l'intérieur puis
+ * vers l'extérieur, pour que le mur reste continu au lieu de se trouer. L'eau et la
+ * montagne ferment d'elles-mêmes et ne sont pas rattrapées.
+ *
+ * **[DÉCISION]** Une souche ou un tas de pierres sur le tracé ne fait plus un
+ * trou (M41) : la tuile reste de l'anneau, et l'on va la **défricher** avant d'y
+ * planter le pieu. Sans cela le mur gardait des brèches, `enclos` le voyait
+ * ouvert, et la palissade ne protégeait de rien.
  */
 export function tuilesEnceinte(monde: Monde, centre: Position, rayon: number): Position[] {
   const anneau: Position[] = [];
@@ -521,15 +526,23 @@ export function tuilesEnceinte(monde: Monde, centre: Position, rayon: number): P
     };
     // L'eau, la montagne : le mur est déjà là.
     if (ferme(ideale)) continue;
+    // Le rattrapage se fait **perpendiculairement au mur** : sur un bord est ou
+    // ouest on ne bouge qu'en x, sur un bord nord ou sud qu'en y, et seulement à
+    // un angle on bouge les deux. Déplacer une tuile de bord en diagonale la
+    // détachait de ses voisines et ouvrait une brèche que les loups passaient.
+    const surX = Math.abs(dx) === rayon;
+    const surY = Math.abs(dy) === rayon;
     const vers = (k: number): Position => ({
-      x: centre.x + dx - Math.sign(dx) * k,
-      y: centre.y + dy - Math.sign(dy) * k,
+      x: centre.x + dx - (surX ? Math.sign(dx) * k : 0),
+      y: centre.y + dy - (surY ? Math.sign(dy) * k : 0),
     });
-    const candidates = [ideale, vers(1), vers(-1)];
+    // Deux pas de rattrapage : un marais ou un gué sur le tracé est praticable mais
+    // ne se bâtit pas, et laissait passer les loups par la brèche (M41).
+    const candidates = [ideale, vers(1), vers(-1), vers(2), vers(-2)];
     for (const pos of candidates) {
       const t = monde.grille.tuileOuNull(pos.x, pos.y);
-      if (t === null || !INFO_BIOME[t.biome].constructible) continue;
-      if (t.gisement !== null) continue;
+      // Un marais se laisse assécher (M41) : il compte pour le tracé.
+      if (t === null || !(INFO_BIOME[t.biome].constructible || t.biome === "marais")) continue;
       if (t.batiment !== null && t.batiment.type !== "palissade" && t.batiment.type !== "portail")
         continue;
       // Un rattrapage peut tomber sur la tuile du voisin : on ne la compte qu'une fois.

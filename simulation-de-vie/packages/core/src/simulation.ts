@@ -182,7 +182,7 @@ import {
 } from "./monde/villages.js";
 import type { EtatVillages } from "./monde/villages.js";
 import { MATIERES_BRUTES, bonusPorte, bonusSu, etatTrouvaillesNeuf } from "./savoirs/grammaire.js";
-import { chercher, melanger } from "./savoirs/recherche.js";
+import { chercher, melanger, oublierTrouvailles } from "./savoirs/recherche.js";
 import type { EtatTrouvailles } from "./savoirs/grammaire.js";
 import {
   aubeBatailles,
@@ -1819,6 +1819,7 @@ export class Simulation implements Monde {
       );
       if (this.lois.guerres) aubeBatailles(this, this.rng.fork(`batailles/${String(this.tick)}`));
       aubeRevoltes(this);
+      oublierTrouvailles(this);
     }
     if (this.tick > 0) {
       this.conseilsDuJour = 0;

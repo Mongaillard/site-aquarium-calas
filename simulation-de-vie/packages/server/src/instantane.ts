@@ -1274,9 +1274,12 @@ export function trouvaillesEtat(sim: Simulation): TrouvaillesEtat {
   const trouvailles: TrouvailleEtat[] = [...sim.trouvailles.trouvailles.values()]
     .map((t) => {
       let porteurs = 0;
+      let porteursIdee = 0;
       let enMain = 0;
       for (const p of vivants) {
-        if ((p.savoirs.get(t.id)?.force ?? 0) >= 1) porteurs += 1;
+        const force = p.savoirs.get(t.id)?.force ?? 0;
+        if (force >= 1) porteurs += 1;
+        else if (force >= SEUIL_SAVOIR) porteursIdee += 1;
         enMain += p.corps.inventaire.objets.filter((o) => o.trouvaille === t.id).length;
       }
       const m = sim.trouvailles.matieres.get(t.matiere);
@@ -1296,6 +1299,7 @@ export function trouvaillesEtat(sim: Simulation): TrouvaillesEtat {
         jour: t.jour,
         essais: t.essais,
         porteurs,
+        porteursIdee,
         enMain,
         ingredients: { ...t.ingredients },
       };

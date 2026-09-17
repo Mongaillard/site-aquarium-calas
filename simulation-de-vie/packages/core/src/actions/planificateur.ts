@@ -954,6 +954,12 @@ export function libererPlace(monde: Monde, p: Personnage, garder: readonly Resso
 /** Choix d'un site puis fondation du chantier. */
 function planifierFondation(monde: Monde, p: Personnage, type: TypeBatiment): ResultatPlan {
   const site = choisirSite(monde, p, type);
+  // Un gisement ou un marais sur le tracé du mur (M41) : on l'aménage, puis on bâtira.
+  if (site !== null) {
+    const t = monde.grille.tuileOuNull(site.x, site.y);
+    if (t !== null && (t.gisement !== null || t.biome === "marais"))
+      return planifierDefrichage(monde, p, site);
+  }
   // Plus de place : on dégage une tuile qu'un gisement occupe (M39d).
   if (site === null) {
     const aDegager = siteADefricher(monde, p);
@@ -1194,8 +1200,9 @@ function distanceCarree(a: Position, b: Position): number {
 /** Dégager une tuile : on y va, puis on arrache ce qui l'occupe (M39d). */
 function planifierDefrichage(monde: Monde, p: Personnage, cible: Position): ResultatPlan {
   const t = monde.grille.tuileOuNull(cible.x, cible.y);
-  if (t?.gisement == null) return echec("rien à dégager");
-  if (!outilSatisfait(p.corps.inventaire, t.gisement.outilRequis))
+  if (t === null) return echec("hors du monde");
+  if (t.gisement === null && t.biome !== "marais") return echec("rien à dégager");
+  if (t.gisement !== null && !outilSatisfait(p.corps.inventaire, t.gisement.outilRequis))
     return echec(`il faut ${t.gisement.outilRequis ?? "un outil"} pour dégager`);
   const plan: Action[] = [];
   const aller = allerPresDe(monde, p, cible);

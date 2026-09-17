@@ -2,6 +2,57 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M41 – Les idées aboutissent, et le mur ferme vraiment (2026-09-17)
+
+**Les idées en l'air.** L'onglet Inventions se remplissait d'idées que personne n'essayait
+jamais : sur huit mondes de deux cent quarante jours, quatre trouvailles réussies pour seize
+imaginées, et neuf oubliées en route. Quatre causes, quatre corrections.
+
+- **On va chercher ce qui manque.** Une idée n'était retenue que si l'on avait déjà tout en
+  poche ; celle qui demandait cinq cuivres mourait donc toujours. On puise désormais dans un
+  stock de la famille — mais seulement pour **sa propre** idée, et seulement quand on ne manque
+  de rien (ventre plein, pas de froid, pas de disette annoncée). **[DÉCISION]** La quête sans
+  condition faisait passer les journées à bricoler au lieu de manger.
+- **Une idée vit trois mois** au lieu d'un (`JOURS_IDEE`, 30 → 90) : le temps de réunir de quoi
+  la faire.
+- **À gain proche, on choisit ce qu'on peut réunir** : le remède se note `gain × 0,6` quand les
+  matières ne sont nulle part à portée.
+- **Le registre se purge à l'aube** : une trouvaille que plus personne ne connaît, jamais
+  réussie, dont pas un exemplaire ne traîne, et vieille de trois mois, s'efface. Rien n'est
+  perdu — l'identifiant vient du triplet, la même idée peut revenir à quelqu'un d'autre.
+- **Onglet Inventions** : « Idées en l'air » se sépare en **Idées en chantier** (quelqu'un les a
+  en tête et cherche de quoi les faire) et **Idées perdues** (plus personne ne s'en souvient).
+
+Mesuré sur huit mondes de deux cent quarante jours, conteur éteint : **88 trouvailles
+réussies** contre 4, zéro à trois idées en l'air par monde contre neuf, registre de 10 à 15
+entrées, et 94 survivants contre 97. Mesuré sur douze mondes de trois cent soixante jours,
+conteur allumé : 101 survivants et quatre extinctions, contre 111 et trois avant M41 — l'écart
+tient dans le brassage des trajectoires, mais ces chiffres disent surtout autre chose, et cet
+autre chose est pris à part (voir plus bas).
+
+**Ce que la mesure a montré au passage.** Douze mondes menés à trois cent soixante jours avec le
+conteur : **un sur trois s'éteint**, et les causes sont les mêmes avant et après M41 — la
+**soif** (36 morts sur 90 avant, 38 sur 91 après) puis le **froid**. Ce n'est donc pas M41, c'est
+le jeu : une colonie qui ne creuse pas de puits meurt de soif au bout de quelques saisons. C'est
+le sujet du jalon suivant, pas de celui-ci.
+
+**Le mur ne fermait rien.** Les palissades se dressaient bien depuis M39a, mais pas une n'enclosait
+quoi que ce soit. Quatre trous cumulés, dans le même anneau.
+
+- **`RAYON_ENCLOS` : 6 → 16.** Depuis que l'enceinte entoure le village, son rayon va jusqu'à
+  sept — et l'intérieur d'un tel anneau est à six tuiles de son centre. Le test déclarait donc
+  « dehors » quelqu'un debout au milieu d'un mur parfaitement clos.
+- **Le rattrapage se fait perpendiculairement au mur.** Une tuile de bord déplacée en diagonale
+  se détachait de ses voisines : la brèche s'ouvrait là où l'on croyait boucher.
+- **Deux pas de rattrapage** au lieu d'un, et une souche ou un tas de pierres sur le tracé ne
+  fait plus un trou : la tuile reste de l'anneau, on la **défriche** avant d'y planter le pieu.
+- **On assèche le marais.** Un marais se traverse mais ne se bâtit pas : c'était le dernier trou.
+  Défricher une tuile de marais la rend en prairie, sans outil ni gisement à arracher.
+
+Mesuré sur deux mondes de trois cent soixante jours qui dressent une enceinte : centre clos,
+**tous les abris intérieurs clos** (7 sur 7, 1 sur 1), et les seules tuiles hors anneau sont de
+l'eau et deux bâtiments — qui ferment d'eux-mêmes. Avant : trente-quatre abris, **aucun clos**.
+
 ## M40 – Les créatures du ciel et les pillards prennent corps (2026-09-17)
 
 Septième planche CC0 de Kenney, _Tiny Dungeon_, pour ce qui n'est ni villageois ni bête.

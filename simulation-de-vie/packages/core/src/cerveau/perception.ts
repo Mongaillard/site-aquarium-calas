@@ -665,11 +665,28 @@ function trouvaillesAFaire(monde: Monde, p: Personnage): IdTrouvaille[] {
     if (niv < t.niveauRequis) continue;
     if (t.atelier !== null && !atelierAPortee(monde, p, t.atelier)) continue;
 
-    // On fabrique avec ce qu'on a déjà en poche : une idée attend son heure plutôt
-    // que de faire courir après les matières, sinon on bricole au lieu de manger.
+    // On fabrique avec ce qu'on a en poche. **[DÉCISION]** On va chercher ce qui
+    // manque dans un stock de la famille, mais seulement pour **sa propre idée**
+    // et seulement quand on ne manque de rien (M41) : la quête sans condition
+    // faisait passer les journées à bricoler au lieu de manger, et l'interdire
+    // tout à fait laissait mourir les idées qui demandaient cinq cuivres.
+    const sienne = acquis.force < 1;
+    const aLaise =
+      sienne &&
+      p.besoins.faim >= 55 &&
+      p.besoins.chaleur >= 45 &&
+      p.drapeaux.prudenceNourritureJusqua <= monde.horloge.tick;
     let possible = true;
     for (const [r, n] of Object.entries(t.ingredients) as [Ressource, number][]) {
-      if (quantite(inv, r) < n) {
+      if (quantite(inv, r) >= n) continue;
+      if (!aLaise) {
+        possible = false;
+        break;
+      }
+      let ailleurs = 0;
+      for (const b of batimentsAccessibles(monde, p))
+        if (b.stock !== null) ailleurs += quantite(b.stock, r);
+      if (quantite(inv, r) + ailleurs < n) {
         possible = false;
         break;
       }

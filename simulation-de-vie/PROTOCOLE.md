@@ -1451,7 +1451,7 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   porte), `procedesPossibles` (niveau et ateliers). `chercher` raisonne d'abord
   (`meilleurRemede`, sans hasard), puis tire **une seule fois** ; l'idée est retenue à force
   `SEUIL_SAVOIR`, avec `probleme`, `inventeur`, `village`, `jour`. `oublierIdees` efface au bout
-  de `JOURS_IDEE = 30`. `melanger` : devant un four, un curieux (ouverture ≥ 0,45) mêle deux
+  de `JOURS_IDEE` (30, porté à 90 en M41). `melanger` : devant un four, un curieux (ouverture ≥ 0,45) mêle deux
   matières qu'il a en quantité, la coulée les consomme, la famille apprend la matière.
 - **Fabrication** : `recetteDeTrouvaille` rend une `Recette` ordinaire ; `planifierFabrication`
   et `tickFabriquerTrouvaille` suivent le chemin du catalogue (idée requise, niveau, matières,
@@ -1459,9 +1459,10 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   savoir à 1 pour la personne et sa famille, émet `invention`, et `apprendreMatiere` transmet la
   matière avec la trouvaille (au four comme au dialogue).
 - **Cerveau** : `perception.moi.trouvaillesAFaire` ne propose que ce qu'on sait mener (niveau,
-  atelier) et dont **on a déjà les matières en poche** — **[DÉCISION]** sans cela, les gens
+  atelier) et dont **on a les matières en poche** — **[DÉCISION]** sans cela, les gens
   passent leurs journées à courir après des matières au lieu de manger, et la colonie y perd.
-- **Viewer** : onglet Inventions (arbre des matières, trouvailles éprouvées et idées en l'air,
+  M41 rouvre la porte, mais seulement pour sa propre idée et quand on ne manque de rien.
+- **Viewer** : onglet Inventions (arbre des matières, trouvailles éprouvées, idées en chantier et idées perdues,
   avec gain, levier en clair, plainte d'origine, inventeur, prototypes ratés, coût, porteurs),
   icône 🛠️ dans la fiche et les statistiques, `PersonnageEtat.outilCouleur` qui teinte le sprite
   de l'outil à la couleur de sa matière, textes `idee` (avec la plainte), `matiere`.
@@ -1469,7 +1470,7 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   continue, refus d'un procédé ou d'une matière qui ne s'y prête pas, nom et recette déduits du
   triplet, coût de la chaîne, meilleure matière = meilleur gain, levier qui ne joue que pour qui
   porte, fabrication réelle dans le monde, déterminisme, sauvegarde, migration) ;
-  `recherche.test.ts` (7 : rien à signaler chez qui ne manque de rien, froid traduit en fonction,
+  `recherche.test.ts` (10 : rien à signaler chez qui ne manque de rien, froid traduit en fonction,
   idée née d'un ennui avec son inventeur, pas deux fois la même ni moins bien, idée qui s'efface,
   matière tirée du four qui coûte ce qu'on y met, et une colonie sur deux cents jours qui trouve,
   rate et finit par réussir) ; `instantane.test.ts` (2 : l'état envoyé au viewer).
@@ -1527,10 +1528,46 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   (`distance + quantite × 0,35`) — **[DÉCISION]** on ne rase pas un gisement encore riche.
   Tests (`defrichage.test.ts`, 4) : l'outil et la distance ; la tuile dégagée, la forêt ouverte
   et le bois ramassé ; un tas de pierres qui ne change pas le sol ; le choix du plus maigre.
-- **Tests** (`enceinte.test.ts`, 5) : le centre est celui du village ; le rayon contient ce qu'on
-  a bâti sans dépasser sa borne ; l'anneau est continu, sans doublon, et rattrapé d'un pas au
-  plus ; le portail attend que le mur tienne, se taille une fois, du côté de l'eau ; les bêtes du
+- **Tests** (`enceinte.test.ts`, 6) : le centre est celui du village ; le rayon contient ce qu'on
+  a bâti sans dépasser sa borne ; l'anneau est continu, sans doublon, et rattrapé de deux pas au
+  plus (M41) ; le portail attend que le mur tienne, se taille une fois, du côté de l'eau ; les bêtes du
   parc se répartissent autour du piquet. Le test des murs de M10 suit la nouvelle règle.
+
+## 8 novodecies. Les idées qui aboutissent et le mur qui ferme (M41)
+
+- **Quête de matières** (`cerveau/perception.ts`) : `trouvaillesAFaire` accepte qu'une matière
+  manque en poche si un **stock accessible** la porte, à deux conditions —
+  c'est **sa propre** idée (`acquis.force < 1`, donc pas une recette apprise de la famille) et
+  l'on ne manque de rien (`faim ≥ 55`, `chaleur ≥ 45`, pas de `prudenceNourritureJusqua` en
+  cours). **[DÉCISION]** La quête sans condition faisait passer les journées à bricoler au lieu
+  de manger ; l'interdire tout à fait laissait mourir les idées qui demandaient cinq cuivres.
+- **`JOURS_IDEE = 90`** (30 auparavant) : une idée retenue a trois mois pour trouver ses
+  matières, sans quoi `oublierIdees` l'efface de la tête de qui l'a eue.
+- **Choix réalisable** (`savoirs/recherche.ts`) : `matieresAPortee(monde, p, t)` dit si poche et
+  stocks accessibles couvrent la recette. `meilleurRemede` note chaque candidate
+  `gain × (à portée ? 1 : 0,6)` : à gain proche, on préfère ce qu'on peut réunir.
+- **Registre purgé** (`oublierTrouvailles(monde)`, à l'aube dans `Simulation`) : une trouvaille
+  qu'aucun vivant ne connaît (`force > 0`), dont aucun exemplaire ne traîne (poche ou stock), et
+  née depuis plus de `JOURS_IDEE`, sort de `monde.trouvailles`. L'identifiant venant du triplet,
+  la même idée peut renaître chez quelqu'un d'autre ; le nombre renvoyé sert aux tests.
+- **Protocole et viewer** : `TrouvailleEtat.porteursIdee` (vivants qui l'ont en tête sans l'avoir
+  réussie) ; l'onglet Inventions sépare **Idées en chantier** (`porteursIdee > 0`) et **Idées
+  perdues** (personne).
+- **`RAYON_ENCLOS` : 6 → 16** (`monde/danger.ts`). **[DÉCISION]** L'enceinte de M39a va jusqu'au
+  rayon sept, et l'intérieur d'un tel anneau est à six tuiles de son centre : `enclos()`
+  déclarait « dehors » quelqu'un debout au milieu d'un mur parfaitement clos, donc la palissade
+  ne protégeait plus personne. La fouille reste bon marché : à ciel ouvert elle sort en seize
+  pas, enfermée elle est bornée par l'aire de l'enceinte.
+- **Anneau continu** (`tuilesEnceinte`, `monde.ts`) : le rattrapage se fait **perpendiculairement
+  au mur** (sur un bord est ou ouest on ne bouge qu'en `x`, sur un bord nord ou sud qu'en `y`) —
+  en diagonale, la tuile se détachait de ses voisines et ouvrait la brèche qu'on croyait boucher.
+  **Deux pas** de rattrapage au lieu d'un. Une tuile **à gisement** reste de l'anneau (on la
+  défriche avant d'y planter le pieu) et un **marais** aussi (constructible après assèchement) ;
+  seules l'eau et la montagne ferment d'elles-mêmes.
+- **Assécher un marais** (`tickDefricher`, `executeur.ts`) : une tuile de marais se défriche même
+  sans gisement dessus, sans outil requis, et `modifierBiome(..., "prairie")` la rend bâtissable ;
+  l'événement `defrichage` porte `marais: true`. `planifierFondation` route un site à gisement
+  **ou** en marais vers `planifierDefrichage`, qui accepte les deux.
 
 ## 15 bis. Savoirs : leçons et inventions
 

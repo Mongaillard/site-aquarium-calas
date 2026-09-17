@@ -129,6 +129,19 @@ jamais existé — la chaîne n'a pas de fin, donc l'arbre des inventions non pl
 **Inventions** montre tout : l'arbre des matières, ce que chaque trouvaille change, l'ennui qui
 l'a fait naître, qui l'a trouvée et combien de prototypes ont raté.
 
+**Les idées aboutissent, et le mur ferme vraiment (M41).** L'onglet Inventions se remplissait
+d'idées que personne n'essayait jamais. On va désormais **chercher au stock de la famille** ce
+qui manque à sa propre idée — mais seulement quand on ne manque de rien soi-même —, une idée vit
+**trois mois** au lieu d'un, à gain proche on préfère ce qu'on peut vraiment réunir, et le
+registre oublie à l'aube ce dont plus personne ne se souvient. Sur huit mondes de deux cent
+quarante jours, quatre trouvailles réussies deviennent quatre-vingt-huit. Côté défense, les
+palissades se dressaient depuis M39a mais **pas une n'enclosait quoi que ce soit** : le rayon de
+la fouille était plus petit que l'enceinte, le rattrapage d'une tuile de bord se faisait en
+diagonale et la détachait de ses voisines, une souche sur le tracé faisait un trou, et un marais
+se traversait sans se bâtir. Tout cela est corrigé, et l'on peut maintenant **assécher un
+marais** comme on ouvre un coin de forêt. Un anneau achevé enclot désormais tous les abris qu'il
+entoure.
+
 **Les champs poussent, les bêtes ont une allure, les murs entourent le village (M39).** L'enceinte
 de pieux se centre désormais sur le **village** et son tracé est figé une fois choisi : elle ne
 s'égrène plus en anneaux empilés, elle se raccorde d'un pan à l'autre, et on y taille un

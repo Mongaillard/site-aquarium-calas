@@ -50,8 +50,13 @@ export interface Probleme {
 
 /** Il faut au moins ça pour qu'un ennui vaille qu'on y réfléchisse. */
 export const POIDS_MINIMAL = 0.3;
-/** Une idée jamais réalisée s'efface au bout de tant de jours. */
-export const JOURS_IDEE = 30;
+/**
+ * Une idée jamais réalisée s'efface au bout de tant de jours. **[DÉCISION]**
+ * Quatre-vingt-dix et non trente (M41) : à trente jours, une idée qui demandait
+ * cinq cuivres mourait avant qu'on ait pu les réunir, et l'onglet se remplissait
+ * d'idées que personne n'avait jamais eu le temps d'essayer.
+ */
+export const JOURS_IDEE = 90;
 
 /**
  * Ce qui va mal autour de cette personne, du plus pressant au moins. Tout se lit
@@ -358,6 +363,7 @@ function meilleurRemede(
     const levier = FONCTION[ennui.fonction].levier;
     const dejaSu = bonusSu(monde.trouvailles, [p.savoirs.keys()], levier);
     let meilleure: Trouvaille | null = null;
+    let meilleureNote = 0;
     for (const matiere of matieres) {
       for (const procede of procedes) {
         if (!combinaisonValide(ennui.fonction, procede, matiere)) continue;
@@ -366,10 +372,59 @@ function meilleurRemede(
         // Inutile de refaire ce qu'on a déjà, ou moins bien.
         if (1 + t.gain <= dejaSu + 0.05) continue;
         if ((p.savoirs.get(t.id)?.force ?? 0) >= SEUIL_SAVOIR) continue;
-        if (meilleure === null || t.gain > meilleure.gain) meilleure = t;
+        // À gain proche, on préfère ce qu'on peut vraiment réunir (M41).
+        const note = t.gain * (matieresAPortee(monde, p, t) ? 1 : 0.6);
+        if (meilleure === null || note > meilleureNote) {
+          meilleure = t;
+          meilleureNote = note;
+        }
       }
     }
     if (meilleure !== null) return { trouvee: meilleure, ennui };
   }
   return null;
+}
+
+/**
+ * A-t-on de quoi faire cette trouvaille, en poche ou dans un stock accessible ?
+ * C'est ce qui sépare une idée qu'on réalisera d'une idée en l'air (M41).
+ */
+export function matieresAPortee(monde: Monde, p: Personnage, t: Trouvaille): boolean {
+  for (const [r, n] of Object.entries(t.ingredients) as [Ressource, number][]) {
+    let dispo = quantite(p.corps.inventaire, r);
+    if (dispo >= n) continue;
+    for (const b of batimentsAccessibles(monde, p))
+      if (b.stock !== null) dispo += quantite(b.stock, r);
+    if (dispo < n) return false;
+  }
+  return true;
+}
+
+/**
+ * À l'aube, le monde oublie les trouvailles que plus personne ne connaît, qui
+ * n'ont jamais été réussies et dont personne ne porte d'exemplaire (M41) : sans
+ * cela le registre — et l'onglet Inventions — grossit sans fin d'idées mortes.
+ * Rien n'est perdu : l'identifiant vient du triplet, donc la même idée peut
+ * revenir un jour à quelqu'un d'autre.
+ */
+export function oublierTrouvailles(monde: Monde): number {
+  const connues = new Set<string>();
+  for (const p of monde.personnages) {
+    if (!p.vivant) continue;
+    for (const [k, v] of p.savoirs) if (k.startsWith("t:") && v.force > 0) connues.add(k);
+    for (const o of p.corps.inventaire.objets)
+      if (o.trouvaille !== undefined) connues.add(o.trouvaille);
+  }
+  for (const b of monde.batiments.values())
+    if (b.stock !== null)
+      for (const o of b.stock.objets) if (o.trouvaille !== undefined) connues.add(o.trouvaille);
+  let oubliees = 0;
+  for (const [id, t] of monde.trouvailles.trouvailles) {
+    if (connues.has(id)) continue;
+    // On laisse sa chance à une trouvaille toute neuve.
+    if (monde.horloge.moment().jourAbsolu - t.jour < JOURS_IDEE) continue;
+    monde.trouvailles.trouvailles.delete(id);
+    oubliees += 1;
+  }
+  return oubliees;
 }

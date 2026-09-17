@@ -456,6 +456,8 @@ export interface TrouvailleEtat {
   /** Combien de vivants savent la faire, et combien en portent une. */
   readonly porteurs: number;
   readonly enMain: number;
+  /** Combien de vivants l'ont encore en tête sans l'avoir réussie (M41). */
+  readonly porteursIdee: number;
   readonly ingredients: Readonly<Record<string, number>>;
 }
 

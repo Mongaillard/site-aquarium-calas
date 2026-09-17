@@ -1356,10 +1356,13 @@ function tickDefricher(
   if (p.corps.stade === "enfant") return echec("trop jeune pour défricher");
   if (Grille.distance(p.corps.position, action.cible) > 1) return echec("trop loin");
   const gisement = t.gisement;
-  if (gisement === null) return echec("rien à dégager");
+  // Un marais s'assèche même sans rien dessus : c'est ainsi qu'on ferme un mur
+  // dont le tracé le traverse, et qu'on gagne une tuile à bâtir (M41).
+  const marecage = t.biome === "marais";
+  if (gisement === null && !marecage) return echec("rien à dégager");
   if (t.batiment !== null) return echec("la tuile est bâtie");
   // Il faut l'outil du gisement (la hache pour un arbre, la pioche pour la roche).
-  if (!outilSatisfait(p.corps.inventaire, gisement.outilRequis))
+  if (gisement !== null && !outilSatisfait(p.corps.inventaire, gisement.outilRequis))
     return echec(`il faut ${gisement.outilRequis ?? "un outil"}`);
   const niv = niveau(p.experience.recolte);
   action.ticksRestants ??= Math.max(4, Math.round(TICKS_DEFRICHAGE - niv * 0.6));
@@ -1367,9 +1370,13 @@ function tickDefricher(
   if (action.ticksRestants > 0) return ENCOURS;
 
   // Ce qui restait tombe dans les poches, dans la limite de la place.
-  const reste = Math.floor(gisement.quantite);
-  const pris = reste > 0 ? ajouter(p.corps.inventaire, gisement.type, Math.min(reste, 6)) : 0;
-  const ouvert = t.biome === "foret";
+  const reste = gisement === null ? 0 : Math.floor(gisement.quantite);
+  const pris =
+    gisement !== null && reste > 0
+      ? ajouter(p.corps.inventaire, gisement.type, Math.min(reste, 6))
+      : 0;
+  // Une forêt s'ouvre en prairie, un marais s'assèche : la tuile devient bâtissable.
+  const ouvert = t.biome === "foret" || marecage;
   // `modifierBiome` retire le gisement au passage ; sinon on l'ôte à la main.
   if (ouvert) monde.grille.modifierBiome(action.cible.x, action.cible.y, "prairie");
   else t.gisement = null;
@@ -1377,14 +1384,18 @@ function tickDefricher(
   monde.emettre(
     "defrichage",
     p,
-    { ressource: gisement.type, quantite: pris, ouvert },
+    { ressource: gisement?.type ?? "terre", quantite: pris, ouvert, marais: marecage },
     ouvert ? 5 : 3,
     action.cible,
   );
   p.memoire.ajouter(
     monde.horloge.tick,
     "action",
-    ouvert ? "J'ai ouvert un coin de forêt : on pourra bâtir ici." : "J'ai dégagé la place.",
+    marecage
+      ? "J'ai asséché ce marais : on pourra bâtir ici."
+      : ouvert
+        ? "J'ai ouvert un coin de forêt : on pourra bâtir ici."
+        : "J'ai dégagé la place.",
     ouvert ? 6 : 3,
     [],
   );

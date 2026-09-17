@@ -39,7 +39,16 @@ export const RAYON_ALARME = 12;
 /** Distance à laquelle une meute choisit sa proie humaine. */
 export const RAYON_TRAQUE_HUMAIN = 24;
 /** Rayon de la fouille pour savoir si une position est enclose. */
-export const RAYON_ENCLOS = 6;
+/**
+ * Jusqu'où l'on cherche une sortie avant de se dire qu'on est dehors.
+ * **[DÉCISION]** Seize et non six (M41) : depuis que l'enceinte entoure le
+ * village (M39a) son rayon va jusqu'à sept, et l'intérieur d'un tel anneau est
+ * à six tuiles de son centre — le test déclarait donc « dehors » quelqu'un
+ * debout au milieu d'un mur parfaitement clos, et la palissade ne protégeait
+ * plus personne. La recherche reste bon marché : à ciel ouvert elle sort en
+ * seize pas, et enfermée elle est bornée par l'aire de l'enceinte.
+ */
+export const RAYON_ENCLOS = 16;
 /** Les premiers jours, la colonie s'installe : aucune menace avant ce jour. */
 export const JOURS_DE_GRACE = 30;
 
@@ -104,8 +113,8 @@ export function centreVillage(monde: Monde): Position | null {
 
 /**
  * Une position est enclose si, de proche en proche sur les tuiles praticables
- * sans bâtiment, on ne peut pas s'en éloigner de six tuiles : palissades, murs
- * de maisons, eau et montagne ferment l'enceinte.
+ * sans bâtiment, on ne peut pas s'en éloigner de `RAYON_ENCLOS` tuiles :
+ * palissades, murs de maisons, eau et montagne ferment l'enceinte.
  */
 export function enclos(monde: Monde, depart: Position): boolean {
   const vus = new Set<string>();
