@@ -7,7 +7,7 @@ import { Brouillard, COULEUR_INCONNU } from "./brouillard.js";
 import type { Magasin, MorceauVue } from "./etat.js";
 import { cleMorceau } from "./etat.js";
 import { RESOLUTION_FOND, construireFondMorceau } from "./fond.js";
-import { atlasPret, structure } from "./atlas.js";
+import { atlasPret, figure, structure } from "./atlas.js";
 import type { Structure } from "./atlas.js";
 import {
   couleurFamille,
@@ -176,36 +176,18 @@ export class Rendu {
         ctx.arc(c.x + 0.7, c.y + 0.78, 0.12, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Les bandes : des silhouettes grises, lance au poing, en groupe (en bataille, une par une).
+      // Les bandes : des pillards casqués, en groupe (en bataille, une par une).
       const groupesEnBataille = magasin.groupesEnBataille;
       ctx.imageSmoothingEnabled = cam.echelle < SEUIL_PIXELS;
       for (const b of etat.villages.bandes) {
         if (!visible(b.x, b.y) || groupesEnBataille.has(b.id)) continue;
         for (let i = 0; i < Math.min(4, b.taille); i++) {
-          sprites.personnage(ctx, b.x + (i % 2) * 0.6 - 0.3, b.y + Math.floor(i / 2) * 0.5, {
-            couleur: "#4a4a4a",
-            contour: "#222222",
-            teint: "#b8a898",
-            cheveux: "#2a2a2a",
-            sexe: "M",
-            echelle: 0.9,
-            endormi: false,
-            marche: b.etat === "approche" || b.etat === "parti",
-            phase: (maintenant / 350 + i * 0.25) % 1,
-            enceinte: false,
-            selection: false,
-            survol: false,
-            couches: {
-              teint: "hâlé",
-              cheveux: "noirs",
-              sexe: "M",
-              coiffure: i,
-              couleur: "#5a5a60",
-              outil: "lance",
-              malade: false,
-              banni: false,
-            },
-          });
+          this.dessinerPillard(
+            b.x + (i % 2) * 0.6 - 0.3,
+            b.y + Math.floor(i / 2) * 0.5,
+            b.etat === "approche" || b.etat === "parti",
+            (maintenant / 350 + i * 0.25) % 1,
+          );
         }
       }
       ctx.imageSmoothingEnabled = true;
@@ -382,7 +364,7 @@ export class Rendu {
           },
         });
       }
-      // Les combattants virtuels : pillards en gris, lance au poing ; loups un par un.
+      // Les combattants virtuels : pillards casqués, loups un par un.
       for (const { m, pos } of membres) {
         if (!visible(pos.x, pos.y)) continue;
         const elan = elans.get(m.id);
@@ -406,30 +388,7 @@ export class Rendu {
           });
         } else {
           const n = Number.parseInt(m.id.split(":").at(-1) ?? "0", 10) || 0;
-          sprites.personnage(ctx, x, y, {
-            couleur: "#4a4a4a",
-            contour: "#222222",
-            teint: "#b8a898",
-            cheveux: "#2a2a2a",
-            sexe: "M",
-            echelle: 0.9,
-            endormi: false,
-            marche: pos.enMouvement,
-            phase: (maintenant / 350 + n * 0.25) % 1,
-            enceinte: false,
-            selection: false,
-            survol: false,
-            couches: {
-              teint: "hâlé",
-              cheveux: "noirs",
-              sexe: "M",
-              coiffure: n,
-              couleur: "#5a5a60",
-              outil: "lance",
-              malade: false,
-              banni: false,
-            },
-          });
+          this.dessinerPillard(x, y, pos.enMouvement, (maintenant / 350 + n * 0.25) % 1);
         }
       }
       ctx.imageSmoothingEnabled = true;
@@ -464,11 +423,16 @@ export class Rendu {
         ctx.beginPath();
         ctx.ellipse(pos.x + 0.5, pos.y + 0.9, 1.4, 0.6, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.font = "1.6px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(c.emoji, pos.x + 0.5, pos.y - 0.2 + Math.sin(maintenant / 500) * 0.1);
+        // Un corps (M40) : le gardien est un homme d'armes, le fléau un spectre.
+        const flotte = Math.sin(maintenant / 500) * 0.1;
+        const taille = 1.5;
+        if (!figure(ctx, c.genre, pos.x + 0.5 - taille / 2, pos.y - 0.9 + flotte, taille, taille)) {
+          ctx.font = "1.6px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText(c.emoji, pos.x + 0.5, pos.y - 0.2 + flotte);
+        }
       }
       // La faune : troupeaux et meutes sur les tuiles connues.
       for (const tr of etat.troupeaux) {
@@ -1019,6 +983,39 @@ export class Rendu {
         break;
     }
     ctx.restore();
+  }
+
+  /**
+   * Un pillard (M40) : le casque à cornes de la planche Tiny Dungeon, à défaut
+   * la silhouette grise d'avant. `pas` fait sautiller celui qui marche.
+   */
+  private dessinerPillard(x: number, y: number, marche: boolean, phase: number): void {
+    const pas = marche ? Math.abs(Math.sin(phase * Math.PI * 2)) * 0.08 : 0;
+    if (figure(this.ctx, "pillard", x + 0.1, y + 0.06 - pas, 0.84, 0.84)) return;
+    sprites.personnage(this.ctx, x, y, {
+      couleur: "#4a4a4a",
+      contour: "#222222",
+      teint: "#b8a898",
+      cheveux: "#2a2a2a",
+      sexe: "M",
+      echelle: 0.9,
+      endormi: false,
+      marche,
+      phase,
+      enceinte: false,
+      selection: false,
+      survol: false,
+      couches: {
+        teint: "hâlé",
+        cheveux: "noirs",
+        sexe: "M",
+        coiffure: 0,
+        couleur: "#5a5a60",
+        outil: "lance",
+        malade: false,
+        banni: false,
+      },
+    });
   }
 
   /** Positions des pans de mur de la trame courante (palissades et portails). */

@@ -36,3 +36,12 @@ Licence : Creative Commons Zero (CC0) — http://creativecommons.org/publicdomai
   jauges. `cadre.png` (9) reste disponible pour les cadres.
 
 Licence : Creative Commons Zero (CC0) — http://creativecommons.org/publicdomain/zero/1.0/
+
+# Créatures et pillards (M40)
+
+- **Tiny Dungeon**, par Kenney (kenney.nl). https://kenney.nl/assets/tiny-dungeon —
+  `tiny-dungeon/tilemap_packed.png`, grille de 12×11 tuiles de 16×16, sans pas. Trois tuiles
+  servent, pour ce qui n'est ni villageois ni bête : le gardien du ciel (0, 8), le fléau
+  (1, 10) et le pillard (3, 7).
+
+Licence : Creative Commons Zero (CC0) — http://creativecommons.org/publicdomain/zero/1.0/

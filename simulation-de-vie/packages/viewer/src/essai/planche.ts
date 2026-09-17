@@ -1,10 +1,10 @@
 /** Planche d'essai (M39b) : tous les dessins nouveaux, côte à côte. */
 import * as sprites from "../sprites.js";
-import { atlasPret } from "../atlas.js";
+import { atlasPret, figure } from "../atlas.js";
 
 const canvas = document.createElement("canvas");
-canvas.width = 1200;
-canvas.height = 760;
+canvas.width = 1400;
+canvas.height = 940;
 document.body.style.background = "#2a2f26";
 document.body.style.margin = "0";
 document.body.append(canvas);
@@ -70,6 +70,18 @@ function tout(): void {
     ctx.fillStyle = "#6fa04a";
     ctx.fillRect(-1.5, -1.5, 4, 4);
     sprites.parc(ctx, 0, 0);
+  });
+  // Les figures de Tiny Dungeon (M40).
+  const figures = [
+    ["gardien", "gardien du ciel"],
+    ["fleau", "fléau"],
+    ["pillard", "pillard"],
+  ] as const;
+  figures.forEach(([nom, titre], i) => {
+    cellule(i, 4, titre, () => {
+      fond();
+      figure(ctx, nom, 0.05, 0.05, 0.9, 0.9);
+    });
   });
   const especes = ["cerf", "sanglier", "mouflon", "lievre", "aurochs", "loup"];
   especes.forEach((espece, i) => {

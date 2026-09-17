@@ -1505,6 +1505,13 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   le sprite de ferme s'il existe, sinon dessine l'espèce (cerf, sanglier, lièvre, loup).
 - **Planche d'essai** : `packages/viewer/essai/index.html` (source `src/essai/planche.ts`),
   bâtie à part (`vite build essai`), affiche champs, murs, parc et bêtes côte à côte.
+- **Figures** (M40, `atlas.ts`) : `figure(ctx, nom, x, y, w, h)` tire de la planche *Tiny
+  Dungeon* (12×11 tuiles de 16 px, sans pas) le gardien (0, 8), le fléau (1, 10) et le pillard
+  (3, 7) ; faux si la planche n'est pas prête, l'appelant garde alors son dessin.
+  `rendu.ts` remplace le glyphe des créatures du ciel et, par `dessinerPillard`, la silhouette
+  grise des bandes — sur la carte comme parmi les combattants virtuels d'une bataille.
+  **[DÉCISION]** Trois tuiles seulement : les sorciers et les monstres de cette planche
+  feraient basculer un monde d'âge de pierre dans la fantasy.
 - **Interface** (M39c, `style.css`) : quatre tuiles de l'*UI Pack Pixel Adventure* dans
   `src/assets/ui/`, posées en `border-image` (découpe à 8 px, `fill`, `image-rendering:
   pixelated`) sur `#hud > button`, `#pouvoirs button`, `#outils button`,

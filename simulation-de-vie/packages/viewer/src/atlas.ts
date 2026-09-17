@@ -12,6 +12,7 @@
 import roguelikeUrl from "./assets/tuiles/roguelike/roguelikeSheet_transparent.png?inline";
 import tinyTownUrl from "./assets/tuiles/tiny-town/tilemap_packed.png?inline";
 import tinyFarmUrl from "./assets/tuiles/tiny-farm/tilemap_packed.png?inline";
+import tinyDungeonUrl from "./assets/tuiles/tiny-dungeon/tilemap_packed.png?inline";
 import medievalUrl from "./assets/tuiles/medieval-rts/medievalRTS_spritesheet.png?inline";
 import personnagesUrl from "./assets/tuiles/roguelike-characters/roguelikeChar_transparent.png?inline";
 
@@ -37,6 +38,8 @@ const roguelike = charger(roguelikeUrl, 16, 17);
 const tinyTown = charger(tinyTownUrl, 16, 16);
 /** Tiny Farm (M39b) : cultures par stade, bétail, sacs et étals. */
 const tinyFarm = charger(tinyFarmUrl, 16, 16);
+/** Tiny Dungeon (M40) : ce qui n'est ni villageois ni bête — créatures du ciel, pillards. */
+const tinyDungeon = charger(tinyDungeonUrl, 16, 16);
 const medieval = charger(medievalUrl, 0, 0);
 const personnages = charger(personnagesUrl, 16, 17);
 
@@ -388,5 +391,36 @@ export function beteFerme(
   const t = BETES_FERME[espece];
   if (t === undefined) return false;
   tuile(ctx, tinyFarm, t[0], t[1], x, y, w, h);
+  return true;
+}
+
+/* ---------- Tiny Dungeon (M40) : créatures du ciel et pillards ---------- */
+
+/** Ce que la planche prête à ce qui n'est ni villageois ni bête. */
+const FIGURES: Readonly<Record<string, readonly [number, number]>> = {
+  /** Le gardien posté : un homme d'armes casqué. */
+  gardien: [0, 8],
+  /** Le fléau lâché : un spectre. */
+  fleau: [1, 10],
+  /** Un pillard : casque à cornes. */
+  pillard: [3, 7],
+};
+
+/**
+ * Une figure de la planche Tiny Dungeon (M40) ; faux si la planche n'est pas
+ * prête ou si la figure n'existe pas — l'appelant garde alors son dessin.
+ */
+export function figure(
+  ctx: CanvasRenderingContext2D,
+  nom: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): boolean {
+  if (!tinyDungeon.prete) return false;
+  const t = FIGURES[nom];
+  if (t === undefined) return false;
+  tuile(ctx, tinyDungeon, t[0], t[1], x, y, w, h);
   return true;
 }

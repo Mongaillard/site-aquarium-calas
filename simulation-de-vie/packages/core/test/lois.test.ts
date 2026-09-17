@@ -67,14 +67,20 @@ describe("M25 : les lois du monde", () => {
     );
   });
 
-  it("sans les bêtes, la menace en cours s'éteint et aucun combat n'a lieu", () => {
-    const sim = colonie();
-    sim.definirLoi("betes", false);
-    expect(sim.danger.menace).toBeNull();
-    for (let j = 0; j < 40; j++) sim.avancerJusquaAube();
-    expect(sim.journal.compte("combat")).toBe(0);
-    expect(sim.journal.compte("menace")).toBe(0);
-  });
+  // Vingt secondes : ce scénario prend cinq secondes à vide, et frôlait la limite par défaut
+  // dès que la suite tourne en parallèle.
+  it(
+    "sans les bêtes, la menace en cours s'éteint et aucun combat n'a lieu",
+    { timeout: 20_000 },
+    () => {
+      const sim = colonie();
+      sim.definirLoi("betes", false);
+      expect(sim.danger.menace).toBeNull();
+      for (let j = 0; j < 40; j++) sim.avancerJusquaAube();
+      expect(sim.journal.compte("combat")).toBe(0);
+      expect(sim.journal.compte("menace")).toBe(0);
+    },
+  );
 
   it("les commandes loi passent par le protocole et la migration des vieilles sauvegardes les ajoute", () => {
     const sim = colonie();

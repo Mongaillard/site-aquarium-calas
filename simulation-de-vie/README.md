@@ -140,7 +140,9 @@ _Tiny Farm_ de Kenney, le cerf, le sanglier, le lièvre et le loup sont dessiné
 portent des cadres de pixels (_UI Pack Pixel Adventure_). Et l'on peut enfin **défricher** :
 quand il n'y a plus de place à bâtir, on arrache la souche ou le tas de pierres qui occupe une
 tuile, et un coin de forêt s'ouvre en prairie — un village grandit désormais sur la forêt au
-lieu de s'arrêter devant elle.
+lieu de s'arrêter devant elle. Enfin (M40), le **gardien du ciel** est un homme d'armes casqué
+et le **fléau** un spectre, là où ils n'étaient que des emojis, et les **pillards** portent le
+casque à cornes au lieu d'être des villageois teints en gris.
 
 **Bâtiments et personnages en sprites (M31).** Deux planches CC0 de Kenney de plus : tente,
 maisons, grange, four, fumoir, puits et sanctuaire viennent de _Medieval RTS_ ; chaque personnage

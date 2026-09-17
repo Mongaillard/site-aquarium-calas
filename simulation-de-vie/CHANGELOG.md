@@ -2,6 +2,22 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M40 – Les créatures du ciel et les pillards prennent corps (2026-09-17)
+
+Septième planche CC0 de Kenney, _Tiny Dungeon_, pour ce qui n'est ni villageois ni bête.
+
+- **Le gardien du ciel** n'était qu'un emoji flottant : c'est un homme d'armes casqué, qui se
+  balance au-dessus de son halo.
+- **Le fléau** est un spectre pâle, à la place du crâne dessiné en caractère.
+- **Les pillards** étaient des villageois teints en gris, lance au poing — on les confondait avec
+  les habitants. Ils portent désormais le casque à cornes, sur la carte comme en bataille, et
+  sautillent quand ils marchent.
+- **[DÉCISION]** On s'arrête là pour cette planche : ses sorciers, ses monstres et ses donjons
+  feraient basculer un monde d'âge de pierre dans la fantasy. Les trois figures retenues sont
+  celles que le jeu ne pouvait pas dessiner autrement — le surnaturel et l'étranger.
+- Un test frôlait sa limite de cinq secondes et flanchait sous la charge de la suite : il a
+  désormais son délai explicite, comme les autres scénarios longs.
+
 ## M39 – Les champs poussent, les bêtes ont une allure, les murs entourent le village (2026-09-17)
 
 **L'enceinte entoure le village (M39a).** Les pieux semblaient posés au hasard, et pour deux
