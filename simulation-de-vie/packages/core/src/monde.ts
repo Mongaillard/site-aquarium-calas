@@ -322,7 +322,8 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
       (b) =>
         b.type === ambition.cible && b.termineAuTick !== null && b.termineAuTick >= ambition.depuis,
     ) &&
-    (ambition.cible !== "palissade" || tuileEnceinteManquante(monde, p) !== null)
+    (ambition.cible !== "palissade" || tuileEnceinteManquante(monde, p) !== null) &&
+    (ambition.cible !== "portail" || siteDuPortail(monde, p) !== null)
   )
     return ambition.cible as TypeBatiment;
   // Une migration conseillée : loin du foyer qu'on quitte, il faut d'abord un abri.
@@ -399,12 +400,12 @@ export function prochainBatimentNecessaire(monde: Monde, p: Personnage): TypeBat
     grainesAccessibles(monde, p) >= 4
   )
     return "champ";
-  // Des murs contre les loups : une enceinte de pieux autour de l'abri familial.
-  if (
-    (p.savoirs.get("murs_contre_les_loups")?.force ?? 0) >= SEUIL_SAVOIR &&
-    tuileEnceinteManquante(monde, p) !== null
-  )
-    return "palissade";
+  // Des murs contre les loups : une enceinte de pieux autour du village (M39a).
+  if ((p.savoirs.get("murs_contre_les_loups")?.force ?? 0) >= SEUIL_SAVOIR) {
+    if (tuileEnceinteManquante(monde, p) !== null) return "palissade";
+    // L'anneau tient debout : on y taille un portail, par où l'on sort.
+    if (siteDuPortail(monde, p) !== null) return "portail";
+  }
   return null;
 }
 
@@ -423,38 +424,150 @@ export const LIEUX_EAU_POUR_PORT = 25;
 /** Un port sert à tout un village : pas deux à moins de cette distance. */
 export const RAYON_PORT = 40;
 
-/** Rayon de l'enceinte de palissade autour de l'abri familial. */
+/** Rayon minimal de l'enceinte ; elle s'élargit pour contenir le village. */
 export const RAYON_ENCEINTE = 3;
+/** Au-delà, une enceinte demanderait trop de bois pour tenir debout. */
+export const RAYON_ENCEINTE_MAX = 7;
+/** Part de l'anneau qu'il faut avoir dressée avant de tailler un portail. */
+export const PART_ENCEINTE_POUR_PORTAIL = 0.6;
 
 /**
- * Prochaine tuile de l'enceinte familiale qui manque encore : le carré de rayon
- * 3 autour du premier abri de la famille, sauf les tuiles déjà bâties et celles
- * que l'eau ou la montagne ferment d'elles-mêmes.
+ * Le centre de l'enceinte (M39a) : celui du village quand la personne en a un,
+ * sinon le plus ancien abri de sa famille. **[DÉCISION]** Une enceinte entoure
+ * le village, pas une maison : c'est ce qui la rend lisible sur la carte.
  */
-export function tuileEnceinteManquante(monde: Monde, p: Personnage): Position | null {
-  // Le plus ancien abri de la famille (une seule enceinte par famille, quel que soit qui bâtit).
+export function centreEnceinte(monde: Monde, p: Personnage): Position | null {
+  for (const v of monde.villages.villages)
+    if (v.familles.includes(p.identite.nomFamille)) return v.centre;
   const abri = batimentsAccessibles(monde, p)
     .filter((b) => b.etat === "termine" && PLANS_BATIMENT[b.type].abri)
     .sort((a, b) => a.id.localeCompare(b.id))[0];
-  if (abri === undefined) return null;
-  const c = abri.position;
+  return abri?.position ?? null;
+}
+
+/** Le rayon qu'il faut pour que l'anneau contienne ce qu'on a bâti autour du centre. */
+export function rayonEnceinte(monde: Monde, centre: Position): number {
+  let loin = 0;
+  for (const b of monde.batiments.values()) {
+    if (b.type === "palissade" || b.type === "portail" || b.type === "champ") continue;
+    const d = Grille.distance(b.position, centre);
+    if (d <= RAYON_ENCEINTE_MAX && d > loin) loin = d;
+  }
+  return Math.max(RAYON_ENCEINTE, Math.min(RAYON_ENCEINTE_MAX, loin + 1));
+}
+
+/**
+ * Les tuiles de l'anneau, dans le sens des aiguilles d'une montre. Une tuile
+ * qu'on ne peut pas bâtir (un gisement, un bâtiment) est **rattrapée** d'un pas
+ * vers l'intérieur puis vers l'extérieur, pour que le mur reste continu au lieu
+ * de se trouer : c'est ce qui donnait des pieux éparpillés. L'eau et la montagne
+ * ferment d'elles-mêmes et ne sont pas rattrapées.
+ */
+export function tuilesEnceinte(monde: Monde, centre: Position, rayon: number): Position[] {
+  const anneau: Position[] = [];
+  const prises = new Set<string>();
+  const bord: [number, number][] = [];
+  for (let d = -rayon; d <= rayon; d++) bord.push([d, -rayon]);
+  for (let d = -rayon + 1; d <= rayon; d++) bord.push([rayon, d]);
+  for (let d = rayon - 1; d >= -rayon; d--) bord.push([d, rayon]);
+  for (let d = rayon - 1; d >= -rayon + 1; d--) bord.push([-rayon, d]);
+  for (const [dx, dy] of bord) {
+    const ideale = { x: centre.x + dx, y: centre.y + dy };
+    const ferme = (pos: Position): boolean => {
+      const t = monde.grille.tuileOuNull(pos.x, pos.y);
+      return t === null || !INFO_BIOME[t.biome].praticable;
+    };
+    // L'eau, la montagne : le mur est déjà là.
+    if (ferme(ideale)) continue;
+    const vers = (k: number): Position => ({
+      x: centre.x + dx - Math.sign(dx) * k,
+      y: centre.y + dy - Math.sign(dy) * k,
+    });
+    const candidates = [ideale, vers(1), vers(-1)];
+    for (const pos of candidates) {
+      const t = monde.grille.tuileOuNull(pos.x, pos.y);
+      if (t === null || !INFO_BIOME[t.biome].constructible) continue;
+      if (t.gisement !== null) continue;
+      if (t.batiment !== null && t.batiment.type !== "palissade" && t.batiment.type !== "portail")
+        continue;
+      // Un rattrapage peut tomber sur la tuile du voisin : on ne la compte qu'une fois.
+      const cle = `${pos.x},${pos.y}`;
+      if (prises.has(cle)) break;
+      prises.add(cle);
+      anneau.push(pos);
+      break;
+    }
+  }
+  return anneau;
+}
+
+/** Les tuiles de l'anneau déjà dressées (pieu ou portail). */
+function enceinteDressee(monde: Monde, anneau: readonly Position[]): Position[] {
+  return anneau.filter((pos) => {
+    const t = monde.grille.tuileOuNull(pos.x, pos.y);
+    return (
+      t?.batiment != null && (t.batiment.type === "palissade" || t.batiment.type === "portail")
+    );
+  });
+}
+
+/**
+ * Prochaine tuile de l'enceinte qui manque encore, la plus proche de celui qui
+ * bâtit. `null` quand l'anneau est clos.
+ */
+export function tuileEnceinteManquante(monde: Monde, p: Personnage): Position | null {
+  const centre = centreEnceinte(monde, p);
+  if (centre === null) return null;
+  const anneau = tuilesEnceinte(monde, centre, rayonEnceinte(monde, centre));
   let meilleure: Position | null = null;
   let distance = Infinity;
-  for (let dy = -RAYON_ENCEINTE; dy <= RAYON_ENCEINTE; dy++) {
-    for (let dx = -RAYON_ENCEINTE; dx <= RAYON_ENCEINTE; dx++) {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) !== RAYON_ENCEINTE) continue;
-      const x = c.x + dx;
-      const y = c.y + dy;
-      const t = monde.grille.tuileOuNull(x, y);
-      if (t === null || !INFO_BIOME[t.biome].praticable) continue; // l'eau et la montagne ferment
-      if (t.batiment !== null) continue; // déjà bâti (palissade ou autre)
-      if (t.gisement !== null) continue; // un gisement ferme la tuile : on ne bâtit pas dessus
-      if (!INFO_BIOME[t.biome].constructible) continue;
-      const d = Grille.distance(p.corps.position, { x, y });
-      if (d < distance) {
-        distance = d;
-        meilleure = { x, y };
-      }
+  for (const pos of anneau) {
+    const t = monde.grille.tuileOuNull(pos.x, pos.y);
+    if (t?.batiment != null) continue;
+    if (t === null) continue;
+    const d = Grille.distance(p.corps.position, pos);
+    if (d < distance) {
+      distance = d;
+      meilleure = pos;
+    }
+  }
+  return meilleure;
+}
+
+/**
+ * Où tailler le portail (M39a) : sur l'anneau bien dressé, la tuile qui regarde
+ * l'eau connue la plus proche — c'est par là qu'on sort le plus souvent. `null`
+ * tant que l'anneau est trop ajouré, ou s'il a déjà son portail.
+ */
+export function siteDuPortail(monde: Monde, p: Personnage): Position | null {
+  const centre = centreEnceinte(monde, p);
+  if (centre === null) return null;
+  const anneau = tuilesEnceinte(monde, centre, rayonEnceinte(monde, centre));
+  if (anneau.length === 0) return null;
+  const dressees = enceinteDressee(monde, anneau);
+  if (dressees.length < anneau.length * PART_ENCEINTE_POUR_PORTAIL) return null;
+  for (const pos of dressees) {
+    const t = monde.grille.tuileOuNull(pos.x, pos.y);
+    if (t?.batiment?.type === "portail") return null;
+  }
+  // Le côté de l'eau : à défaut, celui d'où l'on vient.
+  let vise = p.corps.position;
+  let dEau = Infinity;
+  for (const l of p.connaissance.values()) {
+    if (l.type !== "eau") continue;
+    const d = Grille.distance(centre, l);
+    if (d < dEau) {
+      dEau = d;
+      vise = { x: l.x, y: l.y };
+    }
+  }
+  let meilleure: Position | null = null;
+  let distance = Infinity;
+  for (const pos of dressees) {
+    const d = Grille.distance(pos, vise);
+    if (d < distance) {
+      distance = d;
+      meilleure = pos;
     }
   }
   return meilleure;

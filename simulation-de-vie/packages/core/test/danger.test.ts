@@ -7,7 +7,13 @@ import { choisirSite } from "../src/actions/planificateur.js";
 import { ajouterObjet } from "../src/agents/inventaire.js";
 import { apprendre } from "../src/savoirs/lecons.js";
 import { combattre } from "../src/agents/combat.js";
-import { prochainBatimentNecessaire, tuileEnceinteManquante } from "../src/monde.js";
+import {
+  centreEnceinte,
+  prochainBatimentNecessaire,
+  rayonEnceinte,
+  siteDuPortail,
+  tuileEnceinteManquante,
+} from "../src/monde.js";
 import { heureTroupeau } from "../src/monde/faune.js";
 import type { Espece, Troupeau } from "../src/monde/faune.js";
 import {
@@ -238,7 +244,7 @@ describe("la nuit menace : combat, alarme et défenses", () => {
     if (defense.ok) expect(defense.plan[defense.plan.length - 1]?.type).toBe("defendre");
   });
 
-  it("la leçon des murs mène à une enceinte de pieux autour de l'abri ; celle du veilleur, à veiller au feu", () => {
+  it("la leçon des murs mène à une enceinte autour du village avec son portail ; celle du veilleur, à veiller au feu", () => {
     const sim = mondePlat(12, 2);
     const [p, q] = sim.personnages;
     if (!p || !q) throw new Error("vide");
@@ -258,20 +264,33 @@ describe("la nuit menace : combat, alarme et défenses", () => {
     expect(prochainBatimentNecessaire(sim, p)).toBe("palissade");
     const site = choisirSite(sim, p, "palissade");
     expect(site).not.toBeNull();
-    if (site) expect(Grille.distance(site, abri.position)).toBe(3);
+    // Depuis M39a l'enceinte entoure le village, pas une maison : le site est sur son anneau.
+    const centre = centreEnceinte(sim, p);
+    expect(centre).not.toBeNull();
+    if (centre === null) throw new Error("pas de centre");
+    const rayon = rayonEnceinte(sim, centre);
+    if (site)
+      expect(
+        Math.max(Math.abs(site.x - centre.x), Math.abs(site.y - centre.y)),
+      ).toBeLessThanOrEqual(rayon + 1);
     expect(tuileEnceinteManquante(sim, p)).toEqual(site);
-    // L'enceinte complète : plus rien à bâtir, et l'abri est enclos.
-    for (let dy = -3; dy <= 3; dy++) {
-      for (let dx = -3; dx <= 3; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== 3) continue;
-        const t = sim.grille.tuile(30 + dx, 30 + dy);
-        if (t.batiment !== null) continue;
-        sim.fonderChantier("palissade", { x: 30 + dx, y: 30 + dy }, p).etat = "termine";
-      }
+    // L'enceinte complète : plus rien à bâtir, puis un portail, et le centre est enclos.
+    let garde = 0;
+    for (let pos = tuileEnceinteManquante(sim, p); pos !== null && garde < 80; garde++) {
+      sim.fonderChantier("palissade", pos, p).etat = "termine";
+      pos = tuileEnceinteManquante(sim, p);
     }
     expect(tuileEnceinteManquante(sim, p)).toBeNull();
+    expect(prochainBatimentNecessaire(sim, p)).toBe("portail");
+    const portail = siteDuPortail(sim, p);
+    expect(portail).not.toBeNull();
+    if (portail !== null) {
+      const t = sim.grille.tuileOuNull(portail.x, portail.y);
+      if (t?.batiment != null) sim.detruireBatiment(t.batiment.id);
+      sim.fonderChantier("portail", portail, p).etat = "termine";
+    }
     expect(prochainBatimentNecessaire(sim, p)).toBeNull();
-    expect(enclos(sim, abri.position)).toBe(true);
+    expect(enclos(sim, centre)).toBe(true);
     // Le veilleur : la nuit, avec la leçon et une lance, on veille au feu.
     jusquaLaNuit(sim);
     ajouterObjet(q.corps.inventaire, { type: "lance", solidite: 100 });

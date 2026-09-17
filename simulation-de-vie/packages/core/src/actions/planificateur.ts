@@ -39,6 +39,7 @@ import {
   portsDe,
   prochainBatimentNecessaire,
   RESERVE_BOIS_MAX,
+  siteDuPortail,
   tuileEnceinteManquante,
 } from "../monde.js";
 import type { Monde } from "../monde.js";
@@ -965,6 +966,7 @@ function planifierFondation(monde: Monde, p: Personnage, type: TypeBatiment): Re
  */
 export function choisirSite(monde: Monde, p: Personnage, type: TypeBatiment): Position | null {
   if (type === "palissade") return tuileEnceinteManquante(monde, p);
+  if (type === "portail") return siteDuPortail(monde, p);
   if (type === "port") return sitePortuaire(monde, p);
   const acces = batimentsAccessibles(monde, p);
   // En migration, loin du vieux foyer, on bâtit là où l'on est.
@@ -997,8 +999,15 @@ export function choisirSite(monde: Monde, p: Personnage, type: TypeBatiment): Po
       for (const v of monde.grille.voisins(x, y)) if (v.batiment !== null) voisinBati++;
       const distEau =
         eaux.length > 0 ? Math.min(...eaux.slice(0, 5).map((e) => Grille.distance(pos, e))) : 8;
+      // Un enclos veut de la place autour de lui : le parc doit tenir, clos.
+      let libresAutour = 0;
+      if (type === "enclos")
+        for (const v of monde.grille.voisins(x, y))
+          if (v.batiment === null && v.gisement === null && INFO_BIOME[v.biome].constructible)
+            libresAutour++;
       const score =
         Grille.distance(centre, pos) +
+        (type === "enclos" ? (8 - libresAutour) * 3 : 0) +
         Math.max(0, distEau - 8) * 2 +
         (type === "feu_de_camp" ? (voisinBati > 0 ? -1 : 1) : voisinBati * 1.5) +
         (Grille.distance(pos, p.corps.position) > 12 ? 5 : 0);

@@ -111,9 +111,9 @@ export function tenterCapture(
 export function heureBete(monde: Monde, b: Bete): "reste" | "suit" | "fuit" {
   const enclos = enclosDe(monde, b.famille);
   if (enclos !== null) {
-    if (Grille.distance(b.position, enclos.position) > 1) {
-      b.position = { x: enclos.position.x, y: enclos.position.y + 1 };
-    }
+    // Au parc, chaque bête a son coin : elles ne s'empilent plus sur la même case (M39a).
+    if (Grille.distance(b.position, enclos.position) > 1)
+      b.position = placeAuParc(monde, b, enclos);
     return "reste";
   }
   const maitre = monde.personnages.find((p) => p.id === b.proprietaire && p.vivant);
@@ -130,6 +130,33 @@ export function heureBete(monde: Monde, b: Bete): "reste" | "suit" | "fuit" {
     }
   }
   return "suit";
+}
+
+/**
+ * La place d'une bête dans le parc : les huit cases autour du piquet, prises
+ * dans l'ordre des bêtes de la famille, pour qu'elles se répartissent.
+ */
+function placeAuParc(monde: Monde, b: Bete, enclos: Batiment): Position {
+  const COINS: readonly [number, number][] = [
+    [0, 1],
+    [1, 1],
+    [-1, 1],
+    [1, 0],
+    [-1, 0],
+    [0, -1],
+    [1, -1],
+    [-1, -1],
+  ];
+  const troupe = betesDe(monde, b.famille).sort((x, y) => (x.id < y.id ? -1 : 1));
+  const rang = Math.max(
+    0,
+    troupe.findIndex((x) => x.id === b.id),
+  );
+  const coin = COINS[rang % COINS.length] ?? [0, 1];
+  const pos = { x: enclos.position.x + coin[0], y: enclos.position.y + coin[1] };
+  return monde.grille.estPraticable(pos.x, pos.y)
+    ? pos
+    : { x: enclos.position.x, y: enclos.position.y + 1 };
 }
 
 export interface EvenementBetail {
