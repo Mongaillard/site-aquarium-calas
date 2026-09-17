@@ -285,6 +285,17 @@ function planifierRechauffement(monde: Monde, p: Personnage): ResultatPlan {
     const aller = allerPresDe(monde, p, feu.position);
     if (aller) return ok([aller, attente]);
   }
+  // **[DÉCISION]** Ni abri ni feu à portée : on allume un feu là où l'on est (M43).
+  // Un feu de camp coûte cinq bûches et trois tours de travail — le prix d'une nuit
+  // dehors en hiver. Le plan échouait purement et simplement, et l'on gelait sur
+  // place avec le bois sur le dos.
+  if (
+    p.corps.stade !== "enfant" &&
+    quantite(p.corps.inventaire, "bois") >= (PLANS_BATIMENT.feu_de_camp.materiaux.bois ?? 5)
+  ) {
+    const surPlace = planifierFondation(monde, p, "feu_de_camp");
+    if (surPlace.ok) return surPlace;
+  }
   return echec("aucune source de chaleur connue");
 }
 

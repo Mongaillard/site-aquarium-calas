@@ -293,6 +293,28 @@ export function abriDisponible(monde: Monde, p: Personnage): Batiment | null {
   return null;
 }
 
+/**
+ * Distance à la chaleur la plus proche que cette personne peut vraiment gagner :
+ * un abri des siens où il reste une place, ou un feu allumé. `Infinity` si rien
+ * (M43). **[DÉCISION]** C'est ce qui manquait au cerveau : il ne se demandait que
+ * *si* une chaleur existait — et `feuConnu` répondait oui pour un feu à l'autre
+ * bout du monde —, jamais *à combien de pas*. Les vingt-sept morts de froid
+ * mesurés étaient tous dehors et éveillés : ils partaient trop tard.
+ */
+export function distanceChaleur(monde: Monde, p: Personnage): number {
+  const pos = p.corps.position;
+  let d = Infinity;
+  const abri = abriDisponible(monde, p);
+  if (abri !== null) d = Grille.distance(pos, abri.position);
+  for (const b of monde.batiments.values()) {
+    if (b.etat !== "termine" || !b.allume) continue;
+    if (PLANS_BATIMENT[b.type].atelier !== "feu") continue;
+    const q = Grille.distance(pos, b.position);
+    if (q < d) d = q;
+  }
+  return d;
+}
+
 /** Feu de camp allumé à portée de la position (rayon du plan), le plus proche. */
 export function feuProche(monde: Monde, pos: Position): Batiment | null {
   let meilleur: Batiment | null = null;

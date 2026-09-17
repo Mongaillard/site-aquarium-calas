@@ -129,6 +129,15 @@ jamais existé — la chaîne n'a pas de fin, donc l'arbre des inventions non pl
 **Inventions** montre tout : l'arbre des matières, ce que chaque trouvaille change, l'ennui qui
 l'a fait naître, qui l'a trouvée et combien de prototypes ont raté.
 
+**On ne gèle plus en route (M43).** Les vingt-sept morts de froid mesurés étaient tous
+« éveillés, dehors », souvent avec vingt couchages libres à la maison : on rentrait sous 25 points
+de chaleur que l'abri soit à deux pas ou à vingt, alors qu'une nuit d'hiver coûte un point par pas.
+Le seuil d'alerte vise maintenant **le coût du trajet**, le cerveau sait **à combien de pas** est
+la chaleur la plus proche (au lieu de se demander s'il existe un feu quelque part dans le monde),
+et faute d'abri comme de feu on **allume un feu là où l'on est** plutôt que de geler avec le bois
+dans les bras. Sur douze mondes de trois cent soixante jours : **169 survivants au lieu de 146, un
+seul monde éteint au lieu de trois, et les morts de froid passent de 27 à 15.**
+
 **On ne meurt plus de soif au bord d'un lac (M42).** Un monde sur trois s'éteignait, et la soif
 était le premier tueur. Elle ne tenait pas à l'équilibrage : un lieu mémorisé ne portait qu'une
 ressource, et comme un bord de lac porte presque toujours un banc de poisson, la tuile était

@@ -30,6 +30,7 @@ import type { Echec, LieuConnu, Personnage, Stade } from "../agents/personnage.j
 import type { Intention } from "../actions/types.js";
 import {
   abriDisponible,
+  distanceChaleur,
   batimentAReparer,
   batimentsAccessibles,
   estTuileEau,
@@ -45,7 +46,7 @@ import { PLANS_BATIMENT, materiauxManquants } from "../monde/batiments.js";
 import { Grille } from "../monde/grille.js";
 import type { Position } from "../monde/grille.js";
 import type { Moment, Saison } from "../monde/horloge.js";
-import { EFFETS_METEO } from "../monde/meteo.js";
+import { EFFETS_METEO, EFFETS_SAISON } from "../monde/meteo.js";
 import type { Meteo } from "../monde/meteo.js";
 import type { Ressource } from "../monde/ressources.js";
 import type { Souvenir } from "../memoire/souvenir.js";
@@ -122,6 +123,10 @@ export interface PerceptionLegere {
   };
   readonly abriDisponible: boolean;
   readonly feuConnu: boolean;
+  /** À combien de pas est la chaleur la plus proche qu'on puisse gagner (M43). */
+  readonly distanceChaleur: number;
+  /** Points de chaleur perdus par tick là où l'on est, saison et météo comprises (M43). */
+  readonly perteChaleurParTick: number;
   /** Le feu familial est éteint (ou à court de bois) : on s'en occupe. */
   /** Danger : l'alarme a été donnée, ou une meute lancée sur quelqu'un est en vue. */
   readonly menace?: {
@@ -156,8 +161,24 @@ export function percevoirLeger(monde: Monde, p: Personnage): PerceptionLegere {
     },
     abriDisponible: abriDisponible(monde, p) !== null,
     feuConnu: feuConnu(monde),
+    distanceChaleur: distanceChaleur(monde, p),
+    perteChaleurParTick: perteChaleurParTick(monde),
     menace: menacePercue(monde, p),
   };
+}
+
+/**
+ * Ce que le froid coûte par tick à qui reste dehors, en points de chaleur : la
+ * même formule que le bilan thermique de la simulation, sans les atténuations
+ * personnelles (abri, feu, vêtement). C'est la vitesse à laquelle on gèle, dont
+ * le cerveau a besoin pour savoir quand partir (M43).
+ */
+export function perteChaleurParTick(monde: Monde): number {
+  const moment = monde.horloge.moment();
+  const saison = EFFETS_SAISON[moment.saison];
+  const brute =
+    (moment.estNuit ? saison.froidNuit : saison.froidJour) * EFFETS_METEO[monde.meteo].froid;
+  return (brute * 100) / (1.25 * monde.horloge.ticksParJour);
 }
 
 /** Une meute lancée sur quelqu'un, en vue ou signalée par l'alarme. */
@@ -327,6 +348,10 @@ export interface Perception {
   readonly abriDisponible: boolean;
   readonly feuProche: boolean;
   readonly feuConnu: boolean;
+  /** À combien de pas est la chaleur la plus proche qu'on puisse gagner (M43). */
+  readonly distanceChaleur: number;
+  /** Points de chaleur perdus par tick à rester dehors, saison et météo comprises (M43). */
+  readonly perteChaleurParTick: number;
   readonly feuFamilialAAlimenter: boolean;
   /** Le feu familial est éteint (pas seulement à court de bois). */
   readonly feuFamilialEteint: boolean;
@@ -352,6 +377,8 @@ export interface Perception {
   readonly possedeCanne: boolean;
   /** Quantité de nourriture en poche. */
   readonly nourritureEnPocheQuantite: number;
+  /** Bûches en poche : de quoi allumer un feu là où l'on est (M43). */
+  readonly boisEnPoche: number;
   readonly saison: Saison;
   /** Souvenirs des dernières 24 h, du plus ancien au plus récent. */
   readonly souvenirsRecents: readonly Souvenir[];
@@ -619,6 +646,8 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
     abriDisponible: abriDisponible(monde, p) !== null,
     feuProche: feuProche(monde, p.corps.position) !== null,
     feuConnu: feuAllume,
+    distanceChaleur: distanceChaleur(monde, p),
+    perteChaleurParTick: perteChaleurParTick(monde),
     feuFamilialAAlimenter: feuAAlimenter(monde, p) !== null,
     feuFamilialEteint: feuEteint(monde, p) !== null,
     fumoirConnu: acces.some((b) => b.etat === "termine" && b.type === "fumoir"),
@@ -652,6 +681,7 @@ export function percevoir(monde: Monde, p: Personnage, observerDabord = true): P
     ),
     possedeCanne: possede(inv, "canne_a_peche"),
     nourritureEnPocheQuantite: quantiteNourriture(inv),
+    boisEnPoche: quantite(inv, "bois"),
     saison: moment.saison,
     souvenirsRecents: p.memoire.depuis(monde.horloge.tick - monde.horloge.ticksParJour),
   };

@@ -30,6 +30,30 @@ export const SEUILS_URGENCE = {
   chaleur: 25,
 } as const;
 
+/**
+ * En dessous de quelle chaleur il faut rentrer : de quoi tenir le trajet, plus la
+ * marge de sécurité. **[DÉCISION]** Le seuil était fixe (25, ou 40 pour qui avait
+ * retenu la leçon) et ne disait rien de la distance (M43) : une nuit d'hiver coûte
+ * 1,1 point par tick et un pas prend un tick, si bien qu'à vingt pas de chez soi
+ * on partait avec vingt-deux points pour un trajet qui en demandait vingt-deux —
+ * les vingt-sept morts de froid mesurés étaient tous dehors, éveillés, en route.
+ * On vise donc le coût du trajet (distance × perte, majoré de moitié) sans jamais
+ * descendre sous l'ancien seuil ni monter au-delà de quatre-vingts : au-delà, on
+ * ne sortirait plus de chez soi l'hiver.
+ */
+export function seuilRentrer(perception: {
+  readonly moi: { readonly savoirs: ReadonlySet<Savoir> };
+  readonly distanceChaleur: number;
+  readonly perteChaleurParTick: number;
+}): number {
+  const plancher = perception.moi.savoirs.has("rentrer_quand_on_gele")
+    ? SEUILS_URGENCE.chaleur + 15
+    : SEUILS_URGENCE.chaleur;
+  if (!Number.isFinite(perception.distanceChaleur)) return plancher;
+  const trajet = perception.distanceChaleur * perception.perteChaleurParTick * 1.5;
+  return Math.min(80, Math.max(plancher, trajet));
+}
+
 interface Candidat {
   readonly intention: Intention;
   readonly score: number;
@@ -77,10 +101,8 @@ export class RuleBrain implements Cerveau {
     // Le froid tue plus vite que la faim : quand on gèle et qu'une chaleur est
     // à portée, on rentre d'abord, sauf si l'on a de quoi manger sur soi.
     // Qui a retenu la leçon rentre plus tôt.
-    const seuilChaleur = perception.moi.savoirs.has("rentrer_quand_on_gele")
-      ? SEUILS_URGENCE.chaleur + 15
-      : SEUILS_URGENCE.chaleur;
-    const gele = b.chaleur < seuilChaleur && (perception.abriDisponible || perception.feuConnu);
+    const seuilChaleur = seuilRentrer(perception);
+    const gele = b.chaleur < seuilChaleur && Number.isFinite(perception.distanceChaleur);
     const affame = b.faim < SEUILS_URGENCE.faim;
     if (gele && !(affame && perception.moi.nourritureEnPoche)) return { type: "se_rechauffer" };
     if (affame) return { type: "manger" };
@@ -244,10 +266,12 @@ export class RuleBrain implements Cerveau {
       });
     }
 
-    // Se réchauffer au feu ou à l'abri quand on a froid (plus tôt si l'on a retenu la leçon).
+    // Se réchauffer au feu ou à l'abri quand on a froid (plus tôt si l'on a retenu la
+    // leçon, et toujours s'il reste juste de quoi faire le trajet — M43).
     if (
-      besoins.chaleur < (sait("rentrer_quand_on_gele") ? 75 : 60) &&
-      (perception.feuConnu || perception.abriDisponible)
+      besoins.chaleur <
+        Math.max(sait("rentrer_quand_on_gele") ? 75 : 60, seuilRentrer(perception)) &&
+      (Number.isFinite(perception.distanceChaleur) || perception.boisEnPoche >= 5)
     ) {
       candidats.push({
         intention: { type: "se_rechauffer" },
@@ -562,7 +586,10 @@ export class RuleBrain implements Cerveau {
     if (!adulte) {
       // Un enfant qui a froid, ou que la nuit surprend, va se mettre au chaud
       // plutôt que d'attendre dehors qu'on s'occupe de lui.
-      if ((besoins.chaleur < 70 || nuit) && (perception.abriDisponible || perception.feuConnu)) {
+      if (
+        (besoins.chaleur < Math.max(70, seuilRentrer(perception)) || nuit) &&
+        Number.isFinite(perception.distanceChaleur)
+      ) {
         candidats.push({
           intention: { type: "se_rechauffer" },
           score: 0.7 + urgence(besoins.chaleur) * 3 + (nuit ? 0.3 : 0),
@@ -859,7 +886,13 @@ export class RuleBrain implements Cerveau {
       });
     }
 
-    // Chasser pour le cuir quand on sait ce qu'il vaut.
+    // Chasser pour le cuir quand on sait ce qu'il vaut. **[DÉCISION]** On a essayé
+    // de déclencher cette chasse sur la seule saison froide (M43), puisque sur
+    // vingt-sept morts de froid vingt-six n'avaient pas de vêtement et que la leçon
+    // `vetements_chauds` ne s'apprend qu'en enterrant l'un d'eux. Mesuré : 145
+    // survivants au lieu de 169, et *plus* de morts de froid (12 contre 7) et de
+    // carence (16 contre 8) — courir le gibier en novembre coûte les vivres et la
+    // chaleur qu'on allait chercher. On garde donc la leçon comme déclencheur.
     if (
       adulte &&
       sait("vetements_chauds") &&

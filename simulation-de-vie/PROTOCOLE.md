@@ -1602,6 +1602,44 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   éteints contre quatre, **9 morts de soif contre 38**, 8 puits achevés contre 1. Le froid
   (24 morts) devient le premier tueur.
 
+## 8 unvicies. Le froid : partir à temps, ou faire du feu (M43)
+
+- **Perception** (`cerveau/perception.ts`) : deux champs nouveaux sur les deux perceptions (légère
+  et complète) — `distanceChaleur` (pas jusqu'à la chaleur la plus proche qu'on puisse *gagner*,
+  `Infinity` sinon) et `perteChaleurParTick` (points de chaleur perdus par tick à rester dehors,
+  saison × météo, même formule que le bilan thermique de la simulation sans les atténuations
+  personnelles). `perteChaleurParTick(monde)` est exportée. `moi.boisEnPoche` s'ajoute aussi.
+- **`distanceChaleur(monde, p)`** (`monde.ts`) : le plus proche d'un abri des siens où il reste une
+  place (`abriDisponible`) et d'un feu **allumé** (tout bâtiment `atelier: "feu"`).
+- **`seuilRentrer(perception)`** (`cerveau/rule-brain.ts`) : `min(80, max(plancher, distance ×
+  perte × 1,5))`, le plancher valant `SEUILS_URGENCE.chaleur` (25), ou 40 pour qui a retenu
+  `rentrer_quand_on_gele`. **[DÉCISION]** Le seuil était fixe et ne disait rien de la distance :
+  une nuit d'hiver coûte 1,1 point par tick et un pas prend un tick, si bien qu'à vingt pas on
+  partait avec vingt-deux points pour un trajet qui en demandait vingt-deux — les vingt-sept morts
+  de froid mesurés étaient tous dehors, éveillés, en route. Le plafond de quatre-vingts existe
+  pour qu'on sorte encore de chez soi l'hiver ; sans chaleur connue, on en reste au plancher.
+- **Trois règles corrigées** : l'urgence `se_rechauffer`, le candidat « se réchauffer quand on a
+  froid » et celui de l'enfant lisaient `feuConnu` — vrai dès qu'un feu brûlait **n'importe où
+  dans le monde**. Ils lisent `Number.isFinite(distanceChaleur)`, et leurs seuils passent par
+  `seuilRentrer`.
+- **Feu de fortune** (`planifierRechauffement`) : ni abri ni feu à vingt-cinq pas, mais cinq
+  bûches en poche et l'âge de le faire → `planifierFondation(monde, p, "feu_de_camp")` sur place.
+  Le plan rendait `echec("aucune source de chaleur connue")`, et l'on gelait avec le bois dans les
+  bras.
+- **Un essai rejeté** : déclencher la chasse au cuir sur la saison froide (au lieu de la seule
+  leçon `vetements_chauds`, qui demande un mort) donne **145 survivants contre 169**, avec *plus*
+  de morts de froid (12 contre 7) et de carence (16 contre 8). La mesure est notée dans le code à
+  l'endroit de la tentation.
+- **Tests** (`froid.test.ts`, 4) : le seuil grandit avec le trajet, reste au plancher à deux pas,
+  plafonne à quatre-vingts, et la leçon relève le plancher sans toucher au plafond ; la perte
+  perçue est plus forte par une nuit d'hiver qu'en été ; `distanceChaleur` compte l'abri et le feu
+  allumé mais pas le feu éteint ; sans abri ni feu, le plan de réchauffement fonde un feu de camp
+  si l'on a du bois, et échoue honnêtement sinon. `savoirs.test.ts` donne les deux champs
+  nouveaux à sa perception de laboratoire.
+- **Mesure** (12 graines, 360 jours, conteur allumé) : 169 survivants contre 146, **un** monde
+  éteint contre trois, 15 morts de froid contre 27, 67 morts en tout contre 87. Restent en tête
+  l'infection (12), la faim (11) et la carence (8).
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

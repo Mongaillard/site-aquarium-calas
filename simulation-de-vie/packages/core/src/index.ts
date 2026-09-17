@@ -369,6 +369,7 @@ export {
   batimentEn,
   batimentsAccessibles,
   dormeurs,
+  distanceChaleur,
   abriDisponible,
   feuProche,
   atelierAdjacent,

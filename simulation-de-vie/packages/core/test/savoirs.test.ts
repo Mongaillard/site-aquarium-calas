@@ -83,6 +83,9 @@ describe("leçons tirées des décès", () => {
       moi: { besoins: p.besoins, nourritureEnPoche: false, savoirs: new Set() },
       abriDisponible: true,
       feuConnu: false,
+      // M43 : l'abri est à deux pas, et l'on perd un point de chaleur par tick.
+      distanceChaleur: 2,
+      perteChaleurParTick: 1.11,
     });
     expect(avant).toBeNull();
     apprendre(p, "rentrer_quand_on_gele", 1, "Ambre");
@@ -94,6 +97,8 @@ describe("leçons tirées des décès", () => {
       },
       abriDisponible: true,
       feuConnu: false,
+      distanceChaleur: 2,
+      perteChaleurParTick: 1.11,
     });
     expect(apres).toEqual({ type: "se_rechauffer" });
   });

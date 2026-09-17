@@ -2,6 +2,48 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M43 – Le froid : on ne gèle plus en route (2026-09-17)
+
+M42 avait laissé le froid premier tueur. Les vingt-sept morts de froid mesurés sur douze mondes
+disaient tous la même chose : **éveillés, dehors**. Vingt-cinq sans feu à portée, vingt-six sans
+vêtement — et souvent vingt couchages libres à la maison. Ils ne mouraient pas de manquer d'abri,
+ils mouraient **en route**.
+
+**Le seuil d'alerte ne disait rien de la distance.** On rentrait sous 25 points de chaleur (40 pour
+qui avait retenu la leçon), que l'abri soit à deux pas ou à vingt. Or une nuit d'hiver coûte 1,1
+point par tick, et un pas prend un tick : à vingt pas de chez soi, on partait avec vingt-deux
+points pour un trajet qui en demandait vingt-deux.
+
+- Le seuil vise désormais **le coût du trajet** — distance × perte, majoré de moitié — sans
+  descendre sous l'ancien plancher ni monter au-delà de quatre-vingts. **[DÉCISION]** Ce plafond
+  existe pour qu'on sorte encore de chez soi l'hiver.
+- Le cerveau connaît maintenant **la distance à la chaleur** (un abri des siens où il reste une
+  place, ou un feu allumé) et **la vitesse à laquelle il gèle** (saison × météo).
+- **`feuConnu` répondait oui pour un feu à l'autre bout du monde.** Les trois règles de
+  réchauffement lisaient cette question globale ; elles lisent la distance réelle.
+- **On allume un feu là où l'on est** quand il n'y a ni abri ni feu à portée et qu'on a cinq
+  bûches sur le dos. Le plan échouait purement et simplement, et l'on gelait sur place avec le
+  bois dans les bras.
+
+Mesuré sur les douze mêmes mondes de trois cent soixante jours :
+
+|                                          | après M42 | après M43 |
+| ---------------------------------------- | --------- | --------- |
+| survivants                               | 146       | **169**   |
+| mondes éteints sur 12                    | 3         | **1**     |
+| morts de froid (froid + refroidissement) | 27        | **15**    |
+| morts, toutes causes                     | 87        | **67**    |
+
+**Un essai rejeté, et pourquoi.** Vingt-six des vingt-sept gelés n'avaient pas de vêtement de
+cuir, et la leçon qui fait courir après le cuir (`vetements_chauds`) ne s'apprend qu'en enterrant
+quelqu'un mort de froid. On a donc essayé de déclencher cette chasse sur la seule saison froide.
+Mesuré : **145 survivants au lieu de 169**, et _plus_ de morts de froid (12 contre 7) et de
+carence (16 contre 8) — courir le gibier en novembre coûte les vivres et la chaleur qu'on allait
+chercher. L'essai est annulé, la mesure notée dans le code à l'endroit de la tentation.
+
+Les premiers tueurs sont maintenant l'**infection** (12), la **faim** (11) et la **carence** (8) :
+c'est la nourriture qui vient ensuite.
+
 ## M42 – La soif : on ne meurt plus au bord d'un lac (2026-09-17)
 
 La mesure de M41 avait mis au jour le vrai tueur : **un monde sur trois s'éteignait**, et la
