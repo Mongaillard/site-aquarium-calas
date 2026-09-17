@@ -204,6 +204,8 @@ export interface CouchesPersonnage {
   readonly couleur: string;
   /** Outil en main (`PersonnageEtat.outil`) ou null. */
   readonly outil: string | null;
+  /** Teinte de la matière de l'outil trouvé (M38) : une hache de bronze se voit. */
+  readonly outilCouleur?: string | undefined;
   readonly malade: boolean;
   readonly banni: boolean;
 }
@@ -296,7 +298,7 @@ function couche(
 /** Le sprite composé d'un personnage (16×16), mis en cache par apparence ; null si la planche manque. */
 export function spritePersonnage(c: CouchesPersonnage): HTMLCanvasElement | null {
   if (!personnages.prete) return null;
-  const cle = `${c.teint}|${c.cheveux}|${c.sexe}|${String(c.coiffure)}|${c.couleur}|${c.outil ?? ""}|${c.malade ? "m" : ""}|${c.banni ? "b" : ""}`;
+  const cle = `${c.teint}|${c.cheveux}|${c.sexe}|${String(c.coiffure)}|${c.couleur}|${c.outil ?? ""}|${c.outilCouleur ?? ""}|${c.malade ? "m" : ""}|${c.banni ? "b" : ""}`;
   const existant = cache.get(cle);
   if (existant !== undefined) return existant;
   if (cache.size > 2000) cache.clear();
@@ -317,7 +319,7 @@ export function spritePersonnage(c: CouchesPersonnage): HTMLCanvasElement | null
     c.cheveux === "châtains" ? "#e0c090" : null,
   );
   const outil = c.outil === null ? undefined : OUTILS[c.outil];
-  if (outil !== undefined) couche(ctx, outil[0], outil[1], null);
+  if (outil !== undefined) couche(ctx, outil[0], outil[1], c.outilCouleur ?? null);
   if (c.banni && brouillon !== null) {
     // À l'écart du village : une silhouette éteinte. La multiplication peint tout le carré,
     // une copie du composé sert ensuite de pochoir pour n'en garder que la silhouette.

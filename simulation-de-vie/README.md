@@ -117,6 +117,18 @@ conquis gardent **rancune** (M37) : le panneau Villages les liste, et au bout de
 si la tension monte ou s'ils pèsent assez, ils se **révoltent** et repartent reprendre leur ancien
 village — guerre en vue avec le vainqueur.
 
+**Les inventions sans catalogue (M38).** Le moteur ne connaît plus aucune invention : il connaît
+une grammaire. Une trouvaille est un triplet **matière × procédé × fonction** dont il déduit le
+nom, la recette et l'effet. Les personnages ne suivent aucun plan : le moteur mesure ce qui va
+mal autour d'eux (on gèle, les vivres pourrissent, le gibier fuit, la roche ne cède pas), en
+déduit la fonction qui manque, et le soir un esprit curieux la croise avec une matière qu'il
+connaît et un procédé qu'il maîtrise. Il essaie ; un prototype sur trois rate ; quand ça tient,
+sa famille l'apprend et le dialogue la répand. **Les matières elles-mêmes se dérivent** : au four,
+allier ce qui fond donne du bronze, puis du laiton, du fer, de l'acier, puis des métaux qui n'ont
+jamais existé — la chaîne n'a pas de fin, donc l'arbre des inventions non plus. L'onglet
+**Inventions** montre tout : l'arbre des matières, ce que chaque trouvaille change, l'ennui qui
+l'a fait naître, qui l'a trouvée et combien de prototypes ont raté.
+
 **Bâtiments et personnages en sprites (M31).** Deux planches CC0 de Kenney de plus : tente,
 maisons, grange, four, fumoir, puits et sanctuaire viennent de _Medieval RTS_ ; chaque personnage
 se compose en couches de _Roguelike Characters_ — corps par teint, tunique teintée à la couleur

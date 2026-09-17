@@ -372,6 +372,7 @@ export class Rendu {
             coiffure: coiffureDe(p.id),
             couleur,
             outil: p.outil,
+            outilCouleur: p.outilCouleur,
             malade: p.malade,
             banni: p.banni,
           },

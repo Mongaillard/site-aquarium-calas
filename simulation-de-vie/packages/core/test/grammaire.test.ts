@@ -66,10 +66,10 @@ describe("M38a : la grammaire d'invention", () => {
     const e = etatTrouvaillesNeuf();
     const rng = Rng.depuisGraine(7);
     const cuivre = mat(e, "cuivre");
-    const bronze = derive(e, rng, "allier", [cuivre, mat(e, "pierre")]);
+    const bronze = derive(e, rng, "allier", [cuivre, mat(e, "minerai")]);
     expect(bronze.nom).toBe("bronze");
     expect(bronze.rang).toBe(1);
-    expect(bronze.parents).toEqual(["cuivre", "pierre"]);
+    expect(bronze.parents).toEqual(["cuivre", "minerai"]);
     expect(bronze.durete).toBeGreaterThan(cuivre.durete);
     expect(e.matieres.get(bronze.id)).toBe(bronze);
     // La chaîne continue : un alliage s'allie encore, et le nom ne se répète pas.
@@ -84,6 +84,8 @@ describe("M38a : la grammaire d'invention", () => {
     const fibres = mat(e, "fibres");
     // Allier exige de la tenue : des fibres ne s'allient pas.
     expect(deriverMatiere(e, rng, "allier", [fibres, fibres])).toBeNull();
+    // La pierre ne fond pas : on ne l'allie à rien.
+    expect(deriverMatiere(e, rng, "allier", [mat(e, "cuivre"), mat(e, "pierre")])).toBeNull();
     // Tresser exige de la souplesse : la pierre ne se tresse pas.
     expect(combinaisonValide("pecher", "tresser", mat(e, "pierre"))).toBe(false);
     expect(combinaisonValide("pecher", "tresser", fibres)).toBe(true);
@@ -174,7 +176,7 @@ describe("M38a : la grammaire d'invention", () => {
       const noms: string[] = [];
       let courant = mat(e, "cuivre");
       for (let i = 0; i < 4; i++) {
-        courant = derive(e, rng, "allier", [courant, mat(e, "pierre")]);
+        courant = derive(e, rng, "allier", [courant, mat(e, "minerai")]);
         noms.push(`${courant.nom}:${courant.durete}:${courant.tenue}`);
       }
       return noms;
@@ -188,7 +190,7 @@ describe("M38a : la grammaire d'invention", () => {
     sim.config.brain.conseilsParJour = 0;
     const bronze = derive(sim.trouvailles, sim.rng, "allier", [
       mat(sim.trouvailles, "cuivre"),
-      mat(sim.trouvailles, "pierre"),
+      mat(sim.trouvailles, "minerai"),
     ]);
     const epee = compose(sim.trouvailles, "frapper", "tailler", bronze);
     retenirTrouvaille(sim.trouvailles, epee);

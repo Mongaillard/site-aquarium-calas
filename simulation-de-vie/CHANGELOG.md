@@ -2,6 +2,56 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M38 – Les inventions sans catalogue (2026-09-17)
+
+Le moteur connaissait douze inventions, écrites à la main, et rien d'autre ne pouvait
+jamais être trouvé. Il ne connaît plus aucune invention : il connaît une **grammaire**, et
+les personnages s'en servent pour résoudre leurs propres problèmes. L'arbre n'a pas de fin.
+
+**La grammaire (M38a).** Une trouvaille est un triplet **matière × procédé × fonction**, dont
+le moteur déduit tout le reste : le nom, la recette, la difficulté, la solidité, et l'effet —
+un gain sur un **levier** qu'il sait déjà lire.
+
+- Huit **matières** brutes adossées aux ressources (bois, pierre, fibres, argile, cuir, corde,
+  minerai, cuivre), chacune avec dureté, tenue, isolation, souplesse, rareté et teinte.
+- Huit **procédés** : tailler, tresser, assembler, cuire, fondre, allier, tremper, polir ;
+  chacun exige une propriété minimale, parfois un atelier et un niveau d'artisanat.
+- Dix **fonctions** (couper, creuser, pêcher, chasser, porter, tenir chaud, conserver, soigner,
+  frapper, bâtir) liées à douze **leviers** : rendement des cinq récoltes, solidité,
+  conservation, chaleur, soin, combat, portage, bâtisse.
+- **Les matières se dérivent** : au four, fondre ou allier ce qui fond (minerai, métaux,
+  alliages) donne une matière nouvelle, plus dure et plus tenace que ses parents, à laquelle
+  on donne un nom — bronze, laiton, fer, acier, puis des noms inventés. Chaque niveau coûte
+  moitié plus en matières brutes. **La chaîne n'a pas de fin, donc l'arbre non plus.**
+- Un objet de type « trouvaille » porte son identifiant : l'inventaire, l'usure, la réparation
+  et l'héritage marchent sans rien changer. Sauvegardé, avec migration des mondes d'avant.
+
+**Du problème à l'idée (M38b).** Le moteur ne souffle rien : il mesure.
+
+- Dix **problèmes mesurables** — la faim selon ce qu'on voit autour (du poisson ? du gibier ?),
+  le froid, ce qui pourrit, les plaies qu'on ne referme pas, les mains pleines, la guerre, les
+  gisements qui résistent, un chantier qui traîne — chacun traduit en fonction manquante.
+- Le soir, un **curieux** prend l'ennui le plus vif, le croise avec les matières qu'il connaît
+  (en poche, en stock, ou vues sur la carte) et les procédés qu'il maîtrise, et garde la
+  meilleure combinaison — s'il elle vaut mieux que ce qu'il sait déjà faire.
+- **Il essaie.** Un prototype sur trois rate (le temps est perdu, les matières restent). Quand
+  ça tient, sa famille l'apprend et le dialogue la répand comme les autres savoirs. Une idée
+  jamais réalisée s'efface au bout de trente jours.
+- **Les matières naissent au four** : un curieux y mêle ce qu'il a, la coulée consomme ce qu'on
+  y met, et sa famille apprend la matière.
+- Le levier de la chasse était mort : `tickChasser` lit désormais le gibier (portée, chance de
+  toucher, usure de l'arme). Sur huit graines à 240 jours, la survie est celle d'avant (97
+  contre 97) et chaque monde réalise quinze à vingt-trois inventions.
+
+**Ce que ça donne à l'écran (M38c).** Un onglet **Inventions** : l'arbre des matières (brutes,
+puis celles tirées du four, avec leurs parents et leurs propriétés), puis les trouvailles
+éprouvées et les idées en l'air. Chacune dit ce qu'elle change (« +31 % rapporte plus de
+gibier »), **l'ennui qui l'a fait naître** (« Le gibier part avant qu'on l'approche. »), qui l'a
+trouvée et quand, combien de prototypes ont raté, ce qu'elle coûte, combien savent la faire et
+combien en portent une. La fiche d'un personnage distingue les trouvailles (🛠️) des leçons et
+des inventions du catalogue, et **l'outil en main prend la teinte de sa matière** : une hache de
+bronze ne ressemble pas à une hache de pierre.
+
 ## M37 – La rancune des vaincus (2026-09-17)
 
 Une conquête (M35) fondait les familles du vaincu dans le village vainqueur, sans trace. Elles

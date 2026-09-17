@@ -54,6 +54,8 @@ export interface FicheMatiere {
   readonly couleur: string;
   /** Rang dans la chaîne : 0 pour une matière brute, +1 à chaque dérivation. */
   readonly rang: number;
+  /** Ce qui fond : le minerai, les métaux et tout ce qu'on en tire. La pierre, non. */
+  readonly fusible: boolean;
 }
 
 /** Les matières brutes, celles que le monde donne. */
@@ -64,8 +66,8 @@ export const MATIERES_BRUTES: readonly FicheMatiere[] = [
   m("argile", "argile", "argile", 20, 25, 55, 60, 10, "#b06a44"),
   m("cuir", "cuir", "cuir", 15, 40, 70, 80, 20, "#7a4a2a"),
   m("corde", "corde", "corde", 8, 30, 35, 90, 14, "#a88c4a"),
-  m("minerai", "minerai", "minerai brut", 28, 25, 15, 10, 30, "#6f7f5a"),
-  m("cuivre", "cuivre", "cuivre", 60, 65, 15, 55, 45, "#b87333"),
+  m("minerai", "minerai", "minerai brut", 28, 25, 15, 10, 30, "#6f7f5a", true),
+  m("cuivre", "cuivre", "cuivre", 60, 65, 15, 55, 45, "#b87333", true),
 ];
 
 function m(
@@ -78,6 +80,7 @@ function m(
   souplesse: number,
   rarete: number,
   couleur: string,
+  fusible = false,
 ): FicheMatiere {
   return {
     id,
@@ -92,6 +95,7 @@ function m(
     rarete,
     couleur,
     rang: 0,
+    fusible,
   };
 }
 
@@ -494,6 +498,8 @@ export function deriverMatiere(
 ): FicheMatiere | null {
   const fiche = PROCEDE[procede];
   if (!fiche.derive || parents.length === 0 || parents.length > 2) return null;
+  // On ne fond, n'allie ni ne trempe que ce qui fond : le minerai, les métaux, leurs alliages.
+  if (!parents.every((x) => x.fusible)) return null;
   if (procede === "allier" && parents.length !== 2) return null;
   if (procede !== "allier" && parents.length !== 1) return null;
   const premier = parents[0];
@@ -523,6 +529,7 @@ export function deriverMatiere(
     rarete: borne(moyenne(parents.map((x) => x.rarete)) * 1.3 + 8),
     couleur: teinte(parents, chance),
     rang: Math.max(...parents.map((p) => p.rang)) + 1,
+    fusible: true,
   };
   e.prochain += 1;
   e.nomsPris.add(nom);

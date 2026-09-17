@@ -1400,3 +1400,28 @@ table.saisons td:first-child {
     color: var(--accent);
   }
 }
+
+/* Onglet Inventions (M38) : matières, trouvailles et l'ennui qui les a fait naître. */
+.pastille-matiere {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 0.45em;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 0.35);
+  vertical-align: baseline;
+}
+.liste.inventions li {
+  padding-block: 0.35rem;
+}
+.liste.inventions .gain {
+  margin-left: 0.4em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--accent);
+}
+.liste.inventions .probleme {
+  font-style: italic;
+  opacity: 0.85;
+  margin-top: 0.15rem;
+}

@@ -75,6 +75,9 @@ import type {
   SavoirStat,
   Statistiques,
   ButsEtat,
+  MatiereEtat,
+  TrouvailleEtat,
+  TrouvaillesEtat,
 } from "@sdv/protocole";
 import { FICHES_SCENARIO, FICHES_SUCCES, SUCCES } from "@sdv/protocole";
 
@@ -130,7 +133,27 @@ export function etatPersonnage(sim: Simulation, p: Personnage): PersonnageEtat {
     abattu: p.psyche.abattu,
     foi: Math.round(p.foi * 10) / 10,
     outil: outilEnMain(p),
+    outilCouleur: couleurOutil(sim, p),
   };
+}
+
+/**
+ * La teinte de la matière de l'outil tenu (M38) : une hache de bronze n'a pas la
+ * couleur d'une hache de pierre. Absente quand rien de trouvé n'est en main.
+ */
+function couleurOutil(sim: Simulation, p: Personnage): string | undefined {
+  let meilleure: string | undefined;
+  let gain = -1;
+  for (const o of p.corps.inventaire.objets) {
+    if (o.trouvaille === undefined) continue;
+    const t = sim.trouvailles.trouvailles.get(o.trouvaille);
+    if (t === undefined || t.gain <= gain) continue;
+    const m = sim.trouvailles.matieres.get(t.matiere);
+    if (m === undefined) continue;
+    gain = t.gain;
+    meilleure = m.couleur;
+  }
+  return meilleure;
 }
 
 /** L'outil qu'un personnage tient, d'après ce qu'il veut faire et ce qu'il porte (M31). */
@@ -820,7 +843,7 @@ export function savoirsDuVillage(sim: Simulation): SavoirStat[] {
     if (porteurs === 0) continue;
     resultat.push({
       id,
-      genre: estLecon(id) ? "lecon" : "invention",
+      genre: estIdTrouvaille(id) ? "trouvaille" : estLecon(id) ? "lecon" : "invention",
       titre: titreSavoir(id, (t) => sim.trouvailles.trouvailles.get(t)?.nom ?? null),
       texte: texteSavoir(sim, id),
       porteurs,
@@ -874,6 +897,7 @@ export function messageEtat(sim: Simulation, ctx: ContexteEtat): MessageEtat {
     villages: villagesEtat(sim),
     lois: { ...sim.lois },
     buts: butsEtat(sim),
+    trouvailles: trouvaillesEtat(sim),
     conteur: {
       phase: sim.conteur.phase,
       tension: sim.conteur.tension,
@@ -1138,7 +1162,7 @@ export function messageFiche(sim: Simulation, id: string): MessageFiche | null {
     lieuxConnus: p.connaissance.size,
     savoirs: [...p.savoirs.entries()].map(([id, s]) => ({
       id,
-      genre: estLecon(id) ? "lecon" : "invention",
+      genre: estIdTrouvaille(id) ? "trouvaille" : estLecon(id) ? "lecon" : "invention",
       titre: titreSavoir(id, (t) => sim.trouvailles.trouvailles.get(t)?.nom ?? null),
       texte: texteSavoir(sim, id),
       force: s.force,
@@ -1225,4 +1249,56 @@ function ficheCorps(sim: Simulation, p: Personnage): MessageFiche["corps"] {
 
 function arrondir(v: number): number {
   return Math.round(v * 10) / 10;
+}
+
+/** Les matières et les trouvailles du monde (M38), pour l'onglet Inventions. */
+export function trouvaillesEtat(sim: Simulation): TrouvaillesEtat {
+  const vivants = sim.vivants();
+  const matieres: MatiereEtat[] = [...sim.trouvailles.matieres.values()]
+    .filter((m) => m.ressource === null || m.rang === 0)
+    .map((m) => ({
+      id: m.id,
+      nom: m.nom,
+      couleur: m.couleur,
+      rang: m.rang,
+      parents: [...m.parents],
+      procede: m.procede ?? "",
+      durete: m.durete,
+      tenue: m.tenue,
+      isolation: m.isolation,
+      souplesse: m.souplesse,
+    }))
+    .sort((a, b) => a.rang - b.rang || a.nom.localeCompare(b.nom));
+  const trouvailles: TrouvailleEtat[] = [...sim.trouvailles.trouvailles.values()]
+    .map((t) => {
+      let porteurs = 0;
+      let enMain = 0;
+      for (const p of vivants) {
+        if ((p.savoirs.get(t.id)?.force ?? 0) >= 1) porteurs += 1;
+        enMain += p.corps.inventaire.objets.filter((o) => o.trouvaille === t.id).length;
+      }
+      const m = sim.trouvailles.matieres.get(t.matiere);
+      return {
+        id: t.id,
+        nom: t.nom,
+        matiere: t.matiere,
+        matiereNom: m?.nom ?? t.matiere,
+        couleur: m?.couleur ?? "#888888",
+        procede: t.procede,
+        fonction: t.fonction,
+        levier: t.levier,
+        gain: t.gain,
+        probleme: t.probleme,
+        inventeur: t.inventeur,
+        village: t.village,
+        jour: t.jour,
+        essais: t.essais,
+        porteurs,
+        enMain,
+        ingredients: { ...t.ingredients },
+      };
+    })
+    // Celles que personne ne sait plus faire et que personne ne porte restent en bas.
+    .sort((a, b) => b.porteurs - a.porteurs || b.gain - a.gain || a.nom.localeCompare(b.nom));
+  return { matieres, trouvailles };
 }

@@ -1411,6 +1411,69 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   100 → `revolter` recrée le village au nom et au site d'avant, familles passées, ambitions,
   relation −60 et casus belli, événement, compteur.
 
+## 8 septdecies. La grammaire d'invention telle que réalisée (M38)
+
+- **Matières** (`savoirs/grammaire.ts`, `FicheMatiere`) : `id`, `nom`, `ressource` (la ressource
+  du monde qui la porte, `null` si dérivée), `parents`, `procede`, `durete`, `tenue`,
+  `isolation`, `souplesse`, `rarete`, `couleur`, `rang`, `fusible`. Huit brutes :
+  bois, pierre, fibres, argile, cuir, corde, minerai, cuivre (les deux dernières fusibles).
+- **Procédés** (`PROCEDE`) : tailler, tresser, assembler, cuire, fondre, allier, tremper,
+  polir. Chacun porte ses facteurs sur les quatre propriétés, son atelier (`null`, `feu`,
+  `four`), son niveau d'artisanat, une exigence (`{propriete, seuil}`) et `derive` (fondre,
+  allier, tremper produisent une matière au lieu d'un objet).
+- **Fonctions** (`FONCTION`) : couper, creuser, pêcher, chasser, porter, tenir chaud, conserver,
+  soigner, frapper, bâtir. Chacune nomme son **levier**, la **propriété** qui décide de sa
+  valeur, un `gainMax` et les procédés qui peuvent la servir. Douze leviers : `recolte_bois`,
+  `recolte_pierre`, `recolte_poisson`, `recolte_gibier`, `recolte_minerai`, `solidite`,
+  `conservation`, `chaleur`, `soin`, `combat`, `portage`, `batisse`.
+- **`deriverMatiere(e, rng, procede, parents)`** : refuse un procédé non dérivant, un parent non
+  fusible, ou une matière sous le seuil du procédé ; les propriétés tiennent des parents (la
+  meilleure tirée vers la moyenne) puis du procédé, avec une part de hasard (−10 % à +25 %) ;
+  le nom vient de `NOMS_METAUX` (bronze, laiton, fer, acier…) puis d'un générateur racine +
+  suffixe sans répétition ; `rang = max(parents) + 1`, `fusible` toujours vrai, teinte moyennée.
+- **`composerTrouvaille(e, fonction, procede, matiere)`** : `combinaisonValide` exige que le
+  procédé serve la fonction, ne dérive pas, et que la propriété qui décide, une fois le procédé
+  appliqué, atteigne 40. Le gain vaut `gainMax × part² × avancement`, où `part` est cette
+  propriété sur 100 et `avancement = 0,55 + 0,45 × min(1, rang/3)` — **[DÉCISION]** une matière
+  brute ne donne qu'une part du gain possible, la chaîne fait le reste. Coût :
+  `ingredientsDe` remonte la chaîne jusqu'aux ressources brutes, moitié plus cher à chaque
+  niveau, plafonné à douze par ressource. **L'identifiant est le triplet**
+  (`t:<fonction>.<procede>.<matiere>`) : deux personnes qui ont la même idée ont la même.
+- **Effets** : `bonusPorte(e, inv, levier)` (le meilleur objet en main, jamais cumulé),
+  `bonusSu(e, savoirs, levier)` (ce qu'un groupe sait, pour un bâtiment), `objetDuLevier`
+  (l'objet qui sert, pour l'user). Branchés sur la récolte (rendement et usure), la chasse
+  (portée, chance de toucher, usure), `bonusArme` au combat, la pourriture des stocks et du sac,
+  la perte de chaleur, le soin (un bon pansement assainit la plaie) et le travail de chantier.
+- **Recherche** (`savoirs/recherche.ts`) : `problemes(monde, p)` rend les ennuis mesurables
+  triés par poids (faim selon les gisements vus, froid, pourriture, plaies, mains pleines,
+  guerre, bois, roche, chantier), chacun lié à une fonction et à une plainte. `matieresConnues`
+  (en poche, en stock accessible, ou vues ; les dérivées seulement si `p.matieresSues` les
+  porte), `procedesPossibles` (niveau et ateliers). `chercher` raisonne d'abord
+  (`meilleurRemede`, sans hasard), puis tire **une seule fois** ; l'idée est retenue à force
+  `SEUIL_SAVOIR`, avec `probleme`, `inventeur`, `village`, `jour`. `oublierIdees` efface au bout
+  de `JOURS_IDEE = 30`. `melanger` : devant un four, un curieux (ouverture ≥ 0,45) mêle deux
+  matières qu'il a en quantité, la coulée les consomme, la famille apprend la matière.
+- **Fabrication** : `recetteDeTrouvaille` rend une `Recette` ordinaire ; `planifierFabrication`
+  et `tickFabriquerTrouvaille` suivent le chemin du catalogue (idée requise, niveau, matières,
+  atelier), un prototype sur trois rate **sans consommer les matières**, la réussite met le
+  savoir à 1 pour la personne et sa famille, émet `invention`, et `apprendreMatiere` transmet la
+  matière avec la trouvaille (au four comme au dialogue).
+- **Cerveau** : `perception.moi.trouvaillesAFaire` ne propose que ce qu'on sait mener (niveau,
+  atelier) et dont **on a déjà les matières en poche** — **[DÉCISION]** sans cela, les gens
+  passent leurs journées à courir après des matières au lieu de manger, et la colonie y perd.
+- **Viewer** : onglet Inventions (arbre des matières, trouvailles éprouvées et idées en l'air,
+  avec gain, levier en clair, plainte d'origine, inventeur, prototypes ratés, coût, porteurs),
+  icône 🛠️ dans la fiche et les statistiques, `PersonnageEtat.outilCouleur` qui teinte le sprite
+  de l'outil à la couleur de sa matière, textes `idee` (avec la plainte), `matiere`.
+- **Tests** : `grammaire.test.ts` (11 : matières brutes, alliage plus dur et chaîne qui
+  continue, refus d'un procédé ou d'une matière qui ne s'y prête pas, nom et recette déduits du
+  triplet, coût de la chaîne, meilleure matière = meilleur gain, levier qui ne joue que pour qui
+  porte, fabrication réelle dans le monde, déterminisme, sauvegarde, migration) ;
+  `recherche.test.ts` (7 : rien à signaler chez qui ne manque de rien, froid traduit en fonction,
+  idée née d'un ennui avec son inventeur, pas deux fois la même ni moins bien, idée qui s'efface,
+  matière tirée du four qui coûte ce qu'on y met, et une colonie sur deux cents jours qui trouve,
+  rate et finit par réussir) ; `instantane.test.ts` (2 : l'état envoyé au viewer).
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

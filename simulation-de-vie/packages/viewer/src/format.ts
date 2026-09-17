@@ -446,9 +446,13 @@ export function resumerEvenement(e: EvenementEtat, nom: (id: string) => string):
     case "lecon":
       return `De la mort de ${qui} (${String(d.cause)}), ${String(d.apprenants)} personne${Number(d.apprenants) > 1 ? "s" : ""} retiennent : « ${String(d.morale)} »`;
     case "idee":
-      return `${qui} a une idée : ${String(d.nom)}.`;
+      return d.probleme === undefined
+        ? `${qui} a une idée : ${String(d.nom)}.`
+        : `${qui} se dit : « ${String(d.probleme)} » Et si c'était un ${String(d.nom)} ?`;
     case "invention":
       return `${qui} réussit son ${String(d.nom)} : la famille sait désormais le faire.`;
+    case "matiere":
+      return `${qui} tire du four une matière que personne n'avait vue : le ${String(d.nom)}.`;
     case "prototype_rate":
       return `${qui} rate son prototype de ${String(d.nom)}.`;
     case "jeu":

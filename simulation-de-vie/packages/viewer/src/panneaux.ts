@@ -35,6 +35,22 @@ export interface Interactions {
   readonly ouvrirChronique: (annee: number) => void;
 }
 
+/** Ce que chaque levier change, en clair (M38). */
+const LIBELLE_LEVIER: Record<string, string> = {
+  recolte_bois: "abat plus de bois",
+  recolte_pierre: "extrait plus de pierre",
+  recolte_poisson: "prend plus de poisson",
+  recolte_gibier: "rapporte plus de gibier",
+  recolte_minerai: "extrait plus de minerai",
+  solidite: "dure plus longtemps",
+  conservation: "garde les vivres plus longtemps",
+  chaleur: "tient plus chaud",
+  soin: "soigne mieux",
+  combat: "frappe plus juste",
+  portage: "porte davantage",
+  batisse: "bâtit plus vite",
+};
+
 function $(id: string): HTMLElement {
   const el = document.getElementById(id);
   if (el === null) throw new Error(`élément #${id} introuvable`);
@@ -49,6 +65,7 @@ export class Panneaux {
   private derniereVersionConversations = -1;
   private derniereVersionVillage = -1;
   private derniereVersionLegendes = -1;
+  private derniereVersionInventions = -1;
   private derniereVersionButs = -1;
   private derniereVersionBatiment = -1;
   private dernierRenduLent = 0;
@@ -187,6 +204,12 @@ export class Panneaux {
         if (force || version !== this.derniereVersionVillage) {
           this.village();
           this.derniereVersionVillage = version;
+        }
+        break;
+      case "inventions":
+        if (force || version !== this.derniereVersionInventions) {
+          this.inventions();
+          this.derniereVersionInventions = version;
         }
         break;
       case "legendes":
@@ -441,7 +464,7 @@ export class Panneaux {
       f.savoirs
         .map(
           (s) =>
-            `<span class="puce" title="${e(s.texte)}${s.origine ? ` — ${e(s.origine)}` : ""}">${s.genre === "lecon" ? "📜" : "💡"} ${e(s.titre)}${s.force < 1 ? " (idée)" : ""}</span>`,
+            `<span class="puce" title="${e(s.texte)}${s.origine ? ` — ${e(s.origine)}` : ""}">${s.genre === "lecon" ? "📜" : s.genre === "trouvaille" ? "🛠️" : "💡"} ${e(s.titre)}${s.force < 1 ? " (idée)" : ""}</span>`,
         )
         .join("") || "<span class='discret'>rien encore</span>";
     const corps = f.corps;
@@ -802,7 +825,7 @@ export class Panneaux {
       <h3>Savoirs du village</h3>
       ${
         s.savoirs.length > 0
-          ? `<table class="saisons"><tr><th>savoir</th><th>porté par</th></tr>${s.savoirs.map((v) => `<tr><td title="${e(v.texte)}">${v.genre === "lecon" ? "📜" : "💡"} ${e(v.titre)}</td><td>${v.porteurs}</td></tr>`).join("")}</table>`
+          ? `<table class="saisons"><tr><th>savoir</th><th>porté par</th></tr>${s.savoirs.map((v) => `<tr><td title="${e(v.texte)}">${v.genre === "lecon" ? "📜" : v.genre === "trouvaille" ? "🛠️" : "💡"} ${e(v.titre)}</td><td>${v.porteurs}</td></tr>`).join("")}</table>`
           : "<p class='discret'>aucune leçon ni invention encore</p>"
       }
       <h3>Le conteur</h3>
@@ -941,6 +964,86 @@ export class Panneaux {
   }
 
   /** Onglet Légendes : les récits du village, les lieux nommés, les proverbes. */
+  /**
+   * L'onglet Inventions (M38) : l'arbre des matières, puis ce que le village a
+   * trouvé, avec le problème qui l'a fait naître et ce que ça change.
+   */
+  private inventions(): void {
+    const etat = this.magasin.etat;
+    if (etat === null) return;
+    const init = this.magasin.init;
+    const t = etat.trouvailles;
+    const quand = (jour: number): string =>
+      init
+        ? `an ${Math.floor(jour / (init.joursParSaison * 4)) + 1}, jour ${jour}`
+        : `jour ${jour}`;
+    const nomMatiere = new Map(t.matieres.map((m) => [m.id, m.nom]));
+
+    const pastille = (couleur: string): string =>
+      `<span class="pastille-matiere" style="background:${e(couleur)}"></span>`;
+
+    const brutes = t.matieres.filter((m) => m.rang === 0);
+    const tirees = t.matieres.filter((m) => m.rang > 0);
+    const ligneMatiere = (m: (typeof t.matieres)[number]): string =>
+      `<li>${pastille(m.couleur)}<b>${e(m.nom)}</b>${
+        m.parents.length > 0
+          ? ` <span class="discret">${e(m.procede)} · de ${m.parents.map((x) => e(nomMatiere.get(x) ?? x)).join(" et ")}</span>`
+          : ""
+      }<div class="discret">dureté ${m.durete} · tenue ${m.tenue} · isolation ${m.isolation} · souplesse ${m.souplesse}</div></li>`;
+
+    // Une trouvaille par levier : c'est la meilleure connue qui sert.
+    const parLevier = new Map<string, typeof t.trouvailles>();
+    for (const x of t.trouvailles) {
+      const liste = parLevier.get(x.levier) ?? [];
+      parLevier.set(x.levier, [...liste, x]);
+    }
+    const eprouvees = t.trouvailles.filter((x) => x.porteurs > 0);
+    const idees = t.trouvailles.filter((x) => x.porteurs === 0);
+
+    const ligne = (x: (typeof t.trouvailles)[number]): string => {
+      const cout = Object.entries(x.ingredients)
+        .map(([r, n]) => `${e(r)} ×${n}`)
+        .join(", ");
+      const meilleure = (parLevier.get(x.levier) ?? [])
+        .filter((y) => y.porteurs > 0)
+        .every((y) => y.gain <= x.gain);
+      return `<li class="${x.porteurs > 0 ? "important" : ""}">
+        ${pastille(x.couleur)}<b>${e(x.nom)}</b>
+        <span class="gain">+${Math.round(x.gain * 100)} %</span>
+        <span class="discret">${e(LIBELLE_LEVIER[x.levier] ?? x.levier)}${meilleure && x.porteurs > 0 ? " · la meilleure du village" : ""}</span>
+        ${x.probleme === null ? "" : `<div class="probleme">« ${e(x.probleme)} »</div>`}
+        <div class="discret">
+          ${x.inventeur === null ? "trouvée on ne sait par qui" : `trouvée par ${e(x.inventeur)}, ${e(quand(x.jour))}`}
+          ${x.essais > 0 ? ` · ${x.essais} prototype${x.essais > 1 ? "s" : ""} raté${x.essais > 1 ? "s" : ""}` : ""}
+          · ${e(x.procede)} ${e(x.matiereNom)}${cout === "" ? "" : ` · ${e(cout)}`}
+          · ${x.porteurs} savent la faire, ${x.enMain} en main
+        </div>
+      </li>`;
+    };
+
+    $("inventions").innerHTML = `
+      <h2>Ce que le village a trouvé</h2>
+      <p class="discret">Personne ne suit de plan : un ennui (on gèle, ça pourrit, le gibier fuit) devient une fonction manquante, qu'un esprit curieux croise le soir avec une matière qu'il connaît et un procédé qu'il maîtrise. Il essaie ; souvent ça rate ; quand ça tient, sa famille l'apprend et le dialogue la répand.</p>
+      <h3>Matières</h3>
+      <ul class="liste">${brutes.map(ligneMatiere).join("")}</ul>
+      ${
+        tirees.length > 0
+          ? `<h4>Tirées du four</h4><ul class="liste">${tirees.map(ligneMatiere).join("")}</ul>`
+          : "<p class='discret'>Aucune matière nouvelle : il faut un four, et quelqu'un d'assez curieux pour y mêler ce qu'il a.</p>"
+      }
+      <h3>Trouvailles éprouvées</h3>
+      ${
+        eprouvees.length > 0
+          ? `<ol class="liste inventions">${eprouvees.map(ligne).join("")}</ol>`
+          : "<p class='discret'>Rien encore : les idées viennent des ennuis, et il faut les réussir.</p>"
+      }
+      ${
+        idees.length > 0
+          ? `<h3>Idées en l'air</h3><p class="discret">Imaginées, jamais réussies, ou dont plus personne ne se souvient.</p><ol class="liste inventions">${idees.map(ligne).join("")}</ol>`
+          : ""
+      }`;
+  }
+
   private legendes(): void {
     const etat = this.magasin.etat;
     if (etat === null) return;

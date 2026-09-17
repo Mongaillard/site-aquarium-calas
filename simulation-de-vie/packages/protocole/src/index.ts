@@ -76,6 +76,8 @@ export interface PersonnageEtat {
    * `pioche`, `pioche_cuivre`, `lance`, `arc`, `canne`, `marteau` — ou null les mains vides.
    */
   readonly outil: string | null;
+  /** Teinte de la matière de l'outil tenu (M38), pour le sprite ; absent si banal. */
+  readonly outilCouleur?: string | undefined;
 }
 
 export interface BatimentEtat {
@@ -416,9 +418,56 @@ export interface SocieteEtat {
   readonly bannis: readonly PersonneCourte[];
 }
 
+/** Une matière du monde (M38) : brute, ou tirée du four. */
+export interface MatiereEtat {
+  readonly id: string;
+  readonly nom: string;
+  readonly couleur: string;
+  /** 0 pour une matière brute, +1 à chaque dérivation. */
+  readonly rang: number;
+  readonly parents: readonly string[];
+  /** Le procédé qui l'a tirée, vide pour une matière brute. */
+  readonly procede: string;
+  readonly durete: number;
+  readonly tenue: number;
+  readonly isolation: number;
+  readonly souplesse: number;
+}
+
+/** Une trouvaille (M38) : ce qu'on a inventé, et ce que ça change. */
+export interface TrouvailleEtat {
+  readonly id: string;
+  readonly nom: string;
+  readonly matiere: string;
+  readonly matiereNom: string;
+  readonly couleur: string;
+  readonly procede: string;
+  readonly fonction: string;
+  readonly levier: string;
+  /** Gain apporté, en facteur ajouté (0,35 = un tiers de mieux). */
+  readonly gain: number;
+  /** L'ennui qui l'a fait naître. */
+  readonly probleme: string | null;
+  readonly inventeur: string | null;
+  readonly village: string | null;
+  readonly jour: number;
+  /** Prototypes ratés avant que ça tienne. */
+  readonly essais: number;
+  /** Combien de vivants savent la faire, et combien en portent une. */
+  readonly porteurs: number;
+  readonly enMain: number;
+  readonly ingredients: Readonly<Record<string, number>>;
+}
+
+/** Tout ce que le monde a trouvé (M38). */
+export interface TrouvaillesEtat {
+  readonly matieres: readonly MatiereEtat[];
+  readonly trouvailles: readonly TrouvailleEtat[];
+}
+
 export interface SavoirStat {
   readonly id: string;
-  readonly genre: "lecon" | "invention";
+  readonly genre: "lecon" | "invention" | "trouvaille";
   readonly titre: string;
   readonly texte: string;
   readonly porteurs: number;
@@ -427,7 +476,7 @@ export interface SavoirStat {
 /** Un savoir d'une personne : leçon retenue ou invention (idée en cours si force < 1). */
 export interface SavoirFiche {
   readonly id: string;
-  readonly genre: "lecon" | "invention";
+  readonly genre: "lecon" | "invention" | "trouvaille";
   readonly titre: string;
   readonly texte: string;
   readonly force: number;
@@ -862,6 +911,8 @@ export interface MessageEtat {
   readonly conteur: ConteurEtat;
   /** Les buts (M26) : succès, scénario, prophéties. */
   readonly buts: ButsEtat;
+  /** Ce que le monde a trouvé (M38) : matières et trouvailles. */
+  readonly trouvailles: TrouvaillesEtat;
 }
 
 export interface RelationFiche {
