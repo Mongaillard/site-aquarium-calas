@@ -1,0 +1,1513 @@
+:root {
+  --fond: #14171c;
+  --panneau: #1c2027;
+  --bord: #2c323b;
+  --texte: #e8e8e8;
+  --discret: #9aa3ad;
+  --accent: #6cc2ff;
+  --ok: #7dffa0;
+  --alerte: #ff5f5f;
+  --voile: rgba(20, 23, 28, 0.88);
+  --police: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Hauteur de la barre du haut et de la barre du bas (téléphone), pour caler ce qui flotte. */
+  --hud: 44px;
+  --nav: 56px;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  /* Un doigt qui tire en butée ne doit pas recharger la page (mobile). */
+  overscroll-behavior: none;
+  background: var(--fond);
+  color: var(--texte);
+  font-family: var(--police);
+  font-size: 14px;
+}
+button {
+  font: inherit;
+  color: var(--texte);
+  background: #2a303a;
+  border: 1px solid var(--bord);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+button:hover {
+  background: #343b47;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+button.actif {
+  background: var(--accent);
+  color: #0b1620;
+  border-color: var(--accent);
+}
+select,
+input {
+  font: inherit;
+  color: var(--texte);
+  background: #2a303a;
+  border: 1px solid var(--bord);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+a.lien,
+.lien {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.discret {
+  color: var(--discret);
+}
+[hidden] {
+  display: none !important;
+}
+
+/* La carte prend tout ; tout le reste flotte dessus (M29). */
+#app {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+#zone-carte {
+  position: absolute;
+  inset: 0;
+}
+#carte {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  background: #0f1216;
+  touch-action: none;
+}
+#carte.glisse {
+  cursor: grabbing;
+}
+#carte.dieu {
+  cursor: crosshair;
+}
+
+/* La barre du haut : une seule rangée, ce qui sert à chaque instant. */
+#hud {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+#hud > * {
+  pointer-events: auto;
+}
+#hud button,
+#hud select {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  font-size: 15px;
+  flex: none;
+}
+#hud select {
+  font-size: 13px;
+  padding: 4px 4px;
+}
+#hud .etat {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#hud .etat > span + span:not(:empty)::before {
+  content: "\00a0·\00a0";
+  color: var(--discret);
+}
+#hud .etat > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#hud .etat .horloge {
+  flex: none;
+}
+#hud .conteur {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--discret);
+  border-left: 3px solid #8fd18f;
+}
+/* Le bouton d'un volet ouvert se voit. */
+#app:has(#menu:not([hidden])) #btn-menu,
+#app:has(#panneau.ouvert) #btn-panneau {
+  background: var(--accent);
+  color: #10141a;
+  border-color: var(--accent);
+}
+#hud .conteur.montee {
+  border-left-color: #ffd479;
+  color: #ffd479;
+}
+#hud .conteur.crise {
+  border-left-color: #ff5f5f;
+  color: #ff9c9c;
+}
+#hud .conteur.repit {
+  border-left-color: #9ad8ff;
+  color: #9ad8ff;
+}
+.btn-dieu.actif {
+  background: var(--accent);
+  color: #10141a;
+}
+.btn-dieu.suspendue {
+  color: #ff9c5f;
+}
+.btn-question {
+  background: #ffd479;
+  color: #10141a;
+  font-weight: 600;
+  font-size: 12px;
+  animation: pulsation 1.6s infinite;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#hud .btn-question {
+  background: #ffd479;
+  color: #10141a;
+}
+@keyframes pulsation {
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 212, 121, 0.35);
+  }
+}
+
+/* Calques de lecture (M25), sous la barre. */
+.calques {
+  position: absolute;
+  left: 8px;
+  top: calc(var(--hud) + 12px);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+}
+.calques button {
+  padding: 3px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--discret);
+}
+.calques button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+/* Le fil des grands événements : une ligne par événement, deux au plus, « aller voir » d'un clic. */
+.fil {
+  position: absolute;
+  left: 8px;
+  top: calc(var(--hud) + 48px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(460px, calc(100% - 16px));
+}
+.fil li:nth-child(n + 3) {
+  display: none;
+}
+.fil button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.3;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  color: #ffd479;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fil button .quand {
+  color: var(--discret);
+  margin-right: 4px;
+}
+.fil li.nouveau button {
+  border-color: #ffd479;
+}
+/* La jauge de bataille (M32) : au milieu en haut, les deux camps face à face. */
+.bataille {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--hud) + 8px);
+  transform: translateX(-50%);
+  width: min(360px, calc(100% - 16px));
+  background: var(--voile);
+  border: 1px solid #ff6060;
+  border-radius: 10px;
+  padding: 6px 10px 8px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 3;
+}
+.bataille .titre {
+  width: 100%;
+  text-align: center;
+  font-weight: 600;
+  color: #ffd479;
+  background: none;
+  border: none;
+  padding: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bataille .camp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2fr auto;
+  align-items: center;
+  gap: 8px;
+}
+.bataille .camp .nom {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bataille .camp .effectif {
+  font-variant-numeric: tabular-nums;
+  color: var(--discret);
+}
+.bataille .barre {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.bataille .barre i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.bataille .att .barre i {
+  background: #ff6060;
+}
+.bataille .def .barre i {
+  background: #6fb0ff;
+}
+/* Légende : derrière un « ? », en bas à gauche. */
+.legende {
+  display: none;
+  position: absolute;
+  left: 8px;
+  bottom: 50px;
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--discret);
+  max-width: min(560px, calc(100% - 16px));
+  line-height: 1.5;
+}
+.legende.ouverte {
+  display: block;
+}
+.legende .pastille {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.btn-legende {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  padding: 0;
+  font-weight: 600;
+  background: var(--voile);
+}
+/* En mode Dieu, la barre de pouvoirs prend la place de la légende. */
+#zone-carte.dieu .legende,
+#zone-carte.dieu .btn-legende {
+  display: none;
+}
+.survol {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(20, 23, 28, 0.92);
+  border: 1px solid var(--bord);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* Le volet : onglets et contenu, par-dessus la carte, à droite. */
+#panneau {
+  position: absolute;
+  right: 8px;
+  top: calc(var(--hud) + 12px);
+  bottom: 8px;
+  width: min(420px, calc(100% - 16px));
+  z-index: 6;
+  display: none;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panneau);
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+#panneau.ouvert {
+  display: flex;
+}
+.panneau-entete {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--bord);
+}
+#onglets {
+  display: flex;
+  gap: 2px;
+  padding: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#onglets::-webkit-scrollbar {
+  display: none;
+}
+#onglets button {
+  padding: 4px 8px;
+  font-size: 13px;
+  white-space: nowrap;
+  flex: none;
+}
+.fermer {
+  flex: none;
+  min-width: 32px;
+  min-height: 32px;
+  margin: 0 6px;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--discret);
+}
+.onglet {
+  display: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 10px 12px;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+.onglet.actif {
+  display: block;
+}
+.onglet h2 {
+  font-size: 15px;
+  margin: 12px 0 6px;
+}
+.onglet h2:first-child {
+  margin-top: 0;
+}
+.onglet h3 {
+  font-size: 13px;
+  margin: 10px 0 4px;
+  color: var(--discret);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Le menu ☰ : nouveau monde, sauvegardes, pas à pas, vitesse, lois, plein écran. */
+.menu {
+  position: absolute;
+  left: 8px;
+  top: calc(var(--hud) + 12px);
+  z-index: 7;
+  width: min(380px, calc(100% - 16px));
+  max-height: calc(100% - var(--hud) - 20px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  background: var(--panneau);
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.menu-entete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.menu-entete .titre {
+  font-weight: 600;
+}
+.menu-entete .discret {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu .local {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-items: center;
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--bord);
+}
+.menu .local label {
+  color: var(--discret);
+  font-size: 13px;
+}
+.menu .local .case,
+.menu .local .ligne {
+  grid-column: 1 / -1;
+}
+.menu .local .case {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.menu .ligne {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.menu .ligne button {
+  flex: 1;
+  min-height: 36px;
+}
+.menu .vitesses {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.menu .vitesses button {
+  flex: 1;
+  min-height: 34px;
+  padding: 4px 6px;
+  font-variant-numeric: tabular-nums;
+}
+.menu .connexion {
+  font-size: 12px;
+  color: var(--discret);
+}
+.menu .connexion.ok {
+  color: var(--ok);
+}
+.menu .connexion.ko {
+  color: var(--alerte);
+}
+.menu #resume {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.btn-reprendre {
+  background: #7dffa0;
+  color: #10141a;
+  font-weight: 600;
+  min-height: 36px;
+}
+
+/* La barre du bas (téléphone) : un onglet à la fois, façon appli. */
+#nav-bas {
+  display: none;
+}
+
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.liste li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--bord);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.liste li .quand {
+  color: var(--discret);
+  font-variant-numeric: tabular-nums;
+  margin-right: 6px;
+}
+.liste li.important {
+  color: #fff;
+}
+.liste li.majeur {
+  color: #ffd479;
+}
+.liste li .voir {
+  float: right;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-radius: 6px;
+  background: transparent;
+}
+.liste li .voir:hover {
+  background: var(--accent);
+}
+.liste li[data-id] {
+  cursor: pointer;
+}
+.liste li[data-id]:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.liste li.reve {
+  font-style: italic;
+  color: #c9d6ff;
+}
+.liste li.altere {
+  font-style: italic;
+}
+.filtres {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.filtres select {
+  max-width: 150px;
+}
+
+.entete-fiche {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.entete-fiche .rond {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  flex: none;
+}
+.entete-fiche .nom {
+  font-size: 17px;
+  font-weight: 600;
+}
+.entete-fiche .actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.pensee {
+  font-style: italic;
+  background: #232936;
+  border-left: 3px solid var(--accent);
+  padding: 8px 10px;
+  border-radius: 0 6px 6px 0;
+  margin: 8px 0;
+}
+.pensee.claude {
+  border-left-color: var(--accent);
+}
+.pensee.reve {
+  border-left-color: #c9a7ff;
+  font-size: 13px;
+}
+.epitaphe {
+  font-style: italic;
+  color: var(--discret);
+  border-left: 3px solid var(--bord);
+  padding-left: 8px;
+  margin: 8px 0;
+}
+.jauges {
+  display: grid;
+  grid-template-columns: 70px 1fr 34px;
+  gap: 4px 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.jauge {
+  height: 8px;
+  background: #2a303a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.jauge > i {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+.jauge.bas > i {
+  background: #ffb347;
+}
+.jauge.critique > i {
+  background: var(--alerte);
+}
+.puces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.puce {
+  background: #2a303a;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+.puce.blessure {
+  background: #4a2323;
+  color: #ffb3b3;
+}
+table.relations {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+table.relations td {
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--bord);
+}
+table.relations td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+}
+.tuile {
+  background: #232936;
+  border-radius: 8px;
+  padding: 8px;
+}
+.tuile .valeur {
+  font-size: 20px;
+  font-weight: 600;
+}
+.tuile .libelle {
+  font-size: 11px;
+  color: var(--discret);
+}
+table.saisons {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 6px;
+}
+table.saisons th,
+table.saisons td {
+  padding: 2px 4px;
+  text-align: right;
+  border-bottom: 1px solid var(--bord);
+}
+table.saisons th:first-child,
+table.saisons td:first-child {
+  text-align: left;
+}
+.conversation {
+  margin-bottom: 10px;
+}
+.conversation .replique {
+  padding-left: 8px;
+}
+.conversation .locuteur {
+  color: var(--accent);
+}
+.personne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.personne .rond {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  flex: none;
+}
+.personne .detail {
+  color: var(--discret);
+  font-size: 12px;
+  margin-left: auto;
+}
+.ambition {
+  border-left: 3px solid #ffd479;
+  padding: 6px 8px;
+  margin: 6px 0;
+  background: rgba(255, 212, 121, 0.08);
+  border-radius: 0 6px 6px 0;
+}
+.ambition .but {
+  font-style: italic;
+}
+.ambition.finie {
+  border-left-color: var(--bord);
+  opacity: 0.8;
+}
+.question {
+  color: #ffd479;
+}
+.conseil {
+  border-left: 3px solid var(--accent);
+  padding: 6px 8px;
+  margin: 6px 0;
+  border-radius: 0 6px 6px 0;
+  background: rgba(108, 194, 255, 0.06);
+}
+.conseil ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.conseil li {
+  font-size: 12px;
+  line-height: 1.35;
+}
+.conseil li.choisi {
+  color: #ffd479;
+  font-weight: 600;
+}
+
+/* Mode Dieu : barre de pouvoirs flottante en bas de la carte. */
+.pouvoirs {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 16px);
+  padding: 6px 8px;
+  background: rgba(20, 23, 28, 0.9);
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.pouvoirs .faveur {
+  position: relative;
+  width: 14px;
+  height: 44px;
+  border-radius: 7px;
+  background: #2a2f38;
+  overflow: visible;
+  flex: none;
+}
+.pouvoirs .faveur i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 50%;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #ffe9a8, #ffb347);
+  transition: height 0.4s ease;
+}
+.pouvoirs .faveur span {
+  position: absolute;
+  left: 50%;
+  top: -18px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  white-space: nowrap;
+  color: #ffd479;
+  font-variant-numeric: tabular-nums;
+}
+.pouvoirs .palette {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.pouvoirs .palette::-webkit-scrollbar {
+  display: none;
+}
+.pouvoir {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  scroll-snap-align: start;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 10px;
+  background: #262b33;
+}
+.pouvoir[aria-pressed="true"] {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px #ffd479 inset;
+}
+.pouvoir.providence[aria-pressed="true"] {
+  background: #3b6a3f;
+  box-shadow: 0 0 0 2px #7dffa0 inset;
+}
+.pouvoir:disabled {
+  opacity: 0.4;
+}
+.pouvoir .cout {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-size: 9px;
+  color: #ffd479;
+}
+.pouvoir .touche {
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  font-size: 9px;
+  color: var(--discret);
+}
+.pouvoir .verrou {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(20, 23, 28, 0.75);
+  font-size: 10px;
+  color: #ffd479;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 3px;
+  pointer-events: none;
+}
+.pouvoir.favori {
+  box-shadow: 0 0 0 1px #c8f0a0 inset;
+}
+.pouvoir.etranger .cout {
+  color: #ff9c5f;
+}
+.pouvoir .recharge {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: rgba(20, 23, 28, 0.6);
+  pointer-events: none;
+}
+.domaine-choix {
+  margin-top: 4px;
+  font-size: 12px;
+}
+/* Sculpter et peupler (M25) : une seconde palette, séparée par un filet. */
+.pouvoirs .outils {
+  border-left: 1px solid var(--bord);
+  padding-left: 8px;
+  flex: none;
+  overflow: visible;
+}
+.pouvoirs .palette:not(.outils) {
+  flex: 0 1 auto;
+  min-width: 96px;
+}
+.pouvoirs .reglage {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.pouvoirs .reglage button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  background: #262b33;
+  font-size: 16px;
+  line-height: 1;
+}
+.pouvoirs .reglage span {
+  min-width: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pouvoirs .reglage select {
+  height: 28px;
+}
+.pouvoirs .colonne {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 200px;
+}
+.pouvoirs .aide {
+  font-size: 11px;
+  line-height: 1.3;
+}
+.pouvoirs .reputation {
+  font-size: 11px;
+}
+.pouvoirs .btn-appliquer {
+  flex: none;
+  background: #ffd479;
+  color: #10141a;
+  font-weight: 600;
+}
+.pouvoirs.secousse {
+  animation: secousse 0.3s;
+}
+@keyframes secousse {
+  25% {
+    transform: translateX(calc(-50% - 6px));
+  }
+  75% {
+    transform: translateX(calc(-50% + 6px));
+  }
+}
+/* Les prières en attente : les quêtes du dieu, en haut à droite. */
+.prieres {
+  position: absolute;
+  right: 8px;
+  top: calc(var(--hud) + 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(280px, 60%);
+}
+.prieres button {
+  text-align: left;
+  font-size: 12px;
+  padding: 4px 8px;
+  background: rgba(20, 23, 28, 0.9);
+  border: 1px solid #6a5a2e;
+  border-radius: 8px;
+  color: #ffe9a8;
+}
+.prieres button .discret {
+  display: block;
+  font-size: 11px;
+}
+/* Les lois du monde (M25) : un panneau flottant sous la barre. */
+.lois {
+  position: absolute;
+  left: 8px;
+  top: calc(var(--hud) + 12px);
+  z-index: 4;
+  width: min(360px, calc(100% - 16px));
+  padding: 10px 12px;
+  background: rgba(20, 23, 28, 0.96);
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.lois h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.lois p {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.lois label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid var(--bord);
+  font-size: 13px;
+  cursor: pointer;
+}
+.lois label input {
+  margin-top: 3px;
+}
+.lois label .discret {
+  display: block;
+  font-size: 12px;
+}
+.lois label.suspendue {
+  color: #ff9c5f;
+}
+
+/* Les buts (M26) : scénario, prophéties, grille des succès. */
+.scenario {
+  border-left: 3px solid #ffd479;
+  padding: 8px 10px;
+  margin: 6px 0;
+  background: rgba(255, 212, 121, 0.08);
+  border-radius: 0 8px 8px 0;
+}
+.scenario.gagne {
+  border-left-color: var(--ok);
+}
+.scenario.perdu {
+  border-left-color: var(--alerte);
+}
+.scenario .jauge {
+  margin-top: 6px;
+}
+.succes-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+.succes {
+  background: #232936;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.succes .titre {
+  font-weight: 600;
+  font-size: 13px;
+}
+.succes.verrou {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.succes .quand {
+  display: block;
+  color: var(--discret);
+  font-size: 11px;
+}
+.propheties li.accomplie {
+  color: var(--ok);
+}
+.propheties li.manquee {
+  color: var(--discret);
+  text-decoration: line-through;
+}
+.propheties li.ouverte {
+  color: #ffd479;
+}
+.dialogue.chronique h2 {
+  font-style: italic;
+}
+.dialogue.chronique p {
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 62ch;
+}
+.actes li.crise {
+  color: #ff9c9c;
+}
+.actes li.bienfait {
+  color: #9ad8ff;
+}
+/* Arbres des familles (onglet Population). */
+.familles {
+  margin-bottom: 8px;
+}
+.familles summary {
+  cursor: pointer;
+  color: var(--discret);
+  font-size: 13px;
+}
+.arbre,
+.arbre ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 14px;
+  border-left: 1px solid var(--bord);
+}
+.arbre {
+  padding-left: 0;
+  border-left: 0;
+  margin-bottom: 8px;
+}
+.arbre .noeud {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: transparent;
+}
+.arbre .noeud:hover {
+  background: var(--accent);
+}
+.arbre .noeud .rond {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  flex: none;
+}
+.arbre .noeud.mort {
+  color: var(--discret);
+  text-decoration: line-through;
+}
+.arbre h4 {
+  margin: 6px 0 2px;
+  font-size: 13px;
+}
+
+/* Boîtes de dialogue. */
+.dialogue {
+  background: var(--panneau);
+  color: inherit;
+  border: 1px solid var(--bord);
+  border-radius: 12px;
+  padding: 14px 16px;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+.dialogue::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+.dialogue h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+.dialogue .ligne {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+.dialogue .ligne input {
+  flex: 1;
+  min-width: 120px;
+}
+.dialogue .liste li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.dialogue .liste li span {
+  flex: 1;
+  min-width: 160px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Téléphone et tablette étroite : un onglet à la fois, barre de navigation en bas. */
+@media (max-width: 900px) {
+  /* Sous la rangée des calques, pleine largeur ; le fil descend d'autant. */
+  .bataille {
+    top: calc(var(--hud) + 36px);
+    font-size: 11px;
+    padding: 4px 8px 6px;
+  }
+  .bataille:not([hidden]) ~ .fil {
+    top: calc(var(--hud) + 116px);
+  }
+
+  #zone-carte {
+    bottom: var(--nav);
+  }
+  .ordi {
+    display: none !important;
+  }
+  /* L'état tient sur deux lignes serrées ; la météo et le compte de vivants attendent le menu. */
+  #hud .etat {
+    display: block;
+    padding: 3px 8px;
+    font-size: 11px;
+    line-height: 1.25;
+    white-space: normal;
+    max-height: 36px;
+  }
+  #hud .etat .meteo,
+  #hud .etat .vivants {
+    display: none;
+  }
+  #hud select {
+    max-width: 58px;
+  }
+  #hud .btn-question {
+    max-width: 44px;
+    padding: 4px 6px;
+  }
+  .calques button {
+    padding: 3px 5px;
+    font-size: 11px;
+  }
+  .fil {
+    max-width: calc(100% - 16px);
+  }
+  .fil li:nth-child(n + 2) {
+    display: none;
+  }
+  .prieres {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+    pointer-events: none;
+    top: calc(var(--hud) + 48px);
+  }
+  .prieres button {
+    pointer-events: auto;
+    white-space: nowrap;
+    flex: none;
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+  .prieres button .discret {
+    display: none;
+  }
+  .prieres:not([hidden]) ~ .fil {
+    top: calc(var(--hud) + 84px);
+  }
+  /* La barre de pouvoirs tient en deux rangées qui défilent : pouvoirs, puis outils. */
+  .pouvoirs {
+    left: 8px;
+    right: 8px;
+    bottom: 6px;
+    transform: none;
+    max-width: none;
+    justify-content: flex-start;
+  }
+  .pouvoirs .colonne {
+    display: none;
+  }
+  .pouvoirs .palette:not(.outils) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .pouvoirs .outils,
+  .pouvoirs .reglage {
+    order: 1;
+  }
+  .pouvoirs .outils {
+    flex: 1 1 100%;
+    min-width: 0;
+    overflow-x: auto;
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--bord);
+    padding-top: 6px;
+  }
+  .pouvoirs .btn-appliquer {
+    order: 2;
+  }
+  #panneau {
+    left: 0;
+    right: 0;
+    top: calc(var(--hud) + 8px);
+    bottom: var(--nav);
+    width: auto;
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
+  }
+  #onglets button {
+    min-height: 32px;
+    font-size: 12px;
+    padding: 4px 7px;
+  }
+  .onglet {
+    padding: 8px 10px;
+  }
+  .entete-fiche .nom {
+    font-size: 15px;
+  }
+  .jauges {
+    grid-template-columns: 60px 1fr 30px;
+  }
+  .menu {
+    max-height: calc(100% - var(--hud) - var(--nav) - 16px);
+  }
+  #nav-bas {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--nav);
+    z-index: 8;
+    display: flex;
+    background: var(--panneau);
+    border-top: 1px solid var(--bord);
+  }
+  #nav-bas button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--discret);
+    font-size: 18px;
+    line-height: 1;
+  }
+  #nav-bas button span {
+    font-size: 10px;
+  }
+  #nav-bas button.actif {
+    background: transparent;
+    color: var(--accent);
+  }
+  /* Volet fermé : c'est la carte qui est active, pas le dernier onglet vu. */
+  #app:not(:has(#panneau.ouvert)) #nav-bas button.actif {
+    color: var(--discret);
+  }
+  #app:not(:has(#panneau.ouvert)) #nav-carte {
+    color: var(--accent);
+  }
+}
+
+/* Onglet Inventions (M38) : matières, trouvailles et l'ennui qui les a fait naître. */
+.pastille-matiere {
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 0.45em;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 0.35);
+  vertical-align: baseline;
+}
+.liste.inventions li {
+  padding-block: 0.35rem;
+}
+.liste.inventions .gain {
+  margin-left: 0.4em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--accent);
+}
+.liste.inventions .probleme {
+  font-style: italic;
+  opacity: 0.85;
+  margin-top: 0.15rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Habillage Kenney « UI Pack Pixel Adventure » (M39c). Des cadres en neuf
+ * tranches : le bord de la tuile de 32 px se découpe à 8 px, le centre remplit.
+ *
+ * **[DÉCISION]** On n'en habille que les boutons d'icônes et les jauges. Passé
+ * sur le volet, les puces de calque et les listes, ce cadre mange le contraste
+ * et rend le texte dense illisible : l'essai est dans l'historique.
+ * ------------------------------------------------------------------------ */
+:root {
+  --bouton: url("./assets/ui/bouton.png");
+  --bouton-actif: url("./assets/ui/bouton-actif.png");
+  --jauge-cadre: url("./assets/ui/jauge.png");
+}
+
+/* Les commandes de la barre du haut et les pouvoirs du ciel : des icônes. */
+#hud > button,
+#pouvoirs button,
+#outils button,
+#btn-fermer-panneau,
+#aide {
+  border: 8px solid transparent;
+  border-image: var(--bouton) 8 fill repeat;
+  border-radius: 0;
+  background: none;
+  image-rendering: pixelated;
+}
+#hud > button:hover,
+#pouvoirs button:hover,
+#outils button:hover,
+#btn-fermer-panneau:hover,
+#aide:hover {
+  border-image: var(--bouton-actif) 8 fill repeat;
+  background: none;
+}
+#hud > button.actif,
+#pouvoirs button.actif,
+#outils button.actif {
+  border-image: var(--bouton-actif) 8 fill repeat;
+  background: none;
+  color: var(--texte);
+}
+#hud > button > *,
+#pouvoirs button > *,
+#outils button > * {
+  image-rendering: auto;
+}
+
+/* La jauge de bataille : un cadre de jauge autour des deux camps. */
+#bataille .barre {
+  border: 6px solid transparent;
+  border-image: var(--jauge-cadre) 8 fill repeat;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+
+/* M45 : ouvrir une sauvegarde venue d'un fichier. L'input natif est laid et
+   intraduisible ; on le cache derrière un label qui a l'allure d'un bouton. */
+#fichier-sauvegarde {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.bouton-fichier {
+  display: inline-block;
+  font: inherit;
+  color: var(--texte);
+  background: #2a303a;
+  border: 1px solid var(--bord);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.bouton-fichier:hover {
+  background: #343b47;
+}
+#fichier-sauvegarde:focus-visible + .bouton-fichier {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

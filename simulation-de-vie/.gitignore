@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+saves/
+journal/
+.env
+coverage/
+dist-types/
+dist-local/
+*-itch.zip

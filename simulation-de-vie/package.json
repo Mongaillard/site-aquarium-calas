@@ -1,0 +1,40 @@
+{
+  "name": "simulation-de-vie",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Simulation de vie avec des personnages dotés chacun d'une IA et d'une identité propres",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "sim": "pnpm --filter @sdv/cli run sim",
+    "viewer:build": "pnpm --filter @sdv/viewer build",
+    "viewer:dev": "pnpm --filter @sdv/viewer dev",
+    "serve": "pnpm --filter @sdv/viewer build && pnpm --filter @sdv/server start"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.0",
+    "@types/node": "^22.15.0",
+    "eslint": "^9.30.0",
+    "eslint-config-prettier": "^10.1.0",
+    "prettier": "^3.6.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.35.0",
+    "vitest": "^3.2.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

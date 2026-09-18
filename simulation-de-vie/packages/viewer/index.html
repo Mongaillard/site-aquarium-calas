@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#14171c" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simulation de vie</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="zone-carte">
+        <canvas id="carte"></canvas>
+        <header id="hud">
+          <button
+            id="btn-menu"
+            type="button"
+            title="Menu : nouveau monde, sauvegardes, vitesse, lois, plein écran"
+          >
+            ☰
+          </button>
+          <button id="btn-pause" type="button" title="Pause / reprendre (espace)">⏸</button>
+          <select id="vitesse-select" class="vitesse-select" title="Vitesse"></select>
+          <div class="etat">
+            <span id="horloge" class="horloge">—</span><span id="meteo" class="meteo"></span
+            ><span id="vivants" class="vivants"></span>
+          </div>
+          <button
+            id="conteur"
+            class="conteur ordi"
+            type="button"
+            title="Le conteur : la tension du récit (calme, montée, crise, répit). Cliquer ouvre la dernière chronique."
+            hidden
+          ></button>
+          <button id="btn-question" class="btn-question" type="button" hidden></button>
+          <button
+            id="btn-dieu"
+            class="btn-dieu"
+            type="button"
+            title="Mode Dieu : exercer des pouvoirs sur le monde (g)"
+          >
+            ✨
+          </button>
+          <button id="btn-panneau" type="button" title="Personnage, journal, village, statistiques">
+            📋
+          </button>
+        </header>
+        <div id="calques" class="calques" title="Calques de lecture (c)"></div>
+        <div id="prieres" class="prieres" hidden></div>
+        <div id="bataille" class="bataille" hidden></div>
+        <ol id="fil" class="fil" hidden></ol>
+        <div id="lois" class="lois" hidden>
+          <h3>Les lois du monde</h3>
+          <p class="discret">
+            Décochez pour suspendre une loi ; le monde s'en souvient (sauvegardé).
+          </p>
+          <div id="liste-lois"></div>
+        </div>
+        <div id="legende" class="legende"></div>
+        <button id="btn-legende" class="btn-legende" type="button" title="Légende">?</button>
+        <div id="survol" class="survol" hidden></div>
+        <div id="pouvoirs" class="pouvoirs" hidden>
+          <div class="faveur" title="Faveur : gagnée chaque jour et quand la colonie prospère">
+            <i id="faveur-jauge"></i><span id="faveur-num">✦ 0</span>
+          </div>
+          <div id="palette" class="palette"></div>
+          <div id="outils" class="palette outils" title="Sculpter le monde, poser un peuple"></div>
+          <div id="reglage-outil" class="reglage" hidden>
+            <button id="btn-rayon-moins" type="button" title="Pinceau plus petit">−</button>
+            <span id="rayon-outil">2</span>
+            <button id="btn-rayon-plus" type="button" title="Pinceau plus grand">+</button>
+            <select id="taille-peuple" title="Habitants du peuple à poser" hidden></select>
+          </div>
+          <button
+            id="btn-providence"
+            class="pouvoir providence"
+            type="button"
+            aria-pressed="false"
+            title="Providence : le ciel répond de lui-même aux prières, tant que la faveur le permet"
+          >
+            🙏<span class="cout">auto</span>
+          </button>
+          <div class="colonne">
+            <div id="pouvoir-aide" class="aide discret">
+              Faveur ✦ : +1 par jour, plus quand la colonie prospère ou prie. Choisissez un pouvoir
+              (coût en bas à droite), puis touchez la carte.
+            </div>
+            <div id="reputation" class="reputation discret"></div>
+            <div id="domaine-choix" class="domaine-choix" hidden>
+              <label for="domaine-select" class="discret">Le ciel n'a pas de visage :</label>
+              <select id="domaine-select">
+                <option value="">choisir un domaine…</option>
+                <option value="moisson">🌾 Moisson, le Semeur</option>
+                <option value="orage">⚡ Orage, le Tonnant</option>
+                <option value="feu">🔥 Feu, la Braise</option>
+                <option value="songes">🌙 Songes, le Veilleur</option>
+              </select>
+            </div>
+          </div>
+          <button id="btn-appliquer" class="btn-appliquer" type="button" hidden>✓ Ici</button>
+        </div>
+      </div>
+      <aside id="panneau">
+        <div class="panneau-entete">
+          <nav id="onglets">
+            <button data-onglet="inspecteur" class="actif">Personnage</button>
+            <button data-onglet="journal">Journal</button>
+            <button data-onglet="population">Population</button>
+            <button data-onglet="village">Village</button>
+            <button data-onglet="stats">Statistiques</button>
+            <button data-onglet="buts">Buts</button>
+            <button data-onglet="inventions">Inventions</button>
+            <button data-onglet="legendes">Légendes</button>
+            <button data-onglet="conversations">Conversations</button>
+          </nav>
+          <button id="btn-fermer-panneau" class="fermer" type="button" title="Fermer (Échap)">
+            ✕
+          </button>
+        </div>
+        <section id="inspecteur" class="onglet actif">
+          <p class="discret">
+            Cliquez sur un personnage de la carte, ou choisissez-le dans l'onglet Population.
+          </p>
+        </section>
+        <section id="journal" class="onglet">
+          <div class="filtres">
+            <select id="filtre-type">
+              <option value="">Tous les types</option>
+            </select>
+            <select id="filtre-personnage">
+              <option value="">Tout le monde</option>
+            </select>
+            <label
+              ><input type="checkbox" id="filtre-important" checked /> importants seulement</label
+            >
+          </div>
+          <ol id="liste-journal" class="liste"></ol>
+        </section>
+        <section id="conversations" class="onglet">
+          <ol id="liste-conversations" class="liste"></ol>
+        </section>
+        <section id="stats" class="onglet"></section>
+        <section id="village" class="onglet"></section>
+        <section id="inventions" class="onglet"></section>
+        <section id="legendes" class="onglet"></section>
+        <section id="buts" class="onglet"></section>
+        <section id="population" class="onglet">
+          <details id="familles" class="familles">
+            <summary>Arbres des familles</summary>
+            <div id="arbres"></div>
+          </details>
+          <ol id="liste-population" class="liste"></ol>
+        </section>
+      </aside>
+      <div id="menu" class="menu" hidden>
+        <div class="menu-entete">
+          <span class="titre">Simulation de vie</span>
+          <span id="graine" class="discret"></span>
+          <button id="btn-fermer-menu" class="fermer" type="button" title="Fermer">✕</button>
+        </div>
+        <form id="local" class="local" hidden>
+          <label for="graine-entree">graine</label>
+          <input id="graine-entree" type="text" inputmode="numeric" size="6" value="42" />
+          <label for="population-entree">habitants</label>
+          <select id="population-entree" title="Habitants au départ du nouveau monde">
+            <option value="12">12</option>
+            <option value="24">24</option>
+            <option value="36">36</option>
+            <option value="48">48</option>
+            <option value="64">64</option>
+          </select>
+          <label for="peuples-entree">peuples</label>
+          <select id="peuples-entree" title="Peuples rivaux au départ, chacun avec son village">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+          <label for="domaine-entree">ciel</label>
+          <select
+            id="domaine-entree"
+            title="Le domaine du ciel : colore les pouvoirs et donne ses créatures"
+          >
+            <option value="">sans visage</option>
+            <option value="moisson">🌾 Moisson</option>
+            <option value="orage">⚡ Orage</option>
+            <option value="feu">🔥 Feu</option>
+            <option value="songes">🌙 Songes</option>
+          </select>
+          <label for="scenario-entree">but</label>
+          <select
+            id="scenario-entree"
+            title="Un scénario à réussir avant une année limite (ou partie libre)"
+          >
+            <option value="">partie libre</option>
+            <option value="an_dix">Passez l'an dix</option>
+            <option value="cuivre_an_cinq">Le cuivre avant l'an cinq</option>
+            <option value="une_legende">Faites naître une légende</option>
+            <option value="trois_villages">Trois villages en paix</option>
+            <option value="cent_ames">Cent âmes</option>
+          </select>
+          <label
+            class="case"
+            title="Un monde sans personne : sculptez-le, puis posez votre peuple où vous voulez (mode Dieu)"
+          >
+            <input id="vierge-entree" type="checkbox" /> monde vierge
+          </label>
+          <div class="ligne">
+            <button type="submit" id="btn-nouveau">Nouveau monde</button>
+            <button type="button" id="btn-sauvegardes" title="Sauvegarder ou reprendre une partie">
+              💾 Sauvegardes
+            </button>
+          </div>
+        </form>
+        <button id="btn-reprendre" class="btn-reprendre" type="button" hidden></button>
+        <div class="ligne">
+          <button id="btn-tick" type="button" title="Avancer d'un tick (→)">+1 tick</button>
+          <button id="btn-aube" type="button" title="Sauter à l'aube suivante (a)">→ aube</button>
+        </div>
+        <div class="vitesses" id="vitesses"></div>
+        <label
+          class="case"
+          title="Quand une bataille commence, la caméra y file et le monde marque une pause d'une seconde"
+        >
+          <input id="fanfare-case" type="checkbox" checked /> caméra sur les batailles
+        </label>
+        <div class="ligne">
+          <button
+            id="btn-lois"
+            class="btn-dieu"
+            type="button"
+            title="Les lois du monde : suspendre la faim, les maladies, les bêtes, les raids, les schismes, la vieillesse (l)"
+          >
+            ⚖️ Lois
+          </button>
+          <button id="btn-plein" type="button" title="Plein écran du navigateur (p)">
+            ⛶ Plein écran
+          </button>
+        </div>
+        <div id="resume" class="discret"></div>
+        <div id="connexion" class="connexion">connexion…</div>
+      </div>
+      <nav id="nav-bas">
+        <button id="nav-carte" type="button">🗺<span>Carte</span></button>
+        <button data-onglet="inspecteur" type="button">👤<span>Personnage</span></button>
+        <button data-onglet="journal" type="button">📜<span>Journal</span></button>
+        <button data-onglet="village" type="button">🏘<span>Village</span></button>
+        <button data-onglet="stats" type="button">⋯<span>Plus</span></button>
+      </nav>
+    </div>
+    <dialog id="dlg-sauvegardes" class="dialogue">
+      <h2>Sauvegardes</h2>
+      <p class="discret">
+        Rangées dans ce navigateur (IndexedDB) : elles restent d'une visite à l'autre sur cet
+        appareil. La page sauvegarde toute seule toutes les vingt secondes, à chaque aube, à la
+        pause et, sans attendre, quand elle passe à l'arrière-plan ou se ferme ; elle reprend la
+        partie au chargement suivant. Une partie avancée est mise à l'abri sous son nom avant qu'un
+        nouveau monde ne remplace la sauvegarde automatique.
+      </p>
+      <form id="form-sauver" class="ligne">
+        <input id="nom-sauvegarde" type="text" placeholder="nom de la partie" maxlength="40" />
+        <button type="submit">💾 Sauver maintenant</button>
+      </form>
+      <p class="discret">
+        Un fichier de sauvegarde s'emporte : celui que <code>sim traverser</code> a semé pendant la
+        nuit s'ouvre ici, et la partie de ce navigateur s'exporte pour être reprise ailleurs.
+      </p>
+      <div class="ligne">
+        <input
+          id="fichier-sauvegarde"
+          type="file"
+          accept=".json,.gz,application/json,application/gzip"
+        />
+        <label for="fichier-sauvegarde" class="bouton-fichier">📂 Ouvrir un fichier…</label>
+        <button type="button" id="btn-exporter">⬇️ Exporter la partie</button>
+      </div>
+      <ol id="liste-sauvegardes" class="liste"></ol>
+      <div id="statut-sauvegardes" class="discret"></div>
+      <div class="ligne"><button type="button" id="btn-fermer-sauvegardes">Fermer</button></div>
+    </dialog>
+    <dialog id="dlg-chronique" class="dialogue chronique">
+      <h2 id="chronique-titre">Chronique</h2>
+      <p id="chronique-texte"></p>
+      <div class="ligne">
+        <button type="button" id="btn-lire-chronique" title="Lire à voix haute">🔊 Écouter</button>
+        <button type="button" id="btn-fermer-chronique">Fermer</button>
+      </div>
+    </dialog>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
