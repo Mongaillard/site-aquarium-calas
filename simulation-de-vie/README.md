@@ -129,6 +129,18 @@ jamais existé — la chaîne n'a pas de fin, donc l'arbre des inventions non pl
 **Inventions** montre tout : l'arbre des matières, ce que chaque trouvaille change, l'ennui qui
 l'a fait naître, qui l'a trouvée et combien de prototypes ont raté.
 
+**L'âge du bronze a enfin lieu (M46).** Depuis M38 la grammaire promettait une chaîne de matières
+sans fin ; mesuré sur six mondes de neuf cents jours, elle n'était **jamais** franchie — zéro
+personne vivante sachant fondre, dans les six mondes. Quatre verrous, tous du même voisinage : le
+bloc qui change une idée en savoir vivait dans la branche « recette qui rend un objet », or les
+deux seules recettes qui rendent une **ressource** sont précisément la fonte et le fumoir ; le
+prototype raté consommait les matières malgré son propre commentaire ; le mélange tirait son dé
+avant de regarder ses poches ; et son filtre de propriétés excluait le minerai brut, alors que
+« fondre » n'exige rien et que fondre du minerai est le premier pas décrit par la grammaire. La
+fonte est désormais sue par onze à dix-huit personnes par monde, pour deux fois plus de fours et
+sans un habitant de moins. La chaîne reste peu profonde, et la mesure dit pourquoi : ce n'est pas
+le tirage, c'est qu'il n'y a pas assez de métal en circulation.
+
 **Le moteur sans écran, et le moment qu'on va regarder (M45).** Un onglet de navigateur ne fait
 pas traverser les âges à un monde : il ralentit en arrière-plan et on ne le laisse pas tourner la
 nuit. `sim traverser --seed 5 --annees 40 --tous-les 120 --dossier ma-chronique` fait tourner le

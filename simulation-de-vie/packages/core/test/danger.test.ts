@@ -311,9 +311,16 @@ describe("la nuit menace : combat, alarme et défenses", () => {
     { timeout: 180000 },
     async () => {
       const sim = Simulation.creer({ seed: 42 });
-      await joursAsync(sim, 120);
-      // Le nombre de menaces dépend de la trajectoire de la graine (0 à 3 sur les graines
-      // essayées) : on vérifie que le directeur ouvre bien des menaces, pas combien.
+      // **[DÉCISION]** La meute est posée à la main (M46). Ce test attendait que le
+      // conteur en tire une de lui-même, et son propre commentaire admettait que le
+      // compte allait « de 0 à 3 selon la graine » : c'était un pari, et M46 l'a
+      // perdu — zéro menace sur la graine 42. Or ce qu'il mesure n'est pas la
+      // générosité des dés, c'est que l'alarme se donne et que les loups soient
+      // tenus à distance. On garantit donc la meute et l'on mesure la réponse.
+      await joursAsync(sim, 40); // au-delà des trente jours de grâce
+      const centre = sim.villages.villages[0]?.centre ?? { x: 0, y: 0 };
+      sim.ajouterTroupeau({ x: centre.x + 6, y: centre.y + 6 }, "loup", 4);
+      await joursAsync(sim, 80);
       expect(sim.journal.compteDetail("menace:menace")).toBeGreaterThan(0);
       expect(sim.journal.compte("alarme")).toBeGreaterThan(0);
       expect(

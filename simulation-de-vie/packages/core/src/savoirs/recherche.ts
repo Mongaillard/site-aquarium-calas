@@ -296,17 +296,40 @@ export function melanger(monde: Monde, p: Personnage): FicheMatiere | null {
   if (curiosite < 0.45) return null;
   const possibles = procedesPossibles(monde, p).filter((c) => PROCEDE[c].derive);
   if (possibles.length === 0) return null;
-  if (!p.rng.chance(0.015 + curiosite * 0.03)) return null;
 
   // On ne mêle que ce qu'on a vraiment en main, en quantité : ça se paie.
-  const enMain = matieresConnues(monde, p).filter(
-    (m) =>
-      (m.tenue >= 40 || m.durete >= 40) && aDeQuoi(p, ingredientsDe(monde.trouvailles, m.id, 3)),
+  // **[DÉCISION]** On ne filtre plus sur `tenue >= 40 || durete >= 40` (M46) : c'était
+  // un doublon de ce que `deriverMatiere` vérifie déjà — `fusible` d'un côté, le seuil
+  // propre au procédé de l'autre — et un doublon faux. Le minerai brut vaut 28 de
+  // dureté et 25 de tenue, donc il échouait ; or `fondre` n'exige rien, et fondre du
+  // minerai brut est exactement le premier pas que la grammaire décrit. Comme la seule
+  // autre matière fusible du départ est le cuivre, qu'on n'obtient que par la fonte,
+  // les deux verrous se fermaient l'un sur l'autre : aucun monde neuf ne pouvait
+  // entrer dans l'âge du métal.
+  const fusibles = matieresConnues(monde, p).filter(
+    (m) => m.fusible && aDeQuoi(p, ingredientsDe(monde.trouvailles, m.id, 3)),
   );
-  if (enMain.length === 0) return null;
+  if (fusibles.length === 0) return null;
+  // Le dé se tire **après** avoir vu qu'on a de quoi : autrement on brûlait sa chance
+  // sur les tours où l'on n'avait rien dans les mains (M46, l'inversion que M41 a
+  // corrigée dans `chercher` et oubliée ici).
+  if (!p.rng.chance(0.015 + curiosite * 0.03)) return null;
   const procede = p.rng.choisir(possibles);
+  // **[DÉCISION]** Deux raffinements de ce tirage ont été essayés et **retirés**,
+  // mesure en main (M46), pour qu'on ne les retente pas : appliquer ici le seuil
+  // `exige` du procédé, puis pondérer le tirage par la qualité de la matière
+  // (dureté + tenue). Les deux ont rendu, sur six mondes de neuf cents jours, un
+  // résultat **identique au bit près** au tirage simple. La raison est arithmétique :
+  // pondérer ou filtrer ne change rien quand il n'y a qu'un seul candidat, et
+  // `fusibles` n'en contient presque jamais deux — un forgeron ne tient qu'une matière
+  // fusible à la fois, parce que le minerai est rare (vingt-sept récoltés en cinq ans
+  // dans un village). La profondeur de la chaîne des alliages n'est donc pas bornée
+  // par ce choix mais par la **quantité de métal en circulation** : c'est un sujet de
+  // mine et de transport, pas de tirage.
   const parents =
-    procede === "allier" ? [p.rng.choisir(enMain), p.rng.choisir(enMain)] : [p.rng.choisir(enMain)];
+    procede === "allier"
+      ? [p.rng.choisir(fusibles), p.rng.choisir(fusibles)]
+      : [p.rng.choisir(fusibles)];
   // On n'allie pas une chose avec elle-même.
   if (procede === "allier" && parents[0]?.id === parents[1]?.id) return null;
   const nee = deriverMatiere(monde.trouvailles, p.rng, procede, parents);

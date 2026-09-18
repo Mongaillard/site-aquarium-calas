@@ -1709,6 +1709,36 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   fichier qui n'est pas du JSON et un JSON qui n'est pas une sauvegarde sont refusés avec leur
   motif ; l'export est nommé par le jour, trois fois plus petit que le JSON, et se relit.
 
+## 8 quatervicies. L'âge du bronze, enfin (M46)
+
+- **Promotion d'un savoir** (`actions/executeur.ts`, `tickFabriquer`) : le bloc
+  `apprendre(p, invention, 1, …)` vivait dans la branche `if ("objet" in recette.produit)`.
+  **[DÉCISION]** Il en sort. Deux recettes du catalogue rendent une **ressource** et non un objet
+  — `cuivre` (invention `fonte`) et `poisson_fume` (invention `fumoir`) — et ce sont exactement
+  les deux que le verrou tenait : toute la métallurgie et la conservation par fumage restaient à
+  force 0,6 à vie, donc ni transmises ni solides. Mesuré avant : **zéro porteur vivant de `fonte`
+  sur six mondes de neuf cents jours**.
+- **Prototype raté** : le tirage `p.rng.chance(0.35)` passe **avant** la dépense des ingrédients,
+  comme le disait déjà son commentaire et comme le fait `tickFabriquerTrouvaille` depuis M41. Il
+  consommait trois minerais par échec, sur les vingt-sept qu'un village récolte en cinq ans.
+- **`melanger`** (`savoirs/recherche.ts`) : le dé se tire **après** le calcul des matières en main
+  (l'inversion que M41 a corrigée dans `chercher`), et le filtre
+  `tenue >= 40 || durete >= 40` disparaît au profit du seul `fusible` — **[DÉCISION]** c'était un
+  doublon de ce que `deriverMatiere` vérifie déjà (`fusible` plus le seuil `exige` du procédé) et
+  un doublon faux : le minerai vaut 25/28, or `fondre` n'exige rien.
+- **Deux raffinements retirés, mesure en main** : appliquer au tirage le seuil `exige` du procédé,
+  puis pondérer le tirage par la qualité (dureté + tenue). Les deux rendent un résultat
+  **identique au bit près** sur six mondes : pondérer ou filtrer ne change rien à un seul
+  candidat, et `fusibles` n'en contient presque jamais deux. La profondeur de la chaîne est bornée
+  par la **quantité de métal en circulation**, pas par le choix. La mesure est inscrite dans le
+  code à l'endroit de la tentation.
+- **Tests** (`bronze.test.ts`, 5) : les deux seules recettes à ressource sont `fonte` et `fumoir` ;
+  réussir l'une change l'idée en savoir ; un prototype raté ne consomme plus les matières ; le
+  minerai est fusible et sous les deux anciens seuils, `fondre.exige` est `null` ; un curieux tire
+  du minerai une matière de rang 1 plus dure et plus tenace que son parent.
+- **Mesure** (6 graines, 900 jours) : `fonte` sue par 0 vivant avant, 11 à 18 après ; fours 5 → 11 ;
+  matières dérivées 7 → 10 ; habitants 134 → 137. Rang maximal 2 → 1, expliqué ci-dessus.
+
 ## 15 bis. Savoirs : leçons et inventions
 
 - **Leçon** : à chaque décès, autopsie de la situation → une ou deux morales d'un catalogue

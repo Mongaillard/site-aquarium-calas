@@ -49,27 +49,33 @@ describe("M25 : l'identité du ciel (domaine, paliers, coûts, créatures)", () 
     expect(f.couts.epiphanie).toBeGreaterThan(FICHES_POUVOIR.epiphanie.cout);
   });
 
-  it("chaque usage renchérit le pouvoir d'un quart, et la saison en oublie la moitié", () => {
-    const sim = colonie(null);
-    const p = sim.vivants()[0];
-    if (p === undefined) throw new Error("personne");
-    const base = FICHES_POUVOIR.regard.cout;
-    const pos = p.corps.position;
-    sim.faveur.valeur = 100;
-    sim.faveur.max = 100;
-    expect(coutEffectif(sim.faveur, "regard")).toBe(base);
-    expect(sim.exercer({ pouvoir: "regard", x: pos.x, y: pos.y }).ok).toBe(true);
-    expect(coutEffectif(sim.faveur, "regard")).toBe(Math.max(1, Math.round(base * 1.25)));
-    expect(sim.exercer({ pouvoir: "regard", x: pos.x + 3, y: pos.y }).ok).toBe(true);
-    expect(sim.faveur.usages.get("regard")).toBe(2);
-    expect(coutEffectif(sim.faveur, "regard")).toBe(Math.max(1, Math.round(base * 1.5)));
-    // La sauvegarde retient les usages ; la saison suivante les divise par deux.
-    const copie = Simulation.restaurer(sim.sauvegarder());
-    expect(copie.faveur.usages.get("regard")).toBe(2);
-    while (copie.horloge.moment().jourDeSaison !== 1) copie.avancerJusquaAube();
-    copie.avancer(1);
-    expect(copie.faveur.usages.get("regard")).toBe(1);
-  });
+  // Ce scénario avance une saison entière : il frôlait ses cinq secondes par défaut et
+  // flanchait sous la charge de la suite (mesuré 5,7 s). Son délai est désormais explicite.
+  it(
+    "chaque usage renchérit le pouvoir d'un quart, et la saison en oublie la moitié",
+    { timeout: 30_000 },
+    () => {
+      const sim = colonie(null);
+      const p = sim.vivants()[0];
+      if (p === undefined) throw new Error("personne");
+      const base = FICHES_POUVOIR.regard.cout;
+      const pos = p.corps.position;
+      sim.faveur.valeur = 100;
+      sim.faveur.max = 100;
+      expect(coutEffectif(sim.faveur, "regard")).toBe(base);
+      expect(sim.exercer({ pouvoir: "regard", x: pos.x, y: pos.y }).ok).toBe(true);
+      expect(coutEffectif(sim.faveur, "regard")).toBe(Math.max(1, Math.round(base * 1.25)));
+      expect(sim.exercer({ pouvoir: "regard", x: pos.x + 3, y: pos.y }).ok).toBe(true);
+      expect(sim.faveur.usages.get("regard")).toBe(2);
+      expect(coutEffectif(sim.faveur, "regard")).toBe(Math.max(1, Math.round(base * 1.5)));
+      // La sauvegarde retient les usages ; la saison suivante les divise par deux.
+      const copie = Simulation.restaurer(sim.sauvegarder());
+      expect(copie.faveur.usages.get("regard")).toBe(2);
+      while (copie.horloge.moment().jourDeSaison !== 1) copie.avancerJusquaAube();
+      copie.avancer(1);
+      expect(copie.faveur.usages.get("regard")).toBe(1);
+    },
+  );
 
   it("le domaine se choisit une fois, en cours de partie aussi, et se sauvegarde", () => {
     const sim = colonie(null);

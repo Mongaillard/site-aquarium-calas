@@ -1222,6 +1222,21 @@ function tickFabriquer(
   action.ticksRestants -= 1;
   if (action.ticksRestants > 0) return ENCOURS;
 
+  // Prototype raté : le temps est perdu, les matières restent, on réessaiera.
+  // **[DÉCISION]** Le tirage passe **avant** la dépense (M46), comme le disait déjà
+  // son commentaire et comme le fait la grammaire de M41 : il consommait trois
+  // minerais par échec, sur les vingt-sept qu'un village récolte en cinq ans.
+  if (invention !== undefined && forceIdee < 1 && p.rng.chance(0.35)) {
+    monde.emettre("prototype_rate", p, { invention, nom: INVENTIONS[invention].nom }, 4);
+    p.memoire.ajouter(
+      monde.horloge.tick,
+      "action",
+      `Mon ${INVENTIONS[invention].nom} n'a pas tenu. Je recommencerai autrement.`,
+      4,
+      [],
+    );
+    return TERMINEE;
+  }
   for (const [r, n] of Object.entries(recette.ingredients) as [Ressource, number][]) {
     retirer(p.corps.inventaire, r, n);
   }
@@ -1230,41 +1245,35 @@ function tickFabriquer(
       type: recette.produit.objet,
       solidite: SOLIDITE_INITIALE[recette.produit.objet],
     };
-    if (invention !== undefined && forceIdee < 1 && p.rng.chance(0.35)) {
-      // Prototype raté : le temps est perdu, les matériaux restent, on réessaiera.
-      monde.emettre("prototype_rate", p, { invention, nom: INVENTIONS[invention].nom }, 4);
-      p.memoire.ajouter(
-        monde.horloge.tick,
-        "action",
-        `Mon ${INVENTIONS[invention].nom} n'a pas tenu. Je recommencerai autrement.`,
-        4,
-        [],
-      );
-      return TERMINEE;
-    }
     if (!ajouterObjet(p.corps.inventaire, objet)) return echec("inventaire plein");
     // Un traîneau permet de porter davantage.
     if (objet.type === "traineau") p.corps.inventaire.capacite += 6;
-    if (invention !== undefined && forceIdee < 1) {
-      apprendre(p, invention, 1, p.identite.prenom, monde.horloge.tick);
-      for (const m of membresFamille(monde, p))
-        apprendre(m, invention, 1, p.identite.prenom, monde.horloge.tick);
-      monde.emettre(
-        "invention",
-        p,
-        { invention, nom: INVENTIONS[invention].nom, domaine: INVENTIONS[invention].domaine },
-        9,
-      );
-      p.memoire.ajouter(
-        monde.horloge.tick,
-        "reflexion",
-        `Ça marche ! ${INVENTIONS[invention].confidence}`,
-        9,
-        [],
-      );
-    }
   } else {
     ajouter(p.corps.inventaire, recette.produit.ressource, recette.produit.quantite);
+  }
+  // La réussite change l'idée en savoir éprouvé — **quelle que soit la forme du
+  // produit**. **[DÉCISION]** Ce bloc vivait dans la seule branche « recette qui
+  // rend un objet » (M46), et `fonte` est la **seule** invention du catalogue dont
+  // la recette rend une ressource : elle restait donc à force 0,6 à vie, et avec
+  // elle toute la métallurgie. Mesuré avant : zéro porteur vivant de `fonte` sur
+  // neuf cents jours, sur deux graines.
+  if (invention !== undefined && forceIdee < 1) {
+    apprendre(p, invention, 1, p.identite.prenom, monde.horloge.tick);
+    for (const m of membresFamille(monde, p))
+      apprendre(m, invention, 1, p.identite.prenom, monde.horloge.tick);
+    monde.emettre(
+      "invention",
+      p,
+      { invention, nom: INVENTIONS[invention].nom, domaine: INVENTIONS[invention].domaine },
+      9,
+    );
+    p.memoire.ajouter(
+      monde.horloge.tick,
+      "reflexion",
+      `Ça marche ! ${INVENTIONS[invention].confidence}`,
+      9,
+      [],
+    );
   }
   gagnerExperience(p.experience, recette.competence, 3);
   monde.emettre("fabrication", p, { recette: action.recette }, "objet" in recette.produit ? 5 : 2);

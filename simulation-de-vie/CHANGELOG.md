@@ -2,6 +2,67 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M46 – Que l'âge du bronze ait lieu (2026-09-18)
+
+Première étape de la route vers une époque plus tardive, et ce n'est pas une invention : c'est un
+**débogage**. Depuis M38 la grammaire promettait une chaîne de matières sans fin — le cuivre
+devient bronze, le bronze devient autre chose. Mesuré sur six mondes de neuf cents jours : la
+chaîne n'était **jamais** franchie. **Zéro porteur vivant de `fonte`, dans les six mondes.** Un
+seul four par monde, et deux mondes sur six sans une matière dérivée.
+
+**Quatre verrous, tous dans le même voisinage.**
+
+1. **Le bloc qui change une idée en savoir vivait dans la branche « recette qui rend un objet ».**
+   Or deux recettes du catalogue rendent une **ressource** — `cuivre` (invention `fonte`) et
+   `poisson_fume` (invention `fumoir`) — et ce sont exactement les deux que le verrou tenait :
+   toute la métallurgie, et la conservation par fumage. Elles restaient à force 0,6 à vie, donc
+   jamais transmises, jamais solides.
+2. **Le prototype raté consommait les matières**, alors que son propre commentaire dit « les
+   matériaux restent » et que la grammaire de M41 fait l'inverse. À 35 % d'échec et trois minerais
+   l'essai, sur les vingt-sept qu'un village récolte en cinq ans, c'était éliminatoire. Le tirage
+   passe désormais **avant** la dépense.
+3. **`melanger` tirait son dé avant de regarder ce qu'il avait en poche** : on brûlait sa chance
+   (1,5 à 4,5 %) sur les tours où l'on n'avait rien dans les mains. C'est l'inversion que M41 a
+   corrigée dans `chercher` et oubliée ici.
+4. **Son filtre `tenue ≥ 40 || dureté ≥ 40` excluait le minerai brut** (25 et 28), alors que
+   `deriverMatiere` vérifie déjà `fusible` **et** le seuil propre au procédé, et que `fondre`
+   n'exige rien. Fondre du minerai brut est littéralement le premier pas que la grammaire décrit.
+   Comme la seule autre matière fusible du départ est le cuivre, qu'on n'obtient que par la fonte,
+   **les verrous 1 et 4 se fermaient l'un sur l'autre** : aucun monde neuf ne pouvait entrer dans
+   l'âge du métal.
+
+Mesuré sur les six mêmes mondes de neuf cents jours :
+
+|                           | avant                     | après                 |
+| ------------------------- | ------------------------- | --------------------- |
+| `fonte` sue par un vivant | **0 dans les six mondes** | **11 à 18 par monde** |
+| fours achevés (total)     | 5                         | 11                    |
+| matières dérivées (total) | 7                         | 10                    |
+| habitants (total)         | 134                       | 137                   |
+
+**Deux raffinements essayés, mesurés, retirés.** La chaîne reste plate — rang 1 partout, alors que
+deux mondes atteignaient le rang 2 avant. J'ai cru que le tirage en était la cause et j'ai essayé
+deux corrections : appliquer au tirage le seuil `exige` du procédé, puis pondérer le tirage par la
+qualité de la matière. Les deux ont rendu un résultat **identique au bit près** au tirage simple,
+sur les six mondes. La raison est arithmétique : pondérer ou filtrer ne change rien quand il n'y a
+qu'**un seul candidat**, et un forgeron ne tient presque jamais deux matières fusibles à la fois,
+parce que le minerai est rare. La profondeur de la chaîne n'est donc pas bornée par le choix mais
+par la **quantité de métal en circulation** — un sujet de mine et de transport, pas de tirage. Le
+code est revenu au simple, avec la mesure écrite à côté pour qu'on ne le retente pas.
+
+- **Tests** (`bronze.test.ts`, 5) : deux recettes seulement rendent une ressource, et ce sont
+  `fonte` et `fumoir` ; réussir l'une d'elles change bien l'idée en savoir éprouvé ; un prototype
+  raté ne consomme plus les matières (on y arrive avec la matière d'un seul lingot) ; le minerai
+  brut est fusible, sous les deux seuils du vieux filtre, et `fondre` n'exige rien ; un curieux
+  devant son four tire du minerai une matière de rang 1, plus dure et plus tenace que son parent.
+- **Un test rendu déterministe, pas recalibré.** Le scénario des menaces nocturnes attendait que le
+  conteur tire une meute de lui-même, et son propre commentaire admettait que le compte allait « de
+  0 à 3 selon la graine » : c'était un pari, et le décalage de trajectoire de M46 l'a perdu (zéro
+  menace sur la graine 42). Or ce qu'il mesure n'est pas la générosité des dés mais que l'alarme se
+  donne et que les loups soient tenus à distance : la meute est donc **posée à la main** après les
+  trente jours de grâce, et l'on mesure la réponse. Le scénario d'une saison entière du mode Dieu
+  reçoit par ailleurs son délai explicite (mesuré 5,7 s contre 5 s par défaut).
+
 ## M45 – Le moteur sans écran, et le moment qu'on va regarder (2026-09-18)
 
 Pour savoir si une colonie peut traverser les âges, il faut pouvoir la faire traverser les âges —
