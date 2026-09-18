@@ -1696,8 +1696,12 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   ses deux premiers octets** (`0x1f 0x8b`) et non à l'extension — **[DÉCISION]** un système ou une
   messagerie renomment volontiers un fichier, et se tromper là donnerait « illisible » sur une
   sauvegarde valide — puis vérifie par `estSauvegarde` et rend un motif clair sinon.
-  `fichierDeSauvegarde(s)` rend `{ nom, blob }` (comprimé si le navigateur sait), nommé par le
-  jour. `index.html` : `#fichier-sauvegarde` (caché derrière un label `.bouton-fichier`) et
+  `exporter(s)` offre le fichier : **[DÉCISION]** dans la page publiée sur claude.ai un lien de
+  téléchargement ne fait rien, seule la capacité `downloads` remet un fichier, et sa liste
+  d'extensions ne contient pas `.gz` — on y envoie donc le JSON en clair par
+  `claude.use("downloads").save({filename, data})` ; partout ailleurs (fichier local, application
+  installée) `fichierDeSauvegarde(s)` rend `{ nom, blob }` comprimé et un lien le télécharge.
+  L'artefact déclare donc `capabilities: {db:{}, downloads:true}`. `index.html` : `#fichier-sauvegarde` (caché derrière un label `.bouton-fichier`) et
   `#btn-exporter` dans la boîte des sauvegardes ; `main.ts` : `ouvrirFichier` (range sous
   « Fichier · jour N », puis `relancer`) et `exporterPartie`.
 - **Tests** (`packages/viewer/test/sauvegarde.test.ts`, 14 en tout) : un instantané comprimé et

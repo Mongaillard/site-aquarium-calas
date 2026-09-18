@@ -231,14 +231,62 @@ export async function lireFichierSauvegarde(fichier: File): Promise<Sauvegarde> 
   return contenu;
 }
 
+/** Le peu qu'on attend de `claude.use("downloads")`. */
+interface Telechargements {
+  save(demande: { filename: string; data: Blob | string }): Promise<{ status: string }>;
+}
+
 /**
- * Le fichier à télécharger pour emporter une partie ailleurs (M45) : comprimé
- * quand le navigateur sait le faire, en clair sinon — les deux se relisent.
+ * Offrir un fichier à l'observateur, et dire ce qui s'est passé (M45).
+ *
+ * **[DÉCISION]** Deux chemins, parce qu'il y a deux mondes. Dans la page publiée
+ * sur claude.ai, un lien de téléchargement ne fait **rien** : seule la capacité
+ * `downloads` peut remettre un fichier, et sa liste d'extensions ne contient pas
+ * `.gz` — on y exporte donc le JSON en clair. Partout ailleurs (fichier local,
+ * application installée), le lien marche et l'on comprime : dix fois moins lourd.
+ */
+export async function exporter(
+  s: Sauvegarde,
+): Promise<{ readonly nom: string; readonly octets: number }> {
+  const texte = await stringifyParMorceaux(s);
+  const base = `simulation-de-vie-jour-${String(s.jour).padStart(6, "0")}`;
+  const capacite = await telechargements();
+  if (capacite !== null) {
+    const nom = `${base}.json`;
+    await capacite.save({ filename: nom, data: texte });
+    return { nom, octets: texte.length };
+  }
+  const { nom, blob } = await fichierDeSauvegarde(s, texte);
+  const url = URL.createObjectURL(blob);
+  const lien = document.createElement("a");
+  lien.href = url;
+  lien.download = nom;
+  lien.click();
+  URL.revokeObjectURL(url);
+  return { nom, octets: blob.size };
+}
+
+/** La capacité de téléchargement de la page publiée, ou null partout ailleurs. */
+async function telechargements(): Promise<Telechargements | null> {
+  const claude = window.claude;
+  if (claude === undefined) return null;
+  try {
+    const ns = await claude.use("downloads");
+    return typeof ns === "object" && ns !== null && "save" in ns ? (ns as Telechargements) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Le fichier à emporter : comprimé quand le navigateur sait le faire, en clair
+ * sinon — les deux se relisent.
  */
 export async function fichierDeSauvegarde(
   s: Sauvegarde,
+  dejaEnTexte?: string,
 ): Promise<{ readonly nom: string; readonly blob: Blob }> {
-  const texte = await stringifyParMorceaux(s);
+  const texte = dejaEnTexte ?? (await stringifyParMorceaux(s));
   const base = `simulation-de-vie-jour-${String(s.jour).padStart(6, "0")}`;
   if (!compressionDisponible())
     return { nom: `${base}.json`, blob: new Blob([texte], { type: "application/json" }) };

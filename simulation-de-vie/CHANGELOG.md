@@ -28,7 +28,12 @@ sim traverser --seed 5 --annees 40 --tous-les 120 --dossier ma-chronique
   ciel.
 
 **Ouvrir un moment.** La boîte « Sauvegardes » du viewer reçoit deux boutons : **📂 Ouvrir un
-fichier** et **⬇️ Exporter la partie**. On ouvre l'instantané de la nuit, la partie reprend à ce
+fichier** et **⬇️ Exporter la partie**. L'export prend **deux chemins, parce qu'il y a deux
+mondes** : dans la page publiée sur claude.ai, un lien de téléchargement ne fait rien — seule la
+capacité `downloads` peut remettre un fichier, et sa liste d'extensions ne contient pas `.gz`, donc
+on y exporte le JSON en clair ; partout ailleurs (fichier local, application installée) le lien
+marche et l'on comprime, dix fois plus léger. Sans cette distinction, le bouton n'aurait
+simplement rien fait dans l'artefact, et l'on ne s'en serait aperçu qu'à l'usage. On ouvre l'instantané de la nuit, la partie reprend à ce
 jour-là, et elle est rangée dans le navigateur comme les autres. Le gzip est reconnu **à ses deux
 premiers octets** et non à l'extension — **[DÉCISION]** un système, un navigateur ou une
 messagerie renomment volontiers un fichier, et se tromper là donnerait « sauvegarde illisible »

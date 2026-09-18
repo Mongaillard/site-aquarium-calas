@@ -42,7 +42,7 @@ import { retenirLeTirer } from "./gestes.js";
 import {
   NOM_AUTO,
   copierSauvegarde,
-  fichierDeSauvegarde,
+  exporter,
   lireFichierSauvegarde,
   decrireSauvegarde,
   ecrireSauvegarde,
@@ -523,14 +523,8 @@ async function exporterPartie(): Promise<void> {
       statutSauvegarde("Rien à exporter : le monde n'est pas encore prêt.");
       return;
     }
-    const { nom, blob } = await fichierDeSauvegarde(s);
-    const url = URL.createObjectURL(blob);
-    const lien = document.createElement("a");
-    lien.href = url;
-    lien.download = nom;
-    lien.click();
-    URL.revokeObjectURL(url);
-    statutSauvegarde(`Exportée : ${nom} (${(blob.size / 1024 / 1024).toFixed(2)} Mo).`);
+    const { nom, octets } = await exporter(s);
+    statutSauvegarde(`Exportée : ${nom} (${(octets / 1024 / 1024).toFixed(2)} Mo).`);
   } catch (erreur: unknown) {
     statutSauvegarde(
       `Export impossible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
