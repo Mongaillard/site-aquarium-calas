@@ -2,12 +2,65 @@
 
 Toutes les évolutions notables du projet, phase par phase (voir `PROTOCOLE.md`, section 15).
 
+## M45 – Le moteur sans écran, et le moment qu'on va regarder (2026-09-18)
+
+Pour savoir si une colonie peut traverser les âges, il faut pouvoir la faire traverser les âges —
+et un onglet de navigateur est le mauvais outil : il ralentit en arrière-plan, on ne le laisse pas
+tourner la nuit, et rien ne s'écrit sur le disque. Mais un moteur aveugle ne vaudrait rien : ce
+qu'on veut voir, ce sont des gens.
+
+**`sim traverser`** fait tourner un monde sans écran et **sème des instantanés** :
+
+```
+sim traverser --seed 5 --annees 40 --tous-les 120 --dossier ma-chronique
+```
+
+- Une ligne par instantané, pendant la course : l'année, la population, les naissances et les
+  morts depuis le précédent, les bâtiments, les champs, les villages, les trouvailles.
+- Un fichier par moment, et un `chronique.json` qui les recense. **[DÉCISION]** Un fichier par
+  moment plutôt qu'un journal continu : une sauvegarde se recharge telle quelle, donc le moment
+  n'est pas une image — c'est une partie, qu'on peut reprendre, continuer, et où l'on peut jouer
+  au dieu.
+- **Comprimé par défaut** : à l'an cinq une sauvegarde pèse **10,9 Mo en clair contre 1,1 Mo en
+  gzip**, et une traversée en sème des dizaines. `--json` rend le format lisible si l'on veut
+  fouiller dedans.
+- `--sans-instantanes` pour ne mesurer que la courbe, `--sans-conteur` pour couper les épreuves du
+  ciel.
+
+**Ouvrir un moment.** La boîte « Sauvegardes » du viewer reçoit deux boutons : **📂 Ouvrir un
+fichier** et **⬇️ Exporter la partie**. On ouvre l'instantané de la nuit, la partie reprend à ce
+jour-là, et elle est rangée dans le navigateur comme les autres. Le gzip est reconnu **à ses deux
+premiers octets** et non à l'extension — **[DÉCISION]** un système, un navigateur ou une
+messagerie renomment volontiers un fichier, et se tromper là donnerait « sauvegarde illisible »
+sur une sauvegarde parfaitement valide.
+
+**Une correction, qui change les chiffres déjà publiés.** L'année du jeu fait **quatre saisons de
+trente jours, soit cent vingt jours** — et non trois cent soixante. La commande a d'abord compté
+en années de 360 jours : elle annonçait « an 3 » au moment où le monde affichait « An 7 ». Elle
+prend maintenant l'année à l'horloge du monde. Les mesures de M42 à M44 restent justes — elles
+étaient comptées en **jours**, et les jours n'ont pas changé — mais leurs légendes en années
+étaient trois fois trop courtes : ce que ces entrées appelaient « cinq ans » fait quinze années du
+jeu. Les tableaux sont réécrits en jours, qui ne trompent personne.
+
+- **Tests** (`packages/viewer/test/sauvegarde.test.ts`, 4 de plus, 14 en tout) : un instantané
+  comprimé et **renommé exprès** se relit et le monde repart au bon tick ; un instantané en clair
+  aussi ; un fichier qui n'est pas du JSON et un JSON qui n'est pas une sauvegarde sont refusés
+  avec le motif ; l'export produit un fichier nommé par le jour, trois fois plus petit que le
+  JSON, et qui se relit.
+- **Vérifié à l'écran** : l'instantané du jour 720 semé par la ligne de commande, ouvert dans le
+  viewer, rouvre le monde à « An 7 · printemps 1 » avec ses vingt-quatre vivants, sans une erreur
+  de console.
+- Le scénario le plus lourd de la suite (vingt-quatre habitants sur deux cents jours) a dépassé
+  ses quatre minutes : les mondes de M44 coûtent plus cher par tick, champs et grain compris. Son
+  délai passe à huit minutes, avec la mesure écrite à côté.
+
 ## M44 – Le grain : l'agriculture devient une vraie source de vivres (2026-09-17)
 
 Premier pas de la route vers une époque plus tardive : sans surplus, une colonie ne dépasse pas
 la vingtaine, et sans population il n'y a ni métiers, ni ville, ni industrie.
 
-**Ce que la mesure a trouvé.** Sur quatre mondes d'un an : population moyenne **16,0 à 16,3**, et
+**Ce que la mesure a trouvé.** Sur quatre mondes de trois cent soixante jours (trois années du
+jeu, qui en compte cent vingt) : population moyenne **16,0 à 16,3**, et
 **cinquante points de faim par personne et par jour — exactement ce qu'on consomme**. Le poisson
 faisait **96 %** des vivres (huit mille poissons contre deux cent cinquante baies). Les champs :
 **zéro à deux par monde**, rarement semés, souvent gelés.
@@ -39,22 +92,23 @@ faisait **96 %** des vivres (huit mille poissons contre deux cent cinquante baie
 
 **Mesuré.** Sur un an, l'économie change du tout au tout : **quinze à vingt-deux champs** par
 monde au lieu de zéro à deux, quarante-cinq à cinquante-deux récoltes, et le grain fait **45 à
-77 %** des vivres. Sur cinq ans, là où c'est visible (graine 9) :
+77 %** des vivres. Sur mille huit cents jours — quinze années du jeu — là où c'est visible
+(graine 9) :
 
 |                        | sans le grain                 | avec le grain                |
 | ---------------------- | ----------------------------- | ---------------------------- |
-| habitants à l'an 1     | 19                            | 21                           |
-| à l'an 3               | 23                            | 27                           |
-| à l'an 5               | **24** (stable depuis l'an 2) | **33** (et encore en hausse) |
-| naissances en cinq ans | 19                            | 26                           |
+| habitants au jour 360  | 19                            | 21                           |
+| au jour 1 080          | 23                            | 27                           |
+| au jour 1 800          | **24** (stable depuis le 720) | **33** (et encore en hausse) |
+| naissances sur 1 800 j | 19                            | 26                           |
 | champs                 | 3                             | 42                           |
 
 **Ce que la mesure dit aussi, et qu'il faut dire.** Le plafond de la vingtaine n'était pas une
 disette : ils mangeaient déjà tout ce qu'ils récoltaient. Le grain ne les nourrit pas _plus_, il
 leur donne une réserve qui passe l'hiver, et c'est cela qui débloque la croissance. Et sur la
-graine 2, le monde s'éteint à l'an trois **avec comme sans le grain** (onze naissances, vingt-trois
-morts dans les deux cas) : l'horizon de cinq ans fait apparaître des effondrements qu'une seule
-année cachait. C'est le sujet suivant.
+graine 2, le monde s'éteint vers le jour 900 **avec comme sans le grain** (onze naissances,
+vingt-trois morts dans les deux cas) : l'horizon long fait apparaître des effondrements que trois
+cents jours cachaient. C'est le sujet suivant.
 
 **Les mondes changent.** Ajouter un gisement à la prairie déplace le tirage : toutes les graines
 de monde donnent désormais un terrain différent d'avant M44. Les parties sauvegardées, elles,

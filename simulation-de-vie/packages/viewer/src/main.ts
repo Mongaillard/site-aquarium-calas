@@ -42,6 +42,8 @@ import { retenirLeTirer } from "./gestes.js";
 import {
   NOM_AUTO,
   copierSauvegarde,
+  fichierDeSauvegarde,
+  lireFichierSauvegarde,
   decrireSauvegarde,
   ecrireSauvegarde,
   lireSauvegarde,
@@ -490,6 +492,52 @@ async function rafraichirListeSauvegardes(): Promise<void> {
     listeSauvegardes.append(li);
   }
 }
+/**
+ * Ouvrir une sauvegarde venue d'un fichier (M45) : celle que `sim traverser` a
+ * semée pendant la nuit, ou celle qu'un autre appareil a exportée. On la range
+ * d'abord dans ce navigateur sous un nom tiré du jour, puis on reprend la partie
+ * — ainsi elle survit au rechargement comme les autres.
+ */
+async function ouvrirFichier(fichier: File): Promise<void> {
+  try {
+    const s = await lireFichierSauvegarde(fichier);
+    const nom = `Fichier · jour ${String(s.jour)}`;
+    await ecrireSauvegarde(nom, s, true);
+    dlgSauvegardes.close();
+    btnReprendre.hidden = true;
+    relancer(s.seed, s);
+    graineEntree.value = s.seed;
+    statutSauvegarde(`Partie reprise au jour ${String(s.jour)} (${s.vivants} vivants).`);
+  } catch (erreur: unknown) {
+    statutSauvegarde(
+      `Fichier illisible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+    );
+  }
+}
+
+/** Emporter la partie en cours dans un fichier, pour la reprendre ailleurs (M45). */
+async function exporterPartie(): Promise<void> {
+  try {
+    const s = estSimulee(liaison) ? await liaison.sauvegarderSansBloquer() : null;
+    if (s === null) {
+      statutSauvegarde("Rien à exporter : le monde n'est pas encore prêt.");
+      return;
+    }
+    const { nom, blob } = await fichierDeSauvegarde(s);
+    const url = URL.createObjectURL(blob);
+    const lien = document.createElement("a");
+    lien.href = url;
+    lien.download = nom;
+    lien.click();
+    URL.revokeObjectURL(url);
+    statutSauvegarde(`Exportée : ${nom} (${(blob.size / 1024 / 1024).toFixed(2)} Mo).`);
+  } catch (erreur: unknown) {
+    statutSauvegarde(
+      `Export impossible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+    );
+  }
+}
+
 async function chargerSauvegarde(nom: string, source: Source = "local"): Promise<void> {
   try {
     const s = source === "distant" ? await lireDistante(nom) : await lireSauvegarde(nom);
@@ -619,6 +667,20 @@ if (modeLocal) {
       statutSauvegarde(fait ? `« ${nom} » sauvegardée.` : "Le monde n'est pas encore prêt.");
       void rafraichirListeSauvegardes();
     });
+  });
+  element("fichier-sauvegarde", HTMLInputElement).addEventListener("change", (ev) => {
+    const entree = ev.currentTarget;
+    if (!(entree instanceof HTMLInputElement)) return;
+    const fichier = entree.files?.[0];
+    if (fichier === undefined) return;
+    statutSauvegarde(`Lecture de ${fichier.name}…`);
+    void ouvrirFichier(fichier).finally(() => {
+      // Sans cela, rouvrir le même fichier après une erreur ne déclenche rien.
+      entree.value = "";
+    });
+  });
+  element("btn-exporter", HTMLButtonElement).addEventListener("click", () => {
+    void exporterPartie();
   });
   element("btn-fermer-sauvegardes", HTMLButtonElement).addEventListener("click", () => {
     dlgSauvegardes.close();

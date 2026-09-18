@@ -176,7 +176,11 @@ describe("M38b : du problème à l'idée", () => {
 
   it(
     "sur deux cents jours, une colonie trouve, rate et finit par réussir",
-    { timeout: 240_000 },
+    // Vingt-quatre habitants sur deux cents jours : le scénario le plus lourd de la
+    // suite. Il a frôlé puis dépassé ses quatre minutes quand M44 a rempli les mondes
+    // de champs et de grain (mesuré 249 s, et 254 s sous charge) — le monde coûte plus
+    // cher par tick qu'avant, et c'est voulu. Huit minutes lui laissent de la marge.
+    { timeout: 480_000 },
     async () => {
       const sim = Simulation.creer({ seed: 42, population: { initiale: 24, familles: 4 } });
       sim.config.brain.conseilsParJour = 0;

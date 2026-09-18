@@ -9,7 +9,11 @@ import {
   stringifyParMorceaux,
 } from "../src/compression.js";
 import { sortDuDefilement } from "../src/gestes.js";
-import { decrireSauvegarde } from "../src/sauvegarde.js";
+import {
+  decrireSauvegarde,
+  fichierDeSauvegarde,
+  lireFichierSauvegarde,
+} from "../src/sauvegarde.js";
 import { TAILLE_MORCEAU, decouper, depuisBase64, idDistant, versBase64 } from "../src/distant.js";
 
 describe("compression des sauvegardes", () => {
@@ -113,4 +117,56 @@ describe("sauvegardes distantes (base de l'artefact)", () => {
     expect(estSauvegarde(relu)).toBe(true);
     expect(JSON.stringify(relu)).toBe(JSON.stringify(source));
   }, 30_000);
+});
+
+describe("M45 : une sauvegarde qui passe par un fichier", () => {
+  it("relit l'instantané comprimé que sème `sim traverser`, et le reconnaît à ses octets", async () => {
+    const sim = Simulation.creer({ seed: 7 });
+    sim.avancer(300);
+    const source = sim.sauvegarder();
+    const octets = await compresser(JSON.stringify(source));
+    // Nom trompeur exprès : c'est l'en-tête gzip qui doit décider, pas l'extension.
+    const fichier = new File([octets], "renomme-par-la-messagerie.json", {
+      type: "application/octet-stream",
+    });
+    const relu = await lireFichierSauvegarde(fichier);
+    expect(estSauvegarde(relu)).toBe(true);
+    expect(relu.tick).toBe(source.tick);
+    expect(relu.vivants).toBe(source.vivants);
+    // Et le monde repart vraiment de là.
+    const reprise = Simulation.restaurer(relu);
+    expect(reprise.tick).toBe(sim.tick);
+    expect(reprise.vivants().length).toBe(sim.vivants().length);
+  });
+
+  it("relit aussi un instantané en clair (option --json de la traversée)", async () => {
+    const sim = Simulation.creer({ seed: 8 });
+    sim.avancer(144);
+    const source = sim.sauvegarder();
+    const fichier = new File([JSON.stringify(source)], "jour-000001.json", {
+      type: "application/json",
+    });
+    expect((await lireFichierSauvegarde(fichier)).tick).toBe(source.tick);
+  });
+
+  it("refuse ce qui n'est pas une sauvegarde, en le disant", async () => {
+    const pasDuJson = new File(["ceci n'est pas du JSON"], "notes.json");
+    await expect(lireFichierSauvegarde(pasDuJson)).rejects.toThrow(/JSON illisible/);
+    const jsonQuiNEstPasUneSauvegarde = new File(['{"bonjour":1}'], "autre.json");
+    await expect(lireFichierSauvegarde(jsonQuiNEstPasUneSauvegarde)).rejects.toThrow(
+      /pas une sauvegarde/,
+    );
+  });
+
+  it("exporte un fichier comprimé que l'on sait relire, nommé par le jour", async () => {
+    const sim = Simulation.creer({ seed: 9 });
+    sim.avancer(288);
+    const source = sim.sauvegarder();
+    const { nom, blob } = await fichierDeSauvegarde(source);
+    expect(nom).toContain(String(source.jour).padStart(6, "0"));
+    expect(nom.endsWith(".json.gz")).toBe(compressionDisponible());
+    expect(blob.size).toBeLessThan(JSON.stringify(source).length / 3);
+    const relu = await lireFichierSauvegarde(new File([blob], nom));
+    expect(relu.tick).toBe(source.tick);
+  });
 });

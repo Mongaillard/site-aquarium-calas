@@ -129,6 +129,17 @@ jamais existé — la chaîne n'a pas de fin, donc l'arbre des inventions non pl
 **Inventions** montre tout : l'arbre des matières, ce que chaque trouvaille change, l'ennui qui
 l'a fait naître, qui l'a trouvée et combien de prototypes ont raté.
 
+**Le moteur sans écran, et le moment qu'on va regarder (M45).** Un onglet de navigateur ne fait
+pas traverser les âges à un monde : il ralentit en arrière-plan et on ne le laisse pas tourner la
+nuit. `sim traverser --seed 5 --annees 40 --tous-les 120 --dossier ma-chronique` fait tourner le
+monde sans écran et **sème des instantanés** — un fichier par moment, comprimé (1,1 Mo au lieu de
+10,9), plus un `chronique.json` qui les recense, et une ligne de compte rendu à chaque fois. Un
+instantané n'est pas une image : c'est une partie. La boîte « Sauvegardes » du viewer sait
+désormais **ouvrir un fichier** et **exporter la partie**, si bien qu'on lance quarante ans la
+nuit et qu'on va regarder au matin le moment qui intrigue — puis qu'on le continue. Au passage :
+l'année du jeu fait **cent vingt jours** (quatre saisons de trente), ce que la commande comptait
+d'abord mal ; les mesures des jalons précédents, comptées en jours, sont réécrites en jours.
+
 **Le grain, et l'agriculture qui sert enfin à quelque chose (M44).** Un champ mûr donnait
 vingt-quatre baies une fois l'an — sept jours de vivres pour une personne, quand un village de
 seize en consomme l'équivalent de six mille. Les graines ne venaient que d'une chance sur dix en
@@ -139,7 +150,7 @@ et il se garde trois cents jours — la seule nourriture qui passe l'hiver, et l
 choisir entre manger et semer), un champ rend **trois cents unités** au lieu de vingt-quatre, une
 famille cultive **autant de champs que de bouches à nourrir**, et un champ mûr passe devant le
 poisson quand on cherche à manger. Résultat mesuré : quinze à vingt-deux champs par monde, le
-grain fait **45 à 77 %** des vivres, et sur cinq ans la population passe d'un plateau à
+grain fait **45 à 77 %** des vivres, et sur mille huit cents jours la population passe d'un plateau à
 vingt-quatre à **trente-trois et encore en hausse**.
 
 **On ne gèle plus en route (M43).** Les vingt-sept morts de froid mesurés étaient tous

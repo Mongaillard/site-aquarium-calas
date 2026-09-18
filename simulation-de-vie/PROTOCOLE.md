@@ -1668,11 +1668,42 @@ générateur du personnage), sauvegardé structurellement (drapeau `bataille` pa
   de poisson ; une famille de trois logée et pourvue décide un second champ ; le rendement baisse
   sans jachère mais reste d'un autre ordre qu'avant M44.
 - **Mesures.** Sur un an, quatre graines : quinze à vingt-deux champs (contre zéro à deux),
-  quarante-cinq à cinquante-deux récoltes, grain à 45–77 % des vivres. Sur cinq ans, graine 9 :
-  19 → 24 habitants et un plateau dès l'an deux sans le grain ; 21 → 33 et toujours en hausse
-  avec, pour 26 naissances contre 19 et 42 champs contre 3. Sur la graine 2, le monde s'éteint à
-  l'an trois **avec comme sans** (onze naissances, vingt-trois morts dans les deux cas) : les
-  effondrements à cinq ans sont un sujet à part.
+  quarante-cinq à cinquante-deux récoltes, grain à 45–77 % des vivres. Sur mille huit cents jours,
+  graine 9 : 19 → 24 habitants et un plateau dès le jour 720 sans le grain ; 21 → 33 et toujours
+  en hausse avec, pour 26 naissances contre 19 et 42 champs contre 3. Sur la graine 2, le monde
+  s'éteint vers le jour 900 **avec comme sans** (onze naissances, vingt-trois morts dans les deux
+  cas) : les effondrements au long cours sont un sujet à part.
+
+## 8 tervicies. Le moteur sans écran et la reprise d'un moment (M45)
+
+- **`sim traverser`** (`packages/cli/src/main.ts`) : `--seed`, `--annees` (années du jeu, soit
+  `4 × joursParSaison = 120` jours), `--jours` (l'emporte), `--population`, `--dossier` (défaut
+  `chronique`), `--tous-les <jours>` (défaut 360), `--json`, `--sans-conteur`,
+  `--sans-instantanes`. Une ligne par instantané (an, jour, vivants, naissances et morts depuis le
+  précédent, bâtiments, champs, villages, trouvailles, fichier et poids) ; à la fin, la durée et
+  le temps par année simulée, puis les causes de décès.
+- **Les instantanés** : un fichier `jour-NNNNNN.json.gz` par moment, plus `chronique.json`
+  (`seed`, `population`, `jours`, `pas`, `conteur`, `eteintAuJour`, `dureeMs`, `moments[]`).
+  **[DÉCISION]** Un fichier par moment plutôt qu'un journal continu : une sauvegarde se recharge
+  telle quelle par `Simulation.restaurer`, donc le moment est une **partie** et non une image — on
+  la reprend, on la continue, on y joue au dieu. **[DÉCISION]** Comprimé par défaut : 10,9 Mo en
+  clair contre 1,1 Mo en gzip à l'an cinq, et une traversée en sème des dizaines.
+- **L'année vient de l'horloge** : `sim.config.monde.joursParSaison * 4`, et `Moment.an` est
+  `horloge.moment().annee`. La première version comptait des années de 360 jours et annonçait
+  « an 3 » quand le monde affichait « An 7 » ; les légendes en années de M42 à M44 ont été
+  réécrites en jours (les mesures, elles, étaient déjà en jours).
+- **Viewer** (`src/sauvegarde.ts`) : `lireFichierSauvegarde(fichier: File)` reconnaît le gzip **à
+  ses deux premiers octets** (`0x1f 0x8b`) et non à l'extension — **[DÉCISION]** un système ou une
+  messagerie renomment volontiers un fichier, et se tromper là donnerait « illisible » sur une
+  sauvegarde valide — puis vérifie par `estSauvegarde` et rend un motif clair sinon.
+  `fichierDeSauvegarde(s)` rend `{ nom, blob }` (comprimé si le navigateur sait), nommé par le
+  jour. `index.html` : `#fichier-sauvegarde` (caché derrière un label `.bouton-fichier`) et
+  `#btn-exporter` dans la boîte des sauvegardes ; `main.ts` : `ouvrirFichier` (range sous
+  « Fichier · jour N », puis `relancer`) et `exporterPartie`.
+- **Tests** (`packages/viewer/test/sauvegarde.test.ts`, 14 en tout) : un instantané comprimé et
+  renommé exprès se relit et le monde repart au bon tick ; un instantané en clair aussi ; un
+  fichier qui n'est pas du JSON et un JSON qui n'est pas une sauvegarde sont refusés avec leur
+  motif ; l'export est nommé par le jour, trois fois plus petit que le JSON, et se relit.
 
 ## 15 bis. Savoirs : leçons et inventions
 

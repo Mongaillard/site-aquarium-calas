@@ -3,7 +3,9 @@
  * CLI `sim` (section 12). `sim run` génère le monde, fait tourner la simulation
  * jour par jour et affiche l'état des personnages.
  */
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 import { parseArgs } from "node:util";
 import {
   Simulation,
@@ -20,7 +22,20 @@ const USAGE = `Usage : sim <commande> [options]
 
 Commandes :
   run        Génère un monde et fait tourner la simulation
+  traverser  Fait traverser les âges à un monde, sans écran, en semant des instantanés
   help       Affiche cette aide
+
+Options de traverser :
+  --seed <n|texte>      Graine du monde (défaut : 42)
+  --annees <n>          Durée, en années du jeu (4 saisons de 30 jours, soit 120 jours)
+  --jours <n>           Durée en jours ; l'emporte sur --annees
+  --population <n>      Personnages au départ (défaut : 12)
+  --dossier <chemin>    Où semer les instantanés (défaut : chronique)
+  --tous-les <jours>    Un instantané tous les tant de jours (défaut : 360)
+  --json                Écrit les instantanés en clair ; par défaut ils sont comprimés
+                        (à l'an cinq : 10,9 Mo en clair contre 1,1 Mo en gzip)
+  --sans-conteur        Coupe les épreuves du ciel : on mesure le monde, pas ses malheurs
+  --sans-instantanes    Ne rien écrire : on veut juste la courbe
 
 Options de run :
   --seed <n|texte>     Graine du monde (défaut : 42)
@@ -238,6 +253,181 @@ function commandeRun(argv: string[]): number {
   return 0;
 }
 
+/** Un moment semé le long d'une traversée : de quoi le retrouver et le résumer. */
+interface Moment {
+  readonly fichier: string;
+  readonly jour: number;
+  readonly an: number;
+  readonly saison: string;
+  readonly vivants: number;
+  readonly batiments: number;
+  readonly villages: number;
+  readonly champs: number;
+  readonly trouvailles: number;
+  readonly naissances: number;
+  readonly morts: number;
+  readonly octets: number;
+}
+
+/**
+ * `sim traverser` : le moteur sans écran. On fait tourner des décennies sans
+ * navigateur, et l'on **sème des instantanés** — des sauvegardes datées, qu'on
+ * rouvre ensuite dans le viewer pour aller regarder un moment précis.
+ *
+ * **[DÉCISION]** Un fichier par moment plutôt qu'un journal continu : une
+ * sauvegarde se recharge telle quelle par `Simulation.restaurer`, donc le moment
+ * n'est pas une image, c'est une partie — on peut la reprendre, la continuer, y
+ * jouer au dieu. Un index `chronique.json` les recense pour qu'on sache où aller.
+ */
+function commandeTraverser(argv: string[]): number {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      seed: { type: "string" },
+      annees: { type: "string" },
+      jours: { type: "string" },
+      population: { type: "string" },
+      dossier: { type: "string" },
+      "tous-les": { type: "string" },
+      json: { type: "boolean", default: false },
+      "sans-conteur": { type: "boolean", default: false },
+      "sans-instantanes": { type: "boolean", default: false },
+    },
+  });
+  const graine = values.seed ?? "42";
+  const seed = /^-?\d+$/.test(graine) ? Number.parseInt(graine, 10) : graine;
+  const annees = entier(values.annees, 10, "annees");
+  const population = entier(values.population, 12, "population");
+  const pas = Math.max(1, entier(values["tous-les"], 360, "tous-les"));
+  const dossier = values.dossier ?? "chronique";
+  const ecrire = !values["sans-instantanes"];
+
+  const sim = Simulation.creer({ seed, population: { initiale: population } });
+  // **[DÉCISION]** L'année vient de l'horloge du monde et non d'un 360 écrit à la
+  // main : une année du jeu fait quatre saisons de trente jours, soit cent vingt
+  // jours. Compter en années de 360 jours faisait dire « an 3 » au moment où le
+  // monde en affichait 7 — et triplait toutes les durées annoncées.
+  const joursParAn = sim.config.monde.joursParSaison * 4;
+  const jours = entier(values.jours, annees * joursParAn, "jours");
+  if (values["sans-conteur"]) sim.lois.conteur = false;
+  if (ecrire) mkdirSync(dossier, { recursive: true });
+
+  const moments: Moment[] = [];
+  let naissancesVues = 0;
+  let mortsVues = 0;
+  const causes = new Map<string, number>();
+  sim.journal.ecouter((e) => {
+    if (e.type === "deces") {
+      const c = String(e.details.cause ?? "?");
+      causes.set(c, (causes.get(c) ?? 0) + 1);
+    }
+  });
+
+  const semer = (): void => {
+    const jour = sim.horloge.moment().jourAbsolu;
+    const naissances = sim.journal.compte("naissance");
+    const morts = sim.journal.compte("deces");
+    let octets = 0;
+    let fichier = "";
+    if (ecrire) {
+      const nom = `jour-${String(jour).padStart(6, "0")}`;
+      const json = JSON.stringify(sim.sauvegarder());
+      // **[DÉCISION]** Comprimé par défaut : une sauvegarde pèse 10,9 Mo en clair à
+      // l'an cinq contre 1,1 Mo en gzip, et une traversée en sème des dizaines.
+      if (values.json) {
+        fichier = `${nom}.json`;
+        octets = Buffer.byteLength(json, "utf8");
+        writeFileSync(join(dossier, fichier), json, "utf8");
+      } else {
+        const gz = gzipSync(json);
+        fichier = `${nom}.json.gz`;
+        octets = gz.length;
+        writeFileSync(join(dossier, fichier), gz);
+      }
+    }
+    const m = sim.horloge.moment();
+    let champs = 0;
+    for (const b of sim.batiments.values()) if (b.type === "champ") champs += 1;
+    const moment: Moment = {
+      fichier,
+      jour,
+      an: m.annee,
+      saison: m.saison,
+      vivants: sim.vivants().length,
+      batiments: sim.batiments.size,
+      villages: sim.villages.villages.length,
+      champs,
+      trouvailles: sim.trouvailles.trouvailles.size,
+      naissances: naissances - naissancesVues,
+      morts: morts - mortsVues,
+      octets,
+    };
+    naissancesVues = naissances;
+    mortsVues = morts;
+    moments.push(moment);
+    console.log(
+      `  an ${String(moment.an).padStart(3)} · jour ${String(jour).padStart(6)} · ` +
+        `${String(moment.vivants).padStart(4)} vivants ` +
+        `(+${moment.naissances} −${moment.morts})  ` +
+        `${String(moment.batiments).padStart(4)} bâtiments, ${String(moment.champs).padStart(3)} champs, ` +
+        `${moment.villages} village${moment.villages > 1 ? "s" : ""}, ${moment.trouvailles} trouvailles` +
+        (ecrire ? `  → ${fichier} (${(octets / 1024 / 1024).toFixed(2)} Mo)` : ""),
+    );
+  };
+
+  console.log(
+    `Traversée : graine ${String(seed)}, ${population} au départ, ${jours} jours ` +
+      `(${(jours / joursParAn).toFixed(1)} ans de ${joursParAn} jours), un instantané tous les ${pas} jours` +
+      (ecrire ? ` dans ${dossier}/` : " (sans écrire)"),
+  );
+  const t0 = performance.now();
+  semer();
+  let eteint = -1;
+  for (let j = 1; j <= jours; j++) {
+    sim.avancerJusquaAube();
+    if (eteint < 0 && sim.vivants().length === 0) {
+      eteint = j;
+      console.log(`  ⚑ le monde s'éteint au jour ${String(j)}`);
+      semer();
+      break;
+    }
+    if (j % pas === 0) semer();
+  }
+  if (eteint < 0 && jours % pas !== 0) semer();
+  const duree = performance.now() - t0;
+
+  if (ecrire) {
+    const index = {
+      seed: String(seed),
+      population,
+      jours,
+      pas,
+      conteur: sim.lois.conteur,
+      eteintAuJour: eteint < 0 ? null : eteint,
+      dureeMs: Math.round(duree),
+      moments,
+    };
+    writeFileSync(join(dossier, "chronique.json"), JSON.stringify(index, null, 2), "utf8");
+  }
+
+  const dernier = moments[moments.length - 1];
+  const parAn = duree / Math.max(1, jours / joursParAn);
+  console.log();
+  console.log(
+    `Fin : ${eteint < 0 ? `${String(dernier?.vivants ?? 0)} vivants` : `monde éteint au jour ${String(eteint)}`}` +
+      ` en ${(duree / 1000).toFixed(1)} s, soit ${(parAn / 1000).toFixed(1)} s par année simulée.`,
+  );
+  const tri = [...causes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  if (tri.length > 0)
+    console.log(`Causes de décès : ${tri.map(([c, n]) => `${c} ${String(n)}`).join(", ")}`);
+  if (ecrire)
+    console.log(
+      `${moments.length} instantanés dans ${dossier}/ — ouvrez-en un dans le viewer ` +
+        `(Sauvegardes → « Ouvrir un fichier ») pour reprendre la partie à ce moment-là.`,
+    );
+  return 0;
+}
+
 /** Fiche complète d'un personnage : identité, relations, souvenirs récents. */
 function inspecter(sim: Simulation, id: string): void {
   const p = sim.personnage(id);
@@ -281,6 +471,8 @@ function main(argv: string[]): number {
   switch (commande) {
     case "run":
       return commandeRun(reste);
+    case "traverser":
+      return commandeTraverser(reste);
     case undefined:
     case "help":
     case "--help":

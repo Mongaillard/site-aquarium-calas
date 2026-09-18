@@ -1480,3 +1480,34 @@ table.saisons td:first-child {
   border-radius: 0;
   image-rendering: pixelated;
 }
+
+/* M45 : ouvrir une sauvegarde venue d'un fichier. L'input natif est laid et
+   intraduisible ; on le cache derrière un label qui a l'allure d'un bouton. */
+#fichier-sauvegarde {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.bouton-fichier {
+  display: inline-block;
+  font: inherit;
+  color: var(--texte);
+  background: #2a303a;
+  border: 1px solid var(--bord);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.bouton-fichier:hover {
+  background: #343b47;
+}
+#fichier-sauvegarde:focus-visible + .bouton-fichier {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

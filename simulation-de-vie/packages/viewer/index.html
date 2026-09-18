@@ -261,6 +261,19 @@
         <input id="nom-sauvegarde" type="text" placeholder="nom de la partie" maxlength="40" />
         <button type="submit">💾 Sauver maintenant</button>
       </form>
+      <p class="discret">
+        Un fichier de sauvegarde s'emporte : celui que <code>sim traverser</code> a semé pendant la
+        nuit s'ouvre ici, et la partie de ce navigateur s'exporte pour être reprise ailleurs.
+      </p>
+      <div class="ligne">
+        <input
+          id="fichier-sauvegarde"
+          type="file"
+          accept=".json,.gz,application/json,application/gzip"
+        />
+        <label for="fichier-sauvegarde" class="bouton-fichier">📂 Ouvrir un fichier…</label>
+        <button type="button" id="btn-exporter">⬇️ Exporter la partie</button>
+      </div>
       <ol id="liste-sauvegardes" class="liste"></ol>
       <div id="statut-sauvegardes" class="discret"></div>
       <div class="ligne"><button type="button" id="btn-fermer-sauvegardes">Fermer</button></div>

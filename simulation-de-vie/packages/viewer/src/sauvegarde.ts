@@ -13,9 +13,11 @@
 import { estSauvegarde, type Sauvegarde } from "@sdv/core";
 import {
   COMPRESSION,
+  compresser,
   compresserParMorceaux,
   compressionDisponible,
   decompresser,
+  stringifyParMorceaux,
 } from "./compression.js";
 
 const BASE = "simulation-de-vie";
@@ -205,6 +207,45 @@ export async function supprimerSauvegarde(nom: string): Promise<void> {
 }
 
 /** Nom lisible d'une sauvegarde dans la liste. */
+/**
+ * Lit un fichier de sauvegarde choisi par l'observateur : le `.json.gz` semé par
+ * `sim traverser`, ou un `.json` en clair. **[DÉCISION]** On reconnaît le gzip à
+ * ses deux premiers octets plutôt qu'à l'extension (M45) : un navigateur, un
+ * système ou une messagerie renomment volontiers un fichier, et se tromper ici
+ * donnerait « sauvegarde illisible » sur une sauvegarde parfaitement valide.
+ */
+export async function lireFichierSauvegarde(fichier: File): Promise<Sauvegarde> {
+  const octets = await fichier.arrayBuffer();
+  const tete = new Uint8Array(octets.slice(0, 2));
+  const comprime = tete[0] === 0x1f && tete[1] === 0x8b;
+  if (comprime && !compressionDisponible())
+    throw new Error("ce navigateur ne sait pas décompresser ce fichier");
+  const texte = comprime ? await decompresser(octets) : new TextDecoder().decode(octets);
+  let contenu: unknown;
+  try {
+    contenu = JSON.parse(texte);
+  } catch {
+    throw new Error("ce fichier n'est pas une sauvegarde (JSON illisible)");
+  }
+  if (!estSauvegarde(contenu)) throw new Error("ce fichier n'est pas une sauvegarde de ce jeu");
+  return contenu;
+}
+
+/**
+ * Le fichier à télécharger pour emporter une partie ailleurs (M45) : comprimé
+ * quand le navigateur sait le faire, en clair sinon — les deux se relisent.
+ */
+export async function fichierDeSauvegarde(
+  s: Sauvegarde,
+): Promise<{ readonly nom: string; readonly blob: Blob }> {
+  const texte = await stringifyParMorceaux(s);
+  const base = `simulation-de-vie-jour-${String(s.jour).padStart(6, "0")}`;
+  if (!compressionDisponible())
+    return { nom: `${base}.json`, blob: new Blob([texte], { type: "application/json" }) };
+  const octets = await compresser(texte);
+  return { nom: `${base}.json.gz`, blob: new Blob([octets], { type: "application/gzip" }) };
+}
+
 export function decrireSauvegarde(e: EntreeSauvegarde): string {
   const quand = new Date(e.date).toLocaleString("fr-FR", {
     day: "2-digit",
