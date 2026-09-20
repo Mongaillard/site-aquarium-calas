@@ -141,8 +141,12 @@ export function refundCost(stock, cost, ratio = 1) {
   for (const key in cost) stock[key] += Math.floor(cost[key] * ratio);
 }
 
+/**
+ * Coût d'un bâtiment ou d'une unité, sous forme de balises. Les pictogrammes
+ * sont posés par l'interface (voir `icones.js`) : ce module reste sans
+ * dépendance, il sert aussi à la simulation.
+ */
 export function costLabel(cost) {
   if (!cost) return '';
-  const icons = { food: '🍖', wood: '🪵', gold: '🪙' };
-  return Object.keys(cost).map((k) => icons[k] + cost[k]).join(' ');
+  return Object.keys(cost).map((k) => `<i data-cout="${k}"></i>${cost[k]}`).join(' ');
 }

@@ -381,6 +381,45 @@ check('la ligne « Chantiers » en retire aussi', apresRetrait < apresChantier,
 await page.click('#btn-close-workers');
 await page.waitForTimeout(150);
 
+// Les pictogrammes sont des tracés vectoriels, plus aucun emoji dans l'interface :
+// un emoji se dessine différemment sur chaque téléphone.
+const pictos = await page.evaluate(() => {
+  const emoji = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2190}-\u{27BF}]/u;
+  const fautifs = [];
+  const hud = document.getElementById('hud');
+  const promenade = document.createTreeWalker(hud, NodeFilter.SHOW_TEXT);
+  for (let n = promenade.nextNode(); n; n = promenade.nextNode()) {
+    if (emoji.test(n.textContent)) fautifs.push(n.textContent.trim().slice(0, 40));
+  }
+  return { traces: hud.querySelectorAll('svg.ic').length, fautifs };
+});
+check('l’interface est pavée d’icônes vectorielles', pictos.traces >= 10, pictos.traces + ' tracés');
+check('plus aucun emoji dans le HUD', pictos.fautifs.length === 0, pictos.fautifs.join(' | '));
+
+// Et le canvas dessine bien les pictogrammes des bâtiments.
+const surCarte = await page.evaluate(() => {
+  const g = window.__jeu;
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  return { icone: tc.def.icon, trace: !!g.renderer.constructor.prototype.dessinerIcone };
+});
+check('les bâtiments ont une icône vectorielle',
+  surCarte.icone === 'towncenter' && surCarte.trace, JSON.stringify(surCarte));
+
+// Les crédits sont accessibles depuis le menu : la licence CC BY l'exige.
+await page.click('#btn-menu');
+await page.waitForTimeout(250);
+await page.click('text=Crédits');
+await page.waitForTimeout(300);
+const credits = await page.textContent('.modal-card');
+check('l’écran des crédits cite la licence des icônes',
+  /game-icons/.test(credits) && /CC BY 3\.0/.test(credits));
+check('il cite aussi les auteurs', /Delapouite/.test(credits) && /Lorc/.test(credits));
+await page.click('.modal-card [data-act="close"]');
+await page.waitForTimeout(200);
+await page.click('[data-act="resume"]').catch(() => {});
+await page.waitForTimeout(200);
+await page.evaluate(() => { window.__jeu.paused = false; window.__jeu.ui.hideModal(); });
+
 // Sauvegarde : on joue, on recharge la page, on reprend là où on en était.
 const avantRechargement = await page.evaluate(() => {
   const g = window.__jeu;

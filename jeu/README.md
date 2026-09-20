@@ -2,8 +2,8 @@
 
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
-pas une seule image à télécharger : ~3 500 lignes de JavaScript, du Canvas 2D,
-et tous les graphismes dessinés au code.
+presque aucune image : ~7 000 lignes de JavaScript, du Canvas 2D, des
+pictogrammes vectoriels et trois illustrations de 30 Ko en tout.
 
 ## Lancer le jeu
 
@@ -246,6 +246,41 @@ Le test headless vérifie que l'économie tourne, que les âges sont atteints, q
 des combats ont lieu et que l'état reste cohérent. Le test navigateur vérifie
 qu'il n'y a aucune erreur console, que le rendu tient 30+ images/s, et que les
 gestes (sélection, ordre, pose de bâtiment, zoom) répondent.
+
+## Les images et les icônes
+
+Le jeu n'a longtemps affiché **aucune image** : tout était dessiné au code, et
+les pictogrammes étaient des **emoji**. C'était le point faible visible — un
+emoji se dessine différemment sur chaque téléphone, si bien qu'un Centre-Ville
+n'avait pas la même tête sur un Samsung et sur un iPhone.
+
+**Les 52 pictogrammes sont désormais des tracés vectoriels** (`js/icones.js`,
+73 Ko) issus de [game-icons.net](https://game-icons.net), sous licence
+**CC BY 3.0**. Ils sont rendus par le même jeu de données dans le DOM (balises
+`<svg>`) et sur le canvas (`Path2D`), donc nets à tout zoom et teintables : la
+couleur vient du texte qui les porte. Les auteurs sont cités dans l'écran
+**Crédits**, accessible depuis le menu de pause — c'est ce que la licence exige.
+
+Trois **illustrations** (`assets/`, 30 Ko en WebP) viennent d'une planche de
+personnage fournie par l'auteur du dépôt : le chevalier de l'écran d'accueil,
+le portrait du milicien dans le panneau de sélection, et le chevalier à terre
+de l'écran de défaite. Le portrait de l'adversaire est le même fichier, passé
+en rouge par rotation de teinte — plutôt qu'une seconde image à télécharger.
+
+Le choix des icônes a été fait sur mesure : une icône doit tenir **à 24 px en
+une seule couleur**, et deux concepts voisins ne doivent pas se ressembler.
+D'où, par exemple, le trio caserne / archerie / écurie rendu par trois formes
+sans recouvrement possible — un X d'épées, un disque de cible, un fer à cheval.
+
+### Animation des unités
+
+À cette taille, ce qui se lit n'est pas le détail d'un personnage mais le
+**mouvement**. Les unités ont donc une cadence de marche calée sur la distance
+parcourue (une unité lente balance lentement, une unité bloquée ne pédale pas
+sur place), un coup d'arme qui part en arrière puis balaie vers l'avant, et des
+**éclats de matière** : copeaux bruns sous la hache, poussière grise sur un
+chantier, étincelles au choc, projection à la mort. Tout cela vit dans le rendu,
+jamais dans la simulation — une partie rejouée à la même graine reste identique.
 
 ## Réglages
 

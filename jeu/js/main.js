@@ -14,6 +14,7 @@ import { UI } from './ui.js';
 import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
+import { iconeSVG } from './icones.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 const MAX_CATCHUP = 5;
@@ -137,7 +138,7 @@ class Game {
     if (this.idleNoticeCooldown > 0) this.idleNoticeCooldown -= realDt;
     this.processEvents();
     this.pruneSelection();
-    this.renderer.render();
+    this.renderer.render(realDt);
     this.renderer.drawMinimap();
     this.ui.update(realDt);
     if (this.alertCooldown > 0) this.alertCooldown -= realDt;
@@ -160,7 +161,7 @@ class Game {
         case 'destroyed': if (this.world.isVisible(event.x, event.y)) this.audio.play('destroyed'); break;
         case 'notice': this.ui.toast(event.text, 'warn'); break;
         case 'idleWorker':
-          // On prévient sans harceler : le compteur 💤 reste la source de vérité.
+          // On prévient sans harceler : le compteur des inactifs reste la source de vérité.
           if (this.idleNoticeCooldown <= 0) {
             this.idleNoticeCooldown = 15;
             const count = this.idleVillagers().length;
@@ -418,11 +419,11 @@ class Game {
   ringTownBell() {
     const result = this.world.ringTownBell(this.world.humanIndex);
     if (result.sheltered > 0) {
-      this.ui.toast(`🔔 ${result.sheltered} villageois à l'abri`, 'warn');
+      this.ui.toast(`${result.sheltered} villageois à l'abri`, 'warn');
       this.audio.play('alert');
       this.vibrate([12, 40, 12]);
     } else if (result.released > 0) {
-      this.ui.toast(`🔔 ${result.released} villageois retournent au travail`);
+      this.ui.toast(`${result.released} villageois retournent au travail`);
       this.audio.play('order');
     } else {
       this.ui.toast('Aucun abri disponible', 'error');
@@ -768,7 +769,7 @@ class Game {
   toggleSound() {
     const on = !this.audio.enabled;
     this.audio.setEnabled(on);
-    document.getElementById('btn-sound').textContent = on ? '🔊' : '🔇';
+    document.getElementById('btn-sound').innerHTML = iconeSVG(on ? 'son' : 'sonCoupe', 19);
     if (on) { this.audio.resume(); this.audio.play('click'); }
   }
 
@@ -859,11 +860,11 @@ function refreshResumeCard() {
   if (!save) {
     box.classList.add('hidden');
     box.innerHTML = '';
-    if (play) play.textContent = '⚔️ Jouer';
+    if (play) play.textContent = 'Jouer';
     return;
   }
   // Le bouton dit clairement ce qu'il fait quand une partie dort déjà.
-  if (play) play.textContent = '⚔️ Nouvelle partie';
+  if (play) play.textContent = 'Nouvelle partie';
   const mode = GAME_MODES[save.mode] || GAME_MODES[DEFAULT_MODE];
   const player = save.players[save.humanIndex || 0];
   const age = AGES[player ? player.age : 0];
@@ -873,7 +874,7 @@ function refreshResumeCard() {
     ? `reste ${formatClock(Math.max(0, mode.timeLimit - save.time))}`
     : formatClock(save.time);
   box.innerHTML = `
-    <button id="btn-resume" class="btn primary large">▶️ Reprendre la partie</button>
+    <button id="btn-resume" class="btn primary large">Reprendre la partie</button>
     <p class="resume-info">${mode.icon} ${mode.name} · ${age.name} · ${chrono}
       · ${DIFFICULTIES[save.difficulty] ? DIFFICULTIES[save.difficulty].name : ''}</p>
     <button id="btn-drop-save" class="btn ghost small">Abandonner cette partie</button>`;

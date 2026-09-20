@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
 // Rendu Canvas 2D : terrain, ressources, entités, brouillard, minimap.
-// Aucune image externe : tout est dessiné au code (atlas de tuiles généré au
-// démarrage), ce qui garde le jeu léger et instantané à charger.
+// Terrain, bâtiments et unités sont dessinés au code (atlas de tuiles généré au
+// démarrage) ; les pictogrammes sont des tracés vectoriels (voir icones.js).
+// Aucune image bitmap n'entre ici, ce qui garde le rendu net à tout zoom.
 // ---------------------------------------------------------------------------
 
 import { TILE, BUILDING_TYPES } from './config.js';
+import { iconePath, ICON_BOX } from './icones.js';
 import { TERRAIN } from './map.js';
 import { clamp } from './utils.js';
 
@@ -109,6 +111,10 @@ export class Renderer {
     this.selectionBox = null;
     this.showGrid = false;
     this.frame = 0;
+    // Particules décoratives : elles vivent dans le rendu, jamais dans la
+    // simulation. Une partie rejouée à la même graine reste donc identique.
+    this.particles = [];
+    this.effetsVus = new WeakSet();
     this.buildTileAtlas();
     this.initFogCanvas();
     this.resize();
@@ -173,9 +179,11 @@ export class Renderer {
 
   // --- Boucle de rendu ------------------------------------------------------
 
-  render(interpolation = 0) {
+  render(dt = 1 / 60) {
     const ctx = this.ctx;
     this.frame++;
+    this.suivreEffets();
+    this.majParticules(Math.min(0.05, dt));
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = '#1b2430';
     ctx.fillRect(0, 0, this.width, this.height);
@@ -193,6 +201,7 @@ export class Renderer {
     this.drawEntities();
     this.drawProjectiles();
     this.drawEffects();
+    this.drawParticules();
     this.drawGhost();
     ctx.restore();
 
@@ -451,10 +460,7 @@ export class Renderer {
     // Pictogramme
     if (this.camera.zoom > 0.45) {
       ctx.globalAlpha = alpha * 0.92;
-      ctx.font = `${Math.round(w * 0.36)}px system-ui, "Segoe UI Emoji", sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(b.def.icon, b.x, b.y + 4);
+      this.dessinerIcone(b.def.icon, b.x, b.y + 2, w * 0.46, 'rgba(28,36,48,0.85)');
     }
     ctx.globalAlpha = 1;
 
@@ -550,19 +556,21 @@ export class Renderer {
     const ctx = this.ctx;
     const color = u.player.color;
     const r = u.radius;
-    const bob = u.state === 'move' || u.state === 'attackMove' ? Math.sin(this.frame / 4 + u.id) * 0.8 : 0;
-    const x = u.x, y = u.y + bob;
+    // Le corps monte à chaque appui et se balance ; l'ombre, elle, reste au sol.
+    const anim = this.unitAnim(u);
+    const x = u.x + anim.marche * r * 0.09;
+    const y = u.y - Math.abs(anim.marche) * r * 0.18;
 
     ctx.fillStyle = 'rgba(0,0,0,0.28)';
     ctx.beginPath();
-    ctx.ellipse(x, u.y + r * 0.55, r * 0.75, r * 0.32, 0, 0, Math.PI * 2);
+    ctx.ellipse(u.x, u.y + r * 0.55, r * 0.75, r * 0.32, 0, 0, Math.PI * 2);
     ctx.fill();
 
     if (u.selected) {
       ctx.strokeStyle = u.playerIndex === this.world.humanIndex ? '#ffffff' : '#ff8080';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(x, u.y + r * 0.5, r * 0.95, r * 0.45, 0, 0, Math.PI * 2);
+      ctx.ellipse(u.x, u.y + r * 0.5, r * 0.95, r * 0.45, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -620,14 +628,32 @@ export class Renderer {
     ctx.arc(x, headY, r * 0.42, 0, Math.PI * 2);
     ctx.fill();
 
-    // Marqueur de direction / arme
+    // Arme : elle indique la direction au repos, et s'abat pendant le coup.
+    // Le geste part en arrière puis balaie vers l'avant — à vingt pixels, c'est
+    // ce mouvement-là qu'on lit, pas le détail de la lame.
+    const frappe = anim.coup >= 0;
+    const elan = frappe ? -0.95 + 1.75 * (1 - (1 - anim.coup) ** 2) : 0;
+    const armeAngle = u.facing + elan;
     const fx = Math.cos(u.facing), fy = Math.sin(u.facing);
+    const ax = Math.cos(armeAngle), ay = Math.sin(armeAngle);
+    const portee = r * (frappe ? 1.45 : 1.25);
     ctx.strokeStyle = u.isVillager ? '#c9a441' : '#e8e8e8';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = frappe ? 2.6 : 2;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(x + fx * r * 0.5, y + fy * r * 0.5 - r * 0.2);
-    ctx.lineTo(x + fx * r * 1.25, y + fy * r * 1.25 - r * 0.2);
+    ctx.moveTo(x + ax * r * 0.5, y + ay * r * 0.5 - r * 0.2);
+    ctx.lineTo(x + ax * portee, y + ay * portee - r * 0.2);
     ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // Traînée du coup, sur la première moitié du geste seulement.
+    if (frappe && anim.coup < 0.55) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.5 * (1 - anim.coup / 0.55)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y - r * 0.2, portee, armeAngle - 0.9, armeAngle + 0.15);
+      ctx.stroke();
+    }
 
     if (u.def.class === 'archer') {
       ctx.strokeStyle = '#d9c9a3';
@@ -649,12 +675,18 @@ export class Renderer {
       ctx.stroke();
     }
 
-    // Étincelles de travail
-    if (u.gatherAnim > 0 && this.frame % 8 < 4) {
-      ctx.fillStyle = 'rgba(255,255,220,0.8)';
-      ctx.beginPath();
-      ctx.arc(x + fx * r * 1.5, y + fy * r * 1.5 - r * 0.3, 2, 0, Math.PI * 2);
-      ctx.fill();
+    // Éclats de travail : copeaux bruns sous la hache, poussière grise sur un
+    // chantier, paillettes sur un filon. C'est ce qui donne le sentiment que
+    // quelque chose se passe, bien plus qu'un personnage détaillé.
+    if (u.gatherAnim > 0.34 && !u._travailFx) {
+      u._travailFx = true;
+      const teintes = { wood: '#b07a42', gold: '#f2c14e', food: '#d8695c' };
+      const couleur = u.state === 'build' ? '#cbbfae' : (teintes[u.carry.type] || '#d8d2c4');
+      this.semerParticules(x + fx * r * 1.25, y + fy * r * 1.25 - r * 0.3, 3, {
+        color: couleur, angle: u.facing + Math.PI, spread: 1.5, speed: 30, life: 0.42, size: 1.7,
+      });
+    } else if (u.gatherAnim <= 0.05) {
+      u._travailFx = false;
     }
 
     if (u.hp < u.maxHp) this.drawHealthBar(x, y - r * 1.9, r * 1.7, u.hp / u.maxHp);
@@ -680,6 +712,104 @@ export class Renderer {
       ctx.moveTo(p.x - Math.cos(a) * 7, p.y - Math.sin(a) * 7);
       ctx.lineTo(p.x + Math.cos(a) * 5, p.y + Math.sin(a) * 5);
       ctx.stroke();
+    }
+  }
+
+  /**
+   * Pictogramme vectoriel centré sur (cx, cy). Les icônes sont dessinées dans
+   * un carré de 512 unités : on ramène ce carré à la taille demandée.
+   */
+  dessinerIcone(cle, cx, cy, taille, couleur) {
+    const path = iconePath(cle);
+    if (!path) return;
+    const ctx = this.ctx;
+    const k = taille / ICON_BOX;
+    ctx.save();
+    ctx.translate(cx - taille / 2, cy - taille / 2);
+    ctx.scale(k, k);
+    ctx.fillStyle = couleur;
+    ctx.fill(path);
+    ctx.restore();
+  }
+
+  // --- Animation et particules ----------------------------------------------
+
+  /**
+   * Cadence d'une unité.
+   * - La marche suit la DISTANCE parcourue, pas l'horloge : une unité lente
+   *   balance lentement, et une unité bloquée contre un obstacle ne pédale pas
+   *   sur place.
+   * - Le coup suit le rechargement de l'arme : il part à la frappe et occupe
+   *   le premier tiers du cycle, ce qui le rend lisible même à vingt pixels.
+   */
+  unitAnim(u) {
+    const px = u._ax === undefined ? u.x : u._ax;
+    const py = u._ay === undefined ? u.y : u._ay;
+    const pas = Math.hypot(u.x - px, u.y - py);
+    u._ax = u.x; u._ay = u.y;
+    u._walk = ((u._walk || 0) + pas / Math.max(2.5, u.radius * 0.42)) % (Math.PI * 2);
+
+    const cadence = u.def.attackSpeed || 2;
+    const ecoule = cadence - u.attackCooldown;
+    const enCoup = u.attackCooldown > 0 && ecoule >= 0 && ecoule < cadence * 0.34;
+    return {
+      marche: pas > 0.02 ? Math.sin(u._walk) : 0,
+      coup: enCoup ? ecoule / (cadence * 0.34) : -1,
+    };
+  }
+
+  /** Quelques éclats qui retombent : copeaux, poussière, étincelles. */
+  semerParticules(x, y, n, opts = {}) {
+    const { color = '#ddd', speed = 32, life = 0.5, gravity = 90, size = 1.5,
+      spread = Math.PI * 2, angle = 0 } = opts;
+    for (let i = 0; i < n; i++) {
+      // `Math.random` est ici sans conséquence : rien de tout cela n'entre dans
+      // la simulation, qui possède son propre générateur graine par graine.
+      const a = angle + (Math.random() - 0.5) * spread;
+      const v = speed * (0.45 + Math.random() * 0.9);
+      this.particles.push({
+        x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - speed * 0.35,
+        life, max: life, color, gravity, size,
+      });
+    }
+    // Plafond : sur une grande bataille, mieux vaut perdre les plus anciennes
+    // que de faire tomber la fréquence d'images.
+    if (this.particles.length > 320) this.particles.splice(0, this.particles.length - 320);
+  }
+
+  majParticules(dt) {
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.life -= dt;
+      if (p.life <= 0) { this.particles.splice(i, 1); continue; }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += p.gravity * dt;
+    }
+  }
+
+  drawParticules() {
+    const ctx = this.ctx;
+    for (const p of this.particles) {
+      const t = p.life / p.max;
+      ctx.globalAlpha = Math.min(1, t * 1.6);
+      ctx.fillStyle = p.color;
+      const s = p.size * (0.6 + t * 0.6);
+      ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Un mort ou un coup encaissé projette de la matière : on le voit de loin. */
+  suivreEffets() {
+    for (const fx of this.world.effects) {
+      if (this.effetsVus.has(fx)) continue;
+      this.effetsVus.add(fx);
+      if (fx.kind === 'death') {
+        this.semerParticules(fx.x, fx.y - 4, 7, { color: fx.color || '#777', speed: 46, life: 0.75, size: 2 });
+      } else if (fx.kind === 'hit') {
+        this.semerParticules(fx.x, fx.y, 3, { color: '#ffe08a', speed: 40, life: 0.3, gravity: 30 });
+      }
     }
   }
 
@@ -729,10 +859,7 @@ export class Renderer {
     ctx.strokeStyle = this.ghost.valid ? '#ffffff' : '#ff4d4d';
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, w, w);
-    ctx.font = `${Math.round(w * 0.4)}px system-ui, "Segoe UI Emoji", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(def.icon, x + w / 2, y + w / 2);
+    this.dessinerIcone(def.icon, x + w / 2, y + w / 2, w * 0.5, 'rgba(20,28,38,0.85)');
   }
 
   // --- Brouillard -----------------------------------------------------------

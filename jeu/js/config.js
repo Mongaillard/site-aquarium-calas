@@ -20,19 +20,19 @@ export const RESOURCES = ['food', 'wood', 'gold'];
  */
 export const STANCES = {
   aggressive: {
-    id: 'aggressive', name: 'Agressif', short: 'Agressif', icon: '⚔️', chase: 9,
+    id: 'aggressive', name: 'Agressif', short: 'Agressif', icon: 'aggressive', chase: 9,
     desc: 'Engage tout ennemi en vue et le poursuit loin.',
   },
   defensive: {
-    id: 'defensive', name: 'Défensif', short: 'Défensif', icon: '🛡️', chase: 4,
+    id: 'defensive', name: 'Défensif', short: 'Défensif', icon: 'defensive', chase: 4,
     desc: 'Engage ce qui approche, puis revient à son poste.',
   },
   standGround: {
-    id: 'standGround', name: 'Position tenue', short: 'Tenir', icon: '🧱', chase: 0,
+    id: 'standGround', name: 'Position tenue', short: 'Tenir', icon: 'standGround', chase: 0,
     desc: 'Ne bouge pas : ne frappe que ce qui entre à portée.',
   },
   passive: {
-    id: 'passive', name: 'Sans attaque', short: 'Passif', icon: '🕊️', chase: 0,
+    id: 'passive', name: 'Sans attaque', short: 'Passif', icon: 'passive', chase: 0,
     desc: 'N’attaque jamais de sa propre initiative.',
   },
 };
@@ -48,11 +48,16 @@ export const RESOURCE_LABELS = {
   gold: 'Or',
 };
 
-export const RESOURCE_ICONS = {
-  food: '🍖',
-  wood: '🪵',
-  gold: '🪙',
+/**
+ * Illustrations de personnage, quand il en existe une : elles remplacent
+ * l'icône dans le panneau de sélection. Tout type absent retombe sur son
+ * icône — le jeu ne dépend d'aucune image pour fonctionner.
+ */
+export const PORTRAITS = {
+  militia: 'assets/portrait-milicien.webp',
 };
+
+export const RESOURCE_ICONS = { food: 'food', wood: 'wood', gold: 'gold' };
 
 // --- Âges -------------------------------------------------------------------
 
@@ -69,7 +74,7 @@ export const AGES = [
 
 export const UNIT_TYPES = {
   villager: {
-    id: 'villager', name: 'Villageois', icon: '🧑‍🌾', class: 'villager',
+    id: 'villager', name: 'Villageois', icon: 'villager', class: 'villager',
     cost: { food: 50 }, trainTime: 20, hp: 45, speed: 1.15,
     attack: 3, attackType: 'melee', range: 0.7, attackSpeed: 2.0,
     meleeArmor: 0, pierceArmor: 0, los: 5, radius: 9,
@@ -78,7 +83,7 @@ export const UNIT_TYPES = {
     desc: 'Récolte, construit et répare. La base de toute économie.',
   },
   militia: {
-    id: 'militia', name: 'Milicien', icon: '⚔️', class: 'infantry',
+    id: 'militia', name: 'Milicien', icon: 'militia', class: 'infantry',
     cost: { food: 60, gold: 20 }, trainTime: 16, hp: 45, speed: 1.0,
     attack: 5, attackType: 'melee', range: 0.8, attackSpeed: 1.8,
     meleeArmor: 1, pierceArmor: 1, los: 5, radius: 9,
@@ -86,7 +91,7 @@ export const UNIT_TYPES = {
     desc: 'Fantassin polyvalent et bon marché.',
   },
   spearman: {
-    id: 'spearman', name: 'Lancier', icon: '🔱', class: 'infantry',
+    id: 'spearman', name: 'Lancier', icon: 'spearman', class: 'infantry',
     cost: { food: 35, wood: 25 }, trainTime: 14, hp: 45, speed: 1.0,
     attack: 4, attackType: 'melee', range: 1.0, attackSpeed: 2.0,
     bonus: { cavalry: 10, siege: 6 },
@@ -95,7 +100,7 @@ export const UNIT_TYPES = {
     desc: 'Redoutable contre la cavalerie et les engins de siège.',
   },
   archer: {
-    id: 'archer', name: 'Archer', icon: '🏹', class: 'archer',
+    id: 'archer', name: 'Archer', icon: 'archer', class: 'archer',
     cost: { wood: 25, gold: 45 }, trainTime: 18, hp: 30, speed: 1.0,
     attack: 4, attackType: 'pierce', range: 5, attackSpeed: 2.0,
     bonus: { infantry: 1 },
@@ -105,7 +110,7 @@ export const UNIT_TYPES = {
     desc: 'Tire à distance. Fragile au corps à corps.',
   },
   scout: {
-    id: 'scout', name: 'Éclaireur', icon: '🐎', class: 'cavalry',
+    id: 'scout', name: 'Éclaireur', icon: 'scout', class: 'cavalry',
     cost: { food: 80 }, trainTime: 20, hp: 45, speed: 1.75,
     attack: 3, attackType: 'melee', range: 0.9, attackSpeed: 2.2,
     meleeArmor: 0, pierceArmor: 2, los: 9, radius: 10,
@@ -113,7 +118,7 @@ export const UNIT_TYPES = {
     desc: 'Très rapide et large champ de vision : idéal pour explorer.',
   },
   knight: {
-    id: 'knight', name: 'Cavalier', icon: '🛡️', class: 'cavalry',
+    id: 'knight', name: 'Cavalier', icon: 'knight', class: 'cavalry',
     cost: { food: 60, gold: 75 }, trainTime: 22, hp: 100, speed: 1.5,
     attack: 10, attackType: 'melee', range: 0.9, attackSpeed: 1.8,
     bonus: { archer: 4, villager: 2, siege: 5 },
@@ -122,7 +127,7 @@ export const UNIT_TYPES = {
     desc: 'Cavalerie lourde. Fonce sur les archers et les villageois.',
   },
   ram: {
-    id: 'ram', name: 'Bélier', icon: '🪨', class: 'siege',
+    id: 'ram', name: 'Bélier', icon: 'ram', class: 'siege',
     cost: { wood: 160, gold: 75 }, trainTime: 26, hp: 200, speed: 0.6,
     attack: 4, attackType: 'melee', range: 1.2, attackSpeed: 4.0,
     bonus: { building: 35 },
@@ -136,7 +141,7 @@ export const UNIT_TYPES = {
 
 export const BUILDING_TYPES = {
   towncenter: {
-    id: 'towncenter', name: 'Centre-Ville', icon: '🏛️',
+    id: 'towncenter', name: 'Centre-Ville', icon: 'towncenter',
     cost: { wood: 275 }, buildTime: 80, hp: 1400, size: 3,
     meleeArmor: 3, pierceArmor: 7, los: 8, popBonus: 8,
     dropoff: ['food', 'wood', 'gold'], trains: ['villager'], age: 0, limit: 2,
@@ -146,69 +151,69 @@ export const BUILDING_TYPES = {
     desc: 'Forme les villageois, stocke les ressources et permet de passer à l’âge suivant.',
   },
   house: {
-    id: 'house', name: 'Maison', icon: '🏠', fem: true,
+    id: 'house', name: 'Maison', icon: 'house', fem: true,
     cost: { wood: 25 }, buildTime: 18, hp: 320, size: 2,
     meleeArmor: 1, pierceArmor: 6, los: 4, popBonus: 5, age: 0,
     desc: 'Augmente la population maximale de 5.',
   },
   mill: {
-    id: 'mill', name: 'Moulin', icon: '🌾',
+    id: 'mill', name: 'Moulin', icon: 'mill',
     cost: { wood: 100 }, buildTime: 30, hp: 400, size: 2,
     meleeArmor: 1, pierceArmor: 6, los: 5, dropoff: ['food'], age: 0,
     desc: 'Dépôt de nourriture. Débloque la construction de fermes.',
   },
   lumbercamp: {
-    id: 'lumbercamp', name: 'Camp de bûcherons', icon: '🪓',
+    id: 'lumbercamp', name: 'Camp de bûcherons', icon: 'lumbercamp',
     cost: { wood: 100 }, buildTime: 28, hp: 380, size: 2,
     meleeArmor: 1, pierceArmor: 6, los: 5, dropoff: ['wood'], age: 0,
     desc: 'Dépôt de bois. À construire près des forêts.',
   },
   miningcamp: {
-    id: 'miningcamp', name: 'Camp minier', icon: '⛏️',
+    id: 'miningcamp', name: 'Camp minier', icon: 'miningcamp',
     cost: { wood: 100 }, buildTime: 28, hp: 380, size: 2,
     meleeArmor: 1, pierceArmor: 6, los: 5, dropoff: ['gold'], age: 0,
     desc: 'Dépôt d’or. À construire près des filons.',
   },
   farm: {
-    id: 'farm', name: 'Ferme', icon: '🌽', fem: true,
+    id: 'farm', name: 'Ferme', icon: 'farm', fem: true,
     cost: { wood: 60 }, buildTime: 16, hp: 180, size: 2,
     meleeArmor: 0, pierceArmor: 3, los: 2, age: 0,
     requires: 'mill', walkable: true, farmFood: 260,
     desc: 'Source de nourriture inépuisable tant qu’on la reconstruit.',
   },
   barracks: {
-    id: 'barracks', name: 'Caserne', icon: '🗡️', fem: true,
+    id: 'barracks', name: 'Caserne', icon: 'barracks', fem: true,
     cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
     meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['militia', 'spearman'], age: 0,
     desc: 'Forme l’infanterie.',
   },
   archery: {
-    id: 'archery', name: 'Archerie', icon: '🎯', fem: true,
+    id: 'archery', name: 'Archerie', icon: 'archery', fem: true,
     cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
     meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['archer'], age: 1,
     desc: 'Forme les archers.',
   },
   stable: {
-    id: 'stable', name: 'Écurie', icon: '🐴', fem: true,
+    id: 'stable', name: 'Écurie', icon: 'stable', fem: true,
     cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
     meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['scout', 'knight'], age: 1,
     desc: 'Forme la cavalerie.',
   },
   siege: {
-    id: 'siege', name: 'Atelier de siège', icon: '🏗️',
+    id: 'siege', name: 'Atelier de siège', icon: 'siege',
     cost: { wood: 200 }, buildTime: 50, hp: 800, size: 3,
     meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['ram'], age: 2,
     desc: 'Construit les engins de siège.',
   },
   blacksmith: {
-    id: 'blacksmith', name: 'Forge', icon: '🔨', fem: true,
+    id: 'blacksmith', name: 'Forge', icon: 'blacksmith', fem: true,
     cost: { wood: 150 }, buildTime: 40, hp: 800, size: 3,
     meleeArmor: 2, pierceArmor: 7, los: 6, age: 1,
     techs: ['forging', 'scaleArmor', 'fletching'],
     desc: 'Améliore l’armement et l’armure de toutes vos troupes.',
   },
   tower: {
-    id: 'tower', name: 'Tour de guet', icon: '🗼', fem: true,
+    id: 'tower', name: 'Tour de guet', icon: 'tower', fem: true,
     cost: { wood: 100, gold: 25 }, buildTime: 35, hp: 700, size: 2,
     meleeArmor: 3, pierceArmor: 8, los: 8, age: 1,
     attack: 6, attackType: 'pierce', range: 7, attackSpeed: 1.6, projectile: true,
@@ -222,22 +227,22 @@ export const BUILDING_TYPES = {
 
 export const TECHS = {
   wheelbarrow: {
-    id: 'wheelbarrow', name: 'Brouette', icon: '🛒',
+    id: 'wheelbarrow', name: 'Brouette', icon: 'wheelbarrow',
     cost: { food: 175, wood: 50 }, time: 35, age: 1, from: 'towncenter',
     desc: 'Villageois : +15 % de vitesse et +3 de capacité de charge.',
   },
   forging: {
-    id: 'forging', name: 'Armes forgées', icon: '⚒️',
+    id: 'forging', name: 'Armes forgées', icon: 'forging',
     cost: { food: 150, gold: 40 }, time: 35, age: 1, from: 'blacksmith',
     desc: '+1 attaque pour les unités de mêlée.',
   },
   fletching: {
-    id: 'fletching', name: 'Flèches barbelées', icon: '🪶',
+    id: 'fletching', name: 'Flèches barbelées', icon: 'fletching',
     cost: { food: 100, gold: 50 }, time: 30, age: 1, from: 'blacksmith',
     desc: '+1 attaque et +0,5 portée pour les unités à distance et les tours.',
   },
   scaleArmor: {
-    id: 'scaleArmor', name: 'Armure d’écailles', icon: '🥋',
+    id: 'scaleArmor', name: 'Armure d’écailles', icon: 'scaleArmor',
     cost: { food: 120, gold: 40 }, time: 35, age: 1, from: 'blacksmith',
     desc: '+1 armure de mêlée et +1 armure perforante.',
   },
@@ -270,7 +275,7 @@ export const DEFAULT_SPEED = 'normal';
  */
 export const GAME_MODES = {
   express: {
-    id: 'express', name: 'Express', icon: '⚡',
+    id: 'express', name: 'Express', icon: 'express',
     desc: '10 min chrono · départ Féodal · raser le Centre-Ville adverse, sinon le meilleur score',
     mapSize: 'small', startAge: 1, popMax: 40, villagers: 7,
     // Sept villageois et un éclaireur saturent déjà le Centre-Ville : sans cette
@@ -285,7 +290,7 @@ export const GAME_MODES = {
     townCenterHp: 0.5, timeLimit: 600,
   },
   classique: {
-    id: 'classique', name: 'Classique', icon: '🏰',
+    id: 'classique', name: 'Classique', icon: 'classique',
     desc: '20 à 30 min · trois âges, victoire par conquête',
     mapSize: 'medium', startAge: 0, popMax: POP_MAX, villagers: 4, popStart: 0,
     resources: START_RESOURCES,

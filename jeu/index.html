@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Âge des Empires Mobile</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🏰</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='96' fill='%2316202b'/><path fill='%23e8b64c' d='M254.25 15.344c-132.537 0-240.188 107.62-240.188 240.156c0 132.537 107.65 240.188 240.188 240.188S494.406 388.038 494.406 255.5S386.786 15.344 254.25 15.344m0 18.687c122.436 0 221.47 99.034 221.47 221.47c0 65.65-28.465 124.583-73.75 165.125V238.75l14-22.78h-7.595L364 101.5l-43.813 114.47h-8.156l14.595 22.78v33.875h-36.813v-88.188l14.625-22.78h-7.593l-44.406-114.47l-44.375 114.47h-7.594l14.03 22.78v123.22h-37.375v-18.094l14.594-22.782h-8.19l-43.78-114.467L95.344 266.78H87.75l14.03 22.783V416.25C59.25 375.9 32.75 318.83 32.75 255.5c0-122.436 99.064-221.47 221.5-221.47zm1.094 160.532h18.687v36.344h-18.686v-36.344zm110.156 87.97h18.688v36.312H365.5V282.53zm-246.656 22.03h18.687v36.344h-18.686v-36.344zm50.875 29.407h18.686v36.342H169.72V333.97zm170.81 30.5h18.69v36.342h-18.69z'/></svg>"><text y='52' font-size='52'>🏰</text></svg>">
   <link rel="stylesheet" href="css/jeu.css">
 </head>
 <body>
@@ -20,8 +20,13 @@
 <!-- ------------------------------------------------------------------ -->
 <div id="start-screen" class="screen">
   <div class="start-card">
-    <h1><span class="crest">🏰</span> Âge des Empires <em>Mobile</em></h1>
-    <p class="tagline">Récoltez, bâtissez, traversez les âges et écrasez l'adversaire — au doigt.</p>
+    <div class="start-head">
+      <img class="hero" src="assets/heros.webp" alt="" width="130" height="277" decoding="async">
+      <div>
+        <h1>Âge des Empires <em>Mobile</em></h1>
+        <p class="tagline">Récoltez, bâtissez, traversez les âges et écrasez l'adversaire — au doigt.</p>
+      </div>
+    </div>
 
     <div id="resume-box" class="resume-box hidden"></div>
 
@@ -38,7 +43,7 @@
     <div id="speed-options" class="options row"></div>
 
     <div class="start-actions">
-      <button id="btn-play" class="btn primary large">⚔️ Jouer</button>
+      <button id="btn-play" class="btn primary large">Jouer</button>
       <button id="btn-howto" class="btn">Comment jouer</button>
     </div>
 
@@ -48,9 +53,9 @@
         <li><b>Toucher</b> une unité pour la sélectionner, <b>double tap</b> pour toutes celles du même type</li>
         <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
         <li>Avec une sélection, toucher le sol / un arbre / un ennemi donne l'ordre correspondant</li>
-        <li>Vos villageois n'abandonnent jamais leur poste tout seuls : la barre 👷 en bas à gauche montre qui fait quoi, et permet de les réaffecter</li>
+        <li>Vos villageois n'abandonnent jamais leur poste tout seuls : la barre des ouvriers, en bas à gauche, montre qui fait quoi et permet de les réaffecter</li>
         <li>La partie se sauvegarde toute seule : vous pourrez la reprendre ici même</li>
-        <li>Objectif : détruire tous les bâtiments et villageois adverses (en ⚡ Express, leur Centre-Ville suffit)</li>
+        <li>Objectif : détruire tous les bâtiments et villageois adverses (en mode Express, leur Centre-Ville suffit)</li>
       </ul>
     </div>
     <p class="credits">Jeu web autonome — aucune donnée envoyée, fonctionne hors ligne une fois chargé.</p>
@@ -66,10 +71,10 @@
   <header id="topbar">
     <div class="top-left">
       <div class="res-group">
-        <div class="res"><span class="res-icon">🍖</span><span id="res-food">0</span></div>
-        <div class="res"><span class="res-icon">🪵</span><span id="res-wood">0</span></div>
-        <div class="res"><span class="res-icon">🪙</span><span id="res-gold">0</span></div>
-        <div class="res"><span class="res-icon">👥</span><span id="res-pop">0/0</span></div>
+        <div class="res"><span class="res-icon" data-icone="food"></span><span id="res-food">0</span></div>
+        <div class="res"><span class="res-icon" data-icone="wood"></span><span id="res-wood">0</span></div>
+        <div class="res"><span class="res-icon" data-icone="gold"></span><span id="res-gold">0</span></div>
+        <div class="res"><span class="res-icon" data-icone="population"></span><span id="res-pop">0/0</span></div>
       </div>
       <div id="age-box">
         <span id="age-label">Âge Sombre</span>
@@ -79,8 +84,8 @@
       </div>
     </div>
     <div class="top-right">
-      <button id="btn-sound" class="icon-btn" aria-label="Son">🔊</button>
-      <button id="btn-menu" class="icon-btn" aria-label="Menu">☰</button>
+      <button id="btn-sound" class="icon-btn" aria-label="Son" data-icone="son"></button>
+      <button id="btn-menu" class="icon-btn" aria-label="Menu" data-icone="menu"></button>
     </div>
   </header>
 
@@ -92,12 +97,12 @@
   <div id="build-hint" class="hidden"></div>
 
   <div id="worker-bar">
-    <button id="btn-workers" class="worker-open" aria-label="Affecter les ouvriers">👷</button>
-    <button class="worker-chip" data-task="food"><span>🍖</span><b id="wk-food">0</b></button>
-    <button class="worker-chip" data-task="wood"><span>🪵</span><b id="wk-wood">0</b></button>
-    <button class="worker-chip" data-task="gold"><span>🪙</span><b id="wk-gold">0</b></button>
-    <button class="worker-chip" data-task="build"><span>🏗️</span><b id="wk-build">0</b></button>
-    <button class="worker-chip idle" data-task="idle"><span>💤</span><b id="wk-idle">0</b></button>
+    <button id="btn-workers" class="worker-open" aria-label="Affecter les ouvriers" data-icone="ouvriers"></button>
+    <button class="worker-chip" data-task="food"><span data-icone="food"></span><b id="wk-food">0</b></button>
+    <button class="worker-chip" data-task="wood"><span data-icone="wood"></span><b id="wk-wood">0</b></button>
+    <button class="worker-chip" data-task="gold"><span data-icone="gold"></span><b id="wk-gold">0</b></button>
+    <button class="worker-chip" data-task="build"><span data-icone="chantier"></span><b id="wk-build">0</b></button>
+    <button class="worker-chip idle" data-task="idle"><span data-icone="idle"></span><b id="wk-idle">0</b></button>
   </div>
 
   <footer id="bottombar">
@@ -110,7 +115,7 @@
   <div class="sheet">
     <div class="sheet-head">
       <h2>Construire</h2>
-      <button id="btn-close-build" class="icon-btn">✕</button>
+      <button id="btn-close-build" class="icon-btn" data-icone="fermer"></button>
     </div>
     <div id="build-list" class="build-list"></div>
   </div>
@@ -119,8 +124,8 @@
 <div id="worker-menu" class="overlay hidden">
   <div class="sheet">
     <div class="sheet-head">
-      <h2>👷 Affectation des ouvriers</h2>
-      <button id="btn-close-workers" class="icon-btn">✕</button>
+      <h2>Affectation des ouvriers</h2>
+      <button id="btn-close-workers" class="icon-btn" data-icone="fermer"></button>
     </div>
     <div id="worker-list" class="worker-list"></div>
     <label class="switch-row">

@@ -6,11 +6,22 @@
 // ---------------------------------------------------------------------------
 
 import {
-  AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES, GAME_SPEEDS,
+  AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES, GAME_SPEEDS, PORTRAITS,
 } from './config.js';
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
+import { iconeSVG, ICONES_LICENCE } from './icones.js';
 
 const el = (id) => document.getElementById(id);
+
+/** Icône en ligne dans une phrase, calée sur la taille du texte. */
+const ic = (cle) => iconeSVG(cle, 13, 'inline');
+
+/** Remplace les marqueurs de coût (`<i data-cout="wood">`) par leur pictogramme. */
+function poserIconesDeCout(racine) {
+  for (const marqueur of racine.querySelectorAll('[data-cout]')) {
+    marqueur.innerHTML = iconeSVG(marqueur.dataset.cout, 12, 'inline');
+  }
+}
 
 export class UI {
   constructor(game) {
@@ -40,11 +51,17 @@ export class UI {
   }
 
   bind() {
+    // Pictogrammes fixes du HUD (ressources, boutons) : posés une fois ici,
+    // plutôt qu'écrits en dur dans le HTML — une seule source pour les icônes.
+    for (const node of document.querySelectorAll('[data-icone]')) {
+      node.innerHTML = iconeSVG(node.dataset.icone, node.classList.contains('icon-btn') ? 19 : 17);
+    }
+
     el('btn-menu').addEventListener('click', () => this.game.togglePause());
     el('btn-sound').addEventListener('click', () => this.game.toggleSound());
     el('btn-close-build').addEventListener('click', () => this.game.cancelBuild());
 
-    // Barre des ouvriers : un appui sélectionne le groupe, 👷 ouvre le panneau.
+    // Barre des ouvriers : un appui sélectionne le groupe, le bouton ouvre le panneau.
     el('btn-workers').addEventListener('click', () => this.openWorkerMenu());
     el('btn-close-workers').addEventListener('click', () => this.closeWorkerMenu());
     this.nodes.workerBar.querySelectorAll('[data-task]').forEach((chip) => {
@@ -102,7 +119,7 @@ export class UI {
     // Partie limitée dans le temps : c'est le temps qui reste qui compte.
     const limite = this.world.mode.timeLimit || 0;
     this.setText('timer', this.nodes.timer, limite
-      ? '⏳ ' + formatTime(Math.max(0, limite - this.world.time))
+      ? formatTime(Math.max(0, limite - this.world.time))
       : formatTime(this.world.time));
     this.nodes.timer.classList.toggle('urgent', limite > 0 && limite - this.world.time < 60);
 
@@ -140,23 +157,23 @@ export class UI {
     const stats = this.game.workerStats();
     const sites = this.game.constructionSites().length;
     const rows = [
-      { task: 'food', icon: '🍖', name: 'Nourriture', hint: 'buissons et fermes', assignable: true },
-      { task: 'wood', icon: '🪵', name: 'Bois', hint: 'forêts', assignable: true },
-      { task: 'gold', icon: '🪙', name: 'Or', hint: 'filons', assignable: true },
+      { task: 'food', icon: 'food', name: 'Nourriture', hint: 'buissons et fermes', assignable: true },
+      { task: 'wood', icon: 'wood', name: 'Bois', hint: 'forêts', assignable: true },
+      { task: 'gold', icon: 'gold', name: 'Or', hint: 'filons', assignable: true },
       {
-        task: 'build', icon: '🏗️', name: 'Chantiers', assignable: true, noSource: sites === 0,
+        task: 'build', icon: 'chantier', name: 'Chantiers', assignable: true, noSource: sites === 0,
         hint: sites > 0
           ? `${sites} chantier${sites > 1 ? 's' : ''} ouvert${sites > 1 ? 's' : ''}`
           : 'aucun chantier ouvert',
       },
-      { task: 'idle', icon: '💤', name: 'Sans affectation', hint: 'en attente d’ordres', assignable: false },
+      { task: 'idle', icon: 'idle', name: 'Sans affectation', hint: 'en attente d’ordres', assignable: false },
     ];
 
     if (rebuild || !this.workerRows) {
       this.nodes.workerList.innerHTML = rows.map((row) => `
         <div class="worker-row" data-row="${row.task}">
           <button class="wr-label" data-select="${row.task}">
-            <span class="wr-icon">${row.icon}</span>
+            <span class="wr-icon">${iconeSVG(row.icon, 22)}</span>
             <span>
               <span class="wr-name">${row.name}</span>
               <span class="wr-hint">${row.hint}</span>
@@ -293,36 +310,41 @@ export class UI {
       const def = first.def;
       const rows = [];
       if (first.kind === 'unit') {
-        rows.push(`⚔️ ${def.attack} · 🛡️ ${first.meleeArmor()}/${first.pierceArmor()}`);
-        rows.push(`${first.stanceDef.icon} ${first.stanceDef.name}`);
+        rows.push(`${ic('aggressive')} ${def.attack} · ${ic('defensive')} ${first.meleeArmor()}/${first.pierceArmor()}`);
+        rows.push(`${ic(first.stanceDef.icon)} ${first.stanceDef.name}`);
         if (first.buildQueue && first.buildQueue.length > 0) {
-          rows.push(`🏗️ ${first.buildQueue.length} chantier(s) en file`);
+          rows.push(`${ic('chantier')} ${first.buildQueue.length} chantier(s) en file`);
         }
-        if (def.range > 1.5) rows.push(`🎯 portée ${def.range}`);
+        if (def.range > 1.5) rows.push(`${ic('attaquer')} portée ${def.range}`);
         if (first.isVillager && first.carry.amount > 0.5) {
           rows.push(`${RESOURCE_ICONS[first.carry.type]} ${Math.floor(first.carry.amount)}/${first.carryCapacity()}`);
         }
       } else {
-        if (def.attack) rows.push(`⚔️ ${def.attack} · 🎯 ${def.range}`);
-        if (def.popBonus) rows.push(`👥 +${def.popBonus}`);
-        if (def.garrison) rows.push(`🚪 ${first.garrison.length}/${def.garrison.capacity}`);
-        if (first.type === 'farm') rows.push(`🍖 ${Math.max(0, Math.round(first.foodLeft))}`);
+        if (def.attack) rows.push(`${ic('aggressive')} ${def.attack} · ${ic('attaquer')} ${def.range}`);
+        if (def.popBonus) rows.push(`${ic('population')} +${def.popBonus}`);
+        if (def.garrison) rows.push(`${ic('garrison')} ${first.garrison.length}/${def.garrison.capacity}`);
+        if (first.type === 'farm') rows.push(`${ic('food')} ${Math.max(0, Math.round(first.foodLeft))}`);
         if (!first.complete) {
-          rows.push(`🏗️ ${Math.round(first.progressRatio * 100)} %`);
+          rows.push(`${ic('chantier')} ${Math.round(first.progressRatio * 100)} %`);
           // On compte aussi ceux qui marchent vers le chantier : sinon le
           // renfort qu'on vient d'envoyer semble n'avoir servi à rien.
           const ouvriers = this.world.buildersOn(first);
           rows.push(ouvriers > 0
-            ? `👷 ${ouvriers} ouvrier${ouvriers > 1 ? 's' : ''}`
-            : '👷 aucun ouvrier — touchez le chantier avec des villageois, ou 👷 +1');
+            ? `${ic('ouvriers')} ${ouvriers} ouvrier${ouvriers > 1 ? 's' : ''}`
+            : `${ic('ouvriers')} aucun ouvrier — touchez le chantier avec des villageois`);
         }
       }
       node.innerHTML = `
-        <div class="portrait" style="--team:${first.player.color.main}">${def.icon}</div>
+        <div class="portrait${PORTRAITS[first.type] ? ' illustre' : ''}" style="--team:${first.player.color.main}">${
+          PORTRAITS[first.type]
+            // Un portrait peint est bleu : l'adversaire le porte en rouge, par
+            // rotation de teinte — plutôt qu'une seconde image à télécharger.
+            ? `<img src="${PORTRAITS[first.type]}" alt="" class="${mine ? '' : 'adverse'}">`
+            : iconeSVG(def.icon, 30)}</div>
         <div class="info">
           <div class="name">${def.name}${mine ? '' : ' <span class="enemy">(ennemi)</span>'}</div>
           <div class="hp"><span style="width:${Math.round((first.hp / first.maxHp) * 100)}%"></span></div>
-          <div class="stats">❤️ ${Math.ceil(first.hp)}/${first.maxHp} · ${rows.join(' · ')}</div>
+          <div class="stats">${ic('pointsDeVie')} ${Math.ceil(first.hp)}/${first.maxHp} · ${rows.join(' · ')}</div>
         </div>`;
       if (first.kind === 'building' && first.queue.length > 0) {
         node.insertAdjacentHTML('beforeend', this.renderQueue(first));
@@ -334,7 +356,7 @@ export class UI {
     for (const e of selection) counts[e.type] = (counts[e.type] || 0) + 1;
     const chips = Object.entries(counts).map(([type, count]) => {
       const def = UNIT_TYPES[type] || BUILDING_TYPES[type];
-      return `<button class="chip" data-filter="${type}">${def.icon}<span>${count}</span></button>`;
+      return `<button class="chip" data-filter="${type}">${iconeSVG(def.icon, 17)}<span>${count}</span></button>`;
     }).join('');
     node.innerHTML = `<div class="multi"><div class="multi-title">${selection.length} unités sélectionnées</div>
       <div class="chips">${chips}</div></div>`;
@@ -348,7 +370,7 @@ export class UI {
       const def = UNIT_TYPES[item.id] || TECHS[item.id];
       const ratio = 1 - item.timeLeft / item.total;
       return `<button class="queue-item" data-cancel="${index}" title="Annuler">
-        <span class="qicon">${def.icon}</span>
+        <span class="qicon">${iconeSVG(def.icon, 17)}</span>
         <span class="qbar"><span style="width:${Math.round(ratio * 100)}%"></span></span>
       </button>`;
     }).join('');
@@ -368,14 +390,14 @@ export class UI {
     const military = units.filter((u) => !u.isVillager);
 
     if (villagers.length > 0) {
-      buttons.push({ icon: '🏗️', label: 'Construire', action: () => this.game.openBuildMenu() });
+      buttons.push({ icon: 'chantier', label: 'Construire', action: () => this.game.openBuildMenu() });
     }
     if (units.length > 0) {
-      buttons.push({ icon: '✋', label: 'Stop', action: () => this.game.stopSelection() });
+      buttons.push({ icon: 'stop', label: 'Stop', action: () => this.game.stopSelection() });
     }
     if (military.length > 0) {
       buttons.push({
-        icon: '🎯', label: 'Attaquer ici', toggled: this.game.attackMoveArmed,
+        icon: 'attaquer', label: 'Attaquer ici', toggled: this.game.attackMoveArmed,
         action: () => this.game.toggleAttackMove(),
       });
     }
@@ -383,7 +405,7 @@ export class UI {
       (b) => !b.dead && b.complete && b.playerIndex === this.world.humanIndex
         && b.def.garrison && units.some((u) => b.canGarrison(u)))) {
       buttons.push({
-        icon: '🚪', label: 'Abriter', toggled: this.game.garrisonArmed,
+        icon: 'garrison', label: 'Abriter', toggled: this.game.garrisonArmed,
         action: () => this.game.toggleGarrison(),
       });
     }
@@ -404,12 +426,12 @@ export class UI {
       const b = first;
       if (!b.complete) {
         buttons.push({
-          icon: '👷', label: '+1 ouvrier',
+          icon: 'ouvriers', label: '+1 ouvrier',
           check: () => (this.game.hasSpareWorker()
             ? { ok: true } : { ok: false, reason: 'Aucun villageois disponible' }),
           action: () => this.game.reinforceSite(b),
         });
-        buttons.push({ icon: '❌', label: 'Annuler', action: () => this.game.cancelConstruction(b) });
+        buttons.push({ icon: 'annuler', label: 'Annuler', action: () => this.game.cancelConstruction(b) });
       } else {
         const def = b.def;
         for (const unitType of def.trains || []) {
@@ -443,7 +465,7 @@ export class UI {
           const next = AGES[player.age + 1];
           if (next) {
             buttons.push({
-              icon: '⏫', label: next.name, cost: costLabel(next.cost), highlight: true,
+              icon: 'ageUp', label: next.name, cost: costLabel(next.cost), highlight: true,
               check: () => this.world.canAdvanceAge(b),
               action: () => this.game.advanceAge(b),
             });
@@ -452,22 +474,22 @@ export class UI {
         if (def.garrison) {
           if (b.type === 'towncenter') {
             buttons.push({
-              icon: '🔔', label: 'Cloche', action: () => this.game.ringTownBell(),
+              icon: 'cloche', label: 'Cloche', action: () => this.game.ringTownBell(),
             });
           }
           buttons.push({
-            icon: '🚪', label: `Libérer (${b.garrison.length})`,
+            icon: 'sortir', label: `Libérer (${b.garrison.length})`,
             check: () => (b.garrison.length > 0 ? { ok: true } : { ok: false, reason: 'Personne à l’intérieur' }),
             action: () => this.game.releaseGarrison(b),
           });
         }
         if (def.trains) {
           buttons.push({
-            icon: '🚩', label: 'Ralliement', toggled: this.game.rallyArmed,
+            icon: 'ralliement', label: 'Ralliement', toggled: this.game.rallyArmed,
             action: () => this.game.toggleRally(),
           });
         }
-        buttons.push({ icon: '🗑️', label: 'Détruire', action: () => this.game.demolish(b) });
+        buttons.push({ icon: 'detruire', label: 'Détruire', action: () => this.game.demolish(b) });
       }
     }
 
@@ -480,12 +502,13 @@ export class UI {
       if (b.compact) classes.push('compact');
       const title = b.title ? ` title="${b.title}"` : '';
       return `<button class="${classes.join(' ')}" data-cmd="${i}"${title} ${state.ok ? '' : `data-reason="${state.reason}"`}>
-        <span class="cmd-icon">${b.icon}</span>
+        <span class="cmd-icon">${iconeSVG(b.icon, 22)}</span>
         <span class="cmd-label">${b.label}</span>
         ${b.cost ? `<span class="cmd-cost">${b.cost}</span>` : ''}
       </button>`;
     }).join('');
 
+    poserIconesDeCout(node);
     this.commandButtons = buttons;
     this.commandNodes = [...node.querySelectorAll('[data-cmd]')];
     this.commandNodes.forEach((btn) => {
@@ -542,7 +565,7 @@ export class UI {
       else if (limited) reason = 'Nombre maximum atteint';
       else if (!affordable) reason = 'Ressources insuffisantes';
       return `<button class="build-card ${disabled ? 'disabled' : ''}" data-type="${def.id}" data-reason="${reason}">
-        <span class="bc-icon">${def.icon}</span>
+        <span class="bc-icon">${iconeSVG(def.icon, 26)}</span>
         <span class="bc-body">
           <span class="bc-name">${def.name}</span>
           <span class="bc-desc">${def.desc}</span>
@@ -550,6 +573,7 @@ export class UI {
         <span class="bc-cost">${costLabel(def.cost)}</span>
       </button>`;
     }).join('');
+    poserIconesDeCout(list);
     list.querySelectorAll('[data-type]').forEach((btn) => {
       btn.addEventListener('click', () => {
         if (btn.classList.contains('disabled')) {
@@ -618,6 +642,7 @@ export class UI {
       <div class="modal-actions">
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="help">Comment jouer</button>
+        <button class="btn" data-act="credits">Crédits</button>
         <button class="btn danger" data-act="resign">Abandonner</button>
       </div>`);
     modal.querySelectorAll('[data-speed]').forEach((btn) => {
@@ -628,6 +653,7 @@ export class UI {
     });
     modal.querySelector('[data-act="resume"]').addEventListener('click', () => this.game.togglePause());
     modal.querySelector('[data-act="help"]').addEventListener('click', () => this.showHelp());
+    modal.querySelector('[data-act="credits"]').addEventListener('click', () => this.showCredits());
     modal.querySelector('[data-act="resign"]').addEventListener('click', () => this.game.resign());
   }
 
@@ -639,18 +665,45 @@ export class UI {
         <li><b>Toucher</b> une unité : la sélectionner · <b>double tap</b> : toutes les unités du même type visibles</li>
         <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
         <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant</li>
-        <li><b>🏗️ Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les villageois sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant</li>
-        <li><b>Affecter quelqu'un à un chantier</b> : touchez un villageois, puis touchez le chantier — le même geste que pour l'envoyer au bois ou à la nourriture. La ligne <b>🏗️ Chantiers</b> de la barre 👷 fait pareil avec ses <b>+ / −</b>, et un chantier sélectionné a son bouton <b>👷 +1 ouvrier</b>. (Double tap sur un chantier pour le sélectionner sans y envoyer personne.)</li>
-        <li>Les villageois récoltent 🍖 nourriture, 🪵 bois et 🪙 or ; il faut des <b>maisons</b> pour agrandir la population</li>
-        <li><b>Attitudes</b> (unité sélectionnée) : ⚔️ agressif poursuit loin, 🛡️ défensif revient à son poste, 🧱 position tenue ne bouge pas, 🕊️ sans attaque ignore l'ennemi</li>
-        <li><b>Garnison</b> : touchez votre Centre-Ville ou une tour avec des unités sélectionnées pour les abriter — elles s'y soignent et chaque occupant ajoute une flèche. La <b>🔔 cloche</b> y envoie tous les villageois d'un coup</li>
-        <li><b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le villageois rapporte son chargement puis attend vos ordres. La barre <b>👷</b> montre qui fait quoi et permet de réaffecter d'un doigt</li>
+        <li><b>${ic('chantier')} Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les villageois sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant</li>
+        <li><b>Affecter quelqu'un à un chantier</b> : touchez un villageois, puis touchez le chantier — le même geste que pour l'envoyer au bois ou à la nourriture. La ligne <b>${ic('chantier')} Chantiers</b> de la barre <b>${ic('ouvriers')} Ouvriers</b> fait pareil avec ses <b>+ / −</b>, et un chantier sélectionné a son bouton <b>${ic('ouvriers')} +1 ouvrier</b>. (Double tap sur un chantier pour le sélectionner sans y envoyer personne.)</li>
+        <li>Les villageois récoltent ${ic('food')} nourriture, ${ic('wood')} bois et ${ic('gold')} or ; il faut des <b>maisons</b> pour agrandir la population</li>
+        <li><b>Attitudes</b> (unité sélectionnée) : ${ic('aggressive')} agressif poursuit loin, ${ic('defensive')} défensif revient à son poste, ${ic('standGround')} position tenue ne bouge pas, ${ic('passive')} sans attaque ignore l'ennemi</li>
+        <li><b>Garnison</b> : touchez votre Centre-Ville ou une tour avec des unités sélectionnées pour les abriter — elles s'y soignent et chaque occupant ajoute une flèche. La <b>${ic('cloche')} cloche</b> y envoie tous les villageois d'un coup</li>
+        <li><b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le villageois rapporte son chargement puis attend vos ordres. La barre <b>${ic('ouvriers')} Ouvriers</b> montre qui fait quoi et permet de réaffecter d'un doigt</li>
         <li>Passez les <b>âges</b> depuis le Centre-Ville pour débloquer de nouvelles unités</li>
         <li><b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil</li>
-        <li><b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>▶️ Reprendre</b></li>
-        <li><b>Objectif</b> : détruire tous les bâtiments adverses et leurs villageois — en mode ⚡ Express, leur dernier Centre-Ville suffit</li>
+        <li><b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>Reprendre</b></li>
+        <li><b>Objectif</b> : détruire tous les bâtiments adverses et leurs villageois — en mode ${ic('modeExpress')} Express, leur dernier Centre-Ville suffit</li>
       </ul>
       <div class="modal-actions"><button class="btn primary" data-act="close">J'ai compris</button></div>`, { wide: true });
+    modal.querySelector('[data-act="close"]').addEventListener('click', () => {
+      if (this.game.paused) this.showPause(); else this.hideModal();
+    });
+  }
+
+  /**
+   * Crédits. La licence des icônes (CC BY 3.0) exige que leurs auteurs soient
+   * cités et que la mention soit accessible depuis un menu : c'est ici.
+   */
+  showCredits() {
+    const l = ICONES_LICENCE;
+    const modal = this.showModal(`
+      <h2>Crédits</h2>
+      <ul class="help">
+        <li><b>Icônes</b> — <a href="${l.url}" target="_blank" rel="noopener">${l.source}</a>,
+          sous licence <a href="${l.licenceUrl}" target="_blank" rel="noopener">${l.licence}</a>.
+          <small class="credits-auteurs">${l.auteurs.join(' · ')}</small></li>
+        <li><b>Illustrations</b> (chevalier de l'accueil, portrait, écran de fin) — générées
+          par l'auteur du jeu, découpées et détourées pour l'interface.</li>
+        <li><b>Terrain, bâtiments, unités, sons</b> — dessinés et synthétisés au code,
+          sans aucune image ni fichier audio.</li>
+        <li><b>Jeu</b> — inspiré des principes d'Age of Empires, sans en reprendre
+          aucun contenu : marques, ressources graphiques et sonores appartiennent
+          à leurs propriétaires respectifs.</li>
+      </ul>
+      <div class="modal-actions"><button class="btn primary" data-act="close">Fermer</button></div>`,
+      { wide: true });
     modal.querySelector('[data-act="close"]').addEventListener('click', () => {
       if (this.game.paused) this.showPause(); else this.hideModal();
     });
@@ -660,7 +713,7 @@ export class UI {
     const player = this.world.players[this.world.humanIndex];
     const enemy = this.world.players[1 - this.world.humanIndex];
     const egalite = result.winner === -1;
-    const title = egalite ? '🤝 Égalité' : (result.victory ? '🏆 Victoire !' : '💀 Défaite');
+    const title = egalite ? 'Égalité' : (result.victory ? 'Victoire !' : 'Défaite');
     const summary = `
       <table class="scores">
         <tr><th></th><th>Vous</th><th>Adversaire</th></tr>
@@ -674,7 +727,11 @@ export class UI {
           <td><b>${formatNumber(result.scores[player.index])}</b></td>
           <td><b>${formatNumber(result.scores[enemy.index])}</b></td></tr>` : ''}
       </table>`;
+    const illustration = egalite ? ''
+      : `<img class="fin-illustration${result.victory ? '' : ' tombe'}"
+             src="assets/${result.victory ? 'heros' : 'defaite'}.webp" alt="" decoding="async">`;
     const modal = this.showModal(`
+      ${illustration}
       <h2>${title}</h2>
       <p class="subtitle">${result.timeUp
         ? `Temps écoulé après ${formatTime(result.time)} — le score départage`
