@@ -726,7 +726,11 @@ function setupStartScreen() {
 setupStartScreen();
 showStartScreen();
 
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+// Mode hors ligne : uniquement là où le jeu est déployé en entier (le
+// manifeste accompagne alors le service worker). Ailleurs — page embarquée,
+// aperçu — on n'essaie même pas, pour ne pas laisser un 404 dans la console.
+const deploiementComplet = document.querySelector('link[rel="manifest"]') !== null;
+if (deploiementComplet && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => { /* hors-ligne indisponible, sans gravité */ });
   });
