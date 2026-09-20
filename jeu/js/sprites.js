@@ -47,6 +47,14 @@ const ATLAS = {
     // cristaux sont cyan (teinte < 200°) : seule la fenêtre du bleu bascule.
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
+  // La caserne : même cité, même vue, un peu moins large que le palais — le
+  // Centre-Ville doit rester le plus grand bâtiment de la base.
+  barracks: {
+    src: 'assets/caserne.webp',
+    cellW: 264, cellH: 264, cases: 1, images: 1,
+    largeurMonde: 132, sol: 0.93, natif: 'bleu',
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
   spearman: {
     src: 'assets/lancier.png',
     cellW: 48, cellH: 48, cases: 8, images: 1,

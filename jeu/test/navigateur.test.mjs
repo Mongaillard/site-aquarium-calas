@@ -596,12 +596,10 @@ check('il ne reste aucun bleu franc côté adverse',
   recolor && recolor.bleusRestants === 0,
   recolor && recolor.bleusRestants + ' pixels bleus restants');
 
-// Le Centre-Ville porte une illustration : chargée, déclinée pour les deux
-// camps, et recolorée sans toucher la pierre blanche ni l'eau.
-const centreVille = await page.evaluate(async () => {
+// Les bâtiments illustrés : chargés, déclinés pour les deux camps, et
+// recolorés sans toucher la pierre blanche ni l'eau.
+const batimentsIllustres = await page.evaluate(async () => {
   const mod = await import('./js/sprites.js');
-  const s = mod.spriteDe('towncenter');
-  if (!s) return null;
   const lire = (src) => {
     const c = document.createElement('canvas');
     c.width = src.width; c.height = src.height;
@@ -609,7 +607,6 @@ const centreVille = await page.evaluate(async () => {
     x.drawImage(src, 0, 0);
     return x.getImageData(0, 0, c.width, c.height).data;
   };
-  const bleu = lire(mod.imagePourJoueur(s, 0)), rouge = lire(mod.imagePourJoueur(s, 1));
   const hsl = (r, g, b) => {
     const mx = Math.max(r, g, b) / 255, mn = Math.min(r, g, b) / 255;
     const l = (mx + mn) / 2;
@@ -623,27 +620,33 @@ const centreVille = await page.evaluate(async () => {
     else h = ((R - G) / d + 4) / 6;
     return [h * 360, sa, l];
   };
-  let opaques = 0, changes = 0, pierre = 0, pierreIntacte = 0, bleusRestants = 0;
-  for (let i = 0; i < bleu.length; i += 4) {
-    if (bleu[i + 3] === 0) continue;
-    opaques++;
-    const memes = bleu[i] === rouge[i] && bleu[i + 1] === rouge[i + 1] && bleu[i + 2] === rouge[i + 2];
-    if (!memes) changes++;
-    const [, sb, lb] = hsl(bleu[i], bleu[i + 1], bleu[i + 2]);
-    if (sb <= 0.32 && lb > 0.6) { pierre++; if (memes) pierreIntacte++; }
-    const [hr, sr] = hsl(rouge[i], rouge[i + 1], rouge[i + 2]);
-    if (hr >= 200 && hr <= 255 && sr > 0.32) bleusRestants++;
+  const out = {};
+  for (const type of ['towncenter', 'barracks']) {
+    const s = mod.spriteDe(type);
+    if (!s) { out[type] = null; continue; }
+    const bleu = lire(mod.imagePourJoueur(s, 0)), rouge = lire(mod.imagePourJoueur(s, 1));
+    let opaques = 0, changes = 0, pierre = 0, pierreIntacte = 0, bleusRestants = 0;
+    for (let i = 0; i < bleu.length; i += 4) {
+      if (bleu[i + 3] === 0) continue;
+      opaques++;
+      const memes = bleu[i] === rouge[i] && bleu[i + 1] === rouge[i + 1] && bleu[i + 2] === rouge[i + 2];
+      if (!memes) changes++;
+      const [, sb, lb] = hsl(bleu[i], bleu[i + 1], bleu[i + 2]);
+      if (sb <= 0.32 && lb > 0.6) { pierre++; if (memes) pierreIntacte++; }
+      const [hr, sr] = hsl(rouge[i], rouge[i + 1], rouge[i + 2]);
+      if (hr >= 200 && hr <= 255 && sr > 0.32) bleusRestants++;
+    }
+    out[type] = { largeur: s.def.largeurMonde, opaques, changes, pierre, pierreIntacte, bleusRestants };
   }
-  return { largeur: s.def.largeurMonde, opaques, changes, pierre, pierreIntacte, bleusRestants };
+  return out;
 });
-check('le Centre-Ville porte son illustration', !!centreVille && centreVille.largeur > 96,
-  centreVille ? `${centreVille.largeur} px de large pour une emprise de 96` : 'absente');
-check('le Centre-Ville adverse est repeint', !!centreVille && centreVille.changes > centreVille.opaques * 0.02,
-  centreVille && `${Math.round((centreVille.changes / centreVille.opaques) * 100)} % des pixels`);
-check('la pierre blanche du palais reste blanche', !!centreVille && centreVille.pierre > 1000 && centreVille.pierreIntacte === centreVille.pierre,
-  centreVille && `${centreVille.pierreIntacte}/${centreVille.pierre} pixels de pierre intacts`);
-check('aucun dôme bleu ne subsiste côté adverse', !!centreVille && centreVille.bleusRestants === 0,
-  centreVille && centreVille.bleusRestants + ' pixels bleus restants');
+for (const [type, nom] of [['towncenter', 'le Centre-Ville'], ['barracks', 'la caserne']]) {
+  const b = batimentsIllustres[type];
+  check(`${nom} porte son illustration`, !!b && b.largeur > 96, b ? `${b.largeur} px de large pour une emprise de 96` : 'absente');
+  check(`${nom} adverse est repeint${type === 'barracks' ? 'e' : ''}`, !!b && b.changes > b.opaques * 0.02, b && `${Math.round((b.changes / b.opaques) * 100)} % des pixels`);
+  check(`la pierre blanche ${type === 'towncenter' ? 'du palais' : 'de la caserne'} reste blanche`, !!b && b.pierre > 1000 && b.pierreIntacte === b.pierre, b && `${b.pierreIntacte}/${b.pierre} pixels de pierre intacts`);
+  check(`aucun bleu franc ne subsiste côté adverse (${type})`, !!b && b.bleusRestants === 0, b && b.bleusRestants + ' pixels bleus restants');
+}
 
 // Le palais se touche là où on le voit : un doigt sur les dômes, bien au-dessus
 // de l'emprise, sélectionne le Centre-Ville ; sur les toits d'un palais ennemi,
