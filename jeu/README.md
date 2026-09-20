@@ -261,7 +261,7 @@ n'avait pas la même tête sur un Samsung et sur un iPhone.
 couleur vient du texte qui les porte. Les auteurs sont cités dans l'écran
 **Crédits**, accessible depuis le menu de pause — c'est ce que la licence exige.
 
-Trois **illustrations** (`assets/`, 30 Ko en WebP) viennent d'une planche de
+Quatre **illustrations** (`assets/`, 70 Ko en WebP) viennent d'une planche de
 personnage fournie par l'auteur du dépôt : le chevalier de l'écran d'accueil,
 le portrait du milicien dans le panneau de sélection, et le chevalier à terre
 de l'écran de défaite. Le portrait de l'adversaire est le même fichier, passé
@@ -271,6 +271,17 @@ Le choix des icônes a été fait sur mesure : une icône doit tenir **à 24 px 
 une seule couleur**, et deux concepts voisins ne doivent pas se ressembler.
 D'où, par exemple, le trio caserne / archerie / écurie rendu par trois formes
 sans recouvrement possible — un X d'épées, un disque de cible, un fer à cheval.
+
+### Le milicien porte l'illustration
+
+Les **huit orientations** de la planche sont découpées en atlas (`assets/chevalier.webp`,
+40 Ko) et servent de sprite au milicien sur la carte. Le personnage est dessiné
+plus grand que l'emprise de l'unité — comme dans AoE, sinon un chevalier de dix-huit
+pixels ne se lirait pas — et posé sur un **socle aux couleurs du joueur** : de loin
+une armure reste une tache sombre, et l'appartenance doit se lire d'un coup d'œil.
+
+Toute unité sans illustration garde son rendu dessiné au code, et le jeu reste
+jouable si l'image ne charge pas.
 
 ### Animation des unités
 

@@ -83,6 +83,38 @@ const fps = await page.evaluate(() => new Promise((resolve) => {
 }));
 check('fluidité', fps >= 30, fps + ' images/s');
 
+// La marche ne doit pas trembler : la simulation avance vingt fois par seconde
+// quand l'écran en affiche soixante, et cadencer l'animation sur la distance
+// brute d'une image à l'autre faisait vibrer les personnages.
+const cadence = await page.evaluate(async () => {
+  const g = window.__jeu;
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  g.paused = false;
+  const v = g.world.units.find((u) => u.playerIndex === 0 && u.isVillager && !u.garrisonedIn && !u.dead);
+  if (!v) return { moy: 0, irregularite: 99, parcouru: 0 };
+  v.moveTo(tc.x + 380, tc.y + 30);
+  g.camera.centerOn(v.x, v.y);
+  await new Promise((r) => setTimeout(r, 800));
+  const depart = { x: v.x, y: v.y };
+  const phases = [];
+  for (let i = 0; i < 70; i++) { await new Promise(requestAnimationFrame); phases.push(v._walk || 0); }
+  const parcouru = Math.hypot(v.x - depart.x, v.y - depart.y);
+  const pas = [];
+  for (let i = 1; i < phases.length; i++) {
+    let d = phases[i] - phases[i - 1];
+    if (d < -3) d += Math.PI * 2;
+    pas.push(d);
+  }
+  const moy = pas.reduce((s, x) => s + x, 0) / pas.length;
+  const ecart = Math.sqrt(pas.reduce((s, x) => s + (x - moy) ** 2, 0) / pas.length);
+  return { moy, parcouru, irregularite: moy > 0 ? ecart / moy : 99 };
+});
+check('le villageois se déplace pour la mesure', cadence.parcouru > 8,
+  Math.round(cadence.parcouru) + ' px parcourus');
+check('la cadence de marche est régulière', cadence.irregularite < 0.45,
+  'irrégularité ' + cadence.irregularite.toFixed(2) + ' (un à-coup par image donnerait 1,4)');
+
+
 // Sélection d'un villageois par tap sur sa position écran
 const tapped = await page.evaluate(() => {
   const g = window.__jeu;
@@ -432,6 +464,35 @@ await page.waitForTimeout(200);
 await page.click('[data-act="resume"]').catch(() => {});
 await page.waitForTimeout(200);
 await page.evaluate(() => { window.__jeu.paused = false; window.__jeu.ui.hideModal(); });
+
+// Le milicien porte une illustration : huit orientations, et une version
+// adverse teintée. C'est aussi la garantie que l'atlas se charge.
+const chevalier = await page.evaluate(async () => {
+  const g = window.__jeu;
+  const mod = await import('./js/sprites.js');
+  const s = mod.spriteDe('militia');
+  return {
+    pret: !!s,
+    adverse: !!(s && s.adverse),
+    // Le sud est la première case (le personnage fait face au joueur), puis on
+    // tourne par l'est : on le lit à la cape, toujours dans le dos.
+    sud: mod.caseDirection(Math.PI / 2, 8),
+    est: mod.caseDirection(0, 8),
+    nord: mod.caseDirection(-Math.PI / 2, 8),
+    ouest: mod.caseDirection(Math.PI, 8),
+    // Une orientation quelconque doit toujours tomber dans l'atlas.
+    bornes: [...Array(36)].every((_, i) => {
+      const c = mod.caseDirection((i * 10 * Math.PI) / 180 - Math.PI, 8);
+      return Number.isInteger(c) && c >= 0 && c < 8;
+    }),
+  };
+});
+check('l’illustration du milicien est chargée', chevalier.pret);
+check('sa version adverse est préparée', chevalier.adverse);
+check('les orientations tombent sur les bonnes cases',
+  chevalier.sud === 0 && chevalier.est === 2 && chevalier.nord === 4 && chevalier.ouest === 6,
+  `sud ${chevalier.sud} · est ${chevalier.est} · nord ${chevalier.nord} · ouest ${chevalier.ouest}`);
+check('aucune orientation ne sort de l’atlas', chevalier.bornes);
 
 // Sauvegarde : on joue, on recharge la page, on reprend là où on en était.
 const avantRechargement = await page.evaluate(() => {

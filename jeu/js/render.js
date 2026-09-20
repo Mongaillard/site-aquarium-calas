@@ -7,6 +7,7 @@
 
 import { TILE, BUILDING_TYPES } from './config.js';
 import { iconePath, ICON_BOX } from './icones.js';
+import { chargerSprites, spriteDe, caseDirection } from './sprites.js';
 import { TERRAIN } from './map.js';
 import { clamp } from './utils.js';
 
@@ -115,6 +116,7 @@ export class Renderer {
     // simulation. Une partie rejouée à la même graine reste donc identique.
     this.particles = [];
     this.effetsVus = new WeakSet();
+    chargerSprites();
     this.buildTileAtlas();
     this.initFogCanvas();
     this.resize();
@@ -182,8 +184,9 @@ export class Renderer {
   render(dt = 1 / 60) {
     const ctx = this.ctx;
     this.frame++;
+    this.dt = Math.min(0.05, dt);
     this.suivreEffets();
-    this.majParticules(Math.min(0.05, dt));
+    this.majParticules(this.dt);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = '#1b2430';
     ctx.fillRect(0, 0, this.width, this.height);
@@ -589,6 +592,18 @@ export class Renderer {
       return;
     }
 
+    // Illustration de personnage, si cette unité en a une. Elle remplace le
+    // corps dessiné au code, mais pas le reste : ombre, cercle de sélection,
+    // barre de vie et particules valent pour tout le monde.
+    const sprite = spriteDe(u.type);
+    if (sprite) {
+      this.dessinerSprite(u, sprite, x, y, anim);
+      if (u.isVillager && u.carry.amount > 0.5) this.dessinerCharge(u, x, y, r);
+      if (u.hp < u.maxHp) this.drawHealthBar(u.x, u.y - r * 2.6, r * 1.7, u.hp / u.maxHp);
+      this.eclatsDeTravail(u, x, y, r);
+      return;
+    }
+
     const isCavalry = u.def.class === 'cavalry';
     if (isCavalry) {
       ctx.fillStyle = '#6a5240';
@@ -663,33 +678,88 @@ export class Renderer {
       ctx.stroke();
     }
 
-    // Ressource portée
-    if (u.isVillager && u.carry.amount > 0.5) {
-      const carryColors = { food: '#e06a5b', wood: '#a0703f', gold: '#f2c14e' };
-      ctx.fillStyle = carryColors[u.carry.type] || '#fff';
+    if (u.isVillager && u.carry.amount > 0.5) this.dessinerCharge(u, x, y, r);
+    this.eclatsDeTravail(u, x, y, r);
+    if (u.hp < u.maxHp) this.drawHealthBar(x, y - r * 1.9, r * 1.7, u.hp / u.maxHp);
+  }
+
+  /**
+   * Personnage illustré : une case de l'atlas selon l'orientation, posée sur
+   * ses pieds. Le sprite est dessiné plus grand que l'emprise de l'unité,
+   * comme dans AoE — sinon un chevalier de dix-huit pixels ne se lirait pas.
+   */
+  dessinerSprite(u, sprite, x, y, anim) {
+    const ctx = this.ctx;
+    const { cellW, cellH, cases, hauteurMonde } = sprite.def;
+    const source = u.playerIndex === this.world.humanIndex ? sprite.image : sprite.adverse;
+    const k = caseDirection(u.facing, cases);
+    // Socle aux couleurs du joueur : de loin, une armure reste une tache
+    // sombre, et l'appartenance doit se lire d'un coup d'œil. C'est la
+    // solution d'AoE, et elle vaut mieux qu'un personnage repeint en entier.
+    const sol = y + u.radius * 0.45;
+    ctx.fillStyle = u.player.color.main;
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.ellipse(x, sol - 1, u.radius * 0.78, u.radius * 0.34, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = u.player.color.light;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    const h = hauteurMonde;
+    const w = (cellW / cellH) * h;
+    // Le coup se lit par une fente en avant : l'épée est peinte dans l'image,
+    // on ne peut pas la faire tourner, mais le corps, lui, peut avancer.
+    const fente = anim.coup >= 0 ? Math.sin(anim.coup * Math.PI) * h * 0.14 : 0;
+    const px = x + Math.cos(u.facing) * fente;
+    const py = y + Math.sin(u.facing) * fente;
+    ctx.drawImage(source, k * cellW, 0, cellW, cellH,
+      px - w / 2, py + u.radius * 0.45 - h, w, h);
+
+    if (anim.coup >= 0 && anim.coup < 0.55) {
+      const p = anim.coup / 0.55;
+      ctx.strokeStyle = `rgba(255,255,255,${0.45 * (1 - p)})`;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(x + r * 0.7, y - r * 1.1, 3.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-      ctx.lineWidth = 1;
+      ctx.arc(px, py - u.radius * 0.4, u.radius * 1.6, u.facing - 0.9, u.facing + 0.3);
       ctx.stroke();
     }
+  }
 
-    // Éclats de travail : copeaux bruns sous la hache, poussière grise sur un
-    // chantier, paillettes sur un filon. C'est ce qui donne le sentiment que
-    // quelque chose se passe, bien plus qu'un personnage détaillé.
-    if (u.gatherAnim > 0.34 && !u._travailFx) {
-      u._travailFx = true;
-      const teintes = { wood: '#b07a42', gold: '#f2c14e', food: '#d8695c' };
-      const couleur = u.state === 'build' ? '#cbbfae' : (teintes[u.carry.type] || '#d8d2c4');
-      this.semerParticules(x + fx * r * 1.25, y + fy * r * 1.25 - r * 0.3, 3, {
-        color: couleur, angle: u.facing + Math.PI, spread: 1.5, speed: 30, life: 0.42, size: 1.7,
-      });
-    } else if (u.gatherAnim <= 0.05) {
-      u._travailFx = false;
-    }
+  /** Pastille de la ressource portée par un villageois. */
+  dessinerCharge(u, x, y, r) {
+    const ctx = this.ctx;
+    const teintes = { food: '#e06a5b', wood: '#a0703f', gold: '#f2c14e' };
+    ctx.fillStyle = teintes[u.carry.type] || '#fff';
+    ctx.beginPath();
+    ctx.arc(x + r * 0.7, y - r * 1.1, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
 
-    if (u.hp < u.maxHp) this.drawHealthBar(x, y - r * 1.9, r * 1.7, u.hp / u.maxHp);
+  /**
+   * Éclats de travail : copeaux bruns sous la hache, poussière grise sur un
+   * chantier, paillettes sur un filon. C'est ce qui donne le sentiment que
+   * quelque chose se passe, bien plus qu'un personnage détaillé.
+   *
+   * `gatherAnim` est remis à 0,4 à CHAQUE tick de récolte : il ne redescend
+   * jamais, et guetter son front montant ne produisait qu'une seule volée de
+   * copeaux, au tout premier coup de hache. On bat donc la mesure nous-mêmes.
+   */
+  eclatsDeTravail(u, x, y, r) {
+    if (u.gatherAnim <= 0.05) { u._fxTimer = 0; return; }
+    u._fxTimer = (u._fxTimer || 0) - (this.dt || 1 / 60);
+    if (u._fxTimer > 0) return;
+    u._fxTimer = 0.32;
+    const teintes = { wood: '#b07a42', gold: '#f2c14e', food: '#d8695c' };
+    const couleur = u.state === 'build' ? '#cbbfae' : (teintes[u.carry.type] || '#d8d2c4');
+    const fx = Math.cos(u.facing), fy = Math.sin(u.facing);
+    this.semerParticules(x + fx * r * 1.25, y + fy * r * 1.25 - r * 0.3, 3, {
+      color: couleur, angle: u.facing + Math.PI, spread: 1.5, speed: 30, life: 0.42, size: 1.7,
+    });
   }
 
   drawHealthBar(cx, y, width, ratio) {
@@ -743,17 +813,29 @@ export class Renderer {
    *   le premier tiers du cycle, ce qui le rend lisible même à vingt pixels.
    */
   unitAnim(u) {
+    const dt = this.dt || 1 / 60;
     const px = u._ax === undefined ? u.x : u._ax;
     const py = u._ay === undefined ? u.y : u._ay;
     const pas = Math.hypot(u.x - px, u.y - py);
     u._ax = u.x; u._ay = u.y;
-    u._walk = ((u._walk || 0) + pas / Math.max(2.5, u.radius * 0.42)) % (Math.PI * 2);
+
+    // Vitesse LISSÉE, et non distance brute d'une image à l'autre : la
+    // simulation avance vingt fois par seconde quand l'écran en affiche
+    // soixante, si bien que deux images sur trois voient un déplacement nul,
+    // suivi d'un bond. Cadencer la marche là-dessus faisait trembler les
+    // personnages. La moyenne glissante rend le pas régulier, et l'amplitude
+    // s'éteint d'elle-même quand l'unité ralentit.
+    const instantanee = pas / dt;
+    u._vitesse = (u._vitesse || 0) * 0.86 + instantanee * 0.14;
+    const force = clamp(u._vitesse / (u.def.speed * TILE * 0.5), 0, 1);
+    const foulee = Math.max(2.5, u.radius * 0.5);
+    u._walk = ((u._walk || 0) + (u._vitesse * dt) / foulee) % (Math.PI * 2);
 
     const cadence = u.def.attackSpeed || 2;
     const ecoule = cadence - u.attackCooldown;
     const enCoup = u.attackCooldown > 0 && ecoule >= 0 && ecoule < cadence * 0.34;
     return {
-      marche: pas > 0.02 ? Math.sin(u._walk) : 0,
+      marche: Math.sin(u._walk) * force,
       coup: enCoup ? ecoule / (cadence * 0.34) : -1,
     };
   }
