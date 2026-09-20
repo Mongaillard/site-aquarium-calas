@@ -733,11 +733,12 @@ check('le sol est texturé, pas une couleur plate', sol.variance > 30, `variance
 // case — ils entrent dans l'ordre du peintre avec les unités.
 const vegetation = await page.evaluate(async () => {
   const mod = await import('./js/sprites.js');
-  const a = mod.spriteDe('arbres'), b = mod.spriteDe('buissons');
-  return { arbres: !!a && a.def.cases === 6 && a.def.hauteurMonde > 60, buissons: !!b && b.def.cases === 6 };
+  const a = mod.spriteDe('arbres'), b = mod.spriteDe('buissons'), o = mod.spriteDe('or');
+  return { arbres: !!a && a.def.cases === 6 && a.def.hauteurMonde > 60, buissons: !!b && b.def.cases === 6, or: !!o && o.def.cases === 2 };
 });
 check('les arbres portent leur illustration (six essences, un chevalier et demi de haut)', vegetation.arbres);
 check('les buissons portent leur illustration (six variétés)', vegetation.buissons);
+check('le gisement d’or porte son illustration (et son miroir)', vegetation.or);
 
 check('les orientations tombent sur les bonnes cases',
   chevalier.sud === 0 && chevalier.est === 2 && chevalier.nord === 4 && chevalier.ouest === 6,

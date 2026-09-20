@@ -11,6 +11,7 @@
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 264×264, dessinée sur 132 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
 | `sol-herbe.webp`, `sol-herbe-sombre.webp`, `sol-terre.webp`, `sol-sable.webp` | Les quatre **nappes de sol** (herbe, herbe sombre, terre, sable), 384×384, raccordées bord à bord | Planche de six textures générée par l'auteur du dépôt ; deux (herbe sèche, terre sombre) restent en réserve |
 | `arbres.webp`, `buissons.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux) et six **buissons** fleuris, 82×146 et 72×77 par case | Planche générée par l'auteur du dépôt, avec transparence |
+| `or.webp` | Le **gisement d'or** : rochers veinés d'or sur leur socle, 101×74 par case, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
 Ces images viennent d'une planche de référence fournie par l'auteur du dépôt, qui
@@ -176,9 +177,14 @@ En jeu, arbres et buissons sont plus hauts que leur case : ils sont classés
 dans l'**ordre du peintre** avec les unités et les bâtiments, au pied de leur
 case — une unité qui passe derrière un arbre passe derrière. Un gisement qui
 s'épuise rapetisse un peu (jusqu'à 80 %) : de loin, on voit ce qu'il reste à
-prendre. L'or, plat, garde son dessin au code.
+prendre.
+
+Le gisement d'or suit la même voie : une seule illustration, mise en atlas avec
+son miroir, et une pointe de variation de taille par case (±8 %, figée par la
+variante de la case) pour qu'un filon de sept cases ne soit pas une frise.
+9 Ko.
 
 ## Format
 
-WebP partout où c'est possible : 400 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
+WebP partout où c'est possible : 409 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
 PNG, sans différence visible à l'œil même agrandi trois fois.

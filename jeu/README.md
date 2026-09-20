@@ -3,7 +3,7 @@
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
 très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 400 Ko d'illustrations et de textures — dont un cycle de marche
+pictogrammes vectoriels et 409 Ko d'illustrations et de textures — dont un cycle de marche
 complet.
 
 ## Lancer le jeu
@@ -398,7 +398,9 @@ de la planche : le cyprès fait un chevalier et demi, un buisson tient dans sa
 case. Plus hauts que leur case, ils entrent dans l'**ordre du peintre** avec les
 unités et les bâtiments : une unité passe derrière un arbre quand elle est
 derrière, devant quand elle est devant. Un gisement qui s'épuise rapetisse un
-peu — de loin, on voit ce qu'il reste. L'or garde son dessin au code.
+peu — de loin, on voit ce qu'il reste. Le gisement d'or (`or.webp`, 9 Ko) suit
+la même voie : une illustration et son miroir, avec une pointe de variation de
+taille par case pour qu'un filon ne soit pas une frise.
 
 ### La couleur d'équipe se calcule au chargement
 

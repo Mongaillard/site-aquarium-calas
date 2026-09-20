@@ -438,12 +438,12 @@ export class Renderer {
    */
   drawResources(view) {
     const map = this.world.map;
-    const arbres = spriteDe('arbres'), buissons = spriteDe('buissons');
+    const arbres = spriteDe('arbres'), buissons = spriteDe('buissons'), or = spriteDe('or');
     for (const res of map.resources.values()) {
       if (res.tx < view.x0 || res.tx > view.x1 || res.ty < view.y0 || res.ty > view.y1) continue;
       if (!this.world.fog.explored[res.ty * map.w + res.tx]) continue;
       const x = res.tx * TILE, y = res.ty * TILE;
-      if (res.type === 'gold') this.drawGold(x, y, res);
+      if (res.type === 'gold' && !or) this.drawGold(x, y, res);
       else if (res.type === 'wood' && !arbres) this.drawTree(x, y, res);
       else if (res.type === 'food' && !buissons) this.drawBush(x, y, res);
     }
@@ -456,7 +456,10 @@ export class Renderer {
   dessinerVegetation(res, sprite) {
     const { cellW, cellH, hauteurMonde } = sprite.def;
     const ratio = res.max ? res.amount / res.max : 1;
-    const k = 0.8 + 0.2 * Math.min(1, ratio);
+    // Une pointe de variation de taille par case, figée par la variante : sept
+    // rochers d'or identiques côte à côte feraient une frise.
+    const jitter = 0.92 + 0.16 * ((res.variant * 37) % 8) / 7;
+    const k = (0.8 + 0.2 * Math.min(1, ratio)) * jitter;
     const h = hauteurMonde * k, w = (cellW / cellH) * h;
     const cx = res.tx * TILE + TILE / 2, base = (res.ty + 1) * TILE + 3;
     this.ctx.drawImage(sprite.variantes.bleu, (res.variant % sprite.def.cases) * cellW, 0, cellW, cellH, cx - w / 2, base - h, w, h);
@@ -577,14 +580,14 @@ export class Renderer {
     }
     // Arbres et buissons illustrés : plus hauts que leur case, ils se classent
     // avec le reste — une unité qui passe derrière un arbre passe derrière.
-    const arbres = spriteDe('arbres'), buissons = spriteDe('buissons');
-    if (arbres || buissons) {
+    const arbres = spriteDe('arbres'), buissons = spriteDe('buissons'), or = spriteDe('or');
+    if (arbres || buissons || or) {
       const map = this.world.map;
       const explored = this.world.fog.explored;
       for (const res of map.resources.values()) {
         if (res.tx < view.x0 - 1 || res.tx > view.x1 + 1 || res.ty < view.y0 - 2 || res.ty > view.y1 + 1) continue;
         if (!explored[res.ty * map.w + res.tx]) continue;
-        const sprite = res.type === 'wood' ? arbres : res.type === 'food' ? buissons : null;
+        const sprite = res.type === 'wood' ? arbres : res.type === 'food' ? buissons : res.type === 'gold' ? or : null;
         if (sprite) list.push({ kind: 'vegetation', res, sprite, ty: res.ty });
       }
     }

@@ -68,6 +68,13 @@ const ATLAS = {
     cellW: 72, cellH: 77, cases: 6, images: 1,
     ancreY: 77, hauteurMonde: 38.5,
   },
+  // Le gisement d'or : une seule illustration, et son miroir en seconde case ;
+  // la taille varie un peu d'une case à l'autre (voir dessinerVegetation).
+  or: {
+    src: 'assets/or.webp',
+    cellW: 101, cellH: 74, cases: 2, images: 1,
+    ancreY: 74, hauteurMonde: 37,
+  },
   spearman: {
     src: 'assets/lancier.png',
     cellW: 48, cellH: 48, cases: 8, images: 1,
