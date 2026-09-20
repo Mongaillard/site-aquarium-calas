@@ -36,6 +36,13 @@ Sur un téléphone : ouvrez l'URL, puis « Ajouter à l'écran d'accueil ». Le
 | Bouton 🚪 puis un abri | Mettre la sélection à l'abri · 🔔 met tous les villageois à couvert |
 | Bouton 👷 | Panneau d'affectation : − / + pour déplacer un ouvrier d'un poste à l'autre |
 
+Le pointage est **tolérant** : inutile de viser au pixel près. Un appui à moins
+d'une case d'un ennemi, d'un arbre ou d'un filon vise la bonne cible. Et quand
+vos troupes sont sélectionnées, un ennemi sous le doigt l'emporte sur un allié —
+dans une mêlée, l'intention est d'attaquer, pas de changer de sélection. Un
+appui franc sur l'un de vos bâtiments le sélectionne quand même : en plein raid,
+il faut pouvoir continuer à produire.
+
 ### Comportement des unités : les principes d'Age of Empires
 
 Les personnages se conduisent selon les mêmes règles que dans AoE II.
