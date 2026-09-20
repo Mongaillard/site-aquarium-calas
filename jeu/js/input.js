@@ -11,7 +11,10 @@
 // ---------------------------------------------------------------------------
 
 const TAP_MAX_MS = 260;
-const TAP_MAX_MOVE = 12;
+// Seuils exprimés en ÉCART au point de départ, jamais en distance cumulée :
+// un doigt posé sans bouger tremble de quelques pixels à chaque événement, et
+// cumuler ces micro-mouvements annulait l'appui long avant qu'il ne se déclenche.
+const TAP_MAX_MOVE = 16;
 const LONG_PRESS_MS = 380;
 const DOUBLE_TAP_MS = 320;
 
@@ -52,11 +55,13 @@ export class InputController {
   }
 
   onPointerDown(e) {
-    this.canvas.setPointerCapture?.(e.pointerId);
+    // La capture échoue sur certains navigateurs (pointeur déjà relâché) :
+    // ce n'est pas une raison pour perdre le geste.
+    try { this.canvas.setPointerCapture?.(e.pointerId); } catch { /* sans importance */ }
     const p = this.localPoint(e);
     this.pointers.set(e.pointerId, {
       id: e.pointerId, startX: p.x, startY: p.y, x: p.x, y: p.y,
-      time: performance.now(), moved: 0, button: e.button, type: e.pointerType,
+      time: performance.now(), moved: 0, drift: 0, button: e.button, type: e.pointerType,
     });
 
     // Clic droit souris : ordre immédiat.
@@ -93,7 +98,7 @@ export class InputController {
       this.longPressTimer = setTimeout(() => {
         this.longPressTimer = null;
         const pointer = this.pointers.get(e.pointerId);
-        if (!pointer || pointer.moved > TAP_MAX_MOVE) return;
+        if (!pointer || pointer.drift > TAP_MAX_MOVE) return;
         this.mode = 'box';
         this.boxStart = { x: pointer.x, y: pointer.y };
         this.game.setSelectionBox({ x0: pointer.x, y0: pointer.y, x1: pointer.x, y1: pointer.y });
@@ -108,6 +113,7 @@ export class InputController {
     const p = this.localPoint(e);
     const dx = p.x - pointer.x, dy = p.y - pointer.y;
     pointer.moved += Math.hypot(dx, dy);
+    pointer.drift = Math.hypot(p.x - pointer.startX, p.y - pointer.startY);
     pointer.x = p.x; pointer.y = p.y;
 
     if (this.mode === 'pinch' && this.pointers.size >= 2) {
@@ -132,7 +138,7 @@ export class InputController {
       return;
     }
 
-    if (pointer.moved > TAP_MAX_MOVE) {
+    if (pointer.drift > TAP_MAX_MOVE) {
       this.cancelLongPress();
       this.mode = 'pan';
       this.camera.panByScreen(dx, dy);
@@ -155,13 +161,16 @@ export class InputController {
       this.game.setSelectionBox(null);
       this.mode = 'idle';
       const w = Math.abs(box.x1 - box.x0), h = Math.abs(box.y1 - box.y0);
-      if (w > TAP_MAX_MOVE || h > TAP_MAX_MOVE) { this.game.boxSelect(box); return; }
+      // Un appui long sans glisser sélectionne quand même ce qui est sous le
+      // doigt : le joueur a clairement demandé une sélection.
+      if (w > 8 || h > 8) { this.game.boxSelect(box); return; }
+      if (pointer.type !== 'mouse') { this.game.tapAt(pointer.x, pointer.y, false); return; }
       // Rectangle dégénéré : on retombe sur un simple clic.
       if (pointer.type === 'mouse' && pointer.button === 0) { this.game.tapAt(pointer.x, pointer.y, false); return; }
     }
 
     const duration = performance.now() - pointer.time;
-    const isTap = duration < TAP_MAX_MS * 2.2 && pointer.moved <= TAP_MAX_MOVE;
+    const isTap = duration < TAP_MAX_MS * 2.2 && pointer.drift <= TAP_MAX_MOVE;
     if (!isTap) { this.mode = 'idle'; return; }
 
     if (this.game.buildMode) {

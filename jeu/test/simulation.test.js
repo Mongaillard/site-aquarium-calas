@@ -123,6 +123,15 @@ check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches >
     .filter((r) => r.type === 'wood')
     .sort((a, b) => (a.tx * TILE - tc.x) ** 2 + (a.ty * TILE - tc.y) ** 2
       - ((b.tx * TILE - tc.x) ** 2 + (b.ty * TILE - tc.y) ** 2))[0];
+  // On l'isole : sans bois à proximité, il n'y a pas d'enchaînement possible
+  // et c'est bien au joueur de réaffecter l'ouvrier.
+  for (let dy = -3; dy <= 3; dy++) {
+    for (let dx = -3; dx <= 3; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const other = world.map.resourceAt(tree.tx + dx, tree.ty + dy);
+      if (other && other.type === 'wood') world.map.harvest(tree.tx + dx, tree.ty + dy, 1e9);
+    }
+  }
   tree.amount = 6;
   villager.x = tree.tx * TILE + TILE * 1.2;
   villager.y = tree.ty * TILE + TILE / 2;
@@ -336,6 +345,127 @@ function advance(world, seconds, stop) {
   const team = site.buildEfficiency() * 4;
   check('bâtisseurs : deux valent mieux qu’un', team > solo * 1.5, `1 → ${solo.toFixed(2)} · 4 → ${team.toFixed(2)}`);
   check('bâtisseurs : rendement décroissant', team < solo * 4, `4 ouvriers = ${team.toFixed(2)}× un seul`);
+}
+
+// --- Bugs signalés en partie réelle ------------------------------------------
+
+{
+  // « Je clique sur un villageois, puis sur la ressource : il y va mais il ne
+  // récolte pas. » Cas limite : l'arbre visé est au cœur d'un bois, donc
+  // impossible à border. L'ordre doit être reporté sur un arbre exploitable.
+  const world = sandbox(42);
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const enclave = [...world.map.resources.values()].find(
+    (r) => r.type === 'wood' && !world.map.hasFreeNeighbour(r.tx, r.ty)
+      && Math.hypot(r.tx * TILE - tc.x, r.ty * TILE - tc.y) < 20 * TILE);
+  check('la carte contient bien un arbre enclavé', !!enclave);
+  if (enclave) {
+    world.commandUnits([villager], enclave.tx * TILE + TILE / 2, enclave.ty * TILE + TILE / 2);
+    check('l’ordre est reporté sur un arbre exploitable',
+      villager.resourceTile
+        && (villager.resourceTile.tx !== enclave.tx || villager.resourceTile.ty !== enclave.ty)
+        && world.map.hasOpenNeighbour(villager.resourceTile.tx, villager.resourceTile.ty),
+      villager.resourceTile ? `case ${villager.resourceTile.tx},${villager.resourceTile.ty}` : 'aucune case');
+    const harvested = advance(world, 60, () => villager.carry.amount > 0.5);
+    check('le villageois finit par récolter', harvested,
+      `sac ${villager.carry.amount.toFixed(1)} · état ${villager.state}`);
+  }
+}
+
+{
+  // Cas courant : un arbre normal, en lisière. Doit être rapide.
+  const world = sandbox(13);
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  const tree = world.findNearestResource(villager.x, villager.y, 'wood', 20 * TILE, 0);
+  world.commandUnits([villager], tree.tx * TILE + TILE / 2, tree.ty * TILE + TILE / 2);
+  const distance = dist(villager.x, villager.y, tree.tx * TILE, tree.ty * TILE) / TILE;
+  let seconds = 0;
+  const ok = advance(world, 40, () => { seconds += DT; return villager.carry.amount > 0.5; });
+  check('récolte d’un arbre ordinaire sans détour', ok && seconds < distance * 1.6 + 6,
+    `${distance.toFixed(1)} cases parcourues en ${seconds.toFixed(1)} s`);
+}
+
+{
+  // « Une fois le sac plein, il reste planté devant la ressource. »
+  // Même si tous les dépôts ont été marqués en échec, il doit livrer.
+  const world = sandbox(8);
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const tree = world.findNearestResource(villager.x, villager.y, 'wood', 30 * TILE, 0);
+  villager.gatherAt(tree.tx, tree.ty);
+  advance(world, 90, () => villager.carry.amount >= villager.carryCapacity() - 1);
+  check('le sac se remplit', villager.carry.amount > 5, villager.carry.amount.toFixed(1));
+
+  villager.failedDropoffs = new Set([tc.id]);   // le trajet précédent a échoué
+  villager.startReturn();
+  check('un échec de trajet ne condamne pas le dépôt', villager.state === 'return', villager.state);
+  const delivered = advance(world, 60, () => world.players[0].stats.gathered.wood > 0);
+  check('le chargement finit toujours par être livré', delivered,
+    Math.round(world.players[0].stats.gathered.wood) + ' bois déposés');
+  check('le villageois repart travailler', villager.state !== 'idle', villager.state);
+}
+
+{
+  // Arbre épuisé : le villageois enchaîne sur le voisin immédiat (même bosquet),
+  // sans attendre un nouvel ordre — mais il ne part pas à l'autre bout du monde.
+  const world = sandbox(23);
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  // Un arbre avec au moins un voisin arbre exploitable.
+  let tree = null;
+  for (const res of world.map.resources.values()) {
+    if (res.type !== 'wood' || !world.map.hasOpenNeighbour(res.tx, res.ty)) continue;
+    let voisinOk = false;
+    for (let dy = -2; dy <= 2 && !voisinOk; dy++) {
+      for (let dx = -2; dx <= 2 && !voisinOk; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const other = world.map.resourceAt(res.tx + dx, res.ty + dy);
+        if (other && other.type === 'wood' && world.map.hasOpenNeighbour(other.tx, other.ty)) voisinOk = true;
+      }
+    }
+    if (voisinOk) { tree = res; break; }
+  }
+  check('la carte offre un bosquet', !!tree);
+  tree.amount = 4;
+  villager.gatherAt(tree.tx, tree.ty);
+  const enchaine = advance(world, 120, () => villager.resourceTile
+    && (villager.resourceTile.tx !== tree.tx || villager.resourceTile.ty !== tree.ty));
+  check('arbre épuisé : il passe au suivant du même bosquet', enchaine,
+    villager.resourceTile ? `case ${villager.resourceTile.tx},${villager.resourceTile.ty} · état ${villager.state}` : villager.state);
+  check('l’arbre épuisé a bien disparu', !world.map.resourceAt(tree.tx, tree.ty));
+}
+
+{
+  // Doigt qui rate la case d'un cheveu : l'ordre doit quand même être compris.
+  const world = sandbox(17);
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  // On cherche un arbre bordé d'une case vide, et on vise cette case vide :
+  // c'est le geste d'un pouce imprécis sur un petit écran.
+  let tree = null, miss = null;
+  for (const res of world.map.resources.values()) {
+    if (res.type !== 'wood') continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = res.tx + dx, y = res.ty + dy;
+      if (world.map.resourceAt(x, y) || world.map.isBlocked(x, y)) continue;
+      tree = res; miss = { x, y };
+      break;
+    }
+    if (tree) break;
+  }
+  check('la carte offre un arbre bordé de vide', !!tree);
+  const result = world.commandUnits([villager], miss.x * TILE + TILE / 2, miss.y * TILE + TILE / 2);
+  check('tap à côté de l’arbre : l’ordre de récolte est compris',
+    result && result.kind === 'gather' && villager.resourceTile,
+    `ordre = ${result ? result.kind : 'aucun'}`);
+}
+
+{
+  // Un villageois ne doit jamais rester inactif avec un sac plein.
+  const world = sandbox(21);
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  villager.carry = { type: 'wood', amount: 10 };
+  villager.startReturn();
+  check('sac plein : il part livrer, il ne s’arrête pas', villager.state === 'return', villager.state);
 }
 
 // Déterminisme : une même graine doit rejouer exactement la même partie.

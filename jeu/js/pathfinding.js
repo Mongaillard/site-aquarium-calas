@@ -132,12 +132,17 @@ export class PathFinder {
     return this.smooth(path, start % w, (start / w) | 0);
   }
 
-  /** Supprime les points intermédiaires quand la ligne droite est dégagée. */
+  /**
+   * Supprime les points intermédiaires quand la ligne droite est dégagée.
+   * Le premier point est toujours conservé : l'unité n'est pas forcément au
+   * centre de sa case, et partir en diagonale depuis le bord d'une case fait
+   * accrocher les angles.
+   */
   smooth(path, sx, sy) {
     if (path.length < 3) return path;
-    const out = [];
-    let curX = sx, curY = sy;
-    let i = 0;
+    const out = [path[0]];
+    let curX = path[0].tx, curY = path[0].ty;
+    let i = 1;
     while (i < path.length) {
       let furthest = i;
       for (let j = path.length - 1; j > i; j--) {

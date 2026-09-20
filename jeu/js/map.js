@@ -87,6 +87,39 @@ export class GameMap {
     return false;
   }
 
+  /** Nombre de cases voisines libres (0 à 8). */
+  freeNeighbours(tx, ty) {
+    let n = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        if (this.inBounds(tx + dx, ty + dy) && !this.isBlocked(tx + dx, ty + dy)) n++;
+      }
+    }
+    return n;
+  }
+
+  /**
+   * Case libre et « ouverte » : au moins trois voisines libres. Une poche de
+   * une ou deux cases au cœur d'une forêt passe le test « voisin libre » mais
+   * reste inaccessible — ce critère l'écarte.
+   */
+  isOpenTile(tx, ty) {
+    if (!this.inBounds(tx, ty) || this.isBlocked(tx, ty)) return false;
+    return this.freeNeighbours(tx, ty) >= 3;
+  }
+
+  /** Le gisement est-il bordé par une case ouverte, donc exploitable ? */
+  hasOpenNeighbour(tx, ty) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        if (this.isOpenTile(tx + dx, ty + dy)) return true;
+      }
+    }
+    return false;
+  }
+
   resourceAt(tx, ty) {
     return this.resources.get(ty * this.w + tx);
   }
@@ -288,6 +321,11 @@ export class GameMap {
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
           const ni = ny * w + nx;
           if (seen[ni] || this.blocked[ni]) continue;
+          // Même règle que l'A* : pas de passage en diagonale entre deux
+          // obstacles, sinon la carte est jugée connexe là où les unités
+          // ne passent pas.
+          if (dx !== 0 && dy !== 0
+            && (this.blocked[cy * w + nx] || this.blocked[ny * w + cx])) continue;
           seen[ni] = 1;
           queue.push(ni);
         }

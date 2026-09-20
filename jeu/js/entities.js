@@ -23,6 +23,9 @@ export const STATE = {
 /** Au bout de ce nombre de secondes sans progrès, une cible est déclarée inatteignable. */
 const UNREACHABLE_AFTER = 7;
 
+/** Même chose pour un gisement : on réagit plus vite, il y a un plan B. */
+const GATHER_RETRY_AFTER = 3;
+
 let nextId = 1;
 export function resetEntityIds() { nextId = 1; }
 
@@ -126,7 +129,8 @@ export class Unit extends Entity {
     // Toute l'aléa de simulation passe par le générateur du monde : une même
     // graine rejoue exactement la même partie (tests reproductibles).
     this.facing = world.rng.next() * Math.PI * 2;
-    this.stuckTime = 0;
+    this.stuckTime = 0;       // temps sans progresser vers le point de passage
+    this.repathAttempts = 0;  // relances de trajet pour atteindre la destination
     this.repathCooldown = 0;
     this.scanCooldown = world.rng.next() * 0.5;
     // Attitude à la manière d'AoE : décide si l'unité engage d'elle-même,
@@ -139,6 +143,8 @@ export class Unit extends Entity {
     this.gatherAnim = 0;
     this.pathPending = false;
     this.pendingJob = null; // poste à prendre après la livraison en cours
+    this.failedDropoffs = null; // dépôts que CE villageois n'a pas pu rejoindre
+    this.lastResourceTile = null; // dernière case réellement exploitée
     this.blockedTime = 0;   // temps passé sans pouvoir atteindre sa cible
     this.fleeUntil = 0;     // mise à l'abri en cours (piloté par l'IA)
     this.spawnTime = world.time;
@@ -212,6 +218,7 @@ export class Unit extends Entity {
     this.destination = { x, y };
     this.autoTarget = false;
     this.groupSpeed = 0;   // un ordre individuel rend sa vitesse à l'unité
+    this.repathAttempts = 0;
     this.guardPoint = { x, y };   // le poste devient le point d'arrivée
     this.state = aggressive ? STATE.ATTACK_MOVE : STATE.MOVE;
     this.requestPathTo(x, y);
@@ -251,8 +258,22 @@ export class Unit extends Entity {
   }
 
   gatherAt(tx, ty) {
-    const res = this.world.map.resourceAt(tx, ty);
+    const map = this.world.map;
+    let res = map.resourceAt(tx, ty);
     if (!res || !this.isVillager) return;
+    // Case cernée (arbre au milieu d'un bois) : personne ne peut venir la
+    // travailler. On reporte l'ordre sur le gisement exploitable le plus
+    // proche, plutôt que d'envoyer le villageois attendre devant.
+    if (!map.hasOpenNeighbour(tx, ty)) {
+      const reachable = this.world.findReachableResource(tx, ty, res.type);
+      if (!reachable) {
+        this.state = STATE.IDLE;
+        this.resourceTile = null;
+        this.world.notifyIdleWorker(this);
+        return;
+      }
+      tx = reachable.tx; ty = reachable.ty; res = reachable;
+    }
     if (this.deliverBeforeJob({ kind: 'tile', tx, ty, resType: res.type })) return;
     if (this.carry.type && this.carry.type !== res.type) this.carry = { type: null, amount: 0 };
     this.pendingJob = null;
@@ -465,12 +486,23 @@ export class Unit extends Entity {
         // probablement enclavée (buisson cerné d'arbres). On insiste un peu,
         // puis on l'abandonne définitivement pour ne pas bloquer l'économie.
         this.blockedTime += dt;
-        if (this.blockedTime > UNREACHABLE_AFTER) {
+        if (this.blockedTime > (farm ? UNREACHABLE_AFTER : GATHER_RETRY_AFTER)) {
           this.blockedTime = 0;
-          if (farm) farm.gatherUnreachable = true;
-          else {
-            const res = this.world.map.resourceAt(this.resourceTile.tx, this.resourceTile.ty);
-            if (res) res.inaccessible = true;
+          if (farm) {
+            farm.gatherUnreachable = true;
+            this.findNextResource(resType);
+            return;
+          }
+          // Case injoignable : on la marque, puis on reprend l'ordre du joueur
+          // sur le gisement exploitable le plus proche. Ce n'est pas un
+          // changement de métier, c'est l'ordre donné qui se poursuit.
+          const tile = this.resourceTile;
+          const res = this.world.map.resourceAt(tile.tx, tile.ty);
+          if (res) res.inaccessible = true;
+          const alt = this.world.findReachableResource(tile.tx, tile.ty, resType);
+          if (alt && (alt.tx !== tile.tx || alt.ty !== tile.ty)) {
+            this.gatherAt(alt.tx, alt.ty);
+            return;
           }
           this.findNextResource(resType);
           return;
@@ -495,6 +527,7 @@ export class Unit extends Entity {
     else amount = this.world.map.harvest(this.resourceTile.tx, this.resourceTile.ty, amount);
 
     if (amount <= 0) { this.findNextResource(resType); return; }
+    if (!farm) this.lastResourceTile = { tx: this.resourceTile.tx, ty: this.resourceTile.ty };
     this.carry.amount += amount;
     this.gatherAnim = 0.4;
 
@@ -505,8 +538,18 @@ export class Unit extends Entity {
   }
 
   startReturn() {
-    const drop = this.world.findNearestDropoff(this, this.carry.type);
-    if (!drop) { this.state = STATE.IDLE; return; }
+    let drop = this.world.findNearestDropoff(this, this.carry.type, this.failedDropoffs);
+    if (!drop && this.failedDropoffs) {
+      // Tous les dépôts ont échoué une fois : on repart de zéro plutôt que de
+      // laisser le villageois planté avec un sac plein.
+      this.failedDropoffs = null;
+      drop = this.world.findNearestDropoff(this, this.carry.type);
+    }
+    if (!drop) {
+      this.state = STATE.IDLE;
+      this.world.notifyIdleWorker(this);
+      return;
+    }
     this.returnTo = drop;
     this.state = STATE.RETURN;
     this.requestPathToEntity(drop);
@@ -520,7 +563,10 @@ export class Unit extends Entity {
         this.blockedTime += dt;
         if (this.blockedTime > UNREACHABLE_AFTER) {
           this.blockedTime = 0;
-          drop.unreachable = true;
+          // Échec propre à ce trajet : on essaie un autre dépôt, sans pénaliser
+          // le bâtiment pour les autres villageois.
+          if (!this.failedDropoffs) this.failedDropoffs = new Set();
+          this.failedDropoffs.add(drop.id);
           this.startReturn();
           return;
         }
@@ -533,6 +579,7 @@ export class Unit extends Entity {
     }
     this.blockedTime = 0;
     // Dépôt
+    this.failedDropoffs = null;
     this.world.deposit(this.playerIndex, this.carry.type, this.carry.amount);
     const resType = this.carry.type;
     this.carry = { type: resType, amount: 0 };
@@ -581,8 +628,18 @@ export class Unit extends Entity {
         return;
       }
     }
+    const exhausted = this.lastResourceTile;
     this.resourceTile = null;
     this.target = null;
+
+    // Le gisement désigné s'épuise : on enchaîne sur son voisin immédiat, comme
+    // dans AoE — le joueur a choisi ce bosquet, pas cet arbre-là précisément.
+    // Au-delà de deux cases, c'est un vrai changement de poste : il lui revient.
+    if (exhausted) {
+      const nearby = this.world.findReachableResource(exhausted.tx, exhausted.ty, type, 2);
+      if (nearby) { this.gatherAt(nearby.tx, nearby.ty); return; }
+    }
+
     if (!this.player.autoWorkers) {
       this.state = STATE.IDLE;
       this.world.notifyIdleWorker(this);
@@ -692,10 +749,13 @@ export class Unit extends Entity {
   followPath(dt) {
     if (this.pathPending) return false;
     if (!this.path || this.pathIndex >= this.path.length) {
+      // Chemin épuisé sans être arrivé : on relance, avec son propre compteur.
+      // (Il partageait autrefois `stuckTime` avec la détection de progression,
+      // et les deux mécanismes s'épuisaient mutuellement.)
       if (this.destination && dist(this.x, this.y, this.destination.x, this.destination.y) > TILE * 1.2
-          && this.repathCooldown <= 0 && this.stuckTime < 4) {
-        this.repathCooldown = 1.2;
-        this.stuckTime += 1;
+          && this.repathCooldown <= 0 && this.repathAttempts < 6) {
+        this.repathCooldown = 0.9;
+        this.repathAttempts++;
         this.requestPathTo(this.destination.x, this.destination.y);
         return false;
       }
@@ -721,25 +781,36 @@ export class Unit extends Entity {
 
     this.facing = Math.atan2(vy, vx);
     const step = this.speedPx() * dt;
-    const before = this.x + this.y * 0.000001;
     this.tryMove(vx * step, vy * step);
 
-    // Détection de blocage : si on n'avance pas, on recalcule.
-    if (Math.abs((this.x + this.y * 0.000001) - before) < step * 0.15) {
+    // Ce qui compte n'est pas de bouger, mais de se RAPPROCHER du prochain
+    // point de passage : en longeant un obstacle, une unité avance à pleine
+    // vitesse tout en s'éloignant de sa cible. Sans progression réelle, on
+    // recalcule un chemin depuis la position courante.
+    const after = Math.hypot(nodeX - this.x, nodeY - this.y);
+    if (after > d - step * 0.3) {
       this.stuckTime += dt;
-      if (this.stuckTime > 1.2 && this.repathCooldown <= 0) {
-        this.repathCooldown = 1.0;
+      if (this.stuckTime > 0.8 && this.repathCooldown <= 0) {
+        this.repathCooldown = 0.8;
         this.stuckTime = 0;
         const goal = this.path[this.path.length - 1];
         this.requestPathToTile(goal.tx, goal.ty, this.state !== STATE.MOVE && this.state !== STATE.ATTACK_MOVE);
       }
     } else if (this.stuckTime > 0) {
-      this.stuckTime = Math.max(0, this.stuckTime - dt * 0.5);
+      this.stuckTime = Math.max(0, this.stuckTime - dt * 2);
     }
     return false;
   }
 
-  /** Déplacement avec glissement le long des obstacles. */
+  /**
+   * Déplacement avec contournement des obstacles.
+   *
+   * L'ancienne version ne gardait que la composante non bloquée du pas : le
+   * long d'un mur orienté nord-sud, une unité qui voulait monter n'avançait
+   * plus que de la minuscule part est-ouest de son pas — elle rampait. On
+   * glisse désormais à pleine vitesse le long de l'obstacle, et on s'en écarte
+   * perpendiculairement si les deux axes sont bloqués.
+   */
   tryMove(dx, dy) {
     const map = this.world.map;
     const r = this.radius * 0.6;
@@ -750,12 +821,27 @@ export class Unit extends Entity {
       const t4 = map.isBlocked(Math.floor((x + r) / TILE), Math.floor((y + r) / TILE));
       return !(t1 || t2 || t3 || t4);
     };
-    const nx = this.x + dx, ny = this.y + dy;
-    if (canStand(nx, ny)) { this.x = nx; this.y = ny; }
-    else if (canStand(nx, this.y)) { this.x = nx; }
-    else if (canStand(this.x, ny)) { this.y = ny; }
-    this.x = clamp(this.x, 2, this.world.map.pixelWidth - 2);
-    this.y = clamp(this.y, 2, this.world.map.pixelHeight - 2);
+    const apply = (ox, oy) => {
+      if ((ox === 0 && oy === 0) || !canStand(this.x + ox, this.y + oy)) return false;
+      this.x = clamp(this.x + ox, 2, map.pixelWidth - 2);
+      this.y = clamp(this.y + oy, 2, map.pixelHeight - 2);
+      return true;
+    };
+
+    if (apply(dx, dy)) return;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.0001) return;
+    const ux = dx / len, uy = dy / len;
+
+    // Glissement le long de l'axe dominant, puis de l'autre.
+    const slides = Math.abs(ux) >= Math.abs(uy)
+      ? [[Math.sign(ux) * len, 0], [0, Math.sign(uy) * len]]
+      : [[0, Math.sign(uy) * len], [Math.sign(ux) * len, 0]];
+    for (const [ox, oy] of slides) if (apply(ox, oy)) return;
+
+    // Coincé dans un angle : on s'écarte perpendiculairement pour le contourner.
+    if (apply(-uy * len, ux * len)) return;
+    apply(uy * len, -ux * len);
   }
 }
 

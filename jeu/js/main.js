@@ -276,11 +276,11 @@ class Game {
     const minY = Math.min(a.y, b.y), maxY = Math.max(a.y, b.y);
     const inBox = (e) => e.x >= minX && e.x <= maxX && e.y >= minY && e.y <= maxY;
     const mine = this.world.humanIndex;
-    let picked = this.world.units.filter((u) => !u.dead && u.playerIndex === mine && inBox(u));
-    // Priorité aux unités militaires : on ne veut pas embarquer les villageois
-    // au travail quand on rassemble une armée.
-    const military = picked.filter((u) => !u.isVillager);
-    if (military.length > 0 && military.length !== picked.length) picked = military;
+    // Un rectangle sélectionne ce qu'il contient, sans filtrage malin : le
+    // contraire surprend (un seul éclaireur retenu sur une dizaine de
+    // villageois). Pour ne prendre qu'un type, le double tap est là.
+    let picked = this.world.units.filter(
+      (u) => !u.dead && !u.garrisonedIn && u.playerIndex === mine && inBox(u));
     if (picked.length === 0) {
       picked = this.world.buildings.filter((b) => !b.dead && b.playerIndex === mine && inBox(b)).slice(0, 1);
     }

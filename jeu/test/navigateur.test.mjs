@@ -221,6 +221,52 @@ const barCount = await page.evaluate(() => ({
 check('compteur de la barre à jour', barCount.affiche === barCount.reel,
   `barre=${barCount.affiche} réel=${barCount.reel}`);
 
+// Appui long → sélection rectangulaire, malgré le tremblement du doigt.
+// (Le seuil portait autrefois sur la distance CUMULÉE : les micro-mouvements
+// d'un doigt posé annulaient l'appui long avant qu'il ne se déclenche.)
+const longPress = await page.evaluate(async () => {
+  const g = window.__jeu;
+  const canvas = document.getElementById('game');
+  const rect = canvas.getBoundingClientRect();
+  g.setSelection([]);
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  g.camera.centerOn(tc.x, tc.y);
+  const villagers = g.world.units
+    .filter((u) => u.playerIndex === 0 && u.isVillager && !u.garrisonedIn)
+    .map((u) => g.camera.worldToScreen(u.x, u.y))
+    .filter((p) => p.x > 40 && p.y > 40 && p.x < rect.width - 40 && p.y < rect.height - 120);
+  if (villagers.length < 2) return { skipped: true };
+  const minX = Math.min(...villagers.map((p) => p.x)) - 30;
+  const minY = Math.min(...villagers.map((p) => p.y)) - 30;
+  const maxX = Math.max(...villagers.map((p) => p.x)) + 30;
+  const maxY = Math.max(...villagers.map((p) => p.y)) + 30;
+
+  const send = (type, x, y) => canvas.dispatchEvent(new PointerEvent(type, {
+    pointerId: 7, pointerType: 'touch', isPrimary: true, bubbles: true,
+    clientX: rect.left + x, clientY: rect.top + y,
+  }));
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  send('pointerdown', minX, minY);
+  // Doigt posé : il tremble de un à trois pixels, sans jamais s'écarter.
+  for (let i = 0; i < 26; i++) {
+    await wait(20);
+    send('pointermove', minX + (i % 2 ? 2 : -2), minY + (i % 3 ? 1 : -2));
+  }
+  const armed = !!g.renderer.selectionBox;
+  // Puis on trace le rectangle.
+  for (let i = 1; i <= 10; i++) {
+    send('pointermove', minX + ((maxX - minX) * i) / 10, minY + ((maxY - minY) * i) / 10);
+  }
+  send('pointerup', maxX, maxY);
+  return { armed, selected: g.selection.length };
+});
+check('appui long : le rectangle s’arme malgré le tremblement',
+  longPress.skipped || longPress.armed, longPress.skipped ? 'ignoré' : String(longPress.armed));
+check('appui long : la sélection multiple fonctionne',
+  longPress.skipped || longPress.selected >= 2,
+  longPress.skipped ? 'ignoré' : longPress.selected + ' unités');
+
 // Attitudes de combat (principe d'AoE)
 const stanceCheck = await page.evaluate(() => {
   const g = window.__jeu;

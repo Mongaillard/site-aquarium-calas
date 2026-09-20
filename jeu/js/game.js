@@ -260,10 +260,16 @@ export class World {
     return best;
   }
 
-  findNearestDropoff(unit, resType) {
+  /**
+   * @param {Set<number>} [exclude] entrepôts que CETTE unité n'a pas réussi à
+   *   rejoindre. On n'utilise plus de drapeau global : l'échec d'un villageois
+   *   ne doit pas priver tous les autres de leur dépôt.
+   */
+  findNearestDropoff(unit, resType, exclude) {
     let best = null, bestD = Infinity;
     for (const b of this.buildings) {
-      if (b.dead || b.playerIndex !== unit.playerIndex || !b.complete || b.unreachable) continue;
+      if (b.dead || b.playerIndex !== unit.playerIndex || !b.complete) continue;
+      if (exclude && exclude.has(b.id)) continue;
       if (!b.def.dropoff || !b.def.dropoff.includes(resType)) continue;
       const d = dist2(unit.x, unit.y, b.x, b.y);
       if (d < bestD) { bestD = d; best = b; }
@@ -292,8 +298,34 @@ export class World {
         }
       }
       if (!best) return null;
-      if (best.kind === 'building' || map.hasFreeNeighbour(best.tx, best.ty)) return best;
+      if (best.kind === 'building' || map.hasOpenNeighbour(best.tx, best.ty)) return best;
       best.inaccessible = true;
+    }
+    return null;
+  }
+
+  /**
+   * Gisement du même type réellement exploitable autour d'une case : un arbre
+   * au cœur d'une forêt n'a aucune case voisine libre, donc personne ne peut
+   * venir l'abattre. On reporte alors l'ordre sur le plus proche accessible,
+   * comme le fait Age of Empires quand on clique au milieu d'un bois.
+   */
+  findReachableResource(tx, ty, type, maxRadius = 10) {
+    const map = this.map;
+    for (let r = 0; r <= maxRadius; r++) {
+      let best = null, bestD = Infinity;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = tx + dx, y = ty + dy;
+          const res = map.resourceAt(x, y);
+          if (!res || res.type !== type || res.inaccessible) continue;
+          if (!map.hasOpenNeighbour(x, y)) continue;
+          const d = dx * dx + dy * dy;
+          if (d < bestD) { bestD = d; best = res; }
+        }
+      }
+      if (best) return best;
     }
     return null;
   }
@@ -661,8 +693,7 @@ export class World {
     if (!units || units.length === 0) return null;
     const playerIndex = units[0].playerIndex;
     const target = this.entityAt(worldX, worldY);
-    const tx = Math.floor(worldX / TILE), ty = Math.floor(worldY / TILE);
-    const res = this.map.resourceAt(tx, ty);
+    const res = this.resourceNear(worldX, worldY);
 
     if (target && target.playerIndex !== playerIndex && !target.dead) {
       for (const u of units) {
@@ -695,7 +726,7 @@ export class World {
     if (res) {
       const villagers = units.filter((u) => u.isVillager);
       if (villagers.length) {
-        this.spreadGatherOrder(villagers, tx, ty, res.type);
+        this.spreadGatherOrder(villagers, res.tx, res.ty, res.type);
         const others = units.filter((u) => !u.isVillager);
         for (const u of others) u.moveTo(worldX, worldY, options.aggressive);
         return { kind: 'gather', res };
@@ -705,6 +736,29 @@ export class World {
     return { kind: 'move' };
   }
 
+  /**
+   * Gisement sous le doigt, avec une case de tolérance : au zoom d'un
+   * téléphone, une case fait une vingtaine de pixels à l'écran et viser juste
+   * est illusoire. Sans cela, un doigt qui rate l'arbre d'un cheveu donne un
+   * ordre de déplacement, et le villageois reste planté à côté.
+   */
+  resourceNear(worldX, worldY) {
+    const tx = Math.floor(worldX / TILE), ty = Math.floor(worldY / TILE);
+    const exact = this.map.resourceAt(tx, ty);
+    if (exact) return exact;
+    let best = null, bestD = Infinity;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const res = this.map.resourceAt(tx + dx, ty + dy);
+        if (!res) continue;
+        const d = dist2(worldX, worldY, res.tx * TILE + TILE / 2, res.ty * TILE + TILE / 2);
+        if (d < bestD) { bestD = d; best = res; }
+      }
+    }
+    return best;
+  }
+
   /** Répartit les villageois sur les cases voisines pour éviter l'embouteillage. */
   spreadGatherOrder(villagers, tx, ty, type) {
     const tiles = [];
@@ -712,12 +766,21 @@ export class World {
     for (let y = ty - radius; y <= ty + radius; y++) {
       for (let x = tx - radius; x <= tx + radius; x++) {
         const r = this.map.resourceAt(x, y);
-        if (r && r.type === type) tiles.push({ tx: x, ty: y, d: Math.abs(x - tx) + Math.abs(y - ty) });
+        // Seules les cases qu'on peut border sont des cibles valables.
+        if (r && r.type === type && this.map.hasOpenNeighbour(x, y)) {
+          tiles.push({ tx: x, ty: y, d: Math.abs(x - tx) + Math.abs(y - ty) });
+        }
       }
     }
     tiles.sort((a, b) => a.d - b.d);
+    if (tiles.length === 0) {
+      // Rien d'exploitable dans le voisinage immédiat : chaque villageois
+      // rejoint le gisement accessible le plus proche (gatherAt s'en charge).
+      for (const v of villagers) v.gatherAt(tx, ty);
+      return;
+    }
     villagers.forEach((v, i) => {
-      const tile = tiles[i % Math.max(1, tiles.length)] || { tx, ty };
+      const tile = tiles[i % tiles.length];
       v.gatherAt(tile.tx, tile.ty);
     });
   }
