@@ -475,8 +475,9 @@ export class World {
   assignVillager(villager, type) {
     const target = this.findNearestResource(villager.x, villager.y, type, 40 * TILE, villager.playerIndex);
     if (!target) return false;
-    if (target.kind === 'building') villager.gatherFarm(target);
-    else villager.gatherAt(target.tx, target.ty);
+    // On passe par la répartition : un renfort évite les cases déjà occupées.
+    if (target.kind === 'building') this.spreadFarmOrder([villager], target);
+    else this.spreadGatherOrder([villager], target.tx, target.ty, type);
     return true;
   }
 
@@ -715,8 +716,8 @@ export class World {
         return { kind: 'garrison', target };
       }
       if (target.type === 'farm' && villagers.length) {
-        for (const v of villagers) v.gatherFarm(target);
-        return { kind: 'gather', target };
+        const spread = this.spreadFarmOrder(villagers, target);
+        return { kind: 'gather', target, workers: villagers.length, spread };
       }
       if (target.hp < target.maxHp && villagers.length) {
         for (const v of villagers) v.buildAt(target);
@@ -726,14 +727,48 @@ export class World {
     if (res) {
       const villagers = units.filter((u) => u.isVillager);
       if (villagers.length) {
-        this.spreadGatherOrder(villagers, res.tx, res.ty, res.type);
+        const spread = this.spreadGatherOrder(villagers, res.tx, res.ty, res.type);
         const others = units.filter((u) => !u.isVillager);
         for (const u of others) u.moveTo(worldX, worldY, options.aggressive);
-        return { kind: 'gather', res };
+        return { kind: 'gather', res, workers: villagers.length, spread };
       }
     }
     this.formationMove(units, worldX, worldY, options.aggressive);
     return { kind: 'move' };
+  }
+
+  /** Cases exploitables d'un type donné autour d'un point. */
+  collectResourceTiles(tx, ty, type, radius) {
+    const out = [];
+    for (let y = ty - radius; y <= ty + radius; y++) {
+      for (let x = tx - radius; x <= tx + radius; x++) {
+        const res = this.map.resourceAt(x, y);
+        if (res && res.type === type && !res.inaccessible && this.map.hasOpenNeighbour(x, y)) {
+          out.push({ tx: x, ty: y });
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Qui travaille déjà où : nombre de villageois par case de gisement et par
+   * ferme. Sert à ne pas entasser tout le monde au même endroit.
+   */
+  gatherOccupancy(playerIndex, exclude) {
+    const tiles = new Map();
+    const farms = new Map();
+    for (const u of this.units) {
+      if (u.dead || u.playerIndex !== playerIndex || !u.isVillager) continue;
+      if (exclude && exclude.has(u)) continue;
+      if (u.resourceTile) {
+        const key = u.resourceTile.tx + ',' + u.resourceTile.ty;
+        tiles.set(key, (tiles.get(key) || 0) + 1);
+      } else if (u.target && u.target.type === 'farm') {
+        farms.set(u.target.id, (farms.get(u.target.id) || 0) + 1);
+      }
+    }
+    return { tiles, farms };
   }
 
   /**
@@ -759,30 +794,91 @@ export class World {
     return best;
   }
 
-  /** Répartit les villageois sur les cases voisines pour éviter l'embouteillage. */
+  /**
+   * Répartit un groupe de villageois sur un gisement.
+   *
+   * Chacun prend la case libre la plus proche de LUI (et non la n-ième case
+   * dans l'ordre de la sélection), on élargit la zone tant qu'il n'y a pas
+   * assez de cases pour tout le monde, et on ne double une case que lorsqu'il
+   * n'y a plus de place ailleurs. Les villageois déjà au travail comptent :
+   * un renfort ne vient pas se coller sur un arbre déjà occupé.
+   */
   spreadGatherOrder(villagers, tx, ty, type) {
-    const tiles = [];
-    const radius = 3;
-    for (let y = ty - radius; y <= ty + radius; y++) {
-      for (let x = tx - radius; x <= tx + radius; x++) {
-        const r = this.map.resourceAt(x, y);
-        // Seules les cases qu'on peut border sont des cibles valables.
-        if (r && r.type === type && this.map.hasOpenNeighbour(x, y)) {
-          tiles.push({ tx: x, ty: y, d: Math.abs(x - tx) + Math.abs(y - ty) });
-        }
-      }
+    if (villagers.length === 0) return;
+    let tiles = [];
+    for (let radius = 3; radius <= 12; radius += 3) {
+      tiles = this.collectResourceTiles(tx, ty, type, radius);
+      if (tiles.length >= villagers.length) break;
     }
-    tiles.sort((a, b) => a.d - b.d);
     if (tiles.length === 0) {
-      // Rien d'exploitable dans le voisinage immédiat : chaque villageois
-      // rejoint le gisement accessible le plus proche (gatherAt s'en charge).
+      // Rien d'exploitable ici : gatherAt redirige chacun vers le plus proche.
       for (const v of villagers) v.gatherAt(tx, ty);
-      return;
+      return 1;
     }
-    villagers.forEach((v, i) => {
-      const tile = tiles[i % tiles.length];
-      v.gatherAt(tile.tx, tile.ty);
-    });
+
+    const excluded = new Set(villagers);
+    const { tiles: occupancy } = this.gatherOccupancy(villagers[0].playerIndex, excluded);
+    // Une case déjà prise coûte autant qu'un détour de sept cases : on préfère
+    // marcher un peu plus loin plutôt que de se marcher dessus.
+    const crowdPenalty = (7 * TILE) ** 2;
+    const anchorX = tx * TILE + TILE / 2, anchorY = ty * TILE + TILE / 2;
+    const pris = new Set();
+    // Les plus proches du point visé choisissent en premier.
+    const order = [...villagers].sort(
+      (a, b) => dist2(a.x, a.y, anchorX, anchorY) - dist2(b.x, b.y, anchorX, anchorY));
+
+    for (const v of order) {
+      let best = null, bestScore = Infinity;
+      for (const tile of tiles) {
+        const key = tile.tx + ',' + tile.ty;
+        const score = dist2(v.x, v.y, tile.tx * TILE + TILE / 2, tile.ty * TILE + TILE / 2)
+          + (occupancy.get(key) || 0) * crowdPenalty;
+        if (score < bestScore) { bestScore = score; best = tile; }
+      }
+      const key = best.tx + ',' + best.ty;
+      occupancy.set(key, (occupancy.get(key) || 0) + 1);
+      pris.add(key);
+      v.gatherAt(best.tx, best.ty);
+    }
+    return pris.size;
+  }
+
+  /**
+   * Même principe pour les fermes : une ferme nourrit un villageois. Un groupe
+   * envoyé sur une ferme se répartit sur celles qui sont libres.
+   */
+  spreadFarmOrder(villagers, farm) {
+    if (villagers.length === 0) return;
+    const playerIndex = villagers[0].playerIndex;
+    const farms = this.buildings.filter(
+      (b) => !b.dead && b.complete && b.type === 'farm'
+        && b.playerIndex === playerIndex && b.foodLeft > 0);
+    if (farms.length <= 1) {
+      for (const v of villagers) v.gatherFarm(farm);
+      return 1;
+    }
+    const excluded = new Set(villagers);
+    const { farms: occupancy } = this.gatherOccupancy(playerIndex, excluded);
+    const crowdPenalty = (10 * TILE) ** 2;
+    const order = [...villagers].sort(
+      (a, b) => dist2(a.x, a.y, farm.x, farm.y) - dist2(b.x, b.y, farm.x, farm.y));
+    const prises = new Set();
+    let first = true;
+    for (const v of order) {
+      let best = null, bestScore = Infinity;
+      for (const candidate of farms) {
+        const occ = occupancy.get(candidate.id) || 0;
+        // La ferme touchée revient au premier villageois, si elle est libre.
+        const bonus = (first && candidate === farm && occ === 0) ? -crowdPenalty : 0;
+        const score = dist2(v.x, v.y, candidate.x, candidate.y) + occ * crowdPenalty + bonus;
+        if (score < bestScore) { bestScore = score; best = candidate; }
+      }
+      first = false;
+      occupancy.set(best.id, (occupancy.get(best.id) || 0) + 1);
+      prises.add(best.id);
+      v.gatherFarm(best);
+    }
+    return prises.size;
   }
 
   /** Déplacement de groupe : les unités visent des points répartis autour de la cible. */

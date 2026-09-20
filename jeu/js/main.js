@@ -256,6 +256,15 @@ class Game {
       (e) => e.kind === 'unit' && e.playerIndex === this.world.humanIndex);
     if (units.length === 0) return;
     const result = this.world.commandUnits(units, worldX, worldY);
+    // Retour explicite : sur un petit écran, on ne voit pas d'un coup d'œil
+    // que le groupe s'est étalé sur plusieurs arbres.
+    if (result && result.kind === 'gather' && result.workers > 1) {
+      const lieux = { wood: 'arbres', gold: 'filons', food: 'sources de nourriture' };
+      const type = result.res ? result.res.type : 'food';
+      this.ui.toast(result.spread > 1
+        ? `${result.workers} villageois répartis sur ${result.spread} ${lieux[type]}`
+        : `${result.workers} villageois envoyés récolter`);
+    }
     const colors = {
       attack: '#ff6b6b', gather: '#ffd166', build: '#8ecae6',
       repair: '#8ecae6', garrison: '#c39bf6', move: '#9bf6a0',

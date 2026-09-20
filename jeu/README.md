@@ -74,6 +74,19 @@ une seule unité lui rend sa vitesse propre.
 **Chantiers.** Plusieurs bâtisseurs accélèrent la construction, avec un
 rendement décroissant : quatre villageois valent 2,8 villageois, pas 4.
 
+### Répartition d'un groupe sur une ressource
+
+Sélectionnez dix villageois, touchez une forêt : chacun rejoint **l'arbre libre
+le plus proche de lui**, pas le même. La zone s'élargit jusqu'à ce qu'il y ait
+assez de cases pour tout le monde, les villageois déjà au travail sont comptés
+(un renfort ne vient pas se coller sur un arbre occupé), et on ne double une
+case que lorsqu'il n'y a plus de place ailleurs. Une notification confirme la
+répartition.
+
+Les fermes suivent la même règle, avec la contrainte d'AoE : **une ferme nourrit
+un villageois**. Un groupe envoyé sur une ferme se distribue sur celles qui sont
+libres.
+
 ### Ce sont vos ouvriers, c'est vous qui les affectez
 
 Le jeu ne réaffecte **jamais** vos villageois à votre place. Quand un arbre, un

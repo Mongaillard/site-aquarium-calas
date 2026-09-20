@@ -468,6 +468,94 @@ function advance(world, seconds, stop) {
   check('sac plein : il part livrer, il ne s’arrête pas', villager.state === 'return', villager.state);
 }
 
+// --- Répartition d'un groupe sur les ressources ------------------------------
+
+{
+  const world = sandbox(31);
+  // Un bosquet offrant au moins six cases exploitables.
+  let bosquet = null;
+  for (const res of world.map.resources.values()) {
+    if (res.type !== 'wood') continue;
+    if (world.collectResourceTiles(res.tx, res.ty, 'wood', 3).length >= 6) { bosquet = res; break; }
+  }
+  check('la carte offre un bosquet assez large', !!bosquet);
+
+  const groupe = [];
+  for (let i = 0; i < 6; i++) {
+    groupe.push(world.spawnUnit(0, 'villager',
+      bosquet.tx * TILE + (i - 3) * TILE, bosquet.ty * TILE + 5 * TILE));
+  }
+  world.commandUnits(groupe, bosquet.tx * TILE + TILE / 2, bosquet.ty * TILE + TILE / 2);
+
+  const cases = groupe.map((v) => v.resourceTile && `${v.resourceTile.tx},${v.resourceTile.ty}`);
+  const distinctes = new Set(cases.filter(Boolean));
+  check('un groupe envoyé sur un bosquet se répartit', distinctes.size >= 5,
+    `${distinctes.size} cases distinctes pour ${groupe.length} villageois`);
+
+  const parCase = {};
+  for (const c of cases) if (c) parCase[c] = (parCase[c] || 0) + 1;
+  check('personne ne s’entasse', Math.max(...Object.values(parCase)) <= 2,
+    'au plus ' + Math.max(...Object.values(parCase)) + ' par case');
+
+  // Chacun doit travailler une case proche de lui, pas la n-ième de la liste.
+  const detours = groupe.map((v) => dist(v.x, v.y,
+    v.resourceTile.tx * TILE + TILE / 2, v.resourceTile.ty * TILE + TILE / 2) / TILE);
+  check('chacun prend une case proche de lui', Math.max(...detours) < 9,
+    'détour maximal ' + Math.max(...detours).toFixed(1) + ' cases');
+}
+
+{
+  // Un renfort ne vient pas se coller sur une case déjà travaillée.
+  const world = sandbox(33);
+  let bosquet = null;
+  for (const res of world.map.resources.values()) {
+    if (res.type !== 'wood') continue;
+    if (world.collectResourceTiles(res.tx, res.ty, 'wood', 3).length >= 4) { bosquet = res; break; }
+  }
+  const ancien = world.spawnUnit(0, 'villager', bosquet.tx * TILE, bosquet.ty * TILE + 3 * TILE);
+  world.commandUnits([ancien], bosquet.tx * TILE + TILE / 2, bosquet.ty * TILE + TILE / 2);
+  const priseAncienne = `${ancien.resourceTile.tx},${ancien.resourceTile.ty}`;
+
+  const renfort = world.spawnUnit(0, 'villager', ancien.x + TILE, ancien.y);
+  world.commandUnits([renfort], bosquet.tx * TILE + TILE / 2, bosquet.ty * TILE + TILE / 2);
+  check('le renfort évite la case déjà occupée',
+    `${renfort.resourceTile.tx},${renfort.resourceTile.ty}` !== priseAncienne,
+    `ancien ${priseAncienne} · renfort ${renfort.resourceTile.tx},${renfort.resourceTile.ty}`);
+}
+
+{
+  // Les fermes : une ferme nourrit un villageois.
+  const world = sandbox(35);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  // On pose les fermes directement : le test porte sur la répartition, pas sur
+  // les prérequis de construction (une ferme exige un moulin).
+  const libre = (tx, ty) => {
+    for (let y = ty; y < ty + 2; y++) {
+      for (let x = tx; x < tx + 2; x++) if (world.map.isBlocked(x, y)) return false;
+    }
+    return true;
+  };
+  const fermes = [];
+  for (let r = 3; r <= 10 && fermes.length < 3; r++) {
+    for (let dy = -r; dy <= r && fermes.length < 3; dy++) {
+      for (let dx = -r; dx <= r && fermes.length < 3; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const tx = tc.tx + dx, ty = tc.ty + dy;
+        if (!world.map.inBounds(tx + 1, ty + 1) || !libre(tx, ty)) continue;
+        if (fermes.some((f) => Math.abs(f.tx - tx) < 3 && Math.abs(f.ty - ty) < 3)) continue;
+        fermes.push(world.spawnBuilding(0, 'farm', tx, ty, true));
+      }
+    }
+  }
+  check('trois fermes disponibles', fermes.length === 3, fermes.length + ' fermes');
+
+  const groupe = world.units.filter((u) => u.playerIndex === 0 && u.isVillager).slice(0, 3);
+  world.commandUnits(groupe, fermes[0].x, fermes[0].y);
+  const occupees = new Set(groupe.map((v) => v.target && v.target.id));
+  check('un groupe envoyé sur une ferme se répartit sur les autres',
+    occupees.size === 3, occupees.size + ' fermes occupées pour 3 villageois');
+}
+
 // Déterminisme : une même graine doit rejouer exactement la même partie.
 const runA = runMatch({ seed: 99, mapSize: 'small', difficulty: 'normal', minutes: 3 });
 const runB = runMatch({ seed: 99, mapSize: 'small', difficulty: 'normal', minutes: 3 });
