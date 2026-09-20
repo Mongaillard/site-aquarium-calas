@@ -30,8 +30,11 @@ export class AIPlayer {
     // imprévisible d'une partie à l'autre, mais rejouable à l'identique.
     this.rng = new RNG((world.seed || 1) + 7919 * (playerIndex + 1));
     this.timer = 1 + this.rng.next();
-    this.attackTimer = difficulty.attackDelay * 0.35;
-    this.armyTarget = difficulty.armyTrigger;
+    // Format de partie : en Express, une horloge d'attaque calée sur une partie
+    // de trente minutes ne se déclencherait jamais.
+    this.rush = (world.mode && world.mode.aiRush) || 1;
+    this.attackTimer = difficulty.attackDelay * 0.35 * this.rush;
+    this.armyTarget = Math.max(3, Math.round(difficulty.armyTrigger * this.rush));
     this.waveCount = 0;
     this.defendUntil = 0;
     this.lastHouseAt = -99;
@@ -408,10 +411,18 @@ export class AIPlayer {
       const target = this.pickAttackTarget();
       if (target) {
         this.waveCount++;
-        this.armyTarget = Math.min(24, this.difficulty.armyTrigger + this.waveCount * this.difficulty.armyStep);
-        this.attackTimer = this.difficulty.attackDelay * 0.25 + 20;
+        this.armyTarget = Math.min(24, Math.max(3, Math.round(
+          (this.difficulty.armyTrigger + this.waveCount * this.difficulty.armyStep) * this.rush)));
+        this.attackTimer = (this.difficulty.attackDelay * 0.25 + 20) * this.rush;
         this.world.setStance(this.army, 'aggressive');   // en campagne, on engage
-        this.world.formationMove(this.army, target.x, target.y, true);
+        // Quand la victoire se joue sur le Centre-Ville, on le prend pour cible
+        // explicitement : une attaque-déplacement s'égare sur les villageois et
+        // la partie n'aboutit jamais à son objectif.
+        if (this.world.mode.victory === 'towncenter' && target.kind === 'building') {
+          for (const u of this.army) u.attackEntity(target);
+        } else {
+          this.world.formationMove(this.army, target.x, target.y, true);
+        }
       }
     } else if (this.army.length > 0) {
       // Regroupement défensif autour du Centre-Ville.
@@ -451,6 +462,11 @@ export class AIPlayer {
     if (targets.length === 0) {
       const units = world.units.filter((u) => !u.dead && u.playerIndex === enemyIndex);
       return units[0] || null;
+    }
+    // Format « le Centre-Ville décide » : inutile de raser une maison.
+    if (world.mode.victory === 'towncenter') {
+      const centre = targets.find((b) => b.type === 'towncenter');
+      if (centre) return centre;
     }
     // On vise en priorité ce qui produit, puis ce qui est proche.
     const priority = { towncenter: 0.6, barracks: 0.8, archery: 0.8, stable: 0.8, siege: 0.8 };

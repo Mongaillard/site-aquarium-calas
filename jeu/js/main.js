@@ -2,8 +2,12 @@
 // Point d'entrée : écrans, boucle de jeu à pas fixe, sélection et ordres.
 // ---------------------------------------------------------------------------
 
-import { TILE, TICKS_PER_SECOND, AGES, DIFFICULTIES, MAP_SIZES, BUILDING_TYPES } from './config.js';
+import {
+  TILE, TICKS_PER_SECOND, AGES, DIFFICULTIES, MAP_SIZES, BUILDING_TYPES,
+  GAME_MODES, DEFAULT_MODE, GAME_SPEEDS, DEFAULT_SPEED,
+} from './config.js';
 import { World } from './game.js';
+import { saveGame, loadSave, clearSave, restoreWorld } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
 import { UI } from './ui.js';
@@ -18,6 +22,10 @@ const audio = new AudioEngine();
 
 // Préférence « réaffectation automatique » : conservée d'une partie à l'autre.
 const AUTO_WORKERS_KEY = 'aem.autoWorkers';
+const SPEED_KEY = 'aem.vitesse';
+const SETUP_KEY = 'aem.reglages';
+/** Intervalle de sauvegarde automatique, en secondes réelles. */
+const AUTOSAVE_INTERVAL = 30;
 
 function loadAutoWorkers() {
   try { return localStorage.getItem(AUTO_WORKERS_KEY) === '1'; } catch { return false; }
@@ -27,10 +35,35 @@ function saveAutoWorkers(on) {
   try { localStorage.setItem(AUTO_WORKERS_KEY, on ? '1' : '0'); } catch { /* stockage indisponible */ }
 }
 
+function loadSpeed() {
+  try {
+    const id = localStorage.getItem(SPEED_KEY);
+    return GAME_SPEEDS.some((s) => s.id === id) ? id : DEFAULT_SPEED;
+  } catch { return DEFAULT_SPEED; }
+}
+
+function storeSpeed(id) {
+  try { localStorage.setItem(SPEED_KEY, id); } catch { /* stockage indisponible */ }
+}
+
+/** Réglages de l'écran d'accueil, retenus d'une partie à l'autre. */
+function loadSetup() {
+  try { return JSON.parse(localStorage.getItem(SETUP_KEY) || '{}') || {}; } catch { return {}; }
+}
+
+function storeSetup(setup) {
+  try { localStorage.setItem(SETUP_KEY, JSON.stringify(setup)); } catch { /* stockage indisponible */ }
+}
+
+export function speedDef(id) {
+  return GAME_SPEEDS.find((s) => s.id === id) || GAME_SPEEDS.find((s) => s.id === DEFAULT_SPEED);
+}
+
 class Game {
   constructor(options) {
     this.options = options;
-    this.world = new World(options);
+    // Reprise d'une partie interrompue : le monde vient de la sauvegarde.
+    this.world = (options.restore && restoreWorld(options.restore)) || new World(options);
     this.canvas = document.getElementById('game');
     this.camera = new Camera(this.world);
     this.renderer = new Renderer(this.canvas, this.world, this.camera);
@@ -44,8 +77,10 @@ class Game {
     this.rallyArmed = false;
     this.garrisonArmed = false;
     this.paused = false;
-    this.speed = 1;
+    this.speedId = options.speed || (options.restore && options.restore.speed) || loadSpeed();
+    this.speed = speedDef(this.speedId).mult;
     this.accumulator = 0;
+    this.saveTimer = AUTOSAVE_INTERVAL;
     this.lastFrame = performance.now();
     this.alertCooldown = 0;
     this.idleNoticeCooldown = 0;
@@ -58,6 +93,16 @@ class Game {
     this.camera.zoom = clamp(this.camera.viewWidth / (24 * TILE), this.camera.minZoom, 1.1);
 
     window.addEventListener('resize', () => this.renderer.resize());
+    // Le téléphone peut couper l'onglet sans prévenir : on écrit avant de partir,
+    // et on met la partie en pause plutôt que de la laisser tourner sans être vue.
+    this.onHide = () => {
+      if (document.visibilityState !== 'hidden') return;
+      this.saveNow();
+      if (!this.paused && !this.world.gameOver) this.togglePause();
+    };
+    this.onLeave = () => this.saveNow();
+    document.addEventListener('visibilitychange', this.onHide);
+    window.addEventListener('pagehide', this.onLeave);
     this.ui.toast('Affectez vos villageois : touchez-les, puis touchez un arbre, un buisson ou un filon.');
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -79,6 +124,13 @@ class Game {
         steps++;
       }
       if (steps === MAX_CATCHUP) this.accumulator = 0;   // on ne rattrape pas l'irrattrapable
+    }
+
+    // Sauvegarde automatique : un appel qui arrive, l'onglet qui passe en
+    // arrière-plan, et une partie de vingt minutes serait perdue.
+    if (!this.world.gameOver) {
+      this.saveTimer -= realDt;
+      if (this.saveTimer <= 0) { this.saveTimer = AUTOSAVE_INTERVAL; this.saveNow(); }
     }
 
     this.input.updateKeyboardPan(realDt);
@@ -139,6 +191,7 @@ class Game {
           break;
         case 'gameOver':
           this.audio.play(event.result.victory ? 'victory' : 'defeat');
+          clearSave();
           this.ui.showGameOver(event.result);
           break;
       }
@@ -719,6 +772,30 @@ class Game {
     if (on) { this.audio.resume(); this.audio.play('click'); }
   }
 
+  /** Écrit l'instantané de la partie en cours. */
+  saveNow() {
+    if (this.world.gameOver) { clearSave(); return false; }
+    const ok = saveGame(this.world, { speed: this.speedId });
+    // Navigation privée, quota plein : mieux vaut le dire une fois que laisser
+    // croire que la partie sera retrouvée.
+    if (!ok && !this.saveWarned) {
+      this.saveWarned = true;
+      this.ui.toast('Sauvegarde impossible sur cet appareil : la partie ne pourra pas être reprise', 'warn');
+    }
+    return ok;
+  }
+
+  /** Vitesse de jeu : un multiplicateur sur la boucle, la simulation ne change pas. */
+  setSpeed(id) {
+    const def = speedDef(id);
+    this.speedId = def.id;
+    this.speed = def.mult;
+    this.accumulator = 0;
+    storeSpeed(def.id);
+    this.ui.toast(`Vitesse : ${def.name} (${def.short})`);
+    this.ui.refreshSelection(true);
+  }
+
   vibrate(pattern) {
     if (navigator.vibrate && this.options.haptics !== false) navigator.vibrate(pattern);
   }
@@ -727,11 +804,13 @@ class Game {
     this.paused = false;
     this.ui.hideModal();
     this.world.resign();
+    clearSave();
   }
 
   restart() {
     this.destroy();
-    startGame(this.options);
+    clearSave();
+    startGame({ ...this.options, restore: null, seed: Math.floor(Math.random() * 1e9) });
   }
 
   quitToMenu() {
@@ -740,6 +819,9 @@ class Game {
   }
 
   destroy() {
+    this.saveNow();
+    document.removeEventListener('visibilitychange', this.onHide);
+    window.removeEventListener('pagehide', this.onLeave);
     this.running = false;
     this.ui.hideModal();
     this.ui.closeBuildMenu();
@@ -753,12 +835,62 @@ class Game {
 // ---------------------------------------------------------------------------
 
 let currentGame = null;
-const settings = { difficulty: 'normal', mapSize: 'medium' };
+const stored = loadSetup();
+const settings = {
+  mode: GAME_MODES[stored.mode] ? stored.mode : DEFAULT_MODE,
+  difficulty: DIFFICULTIES[stored.difficulty] ? stored.difficulty : 'normal',
+  mapSize: MAP_SIZES[stored.mapSize] ? stored.mapSize : GAME_MODES[DEFAULT_MODE].mapSize,
+  speed: loadSpeed(),
+};
 
 function showStartScreen() {
   currentGame = null;
   document.getElementById('start-screen').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');
+  refreshResumeCard();
+}
+
+/** Carte « reprendre » : n'apparaît que s'il y a vraiment une partie en cours. */
+function refreshResumeCard() {
+  const box = document.getElementById('resume-box');
+  if (!box) return;
+  const save = loadSave();
+  const play = document.getElementById('btn-play');
+  if (!save) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    if (play) play.textContent = '⚔️ Jouer';
+    return;
+  }
+  // Le bouton dit clairement ce qu'il fait quand une partie dort déjà.
+  if (play) play.textContent = '⚔️ Nouvelle partie';
+  const mode = GAME_MODES[save.mode] || GAME_MODES[DEFAULT_MODE];
+  const player = save.players[save.humanIndex || 0];
+  const age = AGES[player ? player.age : 0];
+  box.classList.remove('hidden');
+  // Sur un format chronométré, ce qui compte c'est le temps qu'il reste.
+  const chrono = mode.timeLimit
+    ? `reste ${formatClock(Math.max(0, mode.timeLimit - save.time))}`
+    : formatClock(save.time);
+  box.innerHTML = `
+    <button id="btn-resume" class="btn primary large">▶️ Reprendre la partie</button>
+    <p class="resume-info">${mode.icon} ${mode.name} · ${age.name} · ${chrono}
+      · ${DIFFICULTIES[save.difficulty] ? DIFFICULTIES[save.difficulty].name : ''}</p>
+    <button id="btn-drop-save" class="btn ghost small">Abandonner cette partie</button>`;
+  document.getElementById('btn-resume').addEventListener('click', () => {
+    audio.resume(); audio.play('click');
+    startGame({ restore: save, speed: settings.speed });
+  });
+  document.getElementById('btn-drop-save').addEventListener('click', () => {
+    clearSave();
+    audio.play('click');
+    refreshResumeCard();
+  });
+}
+
+function formatClock(seconds) {
+  const m = Math.floor((seconds || 0) / 60), sec = Math.floor((seconds || 0) % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
 function startGame(options) {
@@ -770,6 +902,20 @@ function startGame(options) {
 }
 
 function setupStartScreen() {
+  const modeBox = document.getElementById('mode-options');
+  modeBox.innerHTML = Object.values(GAME_MODES).map((m) => `
+    <button class="option ${m.id === settings.mode ? 'active' : ''}" data-mode="${m.id}">
+      <span class="option-name">${m.icon} ${m.name}</span>
+      <span class="option-desc">${m.desc}</span>
+    </button>`).join('');
+
+  const speedBox = document.getElementById('speed-options');
+  speedBox.innerHTML = GAME_SPEEDS.map((sp) => `
+    <button class="option compact ${sp.id === settings.speed ? 'active' : ''}" data-speed="${sp.id}">
+      <span class="option-name">${sp.name}</span>
+      <span class="option-desc">${sp.short}</span>
+    </button>`).join('');
+
   const difficultyBox = document.getElementById('difficulty-options');
   difficultyBox.innerHTML = Object.values(DIFFICULTIES).map((d) => `
     <button class="option ${d.id === settings.difficulty ? 'active' : ''}" data-difficulty="${d.id}">
@@ -784,9 +930,35 @@ function setupStartScreen() {
       <span class="option-desc">${m.tiles}×${m.tiles}</span>
     </button>`).join('');
 
+  const activate = (box, btn) => box.querySelectorAll('.option').forEach(
+    (b) => b.classList.toggle('active', b === btn));
+
+  modeBox.querySelectorAll('[data-mode]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      settings.mode = btn.dataset.mode;
+      // Chaque format a sa carte de prédilection ; rien n'empêche d'en changer.
+      settings.mapSize = GAME_MODES[settings.mode].mapSize;
+      storeSetup(settings);
+      activate(modeBox, btn);
+      mapBox.querySelectorAll('[data-map]').forEach(
+        (b) => b.classList.toggle('active', b.dataset.map === settings.mapSize));
+      audio.resume(); audio.play('click');
+    });
+  });
+  speedBox.querySelectorAll('[data-speed]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      settings.speed = btn.dataset.speed;
+      storeSpeed(settings.speed);
+      storeSetup(settings);
+      activate(speedBox, btn);
+      audio.resume(); audio.play('click');
+    });
+  });
+
   difficultyBox.querySelectorAll('[data-difficulty]').forEach((btn) => {
     btn.addEventListener('click', () => {
       settings.difficulty = btn.dataset.difficulty;
+      storeSetup(settings);
       difficultyBox.querySelectorAll('.option').forEach((b) => b.classList.toggle('active', b === btn));
       audio.resume(); audio.play('click');
     });
@@ -794,13 +966,21 @@ function setupStartScreen() {
   mapBox.querySelectorAll('[data-map]').forEach((btn) => {
     btn.addEventListener('click', () => {
       settings.mapSize = btn.dataset.map;
+      storeSetup(settings);
       mapBox.querySelectorAll('.option').forEach((b) => b.classList.toggle('active', b === btn));
       audio.resume(); audio.play('click');
     });
   });
 
   document.getElementById('btn-play').addEventListener('click', () => {
-    startGame({ difficulty: settings.difficulty, mapSize: settings.mapSize, seed: Math.floor(Math.random() * 1e9) });
+    // Pas de boîte de confirmation : le bouton s'intitule « Nouvelle partie »
+    // quand une partie dort, et la carte de reprise est juste au-dessus. Une
+    // fenêtre modale native peut d'ailleurs être bloquée selon l'hébergement.
+    clearSave();
+    startGame({
+      mode: settings.mode, difficulty: settings.difficulty, mapSize: settings.mapSize,
+      speed: settings.speed, seed: Math.floor(Math.random() * 1e9),
+    });
   });
   document.getElementById('btn-howto').addEventListener('click', () => {
     document.getElementById('howto').classList.toggle('hidden');

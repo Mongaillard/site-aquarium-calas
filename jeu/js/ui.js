@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import {
-  AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES,
+  AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES, GAME_SPEEDS,
 } from './config.js';
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
 
@@ -99,7 +99,12 @@ export class UI {
       this.setText('age', this.nodes.age, ageName);
       this.nodes.ageBar.parentElement.classList.add('hidden');
     }
-    this.setText('timer', this.nodes.timer, formatTime(this.world.time));
+    // Partie limitée dans le temps : c'est le temps qui reste qui compte.
+    const limite = this.world.mode.timeLimit || 0;
+    this.setText('timer', this.nodes.timer, limite
+      ? '⏳ ' + formatTime(Math.max(0, limite - this.world.time))
+      : formatTime(this.world.time));
+    this.nodes.timer.classList.toggle('urgent', limite > 0 && limite - this.world.time < 60);
 
     this.refreshWorkerBar();
     this.refreshSelection();
@@ -600,13 +605,27 @@ export class UI {
   hideModal() { this.nodes.modal.classList.add('hidden'); this.nodes.modal.innerHTML = ''; }
 
   showPause() {
+    const vitesses = GAME_SPEEDS.map((sp) => `
+      <button class="option compact ${sp.id === this.game.speedId ? 'active' : ''}" data-speed="${sp.id}">
+        <span class="option-name">${sp.name}</span>
+        <span class="option-desc">${sp.short}</span>
+      </button>`).join('');
     const modal = this.showModal(`
       <h2>Partie en pause</h2>
+      <p class="hint">La partie est sauvegardée : vous pouvez fermer l'onglet et la reprendre plus tard.</p>
+      <h3 class="modal-sub">Vitesse de jeu</h3>
+      <div class="options row">${vitesses}</div>
       <div class="modal-actions">
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="help">Comment jouer</button>
         <button class="btn danger" data-act="resign">Abandonner</button>
       </div>`);
+    modal.querySelectorAll('[data-speed]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.game.setSpeed(btn.dataset.speed);
+        modal.querySelectorAll('[data-speed]').forEach((b) => b.classList.toggle('active', b === btn));
+      });
+    });
     modal.querySelector('[data-act="resume"]').addEventListener('click', () => this.game.togglePause());
     modal.querySelector('[data-act="help"]').addEventListener('click', () => this.showHelp());
     modal.querySelector('[data-act="resign"]').addEventListener('click', () => this.game.resign());
@@ -627,7 +646,9 @@ export class UI {
         <li><b>Garnison</b> : touchez votre Centre-Ville ou une tour avec des unités sélectionnées pour les abriter — elles s'y soignent et chaque occupant ajoute une flèche. La <b>🔔 cloche</b> y envoie tous les villageois d'un coup</li>
         <li><b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le villageois rapporte son chargement puis attend vos ordres. La barre <b>👷</b> montre qui fait quoi et permet de réaffecter d'un doigt</li>
         <li>Passez les <b>âges</b> depuis le Centre-Ville pour débloquer de nouvelles unités</li>
-        <li><b>Objectif</b> : détruire tous les bâtiments adverses et leurs villageois</li>
+        <li><b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil</li>
+        <li><b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>▶️ Reprendre</b></li>
+        <li><b>Objectif</b> : détruire tous les bâtiments adverses et leurs villageois — en mode ⚡ Express, leur dernier Centre-Ville suffit</li>
       </ul>
       <div class="modal-actions"><button class="btn primary" data-act="close">J'ai compris</button></div>`, { wide: true });
     modal.querySelector('[data-act="close"]').addEventListener('click', () => {
@@ -638,7 +659,8 @@ export class UI {
   showGameOver(result) {
     const player = this.world.players[this.world.humanIndex];
     const enemy = this.world.players[1 - this.world.humanIndex];
-    const title = result.victory ? '🏆 Victoire !' : '💀 Défaite';
+    const egalite = result.winner === -1;
+    const title = egalite ? '🤝 Égalité' : (result.victory ? '🏆 Victoire !' : '💀 Défaite');
     const summary = `
       <table class="scores">
         <tr><th></th><th>Vous</th><th>Adversaire</th></tr>
@@ -648,10 +670,15 @@ export class UI {
         <tr><td>Unités perdues</td><td>${player.stats.lost}</td><td>${enemy.stats.lost}</td></tr>
         <tr><td>Bâtiments construits</td><td>${player.stats.built}</td><td>${enemy.stats.built}</td></tr>
         <tr><td>Âge atteint</td><td>${AGES[player.age].name}</td><td>${AGES[enemy.age].name}</td></tr>
+        ${result.scores ? `<tr class="total"><td><b>Score final</b></td>
+          <td><b>${formatNumber(result.scores[player.index])}</b></td>
+          <td><b>${formatNumber(result.scores[enemy.index])}</b></td></tr>` : ''}
       </table>`;
     const modal = this.showModal(`
       <h2>${title}</h2>
-      <p class="subtitle">Durée de la partie : ${formatTime(result.time)}</p>
+      <p class="subtitle">${result.timeUp
+        ? `Temps écoulé après ${formatTime(result.time)} — le score départage`
+        : `Durée de la partie : ${formatTime(result.time)}`}</p>
       ${summary}
       <div class="modal-actions">
         <button class="btn primary" data-act="again">Nouvelle partie</button>

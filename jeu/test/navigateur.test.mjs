@@ -381,6 +381,74 @@ check('la ligne « Chantiers » en retire aussi', apresRetrait < apresChantier,
 await page.click('#btn-close-workers');
 await page.waitForTimeout(150);
 
+// Sauvegarde : on joue, on recharge la page, on reprend là où on en était.
+const avantRechargement = await page.evaluate(() => {
+  const g = window.__jeu;
+  for (let i = 0; i < 20 * 45; i++) g.world.update(1 / 20);   // 45 s de jeu
+  g.saveNow();
+  const p = g.world.players[0];
+  return {
+    time: Math.round(g.world.time),
+    food: Math.round(p.resources.food),
+    unites: g.world.units.filter((u) => !u.dead).length,
+    batiments: g.world.buildings.filter((b) => !b.dead).length,
+    sauvegarde: !!localStorage.getItem('aem.partie'),
+  };
+});
+check('la partie s’écrit dans le navigateur', avantRechargement.sauvegarde);
+
+await page.reload({ waitUntil: 'networkidle' });
+check('la carte de reprise est proposée au retour', await page.isVisible('#btn-resume'));
+const resumeTexte = await page.textContent('.resume-info');
+await page.click('#btn-resume');
+// On fige la partie tout de suite : elle reprend à la milliseconde où on la
+// relance, et quelques secondes de jeu suffiraient à fausser la comparaison.
+await page.waitForTimeout(120);
+const apresReprise = await page.evaluate(() => {
+  const g = window.__jeu;
+  g.paused = true;
+  const p = g.world.players[0];
+  return {
+    time: Math.round(g.world.time),
+    food: Math.round(p.resources.food),
+    unites: g.world.units.filter((u) => !u.dead).length,
+    batiments: g.world.buildings.filter((b) => !b.dead).length,
+  };
+});
+check('la partie reprend au même instant',
+  Math.abs(apresReprise.time - avantRechargement.time) <= 1,
+  `${avantRechargement.time} s → ${apresReprise.time} s`);
+check('les ressources sont conservées',
+  Math.abs(apresReprise.food - avantRechargement.food) <= 10,
+  `${avantRechargement.food} → ${apresReprise.food} 🍖`);
+check('unités et bâtiments sont tous là',
+  apresReprise.unites === avantRechargement.unites
+  && apresReprise.batiments === avantRechargement.batiments,
+  `${avantRechargement.unites}/${avantRechargement.batiments} → `
+  + `${apresReprise.unites} unités, ${apresReprise.batiments} bâtiments`);
+check('la carte de reprise résume la partie',
+  /\d+:\d\d/.test(resumeTexte || ''), (resumeTexte || '').trim());
+
+// Vitesse de jeu : le multiplicateur s'applique vraiment à la simulation.
+const vitesse = await page.evaluate(async () => {
+  const g = window.__jeu;
+  g.paused = false;
+  const mesure = async (id) => {
+    g.setSpeed(id);
+    const t0 = g.world.time;
+    await new Promise((r) => setTimeout(r, 1200));
+    return g.world.time - t0;
+  };
+  const normal = await mesure('normal');
+  const blitz = await mesure('blitz');
+  return { normal, blitz, id: g.speedId, mult: g.speed };
+});
+check('la vitesse Blitz double le temps de jeu écoulé',
+  vitesse.blitz > vitesse.normal * 1.5,
+  `${vitesse.normal.toFixed(1)} s vs ${vitesse.blitz.toFixed(1)} s pour 1,2 s réelles`);
+check('la vitesse choisie est retenue', vitesse.id === 'blitz' && vitesse.mult === 2);
+await page.evaluate(() => { window.__jeu.setSpeed('normal'); window.__jeu.paused = false; });
+
 // Attaquer un ennemi au doigt, sans viser au pixel près.
 const combat = await page.evaluate(async () => {
   const g = window.__jeu;

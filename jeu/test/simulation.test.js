@@ -4,6 +4,7 @@
 
 import { World } from '../js/game.js';
 import { AIPlayer } from '../js/ai.js';
+import { serializeWorld, restoreWorld } from '../js/save.js';
 import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
 import { formatTime, dist } from '../js/utils.js';
 
@@ -595,6 +596,133 @@ function freeSpots(world, type, count) {
   // Et on peut retirer quelqu'un du chantier : il redevient disponible.
   villagers[0].stop();
   check('retirer un ouvrier libère le chantier', world.buildersOn(site) === 1);
+}
+
+// --- Sauvegarde et reprise ---------------------------------------------------
+
+/**
+ * Empreinte de l'état visible d'une partie : si deux mondes la partagent, un
+ * joueur ne peut pas les distinguer.
+ */
+function empreinte(world) {
+  const n = (v) => Math.round(v * 100) / 100;
+  const parties = [
+    't' + n(world.time),
+    'r' + world.players.map((p) => [p.age, n(p.resources.food), n(p.resources.wood), n(p.resources.gold),
+      p.pop, p.popCap, [...p.techs].sort().join('+')].join('/')).join('|'),
+    'g' + world.map.resources.size,
+    'u' + world.units.filter((u) => !u.dead)
+      .map((u) => [u.id, u.type, n(u.x), n(u.y), n(u.hp), u.state, n(u.carry.amount)].join(','))
+      .sort().join(';'),
+    'b' + world.buildings.filter((b) => !b.dead)
+      .map((b) => [b.id, b.type, n(b.hp), b.complete ? 1 : 0, n(b.buildProgress), b.queue.length].join(','))
+      .sort().join(';'),
+  ];
+  return parties.join('#');
+}
+
+{
+  // Une partie rechargée doit reprendre exactement là où elle s'est arrêtée —
+  // et continuer de la même façon, IA et hasard compris.
+  const world = new World({ seed: 808, mapSize: 'small', difficulty: 'normal' });
+  world.players[0].autoWorkers = true;
+  world.ais.push(new AIPlayer(world, 0, DIFFICULTIES.normal));
+  advance(world, 150);
+
+  const instantane = JSON.parse(JSON.stringify(serializeWorld(world, { speed: 'rapide' })));
+  const avant = empreinte(world);
+  const repris = restoreWorld(instantane);
+  check('la sauvegarde se recharge', !!repris);
+  check('l’état repris est identique', empreinte(repris) === avant,
+    empreinte(repris) === avant ? '' : 'divergence immédiate');
+  check('les réglages de la partie sont conservés',
+    repris.seed === world.seed && repris.modeId === world.modeId
+    && repris.mapSizeId === world.mapSizeId && repris.difficultyId === world.difficultyId);
+  check('le brouillard exploré est restauré',
+    repris.fog.explored.reduce((a, b) => a + b, 0) === world.fog.explored.reduce((a, b) => a + b, 0));
+
+  // Les deux mondes avancent maintenant en parallèle : ils doivent rester
+  // indiscernables. C'est ce qui prouve que rien n'a été oublié.
+  advance(world, 60);
+  advance(repris, 60);
+  const original = empreinte(world);
+  const suite = empreinte(repris);
+  check('la partie reprise évolue à l’identique', suite === original,
+    suite === original ? '60 s rejouées à l’identique' : 'les deux parties divergent');
+
+  // Et une sauvegarde d'une autre version est refusée plutôt que mal relue.
+  check('une sauvegarde étrangère est refusée',
+    restoreWorld({ ...instantane, version: 999 }) === null);
+}
+
+{
+  // Une sauvegarde ne doit contenir aucune référence d'entité. Un poste différé
+  // (« je livre mon bois, puis je vais à cette ferme ») en contenait une : la
+  // structure devenait circulaire, l'écriture échouait, et la partie n'était
+  // silencieusement jamais sauvegardée.
+  const world = new World({ seed: 404, mapSize: 'small', difficulty: 'normal' });
+  const v = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const ferme = world.spawnBuilding(0, 'farm', tc.tx + 5, tc.ty + 5, true);
+  v.carry = { type: 'wood', amount: 8 };
+  v.gatherFarm(ferme);          // il passe livrer d'abord : le poste est différé
+  check('le poste différé est bien en place', !!v.pendingJob && v.pendingJob.farm === ferme);
+
+  let texte = null;
+  try { texte = JSON.stringify(serializeWorld(world)); } catch { texte = null; }
+  check('l’instantané reste écrivable', typeof texte === 'string',
+    texte ? Math.round(texte.length / 1024) + ' Ko' : 'structure circulaire');
+
+  const repris = texte ? restoreWorld(JSON.parse(texte)) : null;
+  const vr = repris && repris.byId.get(v.id);
+  check('le poste différé survit à la reprise',
+    !!vr && !!vr.pendingJob && vr.pendingJob.farm === repris.byId.get(ferme.id));
+  check('le dépôt visé survit aussi',
+    !!vr && (!v.returnTo || vr.returnTo === repris.byId.get(v.returnTo.id)));
+}
+
+{
+  // Mode Express : départ à l'Âge Féodal, et le Centre-Ville décide.
+  const world = new World({ seed: 91, mode: 'express', difficulty: 'normal' });
+  const villageois = world.units.filter((u) => u.playerIndex === 0 && u.isVillager).length;
+  check('Express démarre à l’Âge Féodal', world.players[0].age === 1, 'âge ' + world.players[0].age);
+  check('Express démarre avec plus de villageois', villageois === 7, villageois + ' villageois');
+  check('Express plafonne la population plus bas', world.popMax === 40, String(world.popMax));
+  check('Express part avec des ressources garnies', world.players[0].resources.food === 500);
+
+  const tc = world.buildings.find((b) => b.playerIndex === 1 && b.type === 'towncenter');
+  world.killEntity(tc, null, true);
+  world.checkVictory();
+  check('le dernier Centre-Ville tombé donne la victoire',
+    world.gameOver && world.gameOver.victory === true,
+    world.gameOver ? 'partie finie' : 'partie toujours en cours');
+
+  // Le Centre-Ville est l'objectif : il ne peut pas être imprenable.
+  const express = new World({ seed: 92, mode: 'express', difficulty: 'normal' });
+  const classiqueTc = new World({ seed: 92, mode: 'classique', difficulty: 'normal' });
+  const hpExpress = express.buildings.find((b) => b.type === 'towncenter').maxHp;
+  const hpClassique = classiqueTc.buildings.find((b) => b.type === 'towncenter').maxHp;
+  check('le Centre-Ville est plus fragile en Express', hpExpress === Math.round(hpClassique * 0.5),
+    `${hpExpress} contre ${hpClassique} points de vie`);
+
+  // Et la partie se termine au chronomètre, quoi qu'il arrive sur le terrain.
+  express.time = 600 - DT / 2;   // le tick suivant franchit la limite
+  express.update(DT);
+  check('la limite de temps met fin à la partie',
+    !!express.gameOver && express.gameOver.timeUp === true,
+    express.gameOver ? 'terminée' : 'toujours en cours');
+  check('le score départage au temps écoulé',
+    express.gameOver && express.gameOver.scores.length === 2
+    && express.gameOver.scores.every((v) => Number.isFinite(v)),
+    express.gameOver ? express.gameOver.scores.join(' vs ') : '');
+
+  // En Classique, raser le seul Centre-Ville ne suffit pas.
+  const classique = new World({ seed: 91, mode: 'classique', difficulty: 'normal' });
+  const tc2 = classique.buildings.find((b) => b.playerIndex === 1 && b.type === 'towncenter');
+  classique.killEntity(tc2, null, true);
+  classique.checkVictory();
+  check('en Classique la partie continue après le Centre-Ville',
+    !classique.gameOver, classique.gameOver ? 'finie trop tôt' : '');
 }
 
 // --- Viser l'ennemi au doigt --------------------------------------------------

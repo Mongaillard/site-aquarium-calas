@@ -6,11 +6,11 @@
 
 import {
   TILE, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
-  START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS,
+  START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, GAME_MODES, DEFAULT_MODE,
 } from './config.js';
 import { GameMap } from './map.js';
 import { PathFinder } from './pathfinding.js';
-import { Unit, Building, Projectile, STATE, computeDamage, resetEntityIds } from './entities.js';
+import { Unit, Building, Projectile, STATE, computeDamage } from './entities.js';
 import { SpatialGrid, RNG, dist, dist2, canAfford, payCost, clamp } from './utils.js';
 import { AIPlayer } from './ai.js';
 
@@ -42,13 +42,20 @@ function makePlayer(index, name, isAI) {
 
 export class World {
   constructor(options = {}) {
-    resetEntityIds();
-    const mapSize = MAP_SIZES[options.mapSize || 'medium'];
+    this.nextId = 1;            // identifiants d'entités, propres à cette partie
+    // Les identifiants des réglages sont conservés tels quels : une sauvegarde
+    // doit pouvoir recréer exactement le même monde (voir save.js).
+    this.modeId = GAME_MODES[options.mode] ? options.mode : DEFAULT_MODE;
+    this.mode = GAME_MODES[this.modeId];
+    this.mapSizeId = MAP_SIZES[options.mapSize] ? options.mapSize : this.mode.mapSize;
+    this.difficultyId = DIFFICULTIES[options.difficulty] ? options.difficulty : 'normal';
+    const mapSize = MAP_SIZES[this.mapSizeId];
+    this.popMax = this.mode.popMax || POP_MAX;
     this.seed = options.seed || Math.floor(Math.random() * 1e9);
     this.rng = new RNG(this.seed);
     this.map = new GameMap(mapSize.tiles, this.seed);
     this.pathfinder = new PathFinder(this.map);
-    this.difficulty = DIFFICULTIES[options.difficulty || 'normal'];
+    this.difficulty = DIFFICULTIES[this.difficultyId];
     this.time = 0;
     this.entities = [];
     this.units = [];
@@ -73,6 +80,9 @@ export class World {
     this.fog = this.createFog();
     this.ais = [];
 
+    // Reprise d'une partie : le contenu du monde vient de la sauvegarde, pas
+    // d'une mise en place neuve.
+    if (options.restoring) return;
     this.setupStartingPositions();
     this.updateFog(true);
   }
@@ -85,19 +95,33 @@ export class World {
   }
 
   setupStartingPositions() {
+    const villagers = this.mode.villagers || 4;
+    for (const p of this.players) {
+      p.resources = { ...(this.mode.resources || START_RESOURCES) };
+      p.age = this.mode.startAge || 0;
+    }
     this.map.startPositions.forEach((start, index) => {
       const tc = this.spawnBuilding(index, 'towncenter', start.tx - 1, start.ty - 1, true);
       const spawn = tc.spawnPoint();
-      for (let i = 0; i < 4; i++) {
-        const angle = (Math.PI * 2 * i) / 4 + 0.6;
+      for (let i = 0; i < villagers; i++) {
+        const angle = (Math.PI * 2 * i) / villagers + 0.6;
         this.spawnUnit(index, 'villager',
           spawn.x + Math.cos(angle) * TILE * 1.6,
           spawn.y + Math.sin(angle) * TILE * 1.6);
       }
       this.spawnUnit(index, 'scout', spawn.x + TILE * 2.5, spawn.y + TILE * 1.2);
     });
-    this.ais.push(new AIPlayer(this, 1, this.difficulty));
+    this.addAI(1);
     this.recomputePopulation();
+  }
+
+  newEntityId() { return this.nextId++; }
+
+  /** Branche une intelligence artificielle sur un joueur (mise en place ou reprise). */
+  addAI(playerIndex) {
+    const ai = new AIPlayer(this, playerIndex, this.difficulty);
+    this.ais.push(ai);
+    return ai;
   }
 
   spawnUnit(playerIndex, type, x, y) {
@@ -117,6 +141,10 @@ export class World {
     tx = clamp(tx, 0, this.map.w - size);
     ty = clamp(ty, 0, this.map.h - size);
     const b = new Building(this, playerIndex, type, tx, ty, complete);
+    // Format de partie : en Express, le Centre-Ville est l'objectif, il ne peut
+    // pas être une forteresse imprenable.
+    const facteur = type === 'towncenter' ? (this.mode.townCenterHp || 1) : 1;
+    if (facteur !== 1) { b.maxHp = Math.round(b.maxHp * facteur); b.hp = Math.min(b.hp, b.maxHp); }
     this.entities.push(b);
     this.buildings.push(b);
     this.byId.set(b.id, b);
@@ -182,6 +210,7 @@ export class World {
     }
 
     this.checkVictory();
+    this.checkTimeLimit();
   }
 
   rebuildGrid() {
@@ -485,7 +514,7 @@ export class World {
       if (b.dead || !b.complete || !b.def.popBonus) continue;
       this.players[b.playerIndex].popCap += b.def.popBonus;
     }
-    for (const p of this.players) p.popCap = Math.min(POP_MAX, p.popCap);
+    for (const p of this.players) p.popCap = Math.min(this.popMax, p.popCap);
   }
 
   /** Un villageois vient de se retrouver sans travail (gisement épuisé). */
@@ -1099,8 +1128,17 @@ export class World {
   // --- Fin de partie --------------------------------------------------------
 
   checkVictory() {
+    // En Express, le dernier Centre-Ville tombé suffit : une partie courte se
+    // joue sur un objectif clair, pas sur la chasse au dernier villageois.
+    const parCentreVille = this.mode.victory === 'towncenter';
     for (const p of this.players) {
       if (p.defeated) continue;
+      if (parCentreVille) {
+        const hasTC = this.buildings.some(
+          (b) => !b.dead && b.playerIndex === p.index && b.type === 'towncenter');
+        if (!hasTC) p.defeated = true;
+        continue;
+      }
       const hasBuildings = this.buildings.some((b) => !b.dead && b.playerIndex === p.index);
       const hasVillagers = this.units.some((u) => !u.dead && u.playerIndex === p.index && u.isVillager);
       if (!hasBuildings && !hasVillagers) p.defeated = true;
@@ -1115,6 +1153,37 @@ export class World {
       };
       this.pushEvent({ type: 'gameOver', result: this.gameOver });
     }
+  }
+
+  /**
+   * Score d'un joueur à la fin d'une partie limitée dans le temps : ce qu'il a
+   * récolté, plus ce qui est encore debout. Lisible d'un coup d'œil, et
+   * impossible à gonfler en se cachant.
+   */
+  score(player) {
+    const g = player.stats.gathered;
+    const unites = this.units.filter((u) => !u.dead && u.playerIndex === player.index).length;
+    const batiments = this.buildings.filter(
+      (b) => !b.dead && b.complete && b.playerIndex === player.index).length;
+    return Math.round(g.food + g.wood + g.gold + unites * 10 + batiments * 25);
+  }
+
+  /** Fin au temps imparti (mode Express) : le meilleur score l'emporte. */
+  checkTimeLimit() {
+    const limite = this.mode.timeLimit || 0;
+    if (!limite || this.gameOver || this.time < limite) return;
+    const scores = this.players.map((p) => this.score(p));
+    let best = 0;
+    for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
+    const egalite = scores.filter((s) => s === scores[best]).length > 1;
+    this.gameOver = {
+      winner: egalite ? -1 : best,
+      victory: !egalite && best === this.humanIndex,
+      time: this.time,
+      timeUp: true,
+      scores,
+    };
+    this.pushEvent({ type: 'gameOver', result: this.gameOver });
   }
 
   resign() {

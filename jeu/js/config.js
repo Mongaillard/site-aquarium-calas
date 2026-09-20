@@ -247,6 +247,51 @@ export const TECHS = {
 
 export const START_RESOURCES = { food: 200, wood: 200, gold: 100 };
 
+/**
+ * Vitesse de jeu, comme dans AoE : un simple multiplicateur sur la boucle de
+ * simulation. Le pas de temps reste fixe, on en exécute juste plus (ou moins)
+ * par seconde réelle — la simulation reste déterministe.
+ */
+export const GAME_SPEEDS = [
+  { id: 'calme', name: 'Tranquille', short: '×0,75', mult: 0.75, desc: 'Pour prendre le temps' },
+  { id: 'normal', name: 'Normal', short: '×1', mult: 1, desc: 'Le rythme de référence' },
+  { id: 'rapide', name: 'Rapide', short: '×1,5', mult: 1.5, desc: 'Une partie plus nerveuse' },
+  { id: 'blitz', name: 'Blitz', short: '×2', mult: 2, desc: 'Tout va deux fois plus vite' },
+];
+
+export const DEFAULT_SPEED = 'normal';
+
+/**
+ * Formats de partie. `victory` vaut 'conquest' (raser la civilisation adverse,
+ * comme dans AoE) ou 'towncenter' (le dernier Centre-Ville tombé donne la
+ * victoire — une partie courte et tranchée). `aiRush` accélère d'autant
+ * l'horloge d'attaque de l'IA : sans ça, en Express, elle attaquerait après la
+ * fin de la partie.
+ */
+export const GAME_MODES = {
+  express: {
+    id: 'express', name: 'Express', icon: '⚡',
+    desc: '10 min chrono · départ Féodal · raser le Centre-Ville adverse, sinon le meilleur score',
+    mapSize: 'small', startAge: 1, popMax: 40, villagers: 7,
+    resources: { food: 500, wood: 500, gold: 250 },
+    victory: 'towncenter', aiRush: 0.4,
+    // Un Centre-Ville de 1400 points de vie tient tête à toute une armée : en
+    // Express il est deux fois plus fragile, sinon l'objectif est hors d'atteinte
+    // dans le temps imparti. Et la limite de temps garantit une partie courte :
+    // à son terme, c'est le score qui tranche.
+    townCenterHp: 0.5, timeLimit: 600,
+  },
+  classique: {
+    id: 'classique', name: 'Classique', icon: '🏰',
+    desc: '20 à 30 min · trois âges, victoire par conquête',
+    mapSize: 'medium', startAge: 0, popMax: POP_MAX, villagers: 4,
+    resources: START_RESOURCES,
+    victory: 'conquest', aiRush: 1, townCenterHp: 1, timeLimit: 0,
+  },
+};
+
+export const DEFAULT_MODE = 'classique';
+
 export const DIFFICULTIES = {
   easy: {
     id: 'easy', name: 'Facile',

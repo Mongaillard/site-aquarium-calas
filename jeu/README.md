@@ -20,6 +20,35 @@ python3 -m http.server 8080    # puis ouvrir http://localhost:8080/index.html
 Sur un téléphone : ouvrez l'URL, puis « Ajouter à l'écran d'accueil ». Le
 *service worker* met tout en cache, le jeu fonctionne ensuite **hors ligne**.
 
+## Formats de partie, vitesse et sauvegarde
+
+Trois réglages se choisissent sur l'écran d'accueil, avant de lancer la partie.
+
+| Format | Durée | Ce qui change |
+| --- | --- | --- |
+| ⚡ **Express** | **10 min chrono** | Départ à l'**Âge Féodal** avec 7 villageois et des ressources garnies, petite carte, population plafonnée à 40, IA agressive dès la première minute. **Raser le Centre-Ville adverse met fin à la partie sur-le-champ** (il y est deux fois moins résistant) ; sinon, au temps écoulé, **le meilleur score l'emporte** |
+| 🏰 **Classique** | 20 à 30 min | La partie complète : trois âges, population 60, victoire par conquête (tous les bâtiments **et** villageois adverses) |
+
+Le score d'une partie Express : *ressources récoltées + 10 par unité vivante +
+25 par bâtiment debout*. Il s'affiche sur l'écran de fin, et le compte à rebours
+remplace le chronomètre en haut de l'écran (il rougit dans la dernière minute).
+
+Mesuré sur huit parties IA contre IA : **toutes se terminent en 10 minutes**,
+score moyen autour de 2 500. Entre deux IA, la victoire par Centre-Ville reste
+rare — elles défendent bien ; un joueur qui masse ses troupes, lui, peut la
+provoquer.
+
+La **vitesse de jeu** — Tranquille ×0,75, Normal, Rapide ×1,5, Blitz ×2 —
+multiplie le nombre de pas de simulation par seconde réelle. Elle se change
+aussi en cours de partie depuis le menu pause, et le réglage est conservé d'une
+partie à l'autre. Le pas de temps, lui, ne bouge pas : la simulation reste
+déterministe quelle que soit la vitesse.
+
+**La partie se sauvegarde toute seule**, toutes les 30 secondes et dès que
+l'onglet passe en arrière-plan (un appel qui arrive, un écran qui s'éteint). Au
+retour, l'écran d'accueil propose **Reprendre la partie** avec son format, son
+âge et son chrono. Une partie finie ou abandonnée efface sa sauvegarde.
+
 ## Comment on joue
 
 | Geste | Effet |
@@ -159,7 +188,10 @@ annuler, `.` pour trouver un villageois inactif, `H` pour revenir au Centre-Vill
   déplacement de groupe au rythme du plus lent (voir plus bas).
 - **Affectation manuelle des ouvriers** : barre de répartition permanente et
   panneau d'affectation (voir plus haut).
-- **Victoire** : détruire tous les bâtiments adverses et leurs villageois.
+- **Victoire** : détruire tous les bâtiments adverses et leurs villageois — ou,
+  en mode Express, leur dernier Centre-Ville.
+- **Sauvegarde automatique** et reprise, **vitesse de jeu** réglable, **formats
+  de partie** (voir plus haut).
 
 ### L'IA adverse
 
@@ -206,7 +238,7 @@ chemin sont mises en file avec un budget par tick pour éviter les à-coups.
 
 ```bash
 cd jeu
-npm test              # simulation headless : deux IA jouent 16 minutes
+npm test              # simulation headless : deux IA jouent 16 minutes, sauvegarde comprise
 npm run test:navigateur   # Chromium (Playwright) : chargement, gestes, rendu, FPS
 ```
 
@@ -219,5 +251,23 @@ gestes (sélection, ordre, pose de bâtiment, zoom) répondent.
 
 Presque tout l'équilibrage est dans `js/config.js` : coûts, temps, points de vie,
 armures, bonus de dégâts, taux de récolte, coûts des âges, paramètres de
-difficulté et tailles de carte. Changer une valeur suffit, rien n'est codé en dur
-ailleurs.
+difficulté, tailles de carte, **formats de partie** (`GAME_MODES`) et **vitesses**
+(`GAME_SPEEDS`). Changer une valeur suffit, rien n'est codé en dur ailleurs.
+
+## La sauvegarde, en deux mots
+
+`js/save.js` ne stocke **pas la carte** : il stocke sa *graine*. La génération
+étant déterministe, il suffit de rejouer ce qui a changé depuis — les gisements
+épuisés et ce qu'il reste dans les autres. Le reste (joueurs, unités, bâtiments,
+flèches en vol, IA, brouillard exploré, état du générateur aléatoire, minuteries
+internes) est repris champ par champ.
+
+C'est exigeant, et c'est vérifié comme tel : le test compare une partie qui
+continue avec la même partie sauvegardée puis rechargée, et exige que les deux
+restent **rigoureusement identiques** 60 secondes plus tard — positions au
+centième de pixel, points de vie, contenu des gisements, décisions de l'IA. Un
+seul champ oublié fait diverger les deux parties et échouer le test.
+
+Une sauvegarde fait une centaine de kilo-octets et vit dans `localStorage`, sous
+la clé `aem.partie`. Un numéro de version accompagne le format : une sauvegarde
+plus ancienne est refusée plutôt que relue de travers.

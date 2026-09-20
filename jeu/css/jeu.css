@@ -97,6 +97,25 @@ html, body {
 
 .options { display: grid; gap: 8px; }
 .options.row { grid-template-columns: repeat(3, 1fr); }
+.options.row:has(> :nth-child(4)) { grid-template-columns: repeat(4, 1fr); }
+
+/* Partie interrompue : la reprise passe avant tout le reste de l'écran. */
+.resume-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gold-dark);
+  background: rgba(232, 182, 76, 0.10);
+}
+.resume-info { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+.btn.ghost { background: none; border-color: transparent; color: var(--muted); }
+.btn.small { min-height: 36px; padding: 6px 10px; font-size: 13px; font-weight: 500; }
+.modal-sub { margin: 16px 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+.scores tr.total td { border-top: 1px solid var(--border); padding-top: 8px; color: var(--gold); }
+#game-timer.urgent { color: #ff9d8a; font-weight: 700; }
 
 .option {
   display: flex;

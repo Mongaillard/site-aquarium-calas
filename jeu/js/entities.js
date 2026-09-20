@@ -26,8 +26,9 @@ const UNREACHABLE_AFTER = 7;
 /** Même chose pour un gisement : on réagit plus vite, il y a un plan B. */
 const GATHER_RETRY_AFTER = 3;
 
-let nextId = 1;
-export function resetEntityIds() { nextId = 1; }
+// Les identifiants sont distribués par le monde lui-même : un compteur global
+// serait partagé entre deux parties vivant dans le même processus (test de
+// sauvegarde, vérification d'une reprise) et les ferait diverger.
 
 /**
  * Métier courant d'un villageois : 'food' | 'wood' | 'gold' | 'build'
@@ -64,7 +65,7 @@ export function computeDamage(attackerDef, player, target) {
 
 class Entity {
   constructor(world, playerIndex, def, x, y) {
-    this.id = nextId++;
+    this.id = world.newEntityId();
     this.world = world;
     this.playerIndex = playerIndex;
     this.def = def;

@@ -57,6 +57,10 @@ export class GameMap {
     /** @type {Map<number, {type:string, amount:number, max:number, variant:number, tx:number, ty:number}>} */
     this.resources = new Map();
     this.startPositions = [];
+    // Cases ressource disparues depuis la génération : c'est tout ce qu'il faut
+    // pour rejouer l'état d'une carte, celle-ci étant régénérable à l'identique
+    // depuis sa graine (voir save.js).
+    this.removed = new Set();
     this.dirty = true; // demande un nouveau rendu du calque terrain
     this.generate();
   }
@@ -131,13 +135,22 @@ export class GameMap {
     if (!res) return 0;
     const taken = Math.min(res.amount, amount);
     res.amount -= taken;
-    if (res.amount <= 0.001) {
-      this.resources.delete(i);
-      this.blocked[i] &= ~BLOCK.RESOURCE;
-      this.terrain[i] = res.type === 'gold' ? TERRAIN.DIRT : this.terrain[i];
-      this.dirty = true;
-    }
+    if (res.amount <= 0.001) this.clearResource(i);
     return taken;
+  }
+
+  /**
+   * Fait disparaître une case ressource : gisement épuisé en jeu, ou remise en
+   * état d'une carte rechargée depuis une sauvegarde.
+   */
+  clearResource(i) {
+    const res = this.resources.get(i);
+    if (!res) return;
+    this.resources.delete(i);
+    this.blocked[i] &= ~BLOCK.RESOURCE;
+    if (res.type === 'gold') this.terrain[i] = TERRAIN.DIRT;
+    this.removed.add(i);
+    this.dirty = true;
   }
 
   addResource(tx, ty, type, rng) {
