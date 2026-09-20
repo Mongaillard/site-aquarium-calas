@@ -472,7 +472,8 @@ export class Renderer {
       ctx.fillRect(x + 4, y + w + 2, pw * b.progressRatio, 4);
       // Nombre d'ouvriers sur le chantier : sans ça, on ne voit pas qu'on
       // peut en mettre plusieurs pour aller plus vite.
-      if (b.builderCount > 0 && this.camera.zoom > 0.45) {
+      const ouvriers = b.assignedBuilders || b.builderCount;
+      if (ouvriers > 0 && this.camera.zoom > 0.45) {
         ctx.fillStyle = 'rgba(12,18,26,0.8)';
         ctx.beginPath();
         ctx.arc(x + w - 6, y + w + 4, 8, 0, Math.PI * 2);
@@ -484,7 +485,7 @@ export class Renderer {
         ctx.font = 'bold 9px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(String(b.builderCount), x + w - 6, y + w + 4);
+        ctx.fillText(String(ouvriers), x + w - 6, y + w + 4);
       }
     } else if (b.hp < b.maxHp) {
       this.drawHealthBar(b.x, y - 6, w * 0.8, b.hp / b.maxHp);

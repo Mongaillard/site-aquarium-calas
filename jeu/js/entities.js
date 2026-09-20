@@ -923,6 +923,7 @@ export class Building extends Entity {
     this.garrison = [];          // unités à l'abri à l'intérieur
     this.activeBuilders = 0;     // bâtisseurs présents ce tick
     this.builderCount = 0;       // relevé du tick précédent (rendement)
+    this.assignedBuilders = 0;   // ouvriers affectés, y compris en chemin
     this.createdAt = world.time;
     if (!def.walkable) this.occupyTiles();
   }

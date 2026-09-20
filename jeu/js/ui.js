@@ -33,6 +33,8 @@ export class UI {
     };
     this.lastValues = {};
     this.selectionSignature = '';
+    this.commandsSignature = '';   // les boutons ne se reconstruisent que si leur liste change
+    this.workerRows = null;        // lignes du panneau d'affectation, construites une fois
     this.hudTimer = 0;
     this.bind();
   }
@@ -118,55 +120,88 @@ export class UI {
 
   openWorkerMenu() {
     this.nodes.autoWorkers.checked = this.game.autoWorkers();
-    this.renderWorkerRows();
+    this.renderWorkerRows(true);
     this.nodes.workerMenu.classList.remove('hidden');
   }
 
   closeWorkerMenu() { this.nodes.workerMenu.classList.add('hidden'); }
 
-  renderWorkerRows() {
+  /**
+   * Le panneau se rafraîchit dix fois par seconde : on ne reconstruit le DOM
+   * qu'à l'ouverture, et on ne remplace ensuite que les chiffres. Sinon les
+   * boutons étaient détruits sous le doigt et un appui sur deux se perdait.
+   */
+  renderWorkerRows(rebuild = false) {
     const stats = this.game.workerStats();
+    const sites = this.game.constructionSites().length;
     const rows = [
       { task: 'food', icon: '🍖', name: 'Nourriture', hint: 'buissons et fermes', assignable: true },
       { task: 'wood', icon: '🪵', name: 'Bois', hint: 'forêts', assignable: true },
       { task: 'gold', icon: '🪙', name: 'Or', hint: 'filons', assignable: true },
-      { task: 'build', icon: '🏗️', name: 'Chantiers', hint: 'en construction', assignable: false },
+      {
+        task: 'build', icon: '🏗️', name: 'Chantiers', assignable: true, noSource: sites === 0,
+        hint: sites > 0
+          ? `${sites} chantier${sites > 1 ? 's' : ''} ouvert${sites > 1 ? 's' : ''}`
+          : 'aucun chantier ouvert',
+      },
       { task: 'idle', icon: '💤', name: 'Sans affectation', hint: 'en attente d’ordres', assignable: false },
     ];
-    const html = rows.map((row) => {
-      const count = stats[row.task] || 0;
-      const controls = row.assignable
-        ? `<button class="wr-btn" data-take="${row.task}" ${count === 0 ? 'disabled' : ''}>−</button>
-           <span class="wr-count">${count}</span>
-           <button class="wr-btn" data-give="${row.task}">+</button>`
-        : `<span class="wr-count">${count}</span>`;
-      return `<div class="worker-row">
-        <button class="wr-label" data-select="${row.task}">
-          <span class="wr-icon">${row.icon}</span>
-          <span>
-            <span class="wr-name">${row.name}</span>
-            <span class="wr-hint">${row.hint}</span>
-          </span>
-        </button>
-        <div class="wr-controls">${controls}</div>
-      </div>`;
-    }).join('');
-    const moving = stats.move || 0;
-    this.nodes.workerList.innerHTML = html
-      + (moving > 0 ? `<div class="wr-hint" style="padding-left:4px">${moving} en déplacement</div>` : '');
 
-    this.nodes.workerList.querySelectorAll('[data-give]').forEach((btn) => {
-      btn.addEventListener('click', () => { this.game.assignWorker(btn.dataset.give); this.renderWorkerRows(); });
-    });
-    this.nodes.workerList.querySelectorAll('[data-take]').forEach((btn) => {
-      btn.addEventListener('click', () => { this.game.unassignWorker(btn.dataset.take); this.renderWorkerRows(); });
-    });
-    this.nodes.workerList.querySelectorAll('[data-select]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.game.selectWorkerGroup(btn.dataset.select);
-        this.closeWorkerMenu();
+    if (rebuild || !this.workerRows) {
+      this.nodes.workerList.innerHTML = rows.map((row) => `
+        <div class="worker-row" data-row="${row.task}">
+          <button class="wr-label" data-select="${row.task}">
+            <span class="wr-icon">${row.icon}</span>
+            <span>
+              <span class="wr-name">${row.name}</span>
+              <span class="wr-hint">${row.hint}</span>
+            </span>
+          </button>
+          <div class="wr-controls">${row.assignable
+            ? `<button class="wr-btn" data-take="${row.task}">−</button>
+               <span class="wr-count">0</span>
+               <button class="wr-btn" data-give="${row.task}">+</button>`
+            : '<span class="wr-count">0</span>'}</div>
+        </div>`).join('') + '<div class="wr-hint" data-moving style="padding-left:4px"></div>';
+
+      this.workerRows = {};
+      for (const row of rows) {
+        const node = this.nodes.workerList.querySelector(`[data-row="${row.task}"]`);
+        this.workerRows[row.task] = {
+          count: node.querySelector('.wr-count'),
+          hint: node.querySelector('.wr-hint'),
+          give: node.querySelector('[data-give]'),
+          take: node.querySelector('[data-take]'),
+        };
+      }
+      this.workerMoving = this.nodes.workerList.querySelector('[data-moving]');
+
+      // Les écouteurs ne sont posés qu'une fois, sur des boutons qui ne
+      // sont plus jamais remplacés.
+      this.nodes.workerList.querySelectorAll('[data-give]').forEach((btn) => {
+        btn.addEventListener('click', () => { this.game.assignWorker(btn.dataset.give); this.renderWorkerRows(); });
       });
-    });
+      this.nodes.workerList.querySelectorAll('[data-take]').forEach((btn) => {
+        btn.addEventListener('click', () => { this.game.unassignWorker(btn.dataset.take); this.renderWorkerRows(); });
+      });
+      this.nodes.workerList.querySelectorAll('[data-select]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          this.game.selectWorkerGroup(btn.dataset.select);
+          this.closeWorkerMenu();
+        });
+      });
+    }
+
+    for (const row of rows) {
+      const node = this.workerRows[row.task];
+      const count = stats[row.task] || 0;
+      node.count.textContent = String(count);
+      node.hint.textContent = row.hint;
+      if (node.take) node.take.disabled = count === 0;
+      if (node.give) node.give.disabled = !!row.noSource;
+    }
+    const moving = stats.move || 0;
+    this.workerMoving.textContent = moving > 0 ? `${moving} en déplacement` : '';
   }
 
   /** La barre des ouvriers se cale au-dessus du panneau du bas, dont la hauteur varie. */
@@ -197,27 +232,50 @@ export class UI {
     return Object.entries(counts).map(([k, v]) => k + v).join('|')
       + '#' + selection.length + '#' + Math.round(first.hp) + '#' + queue
       + '#' + (first.stance || '') + '#' + (first.garrison ? first.garrison.length : '')
-      + '#' + (first.buildQueue ? first.buildQueue.length : '') + '#' + (first.builderCount || 0)
+      + '#' + (first.buildQueue ? first.buildQueue.length : '')
+      + '#' + (first.kind === 'building' && !first.complete ? this.world.buildersOn(first) : '')
       + '#' + (first.complete === false ? Math.round(first.progressRatio * 20) : '')
       + '#' + this.world.players[this.world.humanIndex].age;
+  }
+
+  /**
+   * Signature des BOUTONS : uniquement ce qui change leur liste. Les PV, un
+   * avancement de chantier ou une file de production évoluent en permanence —
+   * s'ils entraînaient un nouveau rendu, le bouton disparaissait sous le doigt
+   * et l'appui se perdait.
+   */
+  commandSignature(selection) {
+    const player = this.world.players[this.world.humanIndex];
+    const first = selection[0];
+    return selection.map((e) => e.id + (e.stance || '')).join(',')
+      + '#' + (first.kind === 'building' ? (first.complete ? 'fini' : 'chantier') : '')
+      + '#' + (first.garrison ? first.garrison.length : '')
+      + '#' + player.age + '#' + player.techs.size
+      + '#' + [this.game.attackMoveArmed, this.game.garrisonArmed, this.game.rallyArmed].join('');
   }
 
   refreshSelection(force = false) {
     const selection = this.game.selection.filter((e) => !e.dead);
     const signature = this.signature(selection);
-    if (!force && signature === this.selectionSignature) return;
-    this.selectionSignature = signature;
+    const commands = selection.length > 0 ? this.commandSignature(selection) : 'none';
+    if (!force && signature === this.selectionSignature && commands === this.commandsSignature) return;
 
     if (selection.length === 0) {
-      this.nodes.selection.innerHTML = '<div class="hint">Touchez une unité pour la sélectionner · appui long pour un rectangle</div>';
-      this.nodes.commands.innerHTML = '';
-      this.commandNodes = [];
-      this.commandButtons = [];
-      this.measureBottomBar();
+      if (this.selectionSignature !== 'none' || force) {
+        this.nodes.selection.innerHTML = '<div class="hint">Touchez une unité pour la sélectionner · appui long pour un rectangle</div>';
+        this.nodes.commands.innerHTML = '';
+        this.commandNodes = [];
+        this.commandButtons = [];
+        this.measureBottomBar();
+      }
+      this.selectionSignature = signature;
+      this.commandsSignature = commands;
       return;
     }
-    this.renderSelectionPanel(selection);
-    this.renderCommands(selection);
+    if (force || signature !== this.selectionSignature) this.renderSelectionPanel(selection);
+    if (force || commands !== this.commandsSignature) this.renderCommands(selection);
+    this.selectionSignature = signature;
+    this.commandsSignature = commands;
     this.measureBottomBar();
   }
 
@@ -246,9 +304,12 @@ export class UI {
         if (first.type === 'farm') rows.push(`🍖 ${Math.max(0, Math.round(first.foodLeft))}`);
         if (!first.complete) {
           rows.push(`🏗️ ${Math.round(first.progressRatio * 100)} %`);
-          rows.push(first.builderCount > 0
-            ? `👷 ${first.builderCount} ouvrier${first.builderCount > 1 ? 's' : ''}`
-            : '👷 aucun ouvrier — sélectionnez des villageois et touchez le chantier');
+          // On compte aussi ceux qui marchent vers le chantier : sinon le
+          // renfort qu'on vient d'envoyer semble n'avoir servi à rien.
+          const ouvriers = this.world.buildersOn(first);
+          rows.push(ouvriers > 0
+            ? `👷 ${ouvriers} ouvrier${ouvriers > 1 ? 's' : ''}`
+            : '👷 aucun ouvrier — touchez le chantier avec des villageois, ou 👷 +1');
         }
       }
       node.innerHTML = `
@@ -337,6 +398,12 @@ export class UI {
     if (first.kind === 'building' && selection.length === 1) {
       const b = first;
       if (!b.complete) {
+        buttons.push({
+          icon: '👷', label: '+1 ouvrier',
+          check: () => (this.game.hasSpareWorker()
+            ? { ok: true } : { ok: false, reason: 'Aucun villageois disponible' }),
+          action: () => this.game.reinforceSite(b),
+        });
         buttons.push({ icon: '❌', label: 'Annuler', action: () => this.game.cancelConstruction(b) });
       } else {
         const def = b.def;
@@ -554,7 +621,7 @@ export class UI {
         <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
         <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant</li>
         <li><b>🏗️ Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les villageois sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant</li>
-        <li>Pour renforcer un chantier en cours : sélectionnez des villageois et <b>touchez le chantier</b></li>
+        <li><b>Affecter quelqu'un à un chantier</b> : touchez un villageois, puis touchez le chantier — le même geste que pour l'envoyer au bois ou à la nourriture. La ligne <b>🏗️ Chantiers</b> de la barre 👷 fait pareil avec ses <b>+ / −</b>, et un chantier sélectionné a son bouton <b>👷 +1 ouvrier</b>. (Double tap sur un chantier pour le sélectionner sans y envoyer personne.)</li>
         <li>Les villageois récoltent 🍖 nourriture, 🪵 bois et 🪙 or ; il faut des <b>maisons</b> pour agrandir la population</li>
         <li><b>Attitudes</b> (unité sélectionnée) : ⚔️ agressif poursuit loin, 🛡️ défensif revient à son poste, 🧱 position tenue ne bouge pas, 🕊️ sans attaque ignore l'ennemi</li>
         <li><b>Garnison</b> : touchez votre Centre-Ville ou une tour avec des unités sélectionnées pour les abriter — elles s'y soignent et chaque occupant ajoute une flèche. La <b>🔔 cloche</b> y envoie tous les villageois d'un coup</li>

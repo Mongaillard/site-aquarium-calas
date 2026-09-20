@@ -241,6 +241,17 @@ class Game {
           return;
         }
       }
+      // Des villageois en main + un chantier (ou une ferme) sous le doigt :
+      // on les envoie travailler, exactement comme sur un arbre ou un buisson.
+      // Sans cette règle, l'appui sélectionnait le bâtiment et l'ordre se
+      // perdait — impossible d'affecter quelqu'un à une construction.
+      // Le double appui reste la porte de sortie : il sélectionne le bâtiment
+      // (pour suivre l'avancement ou annuler le chantier).
+      if (entity.kind === 'building' && !isDouble && ownUnits.some((u) => u.isVillager)
+          && (!entity.complete || entity.type === 'farm')) {
+        this.issueOrder(p.x, p.y);
+        return;
+      }
       if (isDouble && entity.kind === 'unit') {
         this.selectSameTypeOnScreen(entity);
       } else {
@@ -286,6 +297,13 @@ class Game {
       this.ui.toast(result.spread > 1
         ? `${result.workers} villageois répartis sur ${result.spread} ${lieux[type]}`
         : `${result.workers} villageois envoyés récolter`);
+    }
+    // Un chantier ne montre pas tout de suite qu'il a reçu du renfort : on le dit.
+    if (result && (result.kind === 'build' || result.kind === 'repair') && result.workers > 0) {
+      const verbe = result.kind === 'repair' ? 'à la réparation' : 'sur le chantier';
+      this.ui.toast(result.workers > 1
+        ? `${result.workers} ouvriers envoyés ${verbe}`
+        : `Ouvrier envoyé ${verbe}`);
     }
     const colors = {
       attack: '#ff6b6b', gather: '#ffd166', build: '#8ecae6',
@@ -518,21 +536,40 @@ class Game {
   }
 
   /**
-   * Envoie un villageois de plus sur une ressource. On puise d'abord dans les
-   * inactifs, puis dans le métier le plus fourni — jamais chez les bâtisseurs,
-   * pour ne pas abandonner un chantier en cours.
+   * Villageois qu'on peut détourner : les inactifs d'abord, puis ceux en
+   * déplacement, enfin le métier le plus fourni — jamais les bâtisseurs, pour
+   * ne pas abandonner un chantier en cours (la ligne « Chantiers » a son −).
    */
-  assignWorker(type) {
+  availableWorkers(exclude) {
     let pool = this.villagersWithTask('idle');
     if (pool.length === 0) pool = this.villagersWithTask('move');
     if (pool.length === 0) {
       const stats = this.workerStats();
       const from = ['food', 'wood', 'gold']
-        .filter((t) => t !== type && stats[t] > 0)
+        .filter((t) => t !== exclude && stats[t] > 0)
         .sort((a, b) => stats[b] - stats[a])[0];
       if (from) pool = this.villagersWithTask(from);
     }
-    if (pool.length === 0) { this.ui.toast('Aucun villageois disponible'); this.audio.play('error'); return false; }
+    if (pool.length === 0) { this.ui.toast('Aucun villageois disponible'); this.audio.play('error'); return null; }
+    return pool;
+  }
+
+  /** Y a-t-il quelqu'un à détourner ? (pour griser un bouton, sans message) */
+  hasSpareWorker() {
+    const s = this.workerStats();
+    return (s.idle + s.move + s.food + s.wood + s.gold) > 0;
+  }
+
+  constructionSites() { return this.world.constructionSites(this.world.humanIndex); }
+
+  /**
+   * Envoie un villageois de plus sur une ressource — ou sur un chantier, qui
+   * est un poste comme un autre : même bouton, même geste.
+   */
+  assignWorker(type) {
+    const pool = this.availableWorkers(type);
+    if (!pool) return false;
+    if (type === 'build') return this.assignWorkerToSite(pool);
 
     // On prend celui qui a le moins de chemin à faire.
     let best = null, bestD = Infinity;
@@ -552,6 +589,46 @@ class Game {
     }
     this.audio.play('order');
     this.vibrate(8);
+    return true;
+  }
+
+  /**
+   * Renfort sur un chantier : exactement le même geste que « +1 sur le bois ».
+   * `site` fixe la destination (bouton du panneau) ; sinon on laisse le monde
+   * choisir le chantier qui manque le plus de bras.
+   */
+  assignWorkerToSite(pool, site = null) {
+    const sites = site ? [site] : this.constructionSites();
+    if (sites.length === 0) {
+      this.ui.toast('Aucun chantier en cours — posez un bâtiment d’abord', 'warn');
+      this.audio.play('error');
+      return false;
+    }
+    // Celui qui a le moins de chemin à faire jusqu'à un chantier.
+    let best = null, bestD = Infinity;
+    for (const v of pool) {
+      for (const s of sites) {
+        const d = dist2(v.x, v.y, s.x, s.y);
+        if (d < bestD) { bestD = d; best = v; }
+      }
+    }
+    if (!best || !this.world.assignBuilder(best, sites)) {
+      this.ui.toast('Aucun villageois ne peut rejoindre le chantier', 'warn');
+      this.audio.play('error');
+      return false;
+    }
+    this.audio.play('order');
+    this.vibrate(8);
+    return true;
+  }
+
+  /** Bouton « +1 ouvrier » d'un chantier sélectionné. */
+  reinforceSite(site) {
+    const pool = this.availableWorkers('build');
+    if (!pool) return false;
+    if (!this.assignWorkerToSite(pool, site)) return false;
+    const n = this.world.buildersOn(site);
+    this.ui.toast(`Ouvrier envoyé — ${n} ouvrier${n > 1 ? 's' : ''} sur ce chantier`, 'good');
     return true;
   }
 

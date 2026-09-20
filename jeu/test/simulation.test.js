@@ -559,6 +559,44 @@ function freeSpots(world, type, count) {
     `gain ×${(solo / trio).toFixed(2)} pour trois fois plus de bras`);
 }
 
+{
+  // Affecter quelqu'un à un chantier : le geste doit être celui de la récolte.
+  const world = sandbox(54);
+  world.players[0].resources.wood = 1000;
+  const spots = freeSpots(world, 'house', 2);
+  const villagers = world.units.filter((u) => u.playerIndex === 0 && u.isVillager);
+  const site = world.placeBuilding(0, 'house', spots[0].tx, spots[0].ty, []);
+  check('chantier posé sans personne dessus', site && world.buildersOn(site) === 0);
+
+  // Appui sur le chantier, villageois en main.
+  const ordre = world.commandUnits([villagers[0]], site.x, site.y);
+  check('un appui sur le chantier vaut ordre de construire',
+    ordre && ordre.kind === 'build' && ordre.workers === 1 && villagers[0].target === site,
+    `ordre « ${ordre ? ordre.kind : 'aucun'} »`);
+  check('le chantier compte son ouvrier avant même qu’il arrive',
+    world.buildersOn(site) === 1, String(world.buildersOn(site)));
+
+  // Renfort automatique : assignBuilder choisit un chantier tout seul.
+  const cible = world.assignBuilder(villagers[1]);
+  check('un renfort trouve le chantier sans qu’on le désigne', cible === site);
+
+  // Deuxième chantier : le suivant doit y aller plutôt que s'entasser.
+  const second = world.placeBuilding(0, 'house', spots[1].tx, spots[1].ty, []);
+  const choix = world.assignBuilder(villagers[2]);
+  check('le chantier qui manque de bras passe devant', choix === second,
+    choix === site ? 'renfort entassé sur le premier' : 'ok');
+
+  check('les chantiers en cours sont listés', world.constructionSites(0).length === 2);
+  world.update(DT);
+  check('le relevé par tick compte aussi ceux qui marchent',
+    site.assignedBuilders === 2 && second.assignedBuilders === 1,
+    `${site.assignedBuilders} / ${second.assignedBuilders}`);
+
+  // Et on peut retirer quelqu'un du chantier : il redevient disponible.
+  villagers[0].stop();
+  check('retirer un ouvrier libère le chantier', world.buildersOn(site) === 1);
+}
+
 // --- Viser l'ennemi au doigt --------------------------------------------------
 
 {

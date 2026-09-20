@@ -141,6 +141,14 @@ export class World {
       if (b.complete) continue;
       b.builderCount = b.activeBuilders;
       b.activeBuilders = 0;
+      b.assignedBuilders = 0;
+    }
+    // Et relevé des ouvriers affectés, ceux qui marchent encore compris : c'est
+    // ce chiffre-là qu'on affiche, pour que le renfort se voie tout de suite.
+    for (let i = 0; i < this.units.length; i++) {
+      const u = this.units[i];
+      if (u.dead || !u.isVillager || u.state !== STATE.BUILD) continue;
+      if (u.target && u.target.kind === 'building' && !u.target.complete) u.target.assignedBuilders++;
     }
 
     for (let i = 0; i < this.units.length; i++) this.units[i].update(dt);
@@ -500,6 +508,46 @@ export class World {
     return true;
   }
 
+  /** Chantiers d'un joueur : bâtiments posés mais pas encore terminés. */
+  constructionSites(playerIndex) {
+    return this.buildings.filter((b) => !b.dead && !b.complete && b.playerIndex === playerIndex);
+  }
+
+  /**
+   * Ouvriers affectés à un chantier — ceux qui frappent comme ceux qui y
+   * marchent encore. `builderCount` ne compte que les premiers : il sert au
+   * rendement, pas à savoir si un renfort est déjà en route.
+   */
+  buildersOn(site) {
+    let n = 0;
+    for (const u of this.units) {
+      if (u.dead || !u.isVillager) continue;
+      if (u.state === STATE.BUILD && u.target === site) n++;
+    }
+    return n;
+  }
+
+  /**
+   * Envoie un villageois prêter main-forte. À distance comparable, le chantier
+   * qui manque de bras passe devant : le rendement décroît, un septième ouvrier
+   * sur la même maison ne sert plus à grand-chose.
+   */
+  assignBuilder(villager, sites = null) {
+    const list = (sites || this.constructionSites(villager.playerIndex))
+      .filter((b) => !b.dead && !b.complete);
+    if (list.length === 0) return null;
+    const crowdPenalty = (6 * TILE) ** 2;
+    let best = null, bestScore = Infinity;
+    for (const site of list) {
+      const score = dist2(villager.x, villager.y, site.x, site.y)
+        + this.buildersOn(site) * crowdPenalty;
+      if (score < bestScore) { bestScore = score; best = site; }
+    }
+    if (!best) return null;
+    villager.buildAt(best);
+    return best;
+  }
+
   notifyPopBlocked(playerIndex) {
     if (playerIndex !== this.humanIndex || this.popWarnCooldown > 0) return;
     this.popWarnCooldown = 12;
@@ -738,7 +786,10 @@ export class World {
       const villagers = units.filter((u) => u.isVillager);
       if (!target.complete && villagers.length) {
         for (const v of villagers) v.buildAt(target);
-        return { kind: 'build', target };
+        // Les soldats du groupe se rendent sur place : ils couvrent le chantier
+        // au lieu de rester plantés là où ils étaient.
+        for (const u of units) if (!u.isVillager) u.moveTo(worldX, worldY, options.aggressive);
+        return { kind: 'build', target, workers: villagers.length };
       }
       // Bâtiment intact pouvant abriter : on s'y réfugie (règle d'AoE).
       if (target.complete && target.def.garrison && target.hp >= target.maxHp
@@ -752,7 +803,7 @@ export class World {
       }
       if (target.hp < target.maxHp && villagers.length) {
         for (const v of villagers) v.buildAt(target);
-        return { kind: 'repair', target };
+        return { kind: 'repair', target, workers: villagers.length };
       }
     }
     if (res) {

@@ -34,14 +34,17 @@ Sur un téléphone : ouvrez l'URL, puis « Ajouter à l'écran d'accueil ». Le
 | Barre 👷 en bas | Voir qui fait quoi · toucher un métier pour sélectionner le groupe |
 | Pastilles ⚔️ 🛡️ 🧱 🕊️ | Attitude de combat de la sélection (voir plus bas) |
 | Bouton 🚪 puis un abri | Mettre la sélection à l'abri · 🔔 met tous les villageois à couvert |
-| Bouton 👷 | Panneau d'affectation : − / + pour déplacer un ouvrier d'un poste à l'autre |
+| Toucher un chantier (villageois sélectionné) | L'y affecter — même geste que pour le bois ou la nourriture |
+| Bouton 👷 | Panneau d'affectation : − / + pour déplacer un ouvrier d'un poste à l'autre, **chantiers compris** |
 
 Le pointage est **tolérant** : inutile de viser au pixel près. Un appui à moins
 d'une case d'un ennemi, d'un arbre ou d'un filon vise la bonne cible. Et quand
 vos troupes sont sélectionnées, un ennemi sous le doigt l'emporte sur un allié —
 dans une mêlée, l'intention est d'attaquer, pas de changer de sélection. Un
 appui franc sur l'un de vos bâtiments le sélectionne quand même : en plein raid,
-il faut pouvoir continuer à produire.
+il faut pouvoir continuer à produire. Deux exceptions, où l'intention ne fait
+aucun doute : un **chantier** ou une **ferme** touchés avec des villageois en
+main les envoient travailler (double tap pour sélectionner le bâtiment).
 
 ### Comportement des unités : les principes d'Age of Empires
 
@@ -91,9 +94,22 @@ d'avis.
 
 Tous les villageois sélectionnés au moment de la pose vont bâtir, et **plus ils
 sont nombreux, plus c'est rapide**, avec le rendement décroissant d'AoE : un
-ouvrier met 18 s pour une maison, trois en mettent 8. Pour renforcer un chantier
-déjà lancé, sélectionnez des villageois et touchez-le. Le nombre d'ouvriers
-présents s'affiche sur le chantier et dans le panneau de sélection.
+ouvrier met 18 s pour une maison, trois en mettent 8. Le nombre d'ouvriers
+affectés — ceux qui marchent encore vers le chantier compris — s'affiche sur le
+chantier et dans le panneau de sélection.
+
+**Affecter quelqu'un à un chantier**, c'est le geste de la récolte : on touche
+le villageois, puis le chantier. Trois chemins mènent au même résultat :
+
+- **au doigt** : sélection (un villageois ou dix), puis appui sur le chantier ;
+- **par la barre 👷** : la ligne *🏗️ Chantiers* a ses **− / +** comme le bois ou
+  la nourriture. Le **+** prend un inactif en priorité, sinon quelqu'un du métier
+  le plus fourni, et l'envoie sur le chantier **qui manque le plus de bras** ;
+- **par le chantier** : sélectionnez-le, puis **👷 +1 ouvrier**.
+
+Un double tap sur un chantier le sélectionne sans y envoyer personne (pour
+suivre l'avancement ou annuler). Et le **−** de la ligne *Chantiers* retire un
+bâtisseur, qui redevient disponible.
 
 ### Répartition d'un groupe sur une ressource
 

@@ -320,6 +320,67 @@ check('une seconde pose part en file',
 check('les deux chantiers aboutissent',
   chantiers.skipped || chantiers.finis, chantiers.skipped ? 'ignoré' : String(chantiers.finis));
 
+// Affecter un ouvrier à un chantier au doigt : on touche le villageois, puis
+// le chantier — exactement le geste qui l'envoie couper du bois.
+const auChantier = await page.evaluate(() => {
+  const g = window.__jeu;
+  g.world.players[0].resources.wood = 1000;
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  let spot = null;
+  for (let r = 3; r <= 12 && !spot; r++) {
+    for (let dy = -r; dy <= r && !spot; dy++) {
+      for (let dx = -r; dx <= r && !spot; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (g.world.canPlace(0, 'house', tc.tx + dx, tc.ty + dy)) spot = { tx: tc.tx + dx, ty: tc.ty + dy };
+      }
+    }
+  }
+  if (!spot) return { skipped: true };
+  const site = g.world.placeBuilding(0, 'house', spot.tx, spot.ty, []);
+  const v = g.world.units.find(
+    (u) => u.playerIndex === 0 && u.isVillager && !u.garrisonedIn && u.state !== 'build');
+  v.stop();
+  g.setSelection([v]);
+  g.camera.centerOn(site.x, site.y);
+  window.__chantier = site.id;
+  window.__ouvrier = v.id;
+  const p = g.camera.worldToScreen(site.x, site.y);
+  return { x: Math.round(p.x), y: Math.round(p.y) };
+});
+if (!auChantier.skipped) {
+  await page.touchscreen.tap(auChantier.x, auChantier.y);
+  await page.waitForTimeout(200);
+}
+const affecte = auChantier.skipped ? null : await page.evaluate(() => {
+  const g = window.__jeu;
+  const site = g.world.byId.get(window.__chantier);
+  const v = g.world.byId.get(window.__ouvrier);
+  return { etat: v.state, surLeChantier: v.target === site, compte: g.world.buildersOn(site) };
+});
+check('appui sur un chantier : l’ouvrier y est affecté',
+  auChantier.skipped || (affecte.etat === 'build' && affecte.surLeChantier),
+  auChantier.skipped ? 'ignoré' : `état « ${affecte.etat} »`);
+check('le chantier affiche son renfort',
+  auChantier.skipped || affecte.compte === 1,
+  auChantier.skipped ? 'ignoré' : affecte.compte + ' ouvrier(s)');
+
+// Et depuis le panneau d'affectation : la ligne « Chantiers » a son +/−.
+await page.click('#btn-workers');
+await page.waitForTimeout(200);
+const avantChantier = await page.evaluate(() => window.__jeu.workerStats().build);
+await page.click('[data-give="build"]');
+await page.waitForTimeout(400);
+const apresChantier = await page.evaluate(() => window.__jeu.workerStats().build);
+check('la ligne « Chantiers » envoie du renfort', apresChantier > avantChantier,
+  `${avantChantier} → ${apresChantier}`);
+await page.click('[data-take="build"]');
+await page.waitForTimeout(300);
+const apresRetrait = await page.evaluate(() => window.__jeu.workerStats().build);
+check('la ligne « Chantiers » en retire aussi', apresRetrait < apresChantier,
+  `${apresChantier} → ${apresRetrait}`);
+await page.click('#btn-close-workers');
+await page.waitForTimeout(150);
+
 // Attaquer un ennemi au doigt, sans viser au pixel près.
 const combat = await page.evaluate(async () => {
   const g = window.__jeu;
