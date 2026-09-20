@@ -369,7 +369,12 @@ export class Renderer {
       if (e.playerIndex !== this.world.humanIndex && !this.isEntityVisible(e)) continue;
       list.push(e);
     }
-    list.sort((a, b) => a.y - b.y);
+    // Ordre du peintre. Un bâtiment est classé à son bord NORD, pas à son
+    // centre : son illustration déborde de l'emprise, et une unité qui longe
+    // le mur doit passer devant, jamais dessous. Ce qui est derrière (plus au
+    // nord) reste caché par les toits — c'est l'effet voulu.
+    const rang = (e) => (e.kind === 'building' ? e.ty * TILE + 8 : e.y);
+    list.sort((a, b) => rang(a) - rang(b));
     for (const e of list) {
       if (e.kind === 'building') this.drawBuilding(e);
       else this.drawUnit(e);
@@ -396,6 +401,13 @@ export class Renderer {
     const w = b.size * TILE;
     const x = b.tx * TILE, y = b.ty * TILE;
     const height = b.size === 3 ? 26 : 18;
+
+    const sprite = spriteDe(b.type);
+    if (sprite) {
+      const haut = this.dessinerBatimentSprite(b, sprite, w, x, y);
+      this.decorerBatiment(b, w, x, y, color, haut);
+      return;
+    }
 
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.beginPath();
@@ -468,7 +480,46 @@ export class Renderer {
       this.dessinerIcone(b.def.icon, b.x, b.y + 2, w * 0.46, 'rgba(28,36,48,0.85)');
     }
     ctx.globalAlpha = 1;
+    this.decorerBatiment(b, w, x, y, color);
+  }
 
+  /**
+   * Bâtiment illustré : l'image, dessinée sur `largeurMonde` pixels, est posée
+   * sur l'emprise par sa ligne de sol — le bas du parvis sur le bord sud — et
+   * monte au-dessus ; le tri du peintre fait le reste. En chantier, elle sort
+   * de terre : on ne la révèle que jusqu'à la hauteur atteinte.
+   */
+  dessinerBatimentSprite(b, sprite, w, x, y) {
+    const ctx = this.ctx;
+    const { cellW, cellH, largeurMonde, sol } = sprite.def;
+    const source = imagePourJoueur(sprite, b.playerIndex);
+    const dw = largeurMonde;
+    const dh = (cellH / cellW) * dw;
+    const dx = b.x - dw / 2;
+    const dy = y + w - dh * (sol ?? 1);
+    if (!b.complete) {
+      const part = Math.max(0.12, b.progressRatio);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(dx, dy + dh * (1 - part), dw, dh * part);
+      ctx.clip();
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(source, 0, 0, cellW, cellH, dx, dy, dw, dh);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return dy + dh * (1 - part);
+    }
+    ctx.drawImage(source, 0, 0, cellW, cellH, dx, dy, dw, dh);
+    return dy;   // le haut de l'image : la barre de vie se pose au-dessus des toits
+  }
+
+  /**
+   * Ce que tout bâtiment porte, illustré ou non : chantier, vie, garnison,
+   * sélection. `haut` est le sommet dessiné — celui de l'emprise pour un
+   * bâtiment tracé au code, celui des toits pour une illustration.
+   */
+  decorerBatiment(b, w, x, y, color, haut = y) {
+    const ctx = this.ctx;
     if (!b.complete) {
       // Échafaudage + barre de progression
       ctx.strokeStyle = 'rgba(255,255,255,0.45)';
@@ -499,11 +550,11 @@ export class Renderer {
         ctx.fillText(String(ouvriers), x + w - 6, y + w + 4);
       }
     } else if (b.hp < b.maxHp) {
-      this.drawHealthBar(b.x, y - 6, w * 0.8, b.hp / b.maxHp);
+      this.drawHealthBar(b.x, haut - 6, w * 0.8, b.hp / b.maxHp);
       if (b.hp / b.maxHp < 0.4) {
         ctx.fillStyle = 'rgba(30,30,30,0.35)';
         ctx.beginPath();
-        ctx.arc(b.x + Math.sin(this.frame / 22) * 4, y - 12, 6, 0, Math.PI * 2);
+        ctx.arc(b.x + Math.sin(this.frame / 22) * 4, haut - 12, 6, 0, Math.PI * 2);
         ctx.fill();
       }
     }

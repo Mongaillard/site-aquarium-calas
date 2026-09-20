@@ -3,7 +3,7 @@
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
 très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 140 Ko d'illustrations — dont un cycle de marche
+pictogrammes vectoriels et 176 Ko d'illustrations — dont un cycle de marche
 complet.
 
 ## Lancer le jeu
@@ -297,7 +297,7 @@ n'avait pas la même tête sur un Samsung et sur un iPhone.
 couleur vient du texte qui les porte. Les auteurs sont cités dans l'écran
 **Crédits**, accessible depuis le menu de pause — c'est ce que la licence exige.
 
-Les **illustrations** (`assets/`, 140 Ko) viennent de planches de personnage
+Les **illustrations** (`assets/`, 176 Ko) viennent de planches de personnage
 fournies par l'auteur du dépôt : le chevalier de l'écran d'accueil,
 le portrait du milicien dans le panneau de sélection, et le chevalier à terre
 de l'écran de défaite. Le portrait de l'adversaire est le même fichier, passé
@@ -343,6 +343,26 @@ l'écran est net : **la marche dessinée l'emporte**. À la taille d'une unité,
 qui se lit n'est pas le détail d'un personnage mais son mouvement ; la peinture
 réduite devient une tache sombre. Elle garde sa place là où elle est vue en
 grand — accueil, portrait, écran de fin.
+
+### Le Centre-Ville est un palais
+
+`assets/centre-ville.webp` (36 Ko) : un palais à dômes bleus, tridents dorés et
+fontaines, sur son parvis. Il est dessiné **plus grand que son emprise** — 144 px
+pour trois cases — et posé par sa ligne de sol sur le bord sud : le palais monte
+au-dessus des cases situées derrière, le parvis déborde devant, sur les cases
+praticables, où les unités marchent. C'est le compromis d'Age of Empires : des
+bâtiments de trois quarts sur un sol vu de dessus.
+
+Deux détails de rendu qui comptent : les bâtiments sont classés à leur **bord
+nord** dans l'ordre du peintre (pas à leur centre), pour qu'une unité qui longe
+le mur passe toujours devant le débord ; et un chantier **sort de terre** — on
+ne révèle l'illustration que jusqu'à la hauteur atteinte, parvis d'abord, murs
+ensuite, dômes à la fin. Le Centre-Ville adverse est le même fichier passé au
+rouge par la fenêtre de teinte du chevalier : dômes et bannières changent de
+camp, la pierre blanche et l'eau des fontaines restent.
+
+Les onze autres bâtiments gardent leur rendu dessiné au code, comme les cinq
+unités sans planche.
 
 ### La couleur d'équipe se calcule au chargement
 

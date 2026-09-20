@@ -7,6 +7,7 @@
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
+| `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 288×287, dessiné sur 144 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
 Ces images viennent d'une planche de référence fournie par l'auteur du dépôt, qui
@@ -101,7 +102,29 @@ Un test le vérifie à chaque exécution : 20 % des pixels sont repeints, **aucu
 pixel d'acier n'est touché** (40 434 sur 40 434 intacts), et il ne reste aucun
 bleu franc côté adverse.
 
+## Le Centre-Ville
+
+L'illustration est en vue de trois quarts sur une carte vue de dessus — c'est
+exactement le compromis d'Age of Empires, où bâtiments et unités sont dessinés
+de trois quarts sur un sol plat. Le fond, un vert olive uni (écart-type 4 sur le
+bord), part par un remplissage depuis les bords ; le sol peint autour du parvis
+— rochers, buissons, dallage — est conservé : sur l'herbe du jeu, il fait un
+parvis crédible.
+
+Le bâtiment est dessiné **plus grand que son emprise** : 144 px de large pour
+3 cases (96 px), posé par sa ligne de sol (93 % de la hauteur) sur le bord sud de
+l'emprise. Le palais monte au-dessus des cases situées derrière lui, le parvis
+déborde sur les cases praticables devant — les unités marchent dessus. Pour
+qu'une unité qui longe le mur ne passe jamais *sous* le débord, le rendu classe
+les bâtiments à leur **bord nord** dans l'ordre du peintre, pas à leur centre.
+
+Réduit à 288 px (deux fois la taille dessinée) et quantifié à 64 couleurs avant
+l'encodage WebP sans pertes : **36 Ko**. La couleur d'équipe suit la règle du
+chevalier animé — seule la fenêtre du bleu franc (200°–255°) bascule : dômes,
+bannières et auvents passent au rouge, la pierre blanche et l'eau cyan des
+fontaines ne bougent pas. Un test le vérifie pixel à pixel.
+
 ## Format
 
-WebP partout où c'est possible : 140 Ko pour l'ensemble, contre environ 430 Ko en
+WebP partout où c'est possible : 176 Ko pour l'ensemble, contre environ 520 Ko en
 PNG, sans différence visible à l'œil même agrandi trois fois.

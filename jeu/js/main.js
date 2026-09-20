@@ -15,7 +15,7 @@ import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
-import { setStyleUnites, styleUnites } from './sprites.js';
+import { setStyleUnites, styleUnites, spriteDe } from './sprites.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 const MAX_CATCHUP = 5;
@@ -254,7 +254,7 @@ class Game {
     if (this.garrisonArmed) {
       this.garrisonArmed = false;
       this.ui.setBuildHint('');
-      const shelter = this.world.entityAt(p.x, p.y, this.world.humanIndex, this.tapTolerance());
+      const shelter = this.devantSousLeDoigt(p, this.world.entityAt(p.x, p.y, this.world.humanIndex, this.tapTolerance()), this.world.humanIndex);
       if (shelter && shelter.kind === 'building' && shelter.def.garrison && ownUnits.length) {
         const sent = this.world.garrisonUnits(ownUnits, shelter);
         if (sent > 0) {
@@ -276,15 +276,22 @@ class Game {
     const tolerance = this.tapTolerance();
     // Exception : le doigt posé franchement sur un de ses bâtiments le
     // sélectionne quand même — en plein raid, il faut pouvoir produire.
-    const ownBuilding = this.world.entityAt(p.x, p.y, this.world.humanIndex, 0);
-    const enemy = ownUnits.length > 0 && !(ownBuilding && ownBuilding.kind === 'building')
+    const ownBuilding = this.devantSousLeDoigt(p, this.world.entityAt(p.x, p.y, this.world.humanIndex, 0), this.world.humanIndex);
+    let enemy = ownUnits.length > 0 && !(ownBuilding && ownBuilding.kind === 'building')
       ? this.world.enemyAt(p.x, p.y, this.world.humanIndex, tolerance) : null;
+    // Le doigt sur les toits d'un palais ennemi : c'est lui qu'on attaque, et
+    // l'ordre vise son centre — le point touché, lui, est hors de l'emprise.
+    let cible = p;
+    if (!enemy && ownUnits.length > 0 && !ownBuilding) {
+      const illustre = this.batimentIllustreSous(p.x, p.y);
+      if (illustre && illustre.playerIndex !== this.world.humanIndex) { enemy = illustre; cible = { x: illustre.x, y: illustre.y }; }
+    }
     if (enemy && this.renderer.isEntityVisible(enemy)) {
-      this.issueOrder(p.x, p.y);
+      this.issueOrder(cible.x, cible.y);
       return;
     }
 
-    const entity = this.world.entityAt(p.x, p.y, null, tolerance);
+    const entity = this.devantSousLeDoigt(p, this.world.entityAt(p.x, p.y, null, tolerance));
     const isMine = entity && entity.playerIndex === this.world.humanIndex;
     const visible = entity && (isMine || this.renderer.isEntityVisible(entity));
 
@@ -342,6 +349,41 @@ class Game {
    * Rayon de pointage en unités monde : on vise une cible d'environ 22 pixels
    * à l'écran quel que soit le zoom — la taille d'un bout de doigt.
    */
+  /**
+   * Un bâtiment illustré se touche là où on le VOIT : le palais monte bien
+   * au-dessus de son emprise, et personne ne vise le sol. Renvoie le bâtiment
+   * dont l'image contient le point, ou null. Sert de repli quand le test sur
+   * l'emprise n'a rien trouvé : une unité devant le palais garde la priorité.
+   */
+  batimentIllustreSous(x, y, playerIndex = null) {
+    for (const b of this.world.buildings) {
+      if (b.dead || (playerIndex !== null && b.playerIndex !== playerIndex)) continue;
+      const s = spriteDe(b.type);
+      if (!s) continue;
+      const { cellW, cellH, largeurMonde, sol } = s.def;
+      const dw = largeurMonde, dh = (cellH / cellW) * dw;
+      const sud = (b.ty + b.size) * TILE;
+      const haut = sud - dh * (sol ?? 1);
+      if (x >= b.x - dw / 2 && x <= b.x + dw / 2 && y >= haut && y <= sud) return b;
+    }
+    return null;
+  }
+
+  /**
+   * Ce qui est réellement sous le doigt, compte tenu des illustrations. Une
+   * unité garde la priorité. Un bâtiment illustré prime sur un bâtiment plat
+   * qu'il recouvre — une ferme au nord du palais est peinte AVANT ses dômes,
+   * le joueur voit les dômes, il veut le palais. `playerIndex` restreint à un
+   * camp, comme pour entityAt.
+   */
+  devantSousLeDoigt(p, trouve, playerIndex = null) {
+    if (trouve && trouve.kind === 'unit') return trouve;
+    const illustre = this.batimentIllustreSous(p.x, p.y, playerIndex);
+    if (!illustre) return trouve;
+    if (!trouve || (trouve.kind === 'building' && trouve !== illustre && illustre.ty > trouve.ty)) return illustre;
+    return trouve;
+  }
+
   tapTolerance() {
     return clamp(16 / this.camera.zoom, 10, 40);
   }

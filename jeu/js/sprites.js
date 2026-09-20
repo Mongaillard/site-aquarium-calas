@@ -35,6 +35,18 @@ const ATLAS = {
     // l'échange de canaux suffit et coûte moins cher qu'une conversion HSL.
     recolorage: 'echange',
   },
+  // Bâtiments : une seule image, dessinée sur `largeurMonde` pixels et posée
+  // sur l'emprise par sa ligne de sol (`sol`, fraction de la hauteur). Le
+  // Centre-Ville déborde de son emprise 3×3 : un palais qui se lit de loin, et
+  // un parvis qui empiète sur les cases voisines — les unités marchent dessus.
+  towncenter: {
+    src: 'assets/centre-ville.webp',
+    cellW: 288, cellH: 287, cases: 1, images: 1,
+    largeurMonde: 144, sol: 0.93, natif: 'bleu',
+    // Dômes et bannières sont bleu franc ; la pierre est blanche, l'eau et les
+    // cristaux sont cyan (teinte < 200°) : seule la fenêtre du bleu bascule.
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
   spearman: {
     src: 'assets/lancier.png',
     cellW: 48, cellH: 48, cases: 8, images: 1,
