@@ -430,16 +430,36 @@ export class Renderer {
     }
   }
 
+  /**
+   * Les ressources. L'or, plat, se dessine ici, sous tout le reste. Arbres et
+   * buissons illustrés sont plus hauts que leur case : ils entrent dans l'ordre
+   * du peintre avec les unités et les bâtiments (voir drawEntities), et ne
+   * passent par ici que si leur atlas manque.
+   */
   drawResources(view) {
     const map = this.world.map;
+    const arbres = spriteDe('arbres'), buissons = spriteDe('buissons');
     for (const res of map.resources.values()) {
       if (res.tx < view.x0 || res.tx > view.x1 || res.ty < view.y0 || res.ty > view.y1) continue;
       if (!this.world.fog.explored[res.ty * map.w + res.tx]) continue;
       const x = res.tx * TILE, y = res.ty * TILE;
-      if (res.type === 'wood') this.drawTree(x, y, res);
-      else if (res.type === 'gold') this.drawGold(x, y, res);
-      else this.drawBush(x, y, res);
+      if (res.type === 'gold') this.drawGold(x, y, res);
+      else if (res.type === 'wood' && !arbres) this.drawTree(x, y, res);
+      else if (res.type === 'food' && !buissons) this.drawBush(x, y, res);
     }
+  }
+
+  /**
+   * Un arbre ou un buisson illustré, posé au bas de sa case. Le gisement qui
+   * s'épuise rapetisse un peu : de loin, on voit ce qu'il reste à prendre.
+   */
+  dessinerVegetation(res, sprite) {
+    const { cellW, cellH, hauteurMonde } = sprite.def;
+    const ratio = res.max ? res.amount / res.max : 1;
+    const k = 0.8 + 0.2 * Math.min(1, ratio);
+    const h = hauteurMonde * k, w = (cellW / cellH) * h;
+    const cx = res.tx * TILE + TILE / 2, base = (res.ty + 1) * TILE + 3;
+    this.ctx.drawImage(sprite.variantes.bleu, (res.variant % sprite.def.cases) * cellW, 0, cellW, cellH, cx - w / 2, base - h, w, h);
   }
 
   drawTree(x, y, res) {
@@ -555,14 +575,30 @@ export class Renderer {
       if (e.playerIndex !== this.world.humanIndex && !this.isEntityVisible(e)) continue;
       list.push(e);
     }
+    // Arbres et buissons illustrés : plus hauts que leur case, ils se classent
+    // avec le reste — une unité qui passe derrière un arbre passe derrière.
+    const arbres = spriteDe('arbres'), buissons = spriteDe('buissons');
+    if (arbres || buissons) {
+      const map = this.world.map;
+      const explored = this.world.fog.explored;
+      for (const res of map.resources.values()) {
+        if (res.tx < view.x0 - 1 || res.tx > view.x1 + 1 || res.ty < view.y0 - 2 || res.ty > view.y1 + 1) continue;
+        if (!explored[res.ty * map.w + res.tx]) continue;
+        const sprite = res.type === 'wood' ? arbres : res.type === 'food' ? buissons : null;
+        if (sprite) list.push({ kind: 'vegetation', res, sprite, ty: res.ty });
+      }
+    }
     // Ordre du peintre. Un bâtiment est classé à son bord NORD, pas à son
     // centre : son illustration déborde de l'emprise, et une unité qui longe
     // le mur doit passer devant, jamais dessous. Ce qui est derrière (plus au
     // nord) reste caché par les toits — c'est l'effet voulu.
-    const rang = (e) => (e.kind === 'building' ? e.ty * TILE + 8 : e.y);
+    // Un arbre se classe au pied de sa case, un peu avant une unité qui s'y
+    // tiendrait devant : celle-ci est dessinée par-dessus le tronc.
+    const rang = (e) => (e.kind === 'building' ? e.ty * TILE + 8 : e.kind === 'vegetation' ? (e.ty + 1) * TILE - 6 : e.y);
     list.sort((a, b) => rang(a) - rang(b));
     for (const e of list) {
       if (e.kind === 'building') this.drawBuilding(e);
+      else if (e.kind === 'vegetation') this.dessinerVegetation(e.res, e.sprite);
       else this.drawUnit(e);
     }
   }

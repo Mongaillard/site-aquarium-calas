@@ -55,6 +55,19 @@ const ATLAS = {
     largeurMonde: 132, sol: 0.93, natif: 'bleu',
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
+  // Végétation : six arbres et six buissons, sans couleur d'équipe. Chaque
+  // case a son sprite posé au bas, centré : l'ancre est le bas de la case, et
+  // la planche dicte les proportions — l'arbre le plus haut fait 73 px monde.
+  arbres: {
+    src: 'assets/arbres.webp',
+    cellW: 82, cellH: 146, cases: 6, images: 1,
+    ancreY: 146, hauteurMonde: 73,
+  },
+  buissons: {
+    src: 'assets/buissons.webp',
+    cellW: 72, cellH: 77, cases: 6, images: 1,
+    ancreY: 77, hauteurMonde: 38.5,
+  },
   spearman: {
     src: 'assets/lancier.png',
     cellW: 48, cellH: 48, cases: 8, images: 1,
@@ -183,8 +196,12 @@ function rotationTeinte(image, l, h, regle) {
   return canvas;
 }
 
-/** Variante d'équipe : l'image d'origine sert un camp, l'autre est recalculée. */
+/**
+ * Variante d'équipe : l'image d'origine sert un camp, l'autre est recalculée.
+ * Sans règle (végétation), les deux camps partagent l'image.
+ */
 function recolorer(def, image, l, h) {
+  if (!def.recolorage) return image;
   return def.recolorage === 'echange'
     ? echangeCanaux(image, l, h)
     : rotationTeinte(image, l, h, def.recolorage);

@@ -10,6 +10,7 @@
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 288×287, dessiné sur 144 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 264×264, dessinée sur 132 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
 | `sol-herbe.webp`, `sol-herbe-sombre.webp`, `sol-terre.webp`, `sol-sable.webp` | Les quatre **nappes de sol** (herbe, herbe sombre, terre, sable), 384×384, raccordées bord à bord | Planche de six textures générée par l'auteur du dépôt ; deux (herbe sèche, terre sombre) restent en réserve |
+| `arbres.webp`, `buissons.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux) et six **buissons** fleuris, 82×146 et 72×77 par case | Planche générée par l'auteur du dépôt, avec transparence |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
 Ces images viennent d'une planche de référence fournie par l'auteur du dépôt, qui
@@ -155,7 +156,29 @@ Réduites à 384 px et encodées en WebP avec pertes (qualité 72) : **149 Ko** 
 les quatre. Les couleurs moyennes des nappes servent à la minimap et à la tuile
 de secours affichée le temps du chargement.
 
+## Les arbres et les buissons
+
+La planche est livrée avec sa transparence, mais aucun pixel n'y est tout à
+fait opaque — le détourage automatique laisse un voile d'alpha (252 au lieu de
+255) : il est renormalisé sur le 99ᵉ centile. Les sprites sont repérés par
+**composantes connexes** (parcours en largeur sur un masque `alpha > 64`) :
+la simple projection par colonnes agglomérait les arbres, dont les socles de
+rochers et les branches se touchent presque.
+
+Une seule échelle pour toute la planche, qui garde ses proportions : l'arbre
+le plus haut (le cyprès) fait **73 px monde**, soit un chevalier et demi ; les
+buissons tombent autour de 36 px, la taille d'une case. Chaque case d'atlas a
+son sprite posé au bas et centré : l'ancre est le bas de la case, le socle de
+rochers vient s'asseoir sur la case de la carte. Atlas à deux fois la taille
+dessinée, WebP avec pertes et transparence : **17 + 29 Ko**.
+
+En jeu, arbres et buissons sont plus hauts que leur case : ils sont classés
+dans l'**ordre du peintre** avec les unités et les bâtiments, au pied de leur
+case — une unité qui passe derrière un arbre passe derrière. Un gisement qui
+s'épuise rapetisse un peu (jusqu'à 80 %) : de loin, on voit ce qu'il reste à
+prendre. L'or, plat, garde son dessin au code.
+
 ## Format
 
-WebP partout où c'est possible : 354 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
+WebP partout où c'est possible : 400 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
 PNG, sans différence visible à l'œil même agrandi trois fois.
