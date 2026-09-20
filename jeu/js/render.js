@@ -348,7 +348,7 @@ export class Renderer {
     const view = this.visibleTileRange();
     const list = [];
     for (const e of this.world.entities) {
-      if (e.dead) continue;
+      if (e.dead || e.garrisonedIn) continue;   // à l'abri : invisible sur la carte
       const pad = e.kind === 'building' ? e.size * TILE : TILE * 2;
       if (e.x < view.left - pad || e.x > view.right + pad
           || e.y < view.top - pad || e.y > view.bottom + pad) continue;
@@ -478,6 +478,23 @@ export class Renderer {
         ctx.arc(b.x + Math.sin(this.frame / 22) * 4, y - 12, 6, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+
+    // Garnison : un fanion indique combien d'unités sont à l'abri.
+    if (b.garrison && b.garrison.length > 0 && this.camera.zoom > 0.4) {
+      const bx = x + w - 9, by = y + 2;
+      ctx.fillStyle = 'rgba(12,18,26,0.85)';
+      ctx.beginPath();
+      ctx.arc(bx, by + 6, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = color.light;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 9px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(b.garrison.length), bx, by + 6);
     }
 
     if (b.selected) this.drawBuildingSelection(b, w, x, y);
@@ -793,7 +810,7 @@ export class Renderer {
     ctx.drawImage(this.fogCanvas, 0, 0, size, size);
 
     for (const e of this.world.entities) {
-      if (e.dead) continue;
+      if (e.dead || e.garrisonedIn) continue;
       if (e.playerIndex !== this.world.humanIndex && !this.isEntityVisible(e)) continue;
       ctx.fillStyle = e.player.color.main;
       const s = e.kind === 'building' ? Math.max(3, e.size * scale) : Math.max(2, scale * 1.2);

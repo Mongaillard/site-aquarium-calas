@@ -135,6 +135,14 @@ export class World {
     this.rebuildGrid();
     this.processPathQueue();
 
+    // Relevé des bâtisseurs du tick précédent : sert au rendement décroissant.
+    for (let i = 0; i < this.buildings.length; i++) {
+      const b = this.buildings[i];
+      if (b.complete) continue;
+      b.builderCount = b.activeBuilders;
+      b.activeBuilders = 0;
+    }
+
     for (let i = 0; i < this.units.length; i++) this.units[i].update(dt);
     for (let i = 0; i < this.buildings.length; i++) this.buildings[i].update(dt);
 
@@ -172,7 +180,7 @@ export class World {
     this.grid.clear();
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i];
-      if (!e.dead) this.grid.insert(e);
+      if (!e.dead && !e.garrisonedIn) this.grid.insert(e);
     }
   }
 
@@ -297,7 +305,7 @@ export class World {
   entityAt(x, y, playerIndex = null) {
     let best = null, bestD = Infinity;
     for (const e of this.entities) {
-      if (e.dead) continue;
+      if (e.dead || e.garrisonedIn) continue;
       if (playerIndex !== null && e.playerIndex !== playerIndex) continue;
       let hit = false, d = 0;
       if (e.kind === 'building') {
@@ -330,10 +338,16 @@ export class World {
   }
 
   onDamaged(entity, source, amount) {
-    // Riposte : une unité militaire inoccupée rend les coups.
-    if (entity.kind === 'unit' && entity.aggressive && source && !source.dead
+    // Riposte : une unité inoccupée rend les coups, sauf attitude « sans
+    // attaque ». Les villageois ne se défendent que contre d'autres villageois
+    // (comme dans AoE : face à un soldat, mieux vaut fuir ou se réfugier).
+    if (entity.kind === 'unit' && source && !source.dead && !entity.garrisonedIn
+        && entity.stance !== 'passive'
         && (entity.state === STATE.IDLE || (entity.state === STATE.MOVE && !entity.destination))) {
-      entity.attackEntity(source);
+      entity.attackEntity(source, true);
+    } else if (entity.kind === 'unit' && entity.isVillager && source && !source.dead
+        && source.kind === 'unit' && source.isVillager && entity.state === STATE.IDLE) {
+      entity.attackEntity(source, true);
     }
     if (entity.playerIndex === this.humanIndex) {
       this.pushEvent({ type: 'underAttack', x: entity.x, y: entity.y, entity });
@@ -356,6 +370,14 @@ export class World {
     } else {
       const i = this.buildings.indexOf(entity);
       if (i >= 0) this.buildings.splice(i, 1);
+      // La garnison périt avec le bâtiment (règle d'AoE).
+      if (entity.garrison && entity.garrison.length > 0) {
+        for (const occupant of entity.garrison.slice()) {
+          occupant.garrisonedIn = null;
+          this.killEntity(occupant, source);
+        }
+        entity.garrison.length = 0;
+      }
       entity.releaseTiles();
       this.map.dirty = true;
       if (!silent) {
@@ -655,6 +677,12 @@ export class World {
         for (const v of villagers) v.buildAt(target);
         return { kind: 'build', target };
       }
+      // Bâtiment intact pouvant abriter : on s'y réfugie (règle d'AoE).
+      if (target.complete && target.def.garrison && target.hp >= target.maxHp
+          && units.some((u) => target.canGarrison(u))) {
+        this.garrisonUnits(units, target);
+        return { kind: 'garrison', target };
+      }
       if (target.type === 'farm' && villagers.length) {
         for (const v of villagers) v.gatherFarm(target);
         return { kind: 'gather', target };
@@ -696,7 +724,13 @@ export class World {
 
   /** Déplacement de groupe : les unités visent des points répartis autour de la cible. */
   formationMove(units, x, y, aggressive) {
-    if (units.length === 1) { units[0].moveTo(x, y, aggressive); return; }
+    if (units.length === 1) { units[0].groupSpeed = 0; units[0].moveTo(x, y, aggressive); return; }
+    // Le groupe avance au rythme du plus lent : l'armée arrive ensemble.
+    let slowest = Infinity;
+    for (const u of units) {
+      const own = u.def.speed * TILE * (u.isVillager ? u.player.mods.villagerSpeed : 1);
+      if (own < slowest) slowest = own;
+    }
     const spacing = TILE * 1.15;
     const cols = Math.ceil(Math.sqrt(units.length));
     const sorted = [...units].sort((a, b) => dist2(a.x, a.y, x, y) - dist2(b.x, b.y, x, y));
@@ -707,7 +741,72 @@ export class World {
       const px = clamp(x + ox, TILE, this.map.pixelWidth - TILE);
       const py = clamp(y + oy, TILE, this.map.pixelHeight - TILE);
       u.moveTo(px, py, aggressive);
+      u.groupSpeed = slowest;
     });
+  }
+
+  /** Envoie des unités s'abriter dans un bâtiment. */
+  garrisonUnits(units, building) {
+    let sent = 0;
+    for (const u of units) {
+      if (u.kind !== 'unit' || u.garrisonedIn) continue;
+      if (!building.canGarrison(u)) continue;
+      if (u.garrisonAt(building)) sent++;
+    }
+    if (sent === 0 && building.playerIndex === this.humanIndex) {
+      const g = building.def.garrison;
+      this.pushEvent({
+        type: 'notice',
+        text: !g ? 'Ce bâtiment n’abrite personne.'
+          : building.garrison.length >= g.capacity ? 'Bâtiment plein.'
+            : 'Ces unités ne peuvent pas s’y abriter.',
+      });
+    }
+    return sent;
+  }
+
+  releaseGarrison(building) {
+    const released = building.releaseGarrison();
+    if (released.length && building.playerIndex === this.humanIndex) {
+      this.pushEvent({ type: 'notice', text: `${released.length} unité(s) sortie(s)` });
+    }
+    return released;
+  }
+
+  /**
+   * Cloche du village : tous les villageois courent s'abriter. Un second coup
+   * les renvoie au travail — ils reprennent leur poste, pas n'importe lequel.
+   */
+  ringTownBell(playerIndex) {
+    const shelters = this.buildings.filter(
+      (b) => !b.dead && b.complete && b.playerIndex === playerIndex && b.def.garrison);
+    if (shelters.length === 0) return { sheltered: 0, released: 0 };
+
+    const occupied = shelters.reduce((sum, b) => sum + b.garrison.length, 0);
+    if (occupied > 0) {
+      let released = 0;
+      for (const b of shelters) released += this.releaseGarrison(b).length;
+      return { sheltered: 0, released };
+    }
+
+    let sheltered = 0;
+    const villagers = this.units.filter(
+      (u) => !u.dead && u.playerIndex === playerIndex && u.isVillager && !u.garrisonedIn);
+    for (const v of villagers) {
+      let best = null, bestD = Infinity;
+      for (const b of shelters) {
+        if (!b.canGarrison(v)) continue;
+        const d = dist2(v.x, v.y, b.x, b.y);
+        if (d < bestD) { bestD = d; best = b; }
+      }
+      if (!best) break;
+      if (v.garrisonAt(best)) sheltered++;
+    }
+    return { sheltered, released: 0 };
+  }
+
+  setStance(units, stanceId) {
+    for (const u of units) if (u.kind === 'unit') u.setStance(stanceId);
   }
 
   setRally(building, x, y) {
@@ -725,7 +824,7 @@ export class World {
     fog.visible.fill(0);
     const { w, h } = this.map;
     for (const e of this.entities) {
-      if (e.dead || e.playerIndex !== this.humanIndex) continue;
+      if (e.dead || e.garrisonedIn || e.playerIndex !== this.humanIndex) continue;
       const radius = Math.round((e.def.los || 4) + (e.kind === 'building' ? e.size / 2 : 0));
       const cx = Math.floor(e.x / TILE), cy = Math.floor(e.y / TILE);
       const r2 = radius * radius;

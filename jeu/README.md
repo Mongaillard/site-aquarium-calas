@@ -32,7 +32,47 @@ Sur un téléphone : ouvrez l'URL, puis « Ajouter à l'écran d'accueil ». Le
 | Toucher le sol / un arbre / un ennemi (avec une sélection) | Ordre contextuel : se déplacer, récolter, construire, attaquer |
 | Bouton 🏗️ puis toucher la carte | Poser un bâtiment |
 | Barre 👷 en bas | Voir qui fait quoi · toucher un métier pour sélectionner le groupe |
+| Pastilles ⚔️ 🛡️ 🧱 🕊️ | Attitude de combat de la sélection (voir plus bas) |
+| Bouton 🚪 puis un abri | Mettre la sélection à l'abri · 🔔 met tous les villageois à couvert |
 | Bouton 👷 | Panneau d'affectation : − / + pour déplacer un ouvrier d'un poste à l'autre |
+
+### Comportement des unités : les principes d'Age of Empires
+
+Les personnages se conduisent selon les mêmes règles que dans AoE II.
+
+**Attitudes de combat.** Chaque unité en a une, réglable d'un doigt sur la
+sélection :
+
+| Attitude | Comportement |
+| --- | --- |
+| ⚔️ **Agressif** | Engage tout ennemi en vue et le poursuit jusqu'à 9 cases de son poste |
+| 🛡️ **Défensif** | Engage ce qui approche, ne s'éloigne pas de plus de 4 cases, puis revient |
+| 🧱 **Position tenue** | Ne bouge jamais : ne frappe que ce qui entre à portée d'arme |
+| 🕊️ **Sans attaque** | N'attaque jamais de sa propre initiative |
+
+Les soldats démarrent en *agressif*, les villageois en *sans attaque* — mais un
+villageois rend les coups à un autre villageois, comme dans AoE.
+
+**Poursuite bornée.** Une unité qui choisit sa cible elle-même ne se laisse
+jamais entraîner à l'autre bout de la carte : passé la limite de son attitude,
+elle abandonne et regagne son poste. Un ordre d'attaque donné par le joueur,
+lui, est suivi sans limite.
+
+**Garnison.** Le Centre-Ville (15 places) et les tours de guet (5) abritent
+villageois, fantassins et archers. À l'intérieur, les unités sont hors d'atteinte
+et se soignent, et **chaque occupant ajoute une flèche** à la salve du bâtiment :
+un Centre-Ville vide ne tire pas, un Centre-Ville plein est une forteresse. Si le
+bâtiment tombe, la garnison périt avec lui. Le bouton **🔔 cloche du village**
+envoie tous les villageois s'abriter d'un coup ; un second coup les renvoie au
+travail. Pour abriter une sélection précise, le bouton **🚪 Abriter** puis un
+appui sur le refuge (des soldats se réfugient d'un simple appui sur l'abri).
+
+**Déplacement en groupe.** Une armée avance au rythme de son unité la plus
+lente : un bélier ne se fait plus distancer par les éclaireurs. Un ordre donné à
+une seule unité lui rend sa vitesse propre.
+
+**Chantiers.** Plusieurs bâtisseurs accélèrent la construction, avec un
+rendement décroissant : quatre villageois valent 2,8 villageois, pas 4.
 
 ### Ce sont vos ouvriers, c'est vous qui les affectez
 
@@ -65,6 +105,8 @@ annuler, `.` pour trouver un villageois inactif, `H` pour revenir au Centre-Vill
 - **4 technologies** : brouette, armes forgées, flèches barbelées, armure d'écailles.
 - **Brouillard de guerre**, minimap, points de ralliement, files de production,
   réparation, annulation de chantier avec remboursement.
+- **Attitudes de combat, poursuite bornée, garnison et cloche du village**,
+  déplacement de groupe au rythme du plus lent (voir plus bas).
 - **Affectation manuelle des ouvriers** : barre de répartition permanente et
   panneau d'affectation (voir plus haut).
 - **Victoire** : détruire tous les bâtiments adverses et leurs villageois.

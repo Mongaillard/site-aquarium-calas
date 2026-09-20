@@ -221,6 +221,75 @@ const barCount = await page.evaluate(() => ({
 check('compteur de la barre à jour', barCount.affiche === barCount.reel,
   `barre=${barCount.affiche} réel=${barCount.reel}`);
 
+// Attitudes de combat (principe d'AoE)
+const stanceCheck = await page.evaluate(() => {
+  const g = window.__jeu;
+  const soldier = g.world.spawnUnit(0, 'militia', g.camera.x, g.camera.y);
+  g.setSelection([soldier]);
+  return { id: soldier.id, stance: soldier.stance };
+});
+check('attitude par défaut : agressif', stanceCheck.stance === 'aggressive', stanceCheck.stance);
+await page.waitForTimeout(250);
+const stanceButtons = await page.$$eval('#command-panel .cmd .cmd-label',
+  (els) => els.map((e) => e.textContent));
+check('les quatre attitudes sont proposées',
+  ['Agressif', 'Défensif', 'Tenir', 'Passif'].every((n) => stanceButtons.includes(n)),
+  stanceButtons.join(', '));
+
+const standIndex = stanceButtons.indexOf('Tenir');
+await page.click(`#command-panel .cmd:nth-of-type(${standIndex + 1})`);
+await page.waitForTimeout(200);
+const newStance = await page.evaluate(() => window.__jeu.selection[0].stance);
+check('changement d’attitude au doigt', newStance === 'standGround', newStance);
+
+// Garnison : bouton « Abriter » puis appui sur le Centre-Ville
+const garrisoned = await page.evaluate(async () => {
+  const g = window.__jeu;
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const villagers = g.world.units
+    .filter((u) => u.playerIndex === 0 && u.isVillager && !u.garrisonedIn).slice(0, 2);
+  g.setSelection(villagers);
+  g.toggleGarrison();
+  const armed = g.garrisonArmed;
+  const p = g.camera.worldToScreen(tc.x, tc.y);
+  g.tapAt(p.x, p.y, false);
+  const ordered = villagers.filter((v) => v.state === 'garrison').length;
+  for (let i = 0; i < 20 * 30; i++) {
+    g.world.update(1 / 20);
+    if (tc.garrison.length >= ordered && ordered > 0) break;
+  }
+  return { armed, ordered, inside: tc.garrison.length, arrows: tc.arrowCount() };
+});
+check('mode « abriter » armé', garrisoned.armed);
+check('le refuge désigné reçoit les unités', garrisoned.ordered >= 1,
+  garrisoned.ordered + ' villageois envoyés');
+check('les occupants sont bien entrés', garrisoned.inside >= 1, garrisoned.inside + ' à l’intérieur');
+check('le Centre-Ville occupé tire', garrisoned.arrows >= 1, garrisoned.arrows + ' flèche(s)');
+
+// Cloche du village depuis le panneau du Centre-Ville
+const bell = await page.evaluate(() => {
+  const g = window.__jeu;
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  g.setSelection([tc]);
+  const before = tc.garrison.length;
+  g.ringTownBell();           // premier coup : libère (des unités sont déjà dedans)
+  return { before, after: tc.garrison.length };
+});
+check('la cloche libère la garnison', bell.after < bell.before || bell.before === 0,
+  `${bell.before} → ${bell.after}`);
+
+// Des soldats qui touchent un abri allié s'y réfugient directement.
+const soldierShelter = await page.evaluate(() => {
+  const g = window.__jeu;
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const soldier = g.world.spawnUnit(0, 'militia', tc.x + 96, tc.y + 96);
+  g.setSelection([soldier]);
+  const p = g.camera.worldToScreen(tc.x, tc.y);
+  g.tapAt(p.x, p.y, false);
+  return soldier.state;
+});
+check('appui direct : les soldats se réfugient', soldierShelter === 'garrison', soldierShelter);
+
 // Menu pause
 await page.evaluate(() => window.__jeu.togglePause());
 await page.waitForTimeout(150);

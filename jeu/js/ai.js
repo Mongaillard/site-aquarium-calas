@@ -374,14 +374,21 @@ export class AIPlayer {
       for (const u of this.army) {
         if (u.state === STATE.IDLE || u.state === STATE.MOVE || !u.target) u.attackEntity(threat);
       }
-      // Les villageois vraiment menacés se réfugient — une seule fois, et
-      // pour quelques secondes : les renvoyer au Centre-Ville à chaque cycle
-      // reviendrait à saborder sa propre économie.
+      // Les villageois vraiment menacés se mettent à l'abri : garnison du
+      // Centre-Ville ou d'une tour, comme au son de la cloche du village.
       const now = this.world.time;
-      if (this.townCenter) {
-        for (const v of this.villagers) {
-          if (v.fleeUntil > now) continue;
-          if (dist2(v.x, v.y, threat.x, threat.y) > (TILE * 3.5) ** 2) continue;
+      const shelters = this.completed.filter((b) => b.def.garrison);
+      for (const v of this.villagers) {
+        if (v.fleeUntil > now || v.garrisonedIn) continue;
+        if (dist2(v.x, v.y, threat.x, threat.y) > (TILE * 3.5) ** 2) continue;
+        let best = null, bestD = Infinity;
+        for (const b of shelters) {
+          if (!b.canGarrison(v)) continue;
+          const d = dist2(v.x, v.y, b.x, b.y);
+          if (d < bestD) { bestD = d; best = b; }
+        }
+        if (best && v.garrisonAt(best)) { v.fleeUntil = now + 25; continue; }
+        if (this.townCenter) {
           v.fleeUntil = now + 6;
           v.moveTo(this.townCenter.x, this.townCenter.y + TILE * 2.5);
         }
@@ -391,6 +398,11 @@ export class AIPlayer {
 
     if (this.world.time < this.defendUntil) return;
 
+    // Danger passé : on rouvre les portes, les villageois retournent au travail.
+    for (const b of this.completed) {
+      if (b.garrison && b.garrison.length > 0) this.world.releaseGarrison(b);
+    }
+
     // Vague d'attaque quand l'armée est assez fournie.
     if (this.attackTimer <= 0 && this.army.length >= this.armyTarget) {
       const target = this.pickAttackTarget();
@@ -398,12 +410,14 @@ export class AIPlayer {
         this.waveCount++;
         this.armyTarget = Math.min(24, this.difficulty.armyTrigger + this.waveCount * this.difficulty.armyStep);
         this.attackTimer = this.difficulty.attackDelay * 0.25 + 20;
+        this.world.setStance(this.army, 'aggressive');   // en campagne, on engage
         this.world.formationMove(this.army, target.x, target.y, true);
       }
     } else if (this.army.length > 0) {
       // Regroupement défensif autour du Centre-Ville.
       const tc = this.townCenter;
       if (!tc) return;
+      this.world.setStance(this.army, 'defensive');     // au camp, on tient son poste
       for (const u of this.army) {
         if (u.state !== STATE.IDLE) continue;
         if (dist2(u.x, u.y, tc.x, tc.y) > (TILE * 11) ** 2) {

@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import {
-  AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS,
+  AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES,
 } from './config.js';
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
 
@@ -196,6 +196,7 @@ export class UI {
       ? first.queue.map((q) => q.id + Math.ceil(q.timeLeft)).join(',') : '';
     return Object.entries(counts).map(([k, v]) => k + v).join('|')
       + '#' + selection.length + '#' + Math.round(first.hp) + '#' + queue
+      + '#' + (first.stance || '') + '#' + (first.garrison ? first.garrison.length : '')
       + '#' + (first.complete === false ? Math.round(first.progressRatio * 20) : '')
       + '#' + this.world.players[this.world.humanIndex].age;
   }
@@ -229,6 +230,7 @@ export class UI {
       const rows = [];
       if (first.kind === 'unit') {
         rows.push(`⚔️ ${def.attack} · 🛡️ ${first.meleeArmor()}/${first.pierceArmor()}`);
+        rows.push(`${first.stanceDef.icon} ${first.stanceDef.name}`);
         if (def.range > 1.5) rows.push(`🎯 portée ${def.range}`);
         if (first.isVillager && first.carry.amount > 0.5) {
           rows.push(`${RESOURCE_ICONS[first.carry.type]} ${Math.floor(first.carry.amount)}/${first.carryCapacity()}`);
@@ -236,6 +238,7 @@ export class UI {
       } else {
         if (def.attack) rows.push(`⚔️ ${def.attack} · 🎯 ${def.range}`);
         if (def.popBonus) rows.push(`👥 +${def.popBonus}`);
+        if (def.garrison) rows.push(`🚪 ${first.garrison.length}/${def.garrison.capacity}`);
         if (first.type === 'farm') rows.push(`🍖 ${Math.max(0, Math.round(first.foodLeft))}`);
         if (!first.complete) rows.push(`🏗️ ${Math.round(first.progressRatio * 100)} %`);
       }
@@ -301,6 +304,26 @@ export class UI {
         action: () => this.game.toggleAttackMove(),
       });
     }
+    if (units.length > 0 && this.world.buildings.some(
+      (b) => !b.dead && b.complete && b.playerIndex === this.world.humanIndex
+        && b.def.garrison && units.some((u) => b.canGarrison(u)))) {
+      buttons.push({
+        icon: '🚪', label: 'Abriter', toggled: this.game.garrisonArmed,
+        action: () => this.game.toggleGarrison(),
+      });
+    }
+    if (units.length > 0) {
+      // Attitudes, comme dans AoE : c'est elles qui décident si l'unité engage
+      // d'elle-même et jusqu'où elle poursuit.
+      const current = units.every((u) => u.stance === units[0].stance) ? units[0].stance : null;
+      for (const stance of Object.values(STANCES)) {
+        buttons.push({
+          icon: stance.icon, label: stance.short, title: stance.name + ' — ' + stance.desc,
+          compact: true, toggled: current === stance.id,
+          action: () => this.game.setStance(stance.id),
+        });
+      }
+    }
 
     if (first.kind === 'building' && selection.length === 1) {
       const b = first;
@@ -345,6 +368,18 @@ export class UI {
             });
           }
         }
+        if (def.garrison) {
+          if (b.type === 'towncenter') {
+            buttons.push({
+              icon: '🔔', label: 'Cloche', action: () => this.game.ringTownBell(),
+            });
+          }
+          buttons.push({
+            icon: '🚪', label: `Libérer (${b.garrison.length})`,
+            check: () => (b.garrison.length > 0 ? { ok: true } : { ok: false, reason: 'Personne à l’intérieur' }),
+            action: () => this.game.releaseGarrison(b),
+          });
+        }
         if (def.trains) {
           buttons.push({
             icon: '🚩', label: 'Ralliement', toggled: this.game.rallyArmed,
@@ -361,7 +396,9 @@ export class UI {
       if (!state.ok) classes.push('disabled');
       if (b.toggled) classes.push('toggled');
       if (b.highlight) classes.push('highlight');
-      return `<button class="${classes.join(' ')}" data-cmd="${i}" ${state.ok ? '' : `data-reason="${state.reason}"`}>
+      if (b.compact) classes.push('compact');
+      const title = b.title ? ` title="${b.title}"` : '';
+      return `<button class="${classes.join(' ')}" data-cmd="${i}"${title} ${state.ok ? '' : `data-reason="${state.reason}"`}>
         <span class="cmd-icon">${b.icon}</span>
         <span class="cmd-label">${b.label}</span>
         ${b.cost ? `<span class="cmd-cost">${b.cost}</span>` : ''}
@@ -509,6 +546,8 @@ export class UI {
         <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant</li>
         <li><b>🏗️ Construire</b> : choisissez un bâtiment, puis touchez l'emplacement</li>
         <li>Les villageois récoltent 🍖 nourriture, 🪵 bois et 🪙 or ; il faut des <b>maisons</b> pour agrandir la population</li>
+        <li><b>Attitudes</b> (unité sélectionnée) : ⚔️ agressif poursuit loin, 🛡️ défensif revient à son poste, 🧱 position tenue ne bouge pas, 🕊️ sans attaque ignore l'ennemi</li>
+        <li><b>Garnison</b> : touchez votre Centre-Ville ou une tour avec des unités sélectionnées pour les abriter — elles s'y soignent et chaque occupant ajoute une flèche. La <b>🔔 cloche</b> y envoie tous les villageois d'un coup</li>
         <li><b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le villageois rapporte son chargement puis attend vos ordres. La barre <b>👷</b> montre qui fait quoi et permet de réaffecter d'un doigt</li>
         <li>Passez les <b>âges</b> depuis le Centre-Ville pour débloquer de nouvelles unités</li>
         <li><b>Objectif</b> : détruire tous les bâtiments adverses et leurs villageois</li>

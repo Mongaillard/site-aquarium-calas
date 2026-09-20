@@ -5,7 +5,7 @@
 import { World } from '../js/game.js';
 import { AIPlayer } from '../js/ai.js';
 import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
-import { formatTime } from '../js/utils.js';
+import { formatTime, dist } from '../js/utils.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 let failures = 0;
@@ -86,9 +86,19 @@ for (const p of eco.world.players) {
   check(`économie : joueur ${p.index} récolte les 3 ressources`,
     g.food > 600 && g.wood > 600 && g.gold > 150,
     `🍖${Math.round(g.food)} 🪵${Math.round(g.wood)} 🪙${Math.round(g.gold)}`);
-  check(`économie : joueur ${p.index} garde ses villageois occupés`,
-    eco.world.units.filter((u) => u.playerIndex === p.index && u.isVillager && u.state === 'idle').length <= 3,
-    eco.world.units.filter((u) => u.playerIndex === p.index && u.isVillager && u.state === 'idle').length + ' inactifs');
+  // Un chômage passager est normal (villageois qui sortent d'un abri, gisement
+  // épuisé…) : ce qu'on traque, c'est une inactivité qui dure. On observe donc
+  // le minimum sur une fenêtre de quelques secondes.
+  let minIdle = Infinity;
+  for (let i = 0; i < 12 * TICKS_PER_SECOND; i++) {
+    eco.world.update(DT);
+    if (i % TICKS_PER_SECOND !== 0) continue;
+    const idle = eco.world.units.filter(
+      (u) => u.playerIndex === p.index && u.isVillager && u.state === 'idle' && !u.garrisonedIn).length;
+    if (idle < minIdle) minIdle = idle;
+  }
+  check(`économie : joueur ${p.index} garde ses villageois occupés`, minIdle <= 2,
+    minIdle + ' inactifs au plus bas sur 12 s');
 }
 
 // Troisième partie, carte et difficulté différentes : on vérifie la robustesse.
@@ -157,6 +167,175 @@ check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches >
   }
   check('le chargement n’est pas perdu', world.players[0].resources.wood >= before + 9,
     Math.round(world.players[0].resources.wood - before) + ' bois livrés');
+}
+
+// --- Comportements « Age of Empires » ---------------------------------------
+// Attitudes, poursuite bornée, garnison, cloche, vitesse de groupe.
+
+/** Petit bac à sable : un monde sans IA, où l'on place les unités à la main. */
+function sandbox(seed = 3) {
+  const world = new World({ seed, mapSize: 'small', difficulty: 'normal' });
+  world.ais = [];
+  return world;
+}
+
+function advance(world, seconds, stop) {
+  const ticks = Math.round(seconds * TICKS_PER_SECOND);
+  for (let i = 0; i < ticks; i++) {
+    world.update(DT);
+    if (stop && stop()) return true;
+  }
+  return false;
+}
+
+{
+  // Position tenue : l'unité ne quitte jamais son poste.
+  const world = sandbox();
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const guard = world.spawnUnit(0, 'militia', tc.x + TILE * 6, tc.y + TILE * 6);
+  const intruder = world.spawnUnit(1, 'militia', guard.x + TILE * 4, guard.y);
+  intruder.setStance('passive');
+  guard.setStance('standGround');
+  const post = { x: guard.x, y: guard.y };
+  advance(world, 6);
+  check('position tenue : l’unité ne bouge pas',
+    dist(guard.x, guard.y, post.x, post.y) < TILE * 0.6,
+    Math.round(dist(guard.x, guard.y, post.x, post.y)) + ' px parcourus');
+  check('position tenue : l’intrus n’est pas poursuivi', intruder.hp === intruder.maxHp);
+
+  // Mais elle frappe ce qui entre à portée.
+  intruder.x = guard.x + TILE * 0.8;
+  intruder.y = guard.y;
+  advance(world, 4);
+  check('position tenue : frappe ce qui entre à portée', intruder.hp < intruder.maxHp,
+    Math.round(intruder.hp) + '/' + intruder.maxHp + ' PV');
+}
+
+{
+  // Sans attaque : l'unité ignore l'ennemi, même collé.
+  const world = sandbox(4);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const pacifist = world.spawnUnit(0, 'militia', tc.x + TILE * 6, tc.y + TILE * 6);
+  const enemy = world.spawnUnit(1, 'militia', pacifist.x + TILE, pacifist.y);
+  pacifist.setStance('passive');
+  enemy.setStance('passive');
+  advance(world, 5);
+  check('sans attaque : n’engage jamais', enemy.hp === enemy.maxHp && pacifist.target === null);
+}
+
+{
+  // Agressif : poursuit, puis regagne son poste si la cible file trop loin.
+  const world = sandbox(5);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const soldier = world.spawnUnit(0, 'militia', tc.x + TILE * 7, tc.y + TILE * 7);
+  soldier.setStance('aggressive');
+  const post = { x: soldier.x, y: soldier.y };
+  const prey = world.spawnUnit(1, 'villager', soldier.x + TILE * 3, soldier.y);
+  prey.setStance('passive');
+  const engaged = advance(world, 4, () => soldier.target === prey);
+  check('agressif : engage l’ennemi en vue', engaged);
+
+  // La proie s'enfuit très loin : la poursuite doit s'arrêter.
+  prey.x = post.x + TILE * 30;
+  prey.y = post.y;
+  advance(world, 12, () => soldier.target === null && soldier.state === 'idle');
+  check('poursuite bornée : la cible trop lointaine est abandonnée', soldier.target === null,
+    'cible=' + (soldier.target ? 'encore suivie' : 'lâchée'));
+  check('agressif : retour au poste après l’engagement',
+    dist(soldier.x, soldier.y, post.x, post.y) < TILE * 2.5,
+    Math.round(dist(soldier.x, soldier.y, post.x, post.y) / TILE) + ' cases du poste');
+}
+
+{
+  // Garnison : abri, invisibilité pour l'ennemi, soin, puis sortie.
+  const world = sandbox(6);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  villager.hp = 10;
+  check('le Centre-Ville vide ne tire pas', tc.arrowCount() === 0);
+
+  villager.garrisonAt(tc);
+  const entered = advance(world, 20, () => villager.garrisonedIn === tc);
+  check('garnison : le villageois entre', entered && tc.garrison.length === 1);
+  check('garnison : une flèche par occupant', tc.arrowCount() === 1);
+
+  world.rebuildGrid();
+  let visible = false;
+  world.grid.forEachNear(tc.x, tc.y, TILE * 6, (e) => { if (e === villager) visible = true; });
+  check('garnison : l’occupant n’est plus une cible', !visible);
+
+  advance(world, 5);
+  check('garnison : l’occupant se soigne', villager.hp > 10, Math.round(villager.hp) + ' PV');
+
+  world.releaseGarrison(tc);
+  check('garnison : sortie sur ordre', villager.garrisonedIn === null && tc.garrison.length === 0);
+}
+
+{
+  // Un Centre-Ville occupé tire ; vide, il encaisse sans riposter.
+  const world = sandbox(7);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const attacker = world.spawnUnit(1, 'militia', tc.x + TILE * 3, tc.y);
+  attacker.setStance('passive');
+  advance(world, 4);
+  check('Centre-Ville vide : aucune riposte', attacker.hp === attacker.maxHp);
+
+  for (const v of world.units.filter((u) => u.playerIndex === 0 && u.isVillager).slice(0, 3)) {
+    tc.addToGarrison(v);
+  }
+  check('trois occupants, trois flèches', tc.arrowCount() === 3);
+  advance(world, 6);
+  check('Centre-Ville occupé : il tire', attacker.hp < attacker.maxHp,
+    Math.round(attacker.hp) + '/' + attacker.maxHp + ' PV');
+}
+
+{
+  // Cloche du village : tout le monde à l'abri, puis tout le monde dehors.
+  const world = sandbox(9);
+  const first = world.ringTownBell(0);
+  check('cloche : les villageois courent s’abriter', first.sheltered >= 3, first.sheltered + ' abrités');
+  advance(world, 25, () => world.units.filter((u) => u.playerIndex === 0 && u.garrisonedIn).length >= 3);
+  const inside = world.units.filter((u) => u.playerIndex === 0 && u.garrisonedIn).length;
+  check('cloche : ils sont bien entrés', inside >= 3, inside + ' à l’intérieur');
+  const second = world.ringTownBell(0);
+  check('cloche : le second coup les fait ressortir', second.released >= 3, second.released + ' libérés');
+}
+
+{
+  // La garnison périt avec le bâtiment.
+  const world = sandbox(10);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  tc.addToGarrison(villager);
+  world.killEntity(tc, null, false);
+  check('la garnison périt avec le bâtiment', villager.dead);
+}
+
+{
+  // Vitesse de groupe : l'armée avance au rythme du plus lent.
+  const world = sandbox(11);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const ram = world.spawnUnit(0, 'ram', tc.x + TILE * 4, tc.y + TILE * 4);
+  const scout = world.spawnUnit(0, 'scout', tc.x + TILE * 5, tc.y + TILE * 4);
+  world.formationMove([ram, scout], tc.x + TILE * 12, tc.y + TILE * 12, false);
+  check('vitesse de groupe : le rapide s’aligne sur le lent',
+    Math.abs(scout.speedPx() - ram.speedPx()) < 0.01,
+    `éclaireur ${scout.speedPx().toFixed(1)} px/s · bélier ${ram.speedPx().toFixed(1)} px/s`);
+  scout.moveTo(tc.x, tc.y);   // ordre individuel : il retrouve sa vitesse
+  check('vitesse de groupe : un ordre individuel libère l’unité',
+    scout.speedPx() > ram.speedPx() * 2);
+}
+
+{
+  // Rendement décroissant des bâtisseurs.
+  const world = sandbox(12);
+  const site = world.spawnBuilding(0, 'house', 4, 4, false);
+  site.builderCount = 1;
+  const solo = site.buildEfficiency();
+  site.builderCount = 4;
+  const team = site.buildEfficiency() * 4;
+  check('bâtisseurs : deux valent mieux qu’un', team > solo * 1.5, `1 → ${solo.toFixed(2)} · 4 → ${team.toFixed(2)}`);
+  check('bâtisseurs : rendement décroissant', team < solo * 4, `4 ouvriers = ${team.toFixed(2)}× un seul`);
 }
 
 // Déterminisme : une même graine doit rejouer exactement la même partie.

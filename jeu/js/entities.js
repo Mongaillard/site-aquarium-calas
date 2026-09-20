@@ -3,7 +3,9 @@
 // Aucune dépendance au rendu : ce module doit pouvoir tourner sans navigateur.
 // ---------------------------------------------------------------------------
 
-import { TILE, UNIT_TYPES, BUILDING_TYPES } from './config.js';
+import {
+  TILE, UNIT_TYPES, BUILDING_TYPES, STANCES, DEFAULT_STANCE, BUILDER_EXPONENT,
+} from './config.js';
 import { dist, dist2, clamp } from './utils.js';
 import { BLOCK } from './map.js';
 
@@ -15,6 +17,7 @@ export const STATE = {
   GATHER: 'gather',
   RETURN: 'return',
   BUILD: 'build',
+  GARRISON: 'garrison',
 };
 
 /** Au bout de ce nombre de secondes sans progrès, une cible est déclarée inatteignable. */
@@ -126,7 +129,13 @@ export class Unit extends Entity {
     this.stuckTime = 0;
     this.repathCooldown = 0;
     this.scanCooldown = world.rng.next() * 0.5;
-    this.aggressive = type !== 'villager';
+    // Attitude à la manière d'AoE : décide si l'unité engage d'elle-même,
+    // jusqu'où elle poursuit, et si elle revient à son poste.
+    this.stance = UNIT_TYPES[type].class === 'villager' ? DEFAULT_STANCE.villager : DEFAULT_STANCE.military;
+    this.guardPoint = null;      // poste à tenir
+    this.autoTarget = false;     // cible prise d'initiative (poursuite limitée)
+    this.groupSpeed = 0;         // vitesse imposée par le groupe (0 = libre)
+    this.garrisonedIn = null;    // bâtiment qui l'abrite
     this.gatherAnim = 0;
     this.pathPending = false;
     this.pendingJob = null; // poste à prendre après la livraison en cours
@@ -139,7 +148,22 @@ export class Unit extends Entity {
 
   speedPx() {
     const mult = this.isVillager ? this.player.mods.villagerSpeed : 1;
-    return this.def.speed * TILE * mult;
+    const own = this.def.speed * TILE * mult;
+    // En groupe, tout le monde va au rythme du plus lent (principe d'AoE :
+    // une armée arrive ensemble, pas en file indienne).
+    return this.groupSpeed > 0 ? Math.min(own, this.groupSpeed) : own;
+  }
+
+  get stanceDef() { return STANCES[this.stance] || STANCES.aggressive; }
+
+  setStance(id) {
+    // Réappliquer l'attitude en place redéfinirait le poste de garde à chaque
+    // appel : l'IA le fait à chaque cycle de réflexion.
+    if (!STANCES[id] || this.stance === id) return;
+    this.stance = id;
+    this.guardPoint = { x: this.x, y: this.y };
+    if (id === 'passive' && this.autoTarget) { this.target = null; this.state = STATE.IDLE; }
+    if (id === 'standGround') { this.path = null; this.destination = null; }
   }
 
   rangePx() {
@@ -186,17 +210,44 @@ export class Unit extends Entity {
     this.target = null;
     this.resourceTile = null;
     this.destination = { x, y };
+    this.autoTarget = false;
+    this.groupSpeed = 0;   // un ordre individuel rend sa vitesse à l'unité
+    this.guardPoint = { x, y };   // le poste devient le point d'arrivée
     this.state = aggressive ? STATE.ATTACK_MOVE : STATE.MOVE;
     this.requestPathTo(x, y);
   }
 
-  attackEntity(target) {
+  /**
+   * @param {boolean} auto vrai si l'unité a choisi sa cible d'elle-même : la
+   *   poursuite est alors limitée par l'attitude. Un ordre du joueur, lui,
+   *   est suivi jusqu'au bout.
+   */
+  attackEntity(target, auto = false) {
     if (!target || target.dead) return;
     this.target = target;
     this.resourceTile = null;
     this.destination = null;
+    this.autoTarget = auto;
+    if (auto && !this.guardPoint) this.guardPoint = { x: this.x, y: this.y };
+    if (!auto) { this.guardPoint = null; this.groupSpeed = 0; }
     this.state = STATE.ATTACK;
-    this.requestPathTo(target.x, target.y, true);
+    if (this.stance === 'standGround' && auto) { this.path = null; return; }
+    this.requestPathToEntity(target);
+  }
+
+  /** Rejoint son poste après un engagement. */
+  returnToGuard() {
+    this.target = null;
+    this.autoTarget = false;
+    const guard = this.guardPoint;
+    if (!guard || dist(this.x, this.y, guard.x, guard.y) < TILE * 1.2) {
+      this.state = STATE.IDLE;
+      this.path = null;
+      return;
+    }
+    this.destination = { x: guard.x, y: guard.y };
+    this.state = STATE.MOVE;
+    this.requestPathTo(guard.x, guard.y);
   }
 
   gatherAt(tx, ty) {
@@ -258,7 +309,7 @@ export class Unit extends Entity {
   // --- Mise à jour ---------------------------------------------------------
 
   update(dt) {
-    if (this.dead) return;
+    if (this.dead || this.garrisonedIn) return;   // à l'abri : hors du jeu
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     if (this.repathCooldown > 0) this.repathCooldown -= dt;
     if (this.gatherAnim > 0) this.gatherAnim -= dt;
@@ -278,64 +329,80 @@ export class Unit extends Entity {
       case STATE.GATHER: this.updateGather(dt); break;
       case STATE.RETURN: this.updateReturn(dt); break;
       case STATE.BUILD: this.updateBuild(dt); break;
+      case STATE.GARRISON: this.updateGarrisonMove(dt); break;
     }
   }
 
   updateIdle(dt) {
-    if (!this.aggressive) return;
+    if (!this.guardPoint) this.guardPoint = { x: this.x, y: this.y };
+    this.tryAcquireTarget(dt);
+  }
+
+  /**
+   * Prise de cible d'initiative, réglée par l'attitude :
+   *  - sans attaque : jamais
+   *  - position tenue : uniquement ce qui entre à portée d'arme
+   *  - défensif / agressif : tout ennemi dans le champ de vision
+   */
+  tryAcquireTarget(dt) {
+    if (this.stance === 'passive') return false;
     this.scanCooldown -= dt;
-    if (this.scanCooldown > 0) return;
-    this.scanCooldown = 0.5;
-    const enemy = this.world.findEnemyNear(this, this.def.los * TILE);
-    if (enemy) {
-      const home = { x: this.x, y: this.y };
-      this.attackEntity(enemy);
-      this.guardPoint = home; // on revient sur place après le combat
-    }
+    if (this.scanCooldown > 0) return false;
+    this.scanCooldown = 0.4;
+    const radius = this.stance === 'standGround'
+      ? this.rangePx() + this.radius
+      : this.def.los * TILE;
+    const enemy = this.world.findEnemyNear(this, radius);
+    if (!enemy) return false;
+    this.attackEntity(enemy, true);
+    return true;
   }
 
   updateMove(dt, aggressive) {
-    if (aggressive) {
-      this.scanCooldown -= dt;
-      if (this.scanCooldown <= 0) {
-        this.scanCooldown = 0.4;
-        const enemy = this.world.findEnemyNear(this, this.def.los * TILE);
-        if (enemy) {
-          const dest = this.destination;
-          this.attackEntity(enemy);
-          this.rallyAfterFight = dest;
-          return;
-        }
+    // En déplacement offensif on engage ce qui se présente ; en déplacement
+    // simple, seule une attitude agressive fait sortir du rang.
+    if (aggressive || this.stance === 'aggressive') {
+      const dest = this.destination;
+      if (this.tryAcquireTarget(dt)) {
+        this.rallyAfterFight = dest;
+        return;
       }
     }
     if (this.followPath(dt)) {
       this.state = STATE.IDLE;
       this.destination = null;
+      this.groupSpeed = 0;
+      this.guardPoint = { x: this.x, y: this.y };
     }
   }
 
   updateAttack(dt) {
     const target = this.target;
-    if (!target || target.dead) {
+    if (!target || target.dead || target.garrisonedIn) {
       this.target = null;
       const rally = this.rallyAfterFight;
       this.rallyAfterFight = null;
       if (rally) { this.moveTo(rally.x, rally.y, true); return; }
-      // Pas d'ordre en attente : on cherche un autre ennemi tout proche.
-      const next = this.world.findEnemyNear(this, this.def.los * TILE * 0.8);
-      if (next) { this.attackEntity(next); return; }
-      const guard = this.guardPoint;
-      this.guardPoint = null;
-      if (guard && dist(this.x, this.y, guard.x, guard.y) > TILE * 3) {
-        this.moveTo(guard.x, guard.y, false);
-      } else {
-        this.state = STATE.IDLE;
+      // Cible abattue : on prend la suivante si l'attitude le permet, sinon
+      // on regagne son poste.
+      if (this.stance !== 'passive' && this.stance !== 'standGround') {
+        const next = this.world.findEnemyNear(this, this.def.los * TILE * 0.8);
+        if (next && this.withinChaseLimit(next)) { this.attackEntity(next, true); return; }
       }
+      this.returnToGuard();
       return;
     }
 
     const reach = this.rangePx();
     const d = target.edgeDistanceTo(this.x, this.y);
+
+    // Poursuite bornée : une cible prise d'initiative n'entraîne jamais
+    // l'unité au-delà de ce que son attitude autorise.
+    if (d > reach && this.autoTarget) {
+      if (this.stance === 'standGround') { this.target = null; this.state = STATE.IDLE; return; }
+      if (!this.withinChaseLimit(target)) { this.returnToGuard(); return; }
+    }
+
     if (d <= reach) {
       this.path = null;
       this.faceTowards(target.x, target.y);
@@ -359,6 +426,15 @@ export class Unit extends Entity {
       }
     }
     this.followPath(dt);
+  }
+
+  /** La cible reste-t-elle dans le rayon de poursuite autorisé ? */
+  withinChaseLimit(target) {
+    const limit = this.stanceDef.chase;
+    if (limit <= 0) return false;
+    const guard = this.guardPoint;
+    if (!guard) return true;
+    return dist(target.x, target.y, guard.x, guard.y) <= limit * TILE;
   }
 
   updateGather(dt) {
@@ -553,8 +629,57 @@ export class Unit extends Entity {
     this.path = null;
     this.faceTowards(site.x, site.y);
     this.gatherAnim = 0.4;
+    site.activeBuilders++;
     if (!site.complete) site.addBuildProgress(dt);
     else site.hp = Math.min(site.maxHp, site.hp + site.maxHp * 0.02 * dt); // réparation
+  }
+
+  // --- Garnison -------------------------------------------------------------
+
+  /** Ordre « va t'abriter » : l'unité rejoint le bâtiment puis y entre. */
+  garrisonAt(building) {
+    if (!building || !building.canGarrison(this)) return false;
+    this.target = building;
+    this.resourceTile = null;
+    this.destination = null;
+    this.state = STATE.GARRISON;
+    this.requestPathToEntity(building);
+    return true;
+  }
+
+  updateGarrisonMove(dt) {
+    const shelter = this.target;
+    if (!shelter || shelter.dead || !shelter.canGarrison(this)) {
+      this.target = null;
+      this.state = STATE.IDLE;
+      return;
+    }
+    if (shelter.edgeDistanceTo(this.x, this.y) <= TILE * 1.2) {
+      shelter.addToGarrison(this);
+      return;
+    }
+    if (this.followPath(dt) && this.repathCooldown <= 0) {
+      this.repathCooldown = 1.0;
+      this.requestPathToEntity(shelter);
+    }
+  }
+
+  enterGarrison(building) {
+    this.stop();
+    this.garrisonedIn = building;
+    this.selected = false;
+    this.path = null;
+  }
+
+  leaveGarrison() {
+    const building = this.garrisonedIn;
+    this.garrisonedIn = null;
+    if (!building) return;
+    const spawn = building.spawnPoint();
+    this.x = spawn.x;
+    this.y = spawn.y;
+    this.state = STATE.IDLE;
+    this.guardPoint = { x: this.x, y: this.y };
   }
 
   // --- Déplacement ---------------------------------------------------------
@@ -658,6 +783,9 @@ export class Building extends Entity {
     this.scanCooldown = world.rng.next() * 0.5;
     this.target = null;
     this.foodLeft = def.farmFood || 0;
+    this.garrison = [];          // unités à l'abri à l'intérieur
+    this.activeBuilders = 0;     // bâtisseurs présents ce tick
+    this.builderCount = 0;       // relevé du tick précédent (rendement)
     this.createdAt = world.time;
     if (!def.walkable) this.occupyTiles();
   }
@@ -680,10 +808,19 @@ export class Building extends Entity {
     return ((this.def.range || 0) + this.player.mods.range) * TILE;
   }
 
+  /**
+   * Rendement décroissant des bâtisseurs, comme dans AoE : deux ouvriers vont
+   * plus vite qu'un, mais pas deux fois plus.
+   */
+  buildEfficiency() {
+    const n = Math.max(1, this.builderCount);
+    return Math.pow(n, BUILDER_EXPONENT) / n;
+  }
+
   addBuildProgress(dt) {
     if (this.complete) return;
     this.unreachable = false;
-    this.buildProgress += dt;
+    this.buildProgress += dt * this.buildEfficiency();
     const ratio = clamp(this.buildProgress / this.def.buildTime, 0, 1);
     this.hp = Math.max(this.hp, this.maxHp * (0.05 + 0.95 * ratio));
     if (this.buildProgress >= this.def.buildTime) {
@@ -726,11 +863,53 @@ export class Building extends Entity {
 
   enqueue(item) { this.queue.push(item); }
 
+  // --- Garnison ---------------------------------------------------------
+
+  canGarrison(unit) {
+    const g = this.def.garrison;
+    if (!g || !this.complete || this.dead || !unit || unit.dead) return false;
+    if (unit.playerIndex !== this.playerIndex) return false;
+    if (this.garrison.length >= g.capacity) return false;
+    return g.classes.includes(unit.def.class);
+  }
+
+  addToGarrison(unit) {
+    if (!this.canGarrison(unit)) return false;
+    this.garrison.push(unit);
+    unit.enterGarrison(this);
+    return true;
+  }
+
+  releaseGarrison() {
+    const released = this.garrison.slice();
+    this.garrison.length = 0;
+    for (const unit of released) unit.leaveGarrison();
+    return released;
+  }
+
+  /** Nombre de flèches par salve : une de base, plus une par occupant. */
+  arrowCount() {
+    if (!this.def.attack) return 0;
+    const base = this.def.garrisonOnly ? 0 : 1;
+    const g = this.def.garrison;
+    const extra = g && g.arrows ? Math.min(this.garrison.length, 5) : 0;
+    return base + extra;
+  }
+
   update(dt) {
     if (this.dead || !this.complete) return;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
+    this.healGarrison(dt);
     this.updateProduction(dt);
     if (this.def.attack) this.updateDefense(dt);
+  }
+
+  healGarrison(dt) {
+    const g = this.def.garrison;
+    if (!g || !g.heal || this.garrison.length === 0) return;
+    for (const unit of this.garrison) {
+      if (unit.hp < unit.maxHp) unit.hp = Math.min(unit.maxHp, unit.hp + g.heal * dt);
+    }
   }
 
   updateProduction(dt) {
@@ -747,7 +926,9 @@ export class Building extends Entity {
   }
 
   updateDefense(dt) {
-    if (this.target && (this.target.dead || this.target.edgeDistanceTo(this.x, this.y) > this.rangePx() + TILE)) {
+    if (this.arrowCount() <= 0) { this.target = null; return; }
+    if (this.target && (this.target.dead || this.target.garrisonedIn
+        || this.target.edgeDistanceTo(this.x, this.y) > this.rangePx() + TILE)) {
       this.target = null;
     }
     if (!this.target) {
@@ -757,8 +938,10 @@ export class Building extends Entity {
       this.target = this.world.findEnemyNear(this, this.rangePx());
     }
     if (this.target && this.attackCooldown <= 0) {
+      const arrows = this.arrowCount();
+      if (arrows <= 0) return;         // bâtiment vide : il n'y a personne pour tirer
       this.attackCooldown = this.def.attackSpeed;
-      this.world.performAttack(this, this.target);
+      for (let i = 0; i < arrows; i++) this.world.performAttack(this, this.target);
     }
   }
 

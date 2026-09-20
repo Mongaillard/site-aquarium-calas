@@ -13,6 +13,35 @@ export const POP_MAX = 60;
 
 export const RESOURCES = ['food', 'wood', 'gold'];
 
+/**
+ * Attitudes de combat, reprises d'Age of Empires : elles décident si une unité
+ * engage d'elle-même, jusqu'où elle poursuit et si elle revient à son poste.
+ *   chase : distance maximale de poursuite (en cases) depuis le point de garde
+ */
+export const STANCES = {
+  aggressive: {
+    id: 'aggressive', name: 'Agressif', short: 'Agressif', icon: '⚔️', chase: 9,
+    desc: 'Engage tout ennemi en vue et le poursuit loin.',
+  },
+  defensive: {
+    id: 'defensive', name: 'Défensif', short: 'Défensif', icon: '🛡️', chase: 4,
+    desc: 'Engage ce qui approche, puis revient à son poste.',
+  },
+  standGround: {
+    id: 'standGround', name: 'Position tenue', short: 'Tenir', icon: '🧱', chase: 0,
+    desc: 'Ne bouge pas : ne frappe que ce qui entre à portée.',
+  },
+  passive: {
+    id: 'passive', name: 'Sans attaque', short: 'Passif', icon: '🕊️', chase: 0,
+    desc: 'N’attaque jamais de sa propre initiative.',
+  },
+};
+
+export const DEFAULT_STANCE = { villager: 'passive', military: 'aggressive' };
+
+/** Rendement décroissant des bâtisseurs : n ouvriers valent n^0,75 ouvriers. */
+export const BUILDER_EXPONENT = 0.75;
+
 export const RESOURCE_LABELS = {
   food: 'Nourriture',
   wood: 'Bois',
@@ -111,6 +140,9 @@ export const BUILDING_TYPES = {
     cost: { wood: 275 }, buildTime: 80, hp: 1400, size: 3,
     meleeArmor: 3, pierceArmor: 7, los: 8, popBonus: 8,
     dropoff: ['food', 'wood', 'gold'], trains: ['villager'], age: 0, limit: 2,
+    garrison: { capacity: 15, classes: ['villager', 'infantry', 'archer'], heal: 12, arrows: true },
+    // Le Centre-Ville ne tire que s'il abrite du monde (une flèche par occupant).
+    attack: 5, attackType: 'pierce', range: 6, attackSpeed: 2.2, projectile: true, garrisonOnly: true,
     desc: 'Forme les villageois, stocke les ressources et permet de passer à l’âge suivant.',
   },
   house: {
@@ -181,6 +213,7 @@ export const BUILDING_TYPES = {
     meleeArmor: 3, pierceArmor: 8, los: 8, age: 1,
     attack: 6, attackType: 'pierce', range: 7, attackSpeed: 1.6, projectile: true,
     bonus: { siege: 4 },
+    garrison: { capacity: 5, classes: ['villager', 'infantry', 'archer'], heal: 8, arrows: true },
     desc: 'Défense fixe qui tire sur les ennemis à portée.',
   },
 };

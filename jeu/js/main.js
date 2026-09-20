@@ -42,6 +42,7 @@ class Game {
     this.buildMode = null;
     this.attackMoveArmed = false;
     this.rallyArmed = false;
+    this.garrisonArmed = false;
     this.paused = false;
     this.speed = 1;
     this.accumulator = 0;
@@ -187,11 +188,45 @@ class Game {
       return;
     }
 
+    // Mode « abriter » armé : le prochain appui désigne le refuge.
+    if (this.garrisonArmed) {
+      this.garrisonArmed = false;
+      this.ui.setBuildHint('');
+      const shelter = this.world.entityAt(p.x, p.y, this.world.humanIndex);
+      if (shelter && shelter.kind === 'building' && shelter.def.garrison && ownUnits.length) {
+        const sent = this.world.garrisonUnits(ownUnits, shelter);
+        if (sent > 0) {
+          this.ui.toast(`${sent} unité(s) se mettent à l'abri`);
+          this.audio.play('order');
+          this.vibrate(10);
+        }
+      } else {
+        this.ui.toast('Touchez un Centre-Ville ou une tour', 'error');
+        this.audio.play('error');
+      }
+      this.ui.refreshSelection(true);
+      return;
+    }
+
     const entity = this.world.entityAt(p.x, p.y);
     const isMine = entity && entity.playerIndex === this.world.humanIndex;
     const visible = entity && (isMine || this.renderer.isEntityVisible(entity));
 
     if (entity && isMine) {
+      // Des soldats qui touchent un abri allié n'ont qu'une intention possible :
+      // s'y réfugier. Pour les villageois on reste sur la sélection, qui sert
+      // aussi à produire ou à passer un âge (l'abri a son bouton dédié).
+      if (entity.kind === 'building' && entity.def.garrison && ownUnits.length > 0
+          && ownUnits.every((u) => !u.isVillager && entity.canGarrison(u))) {
+        const sent = this.world.garrisonUnits(ownUnits, entity);
+        if (sent > 0) {
+          this.ui.toast(`${sent} unité(s) se mettent à l'abri`);
+          this.audio.play('order');
+          this.pingOrder(entity.x, entity.y, '#c39bf6');
+          this.ui.refreshSelection(true);
+          return;
+        }
+      }
       if (isDouble && entity.kind === 'unit') {
         this.selectSameTypeOnScreen(entity);
       } else {
@@ -221,7 +256,10 @@ class Game {
       (e) => e.kind === 'unit' && e.playerIndex === this.world.humanIndex);
     if (units.length === 0) return;
     const result = this.world.commandUnits(units, worldX, worldY);
-    const colors = { attack: '#ff6b6b', gather: '#ffd166', build: '#8ecae6', repair: '#8ecae6', move: '#9bf6a0' };
+    const colors = {
+      attack: '#ff6b6b', gather: '#ffd166', build: '#8ecae6',
+      repair: '#8ecae6', garrison: '#c39bf6', move: '#9bf6a0',
+    };
     this.pingOrder(worldX, worldY, colors[result ? result.kind : 'move'] || '#9bf6a0');
     this.audio.play('order');
     this.vibrate(8);
@@ -264,6 +302,40 @@ class Game {
     if (filtered.length) this.setSelection(filtered);
   }
 
+  /** Applique une attitude à toute la sélection. */
+  setStance(stanceId) {
+    const units = this.selection.filter(
+      (e) => e.kind === 'unit' && e.playerIndex === this.world.humanIndex);
+    if (units.length === 0) return;
+    this.world.setStance(units, stanceId);
+    this.audio.play('click');
+    this.ui.refreshSelection(true);
+  }
+
+  /** Cloche du village : tout le monde à l'abri, ou tout le monde dehors. */
+  ringTownBell() {
+    const result = this.world.ringTownBell(this.world.humanIndex);
+    if (result.sheltered > 0) {
+      this.ui.toast(`🔔 ${result.sheltered} villageois à l'abri`, 'warn');
+      this.audio.play('alert');
+      this.vibrate([12, 40, 12]);
+    } else if (result.released > 0) {
+      this.ui.toast(`🔔 ${result.released} villageois retournent au travail`);
+      this.audio.play('order');
+    } else {
+      this.ui.toast('Aucun abri disponible', 'error');
+      this.audio.play('error');
+    }
+    this.ui.refreshSelection(true);
+  }
+
+  releaseGarrison(building) {
+    const released = this.world.releaseGarrison(building);
+    if (released.length === 0) this.audio.play('error');
+    else this.audio.play('order');
+    this.ui.refreshSelection(true);
+  }
+
   stopSelection() {
     for (const e of this.selection) if (e.kind === 'unit') e.stop();
     this.attackMoveArmed = false;
@@ -273,6 +345,7 @@ class Game {
   toggleAttackMove() {
     this.attackMoveArmed = !this.attackMoveArmed;
     this.rallyArmed = false;
+    this.garrisonArmed = false;
     this.ui.setBuildHint(this.attackMoveArmed ? 'Touchez la zone à attaquer' : '');
     this.ui.refreshSelection(true);
   }
@@ -280,7 +353,16 @@ class Game {
   toggleRally() {
     this.rallyArmed = !this.rallyArmed;
     this.attackMoveArmed = false;
+    this.garrisonArmed = false;
     this.ui.setBuildHint(this.rallyArmed ? 'Touchez le point de ralliement' : '');
+    this.ui.refreshSelection(true);
+  }
+
+  toggleGarrison() {
+    this.garrisonArmed = !this.garrisonArmed;
+    this.attackMoveArmed = false;
+    this.rallyArmed = false;
+    this.ui.setBuildHint(this.garrisonArmed ? 'Touchez le Centre-Ville ou la tour où s’abriter' : '');
     this.ui.refreshSelection(true);
   }
 
@@ -499,8 +581,8 @@ class Game {
       return;
     }
     if (this.buildMode) { this.cancelBuild(); return; }
-    if (this.attackMoveArmed || this.rallyArmed) {
-      this.attackMoveArmed = false; this.rallyArmed = false;
+    if (this.attackMoveArmed || this.rallyArmed || this.garrisonArmed) {
+      this.attackMoveArmed = false; this.rallyArmed = false; this.garrisonArmed = false;
       this.ui.setBuildHint('');
       this.ui.refreshSelection(true);
       return;
