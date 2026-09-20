@@ -19,8 +19,11 @@
 const ATLAS = {
   militia: {
     src: 'assets/milicien-marche.webp',
-    cellW: 44, cellH: 76, cases: 8, images: 8, cycle: 40,
-    ancreY: 73, hauteurMonde: 44, natif: 'bleu',
+    cellW: 51, cellH: 76, cases: 8, images: 8, cycle: 40,
+    ancreY: 75, hauteurMonde: 44, natif: 'bleu',
+    // L'armure est un acier bleuté : un échange de canaux la ferait virer au
+    // cuivre. Seuls les bleus francs — bouclier et tabard — basculent.
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
   // Même unité, l'autre style : l'illustration peinte, sans marche animée.
   // Elle sert à comparer les deux partis pris sans relancer de partie.
@@ -28,11 +31,17 @@ const ATLAS = {
     src: 'assets/chevalier.webp',
     cellW: 76, cellH: 104, cases: 8, images: 1,
     ancreY: 104, hauteurMonde: 40, natif: 'bleu',
+    // Ici le bleu couvre une grande cape peinte, sans acier bleuté à épargner :
+    // l'échange de canaux suffit et coûte moins cher qu'une conversion HSL.
+    recolorage: 'echange',
   },
   spearman: {
     src: 'assets/lancier.png',
     cellW: 48, cellH: 48, cases: 8, images: 1,
     ancreY: 46, hauteurMonde: 44, natif: 'rouge', pixel: true,
+    // Le rouge du tabard voisine avec la peau et le cuir, dont la teinte est
+    // orangée : la fenêtre s'arrête aux rouges francs.
+    recolorage: { teinte: [338, 14], vers: 216, satMin: 0.35, lumMax: 0.75 },
   },
 };
 
@@ -98,11 +107,11 @@ function copie(image, l, h) {
 }
 
 /**
- * Bleu → rouge. Sur l'illustration peinte, le bleu couvre une grande cape :
- * on échange simplement le rouge et le bleu des pixels à dominante bleue, ce
- * qui laisse l'acier et l'or intacts.
+ * Échange rouge et bleu sur les pixels à dominante bleue. C'est la règle la
+ * moins chère, et elle convient à une illustration où le bleu couvre une
+ * grande surface peinte sans acier bleuté alentour.
  */
-function enRouge(image, l, h) {
+function echangeCanaux(image, l, h) {
   const { canvas, ctx } = copie(image, l, h);
   try {
     const data = ctx.getImageData(0, 0, l, h);
@@ -122,28 +131,43 @@ function enRouge(image, l, h) {
 }
 
 /**
- * Rouge → bleu. Sur du pixel art, le rouge du tabard voisine avec la peau du
- * visage et le cuir : une bascule large repeignait le visage en bleu. On ne
- * prend donc que les rouges francs (teinte 338°–14°), ce qui épargne la peau
- * et le cuir, dont la teinte est orangée.
+ * Bascule une FENÊTRE DE TEINTE vers une autre, en gardant saturation et
+ * luminosité. C'est ce qu'il faut dès que la couleur d'équipe voisine une
+ * matière de teinte proche : l'acier bleuté à côté d'un bouclier bleu, la peau
+ * et le cuir à côté d'un tabard rouge. Un échange de canaux les emporterait
+ * avec ; une fenêtre étroite les épargne.
+ *
+ * `teinte` est un intervalle en degrés, qui peut passer par 0 (338 → 14).
  */
-function enBleu(image, l, h) {
+function rotationTeinte(image, l, h, regle) {
   const { canvas, ctx } = copie(image, l, h);
+  const [a, b] = regle.teinte;
+  const cible = regle.vers / 360;
+  const satMin = regle.satMin ?? 0.3;
+  const lumMax = regle.lumMax ?? 1;
+  const dedans = a <= b
+    ? (d) => d >= a && d <= b
+    : (d) => d >= a || d <= b;      // fenêtre à cheval sur 0°
   try {
     const data = ctx.getImageData(0, 0, l, h);
     const p = data.data;
     for (let i = 0; i < p.length; i += 4) {
       if (p[i + 3] === 0) continue;
       const [teinte, sat, lum] = versHSL(p[i], p[i + 1], p[i + 2]);
-      const deg = teinte * 360;
-      if ((deg >= 338 || deg <= 14) && sat > 0.35 && lum < 0.75) {
-        const [r, g, b] = versRGB(0.60, sat, lum);
-        p[i] = r; p[i + 1] = g; p[i + 2] = b;
-      }
+      if (sat <= satMin || lum >= lumMax || !dedans(teinte * 360)) continue;
+      const [r, g, bl] = versRGB(cible, sat, lum);
+      p[i] = r; p[i + 1] = g; p[i + 2] = bl;
     }
     ctx.putImageData(data, 0, 0);
   } catch { /* idem */ }
   return canvas;
+}
+
+/** Variante d'équipe : l'image d'origine sert un camp, l'autre est recalculée. */
+function recolorer(def, image, l, h) {
+  return def.recolorage === 'echange'
+    ? echangeCanaux(image, l, h)
+    : rotationTeinte(image, l, h, def.recolorage);
 }
 
 /** Charge un atlas donné, une seule fois. */
@@ -156,9 +180,10 @@ function chargerAtlas(cle) {
   image.decoding = 'async';
   image.onload = () => {
     const l = image.width, h = image.height;
+    const autre = recolorer(def, image, l, h);
     entree.variantes = def.natif === 'bleu'
-      ? { bleu: image, rouge: enRouge(image, l, h) }
-      : { rouge: image, bleu: enBleu(image, l, h) };
+      ? { bleu: image, rouge: autre }
+      : { rouge: image, bleu: autre };
     entree.pret = true;
   };
   image.onerror = () => { charges.set(cle, { def, pret: false, absent: true }); };

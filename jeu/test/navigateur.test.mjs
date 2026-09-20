@@ -542,6 +542,60 @@ check('une unité à l’arrêt reprend sa pose de repos', chevalier.arretPoseZe
 check('le lancier a son atlas en pixel art',
   chevalier.lancier && chevalier.lancierPixel && chevalier.lancierDeuxCamps,
   JSON.stringify({ pret: chevalier.lancier, pixel: chevalier.lancierPixel }));
+// La recoloration d'équipe doit prendre le bouclier SANS emporter l'acier :
+// l'armure du chevalier est un acier bleuté, qu'un échange de canaux ferait
+// virer au cuivre. On compare les deux variantes pixel à pixel.
+const recolor = await page.evaluate(async () => {
+  const mod = await import('./js/sprites.js');
+  const s = mod.spriteDe('militia');
+  if (!s) return null;
+  const lire = (src) => {
+    const c = document.createElement('canvas');
+    c.width = src.width; c.height = src.height;
+    const x = c.getContext('2d');
+    x.drawImage(src, 0, 0);
+    return x.getImageData(0, 0, c.width, c.height).data;
+  };
+  const bleu = lire(mod.imagePourJoueur(s, 0));
+  const rouge = lire(mod.imagePourJoueur(s, 1));
+  const hsl = (r, g, b) => {
+    const mx = Math.max(r, g, b) / 255, mn = Math.min(r, g, b) / 255;
+    const l = (mx + mn) / 2;
+    if (mx === mn) return [0, 0, l];
+    const d = mx - mn;
+    const sa = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    const R = r / 255, G = g / 255, B = b / 255;
+    let h;
+    if (mx === R) h = ((G - B) / d + (G < B ? 6 : 0)) / 6;
+    else if (mx === G) h = ((B - R) / d + 2) / 6;
+    else h = ((R - G) / d + 4) / 6;
+    return [h * 360, sa, l];
+  };
+  let opaques = 0, changes = 0, acier = 0, acierIntact = 0, bleusRestants = 0;
+  for (let i = 0; i < bleu.length; i += 4) {
+    if (bleu[i + 3] === 0) continue;
+    opaques++;
+    const memes = bleu[i] === rouge[i] && bleu[i + 1] === rouge[i + 1] && bleu[i + 2] === rouge[i + 2];
+    if (!memes) changes++;
+    const [hb, sb] = hsl(bleu[i], bleu[i + 1], bleu[i + 2]);
+    // Acier : bleuté mais peu saturé — c'est lui qu'une règle trop large mange.
+    if (sb <= 0.32) { acier++; if (memes) acierIntact++; }
+    const [hr, sr] = hsl(rouge[i], rouge[i + 1], rouge[i + 2]);
+    if (hr >= 200 && hr <= 255 && sr > 0.32) bleusRestants++;
+    void hb;
+  }
+  return { opaques, changes, acier, acierIntact, bleusRestants };
+});
+check('la variante adverse repeint le bouclier',
+  recolor && recolor.changes > recolor.opaques * 0.08,
+  recolor && `${Math.round((recolor.changes / recolor.opaques) * 100)} % des pixels repeints`);
+check('la recoloration épargne l’acier de l’armure',
+  recolor && recolor.acier > 500 && recolor.acierIntact === recolor.acier,
+  recolor && `${recolor.acierIntact}/${recolor.acier} pixels d’acier intacts`);
+check('il ne reste aucun bleu franc côté adverse',
+  recolor && recolor.bleusRestants === 0,
+  recolor && recolor.bleusRestants + ' pixels bleus restants');
+
 check('les orientations tombent sur les bonnes cases',
   chevalier.sud === 0 && chevalier.est === 2 && chevalier.nord === 4 && chevalier.ouest === 6,
   `sud ${chevalier.sud} · est ${chevalier.est} · nord ${chevalier.nord} · ouest ${chevalier.ouest}`);

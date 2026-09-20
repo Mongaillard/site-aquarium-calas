@@ -6,7 +6,7 @@
 | `portrait-milicien.webp` | Buste du même chevalier | idem |
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
-| `milicien-marche.webp` | Cycle de marche, **huit orientations × huit images** (64 cases), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
+| `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
 Ces images viennent d'une planche de référence fournie par l'auteur du dépôt, qui
@@ -41,27 +41,67 @@ repeignait le visage en bleu ; on ne prend donc que les rouges francs (teinte
 
 ## Le cycle de marche
 
-La planche fournie tient quatre bandes de deux orientations, huit images chacune.
-Les bandes ont été repérées par **projection du canal alpha** (une ligne vide
-sépare deux bandes), puis chaque image découpée sur le même principe, et les
-64 cases recollées en une grille de 8 colonnes (les images) sur 8 lignes (les
-directions) — c'est ce que `cadreSource()` attend d'un atlas animé.
+La planche fournie est une **maquette aplatie** : malgré son en-tête, elle n'a
+pas de canal alpha, et ses huit panneaux partagent le même fond navy que la page
+(9, 17, 22). Le détourage est donc plus simple que sur la planche peinte — le
+contour des personnages est plus **sombre** que le fond, pas plus clair, donc un
+seuil de distance suffit, complété par la connexité au bord pour ne pas percer
+l'intérieur des sprites.
+
+Les quatre bandes ont été repérées par projection des pixels **colorés**
+(luminance > 40 et saturation > 25) : le texte des étiquettes, gris ou blanc, ne
+passe pas ce filtre, les armures oui. Dans chaque bande, les huit images se
+détachent de la même façon — à un cas près, où le bouclier détaché du corps
+formait un neuvième groupe, recollé au plus proche voisin.
 
 L'ordre des directions de la planche — bas, bas-droite, droite, haut-droite,
-haut, haut-gauche, gauche, bas-gauche — correspondait déjà exactement à
+haut, haut-gauche, gauche, bas-gauche — correspondait exactement à
 `caseDirection()`. Vérifié à l'écran plutôt que déduit : une unité envoyée vers
 l'est affiche bien la case 2.
+
+Chaque case est **alignée sur le centre des pieds**, pas sur sa boîte englobante :
+l'épée tendue de la vue de profil décalerait tout le cycle d'une image à l'autre.
+
+Malgré son allure de pixel art, la planche n'est **pas** un agrandissement entier
+d'une petite image : 92 % des plages horizontales de couleur constante font un
+seul pixel. Elle est donc réduite au filtre de Lanczos et dessinée **avec**
+lissage, contrairement au lancier.
 
 L'image affichée vient de la **distance parcourue**, pas de l'horloge. Une unité
 lente marche lentement, une unité bloquée ne pédale pas sur place, et une unité
 arrêtée revient à l'image 0, sa pose de repos.
 
-Le poids a demandé un détour : en WebP **avec pertes**, l'atlas pesait 133 Ko,
-soit plus que les 103 Ko du PNG — le codec dépense son budget sur les bords nets
-et le fond transparent. En le quantifiant à 96 couleurs puis en l'encodant **sans
-pertes**, il tombe à 61 Ko, sans différence visible même agrandi trois fois.
+### Le poids, et le détour par la palette
+
+Cette planche est ombrée en dégradé : après réduction, l'atlas comptait **90 000
+couleurs distinctes**. En WebP sans pertes, il pesait 326 Ko ; en WebP avec pertes
+à qualité 82, encore 136 Ko.
+
+Le détour qui débloque tout : **réduire d'abord à 48 couleurs**, puis encoder sans
+pertes. L'encodeur emprunte alors son chemin palettisé et tombe à **67 Ko** — le
+quart de son poids, sans différence visible à l'œil même agrandi quatre fois (en
+dessous de 32 couleurs, en revanche, le bouclier se désature et le plumet perd
+son dégradé).
+
+### La recoloration d'équipe
+
+Ici l'armure est un **acier bleuté** qui voisine avec le bleu franc du bouclier et
+du tabard. L'échange de canaux utilisé pour l'illustration peinte faisait virer
+toute l'armure au cuivre. La règle retenue bascule une **fenêtre de teinte**
+(200°–255°, saturation > 0,32) vers le rouge, en gardant saturation et luminosité :
+le bouclier et le tabard changent de camp, le casque et les épaulières restent de
+l'acier.
+
+C'est la même mécanique que pour le lancier, dans l'autre sens : une fenêtre
+étroite autour des rouges francs (338°–14°), pour épargner la peau et le cuir.
+`js/sprites.js` n'a donc plus qu'une fonction de rotation de teinte, paramétrée
+par l'atlas, et l'échange de canaux ne sert plus qu'à la cape peinte.
+
+Un test le vérifie à chaque exécution : 20 % des pixels sont repeints, **aucun
+pixel d'acier n'est touché** (40 434 sur 40 434 intacts), et il ne reste aucun
+bleu franc côté adverse.
 
 ## Format
 
-WebP partout où c'est possible : 134 Ko pour l'ensemble, contre environ 420 Ko en
+WebP partout où c'est possible : 140 Ko pour l'ensemble, contre environ 430 Ko en
 PNG, sans différence visible à l'œil même agrandi trois fois.

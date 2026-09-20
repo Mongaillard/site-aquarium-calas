@@ -3,7 +3,7 @@
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
 très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 134 Ko d'illustrations — dont un cycle de marche
+pictogrammes vectoriels et 140 Ko d'illustrations — dont un cycle de marche
 complet.
 
 ## Lancer le jeu
@@ -262,7 +262,7 @@ n'avait pas la même tête sur un Samsung et sur un iPhone.
 couleur vient du texte qui les porte. Les auteurs sont cités dans l'écran
 **Crédits**, accessible depuis le menu de pause — c'est ce que la licence exige.
 
-Les **illustrations** (`assets/`, 134 Ko) viennent de planches de personnage
+Les **illustrations** (`assets/`, 140 Ko) viennent de planches de personnage
 fournies par l'auteur du dépôt : le chevalier de l'écran d'accueil,
 le portrait du milicien dans le panneau de sélection, et le chevalier à terre
 de l'écran de défaite. Le portrait de l'adversaire est le même fichier, passé
@@ -275,12 +275,16 @@ sans recouvrement possible — un X d'épées, un disque de cible, un fer à che
 
 ### Les unités portent une illustration, et deux styles cohabitent
 
-Le milicien marche pour de vrai : `assets/milicien-marche.webp` (61 Ko) tient
-**huit orientations × huit images**, soit 64 cases de 44×76 px, découpées d'une
+Le milicien marche pour de vrai : `assets/milicien-marche.webp` (67 Ko) tient
+**huit orientations × huit images**, soit 64 cases de 51×76 px, découpées d'une
 planche de cycle de marche. L'image affichée est choisie sur la **distance
 parcourue** et non sur l'horloge — les jambes suivent donc le sol, une unité
 lente marche lentement, et une unité arrêtée reprend sa pose de repos plutôt que
 de pédaler sur place.
+
+L'atlas est passé par une **palette de 48 couleurs** avant d'être encodé sans
+pertes : l'encodeur WebP emprunte alors son chemin palettisé et l'atlas tombe de
+326 à 67 Ko, sans différence visible même agrandi quatre fois.
 
 Le **lancier** est du **pixel art natif** (`assets/lancier.png`, 4 Ko) : huit
 orientations de 48 px, dessinées pour cette taille. Il est rendu sans lissage,
@@ -304,6 +308,23 @@ l'écran est net : **la marche dessinée l'emporte**. À la taille d'une unité,
 qui se lit n'est pas le détail d'un personnage mais son mouvement ; la peinture
 réduite devient une tache sombre. Elle garde sa place là où elle est vue en
 grand — accueil, portrait, écran de fin.
+
+### La couleur d'équipe se calcule au chargement
+
+L'illustration d'origine sert un camp, l'autre est recalculée une fois pour
+toutes dans un canvas hors écran — plutôt qu'un filtre appliqué à chaque image,
+qui ne rend pas la même chose d'un navigateur à l'autre.
+
+La règle ne peut pas être la même partout. Sur la cape peinte, un simple échange
+des canaux rouge et bleu suffit. Sur le chevalier animé, l'armure est un **acier
+bleuté** juste à côté du bleu franc du bouclier : l'échange faisait virer toute
+l'armure au cuivre. On bascule donc une **fenêtre de teinte** (200°–255°,
+saturation > 0,32), ce qui prend le bouclier et le tabard en épargnant l'acier.
+Le lancier utilise la même mécanique dans l'autre sens, autour des rouges francs,
+pour épargner la peau et le cuir.
+
+Un test compare les deux variantes pixel à pixel : 20 % des pixels sont repeints,
+**aucun pixel d'acier n'est touché**, et il ne reste aucun bleu franc côté adverse.
 
 Toute unité sans illustration garde son rendu dessiné au code, et le jeu reste
 jouable si une image ne charge pas. Avec 60 unités en marche à l'écran, les deux
