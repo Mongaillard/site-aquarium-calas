@@ -7,7 +7,7 @@
 
 import { TILE, BUILDING_TYPES, UNIT_TYPES, POP_MAX, AGES } from './config.js';
 import { dist2, canAfford, RNG } from './utils.js';
-import { STATE } from './entities.js';
+import { STATE, villagerTask } from './entities.js';
 
 const JOB_RATIOS = [
   { food: 0.45, wood: 0.40, gold: 0.15 }, // Âge Sombre
@@ -135,15 +135,8 @@ export class AIPlayer {
   }
 
   jobOf(v) {
-    if (v.state === STATE.IDLE) return null;
-    if (v.state === STATE.BUILD) return 'build';
-    if (v.resourceTile) {
-      const res = this.world.map.resourceAt(v.resourceTile.tx, v.resourceTile.ty);
-      if (res) return res.type;
-    }
-    if (v.target && v.target.type === 'farm') return 'food';
-    if (v.state === STATE.RETURN && v.carry.type) return v.carry.type;
-    return null;
+    const task = villagerTask(v);
+    return task === 'idle' || task === 'move' ? null : task;
   }
 
   mostNeeded(jobs, ratios, total) {
@@ -158,24 +151,38 @@ export class AIPlayer {
     return best;
   }
 
+  /**
+   * Envoie un villageois sur la ressource demandée. Si elle a disparu des
+   * environs, on se rabat sur une autre plutôt que de le laisser bras ballants.
+   */
   assignJob(villager, type) {
     const world = this.world;
     const from = this.townCenter || villager;
-    const target = world.findNearestResource(villager.x, villager.y, type, 26 * TILE, this.index)
-      || world.findNearestResource(from.x, from.y, type, 40 * TILE, this.index);
-    if (!target) {
-      if (type === 'food') this.wantFarm = true;
-      return false;
+    const order = [type, ...['food', 'wood', 'gold'].filter((t) => t !== type)];
+    for (const candidate of order) {
+      const target = world.findNearestResource(villager.x, villager.y, candidate, 26 * TILE, this.index)
+        || world.findNearestResource(from.x, from.y, candidate, 45 * TILE, this.index);
+      if (!target) {
+        if (candidate === 'food') this.wantFarm = true;
+        continue;
+      }
+      if (target.kind === 'building') villager.gatherFarm(target);
+      else villager.gatherAt(target.tx, target.ty);
+      return candidate === type;
     }
-    if (target.kind === 'building') villager.gatherFarm(target);
-    else villager.gatherAt(target.tx, target.ty);
-    return true;
+    return false;
   }
 
   // --- Construction ---------------------------------------------------------
 
   manageConstruction() {
     const player = this.player;
+    // Le passage d'âge se décide en premier : le tester après la gestion des
+    // chantiers revenait à ne jamais l'atteindre tant que deux fermes étaient
+    // en cours de replantation.
+    const tc = this.townCenter;
+    if (tc && this.ageTarget && this.world.canAdvanceAge(tc).ok) this.world.advanceAge(tc);
+
     // Un chantier qu'aucun villageois ne peut rejoindre est annulé (et remboursé).
     for (const site of this.buildings.filter((b) => !b.complete && b.unreachable)) {
       this.badSpots.add(site.tx + ',' + site.ty);
@@ -196,10 +203,6 @@ export class AIPlayer {
       }
     }
     this.assignBuilders(this.buildings.filter((b) => !b.complete));
-
-    // Passage à l'âge suivant dès que le trésor le permet.
-    const tc = this.townCenter;
-    if (tc && this.ageTarget && this.world.canAdvanceAge(tc).ok) this.world.advanceAge(tc);
   }
 
   /** Ordre de construction, réévalué à chaque cycle selon les besoins. */
@@ -211,9 +214,12 @@ export class AIPlayer {
     if (!this.has('mill') && this.villagers.length >= 6) return 'mill';
     if (!this.has('barracks') && this.villagers.length >= 8) return 'barracks';
     if (!this.has('miningcamp') && this.villagers.length >= 9) return 'miningcamp';
-    // Les fermes stabilisent la nourriture bien avant l'Âge Féodal :
-    // les buissons s'épuisent et les villageois marchent de plus en plus loin.
-    if (this.has('mill') && this.countFarms() < 3 && this.villagers.length >= 10) return 'farm';
+    // Les fermes stabilisent la nourriture bien avant l'Âge Féodal : les
+    // buissons s'épuisent et les villageois marchent de plus en plus loin.
+    // On en veut d'autant plus qu'on a des bras et du bois qui dort.
+    const farmTarget = Math.min(8, Math.floor(this.villagers.length / 4)
+      + (player.resources.wood > 400 ? 2 : 0));
+    if (this.has('mill') && this.villagers.length >= 10 && this.countFarms() < farmTarget) return 'farm';
 
     if (player.age >= 1) {
       if (!this.has('archery')) return 'archery';
@@ -350,7 +356,10 @@ export class AIPlayer {
       // temps, et la réserve saute net si la base est attaquée.
       const underThreat = this.world.time < this.defendUntil;
       const armyFloor = 3 + player.age * 3 + Math.floor(this.world.time / 420);
-      const saving = !underThreat && this.ageTarget && this.army.length >= armyFloor
+      // Hystérésis : une fois la moitié du coût réunie, on garde le cap même si
+      // un soldat tombe. Sinon l'IA redépense sa cagnotte à deux doigts du but.
+      const saving = !underThreat && this.ageTarget
+        && (this.savingForAge || this.army.length >= armyFloor)
         ? this.ageTarget.cost : null;
       const affordable = Object.keys(def.cost).every((k) => {
         const keep = (k === 'wood' ? reserve : 0) + (saving && saving[k] ? saving[k] : 0);

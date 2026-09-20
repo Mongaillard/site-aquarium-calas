@@ -8,12 +8,24 @@ import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
 import { UI } from './ui.js';
 import { AudioEngine } from './audio.js';
+import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 const MAX_CATCHUP = 5;
 
 const audio = new AudioEngine();
+
+// Préférence « réaffectation automatique » : conservée d'une partie à l'autre.
+const AUTO_WORKERS_KEY = 'aem.autoWorkers';
+
+function loadAutoWorkers() {
+  try { return localStorage.getItem(AUTO_WORKERS_KEY) === '1'; } catch { return false; }
+}
+
+function saveAutoWorkers(on) {
+  try { localStorage.setItem(AUTO_WORKERS_KEY, on ? '1' : '0'); } catch { /* stockage indisponible */ }
+}
 
 class Game {
   constructor(options) {
@@ -35,7 +47,9 @@ class Game {
     this.accumulator = 0;
     this.lastFrame = performance.now();
     this.alertCooldown = 0;
+    this.idleNoticeCooldown = 0;
     this.running = true;
+    this.world.players[this.world.humanIndex].autoWorkers = loadAutoWorkers();
 
     const home = this.world.buildings.find(
       (b) => b.playerIndex === this.world.humanIndex && b.type === 'towncenter');
@@ -43,7 +57,7 @@ class Game {
     this.camera.zoom = clamp(this.camera.viewWidth / (24 * TILE), this.camera.minZoom, 1.1);
 
     window.addEventListener('resize', () => this.renderer.resize());
-    this.ui.toast('Formez des villageois et récoltez des ressources !');
+    this.ui.toast('Affectez vos villageois : touchez-les, puis touchez un arbre, un buisson ou un filon.');
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
   }
@@ -67,6 +81,7 @@ class Game {
     }
 
     this.input.updateKeyboardPan(realDt);
+    if (this.idleNoticeCooldown > 0) this.idleNoticeCooldown -= realDt;
     this.processEvents();
     this.pruneSelection();
     this.renderer.render();
@@ -91,6 +106,16 @@ class Game {
         case 'shoot': if (this.world.isVisible(event.x, event.y)) this.audio.play('shoot'); break;
         case 'destroyed': if (this.world.isVisible(event.x, event.y)) this.audio.play('destroyed'); break;
         case 'notice': this.ui.toast(event.text, 'warn'); break;
+        case 'idleWorker':
+          // On prévient sans harceler : le compteur 💤 reste la source de vérité.
+          if (this.idleNoticeCooldown <= 0) {
+            this.idleNoticeCooldown = 15;
+            const count = this.idleVillagers().length;
+            this.ui.toast(count > 1
+              ? `${count} villageois attendent vos ordres`
+              : 'Un villageois attend vos ordres', 'warn');
+          }
+          break;
         case 'tech':
           if (mine) this.ui.toast('Technologie terminée', 'good');
           break;
@@ -341,6 +366,96 @@ class Game {
     if (this.world.advanceAge(building)) this.ui.toast('Passage à l’âge suivant lancé…', 'good');
   }
 
+  // --- Ouvriers : c'est le joueur qui affecte -------------------------------
+
+  humanVillagers() {
+    return this.world.units.filter(
+      (u) => !u.dead && u.playerIndex === this.world.humanIndex && u.isVillager);
+  }
+
+  /** Répartition des villageois par métier, pour la barre et le panneau. */
+  workerStats() {
+    const stats = { food: 0, wood: 0, gold: 0, build: 0, move: 0, idle: 0, total: 0 };
+    for (const v of this.humanVillagers()) {
+      const task = villagerTask(v);
+      if (stats[task] === undefined) stats[task] = 0;
+      stats[task]++;
+      stats.total++;
+    }
+    return stats;
+  }
+
+  villagersWithTask(task) {
+    return this.humanVillagers().filter((v) => villagerTask(v) === task);
+  }
+
+  selectWorkerGroup(task) {
+    const group = this.villagersWithTask(task);
+    if (group.length === 0) { this.ui.toast('Aucun villageois à ce poste'); return; }
+    this.setSelection(group);
+    this.camera.centerOn(group[0].x, group[0].y);
+    this.audio.play('select');
+  }
+
+  /**
+   * Envoie un villageois de plus sur une ressource. On puise d'abord dans les
+   * inactifs, puis dans le métier le plus fourni — jamais chez les bâtisseurs,
+   * pour ne pas abandonner un chantier en cours.
+   */
+  assignWorker(type) {
+    let pool = this.villagersWithTask('idle');
+    if (pool.length === 0) pool = this.villagersWithTask('move');
+    if (pool.length === 0) {
+      const stats = this.workerStats();
+      const from = ['food', 'wood', 'gold']
+        .filter((t) => t !== type && stats[t] > 0)
+        .sort((a, b) => stats[b] - stats[a])[0];
+      if (from) pool = this.villagersWithTask(from);
+    }
+    if (pool.length === 0) { this.ui.toast('Aucun villageois disponible'); this.audio.play('error'); return false; }
+
+    // On prend celui qui a le moins de chemin à faire.
+    let best = null, bestD = Infinity;
+    for (const v of pool) {
+      const res = this.world.findNearestResource(v.x, v.y, type, 40 * TILE, this.world.humanIndex);
+      if (!res) continue;
+      const rx = res.kind === 'building' ? res.x : res.tx * TILE + TILE / 2;
+      const ry = res.kind === 'building' ? res.y : res.ty * TILE + TILE / 2;
+      const d = dist2(v.x, v.y, rx, ry);
+      if (d < bestD) { bestD = d; best = v; }
+    }
+    if (!best || !this.world.assignVillager(best, type)) {
+      const labels = { food: 'nourriture', wood: 'bois', gold: 'or' };
+      this.ui.toast(`Plus de ${labels[type]} à portée — construisez une ferme ou explorez`, 'warn');
+      this.audio.play('error');
+      return false;
+    }
+    this.audio.play('order');
+    this.vibrate(8);
+    return true;
+  }
+
+  /** Retire un villageois d'un poste : il redevient disponible. */
+  unassignWorker(type) {
+    const group = this.villagersWithTask(type);
+    if (group.length === 0) return false;
+    // On libère en priorité quelqu'un qui n'a rien dans les bras.
+    const target = group.find((v) => v.carry.amount < 1) || group[0];
+    target.stop();
+    this.audio.play('click');
+    return true;
+  }
+
+  autoWorkers() { return this.world.players[this.world.humanIndex].autoWorkers; }
+
+  setAutoWorkers(on) {
+    this.world.players[this.world.humanIndex].autoWorkers = !!on;
+    saveAutoWorkers(!!on);
+    this.ui.toast(on
+      ? 'Réaffectation automatique activée'
+      : 'Réaffectation manuelle : vos villageois attendront vos ordres');
+  }
+
   // --- Confort --------------------------------------------------------------
 
   idleVillagers() {
@@ -379,6 +494,10 @@ class Game {
   }
 
   onEscape() {
+    if (!document.getElementById('worker-menu').classList.contains('hidden')) {
+      this.ui.closeWorkerMenu();
+      return;
+    }
     if (this.buildMode) { this.cancelBuild(); return; }
     if (this.attackMoveArmed || this.rallyArmed) {
       this.attackMoveArmed = false; this.rallyArmed = false;
@@ -427,6 +546,7 @@ class Game {
     this.running = false;
     this.ui.hideModal();
     this.ui.closeBuildMenu();
+    this.ui.closeWorkerMenu();
     document.getElementById('hud').classList.add('hidden');
   }
 }

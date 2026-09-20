@@ -186,6 +186,41 @@ await page.waitForTimeout(150);
 const boxSelection = await page.evaluate(() => window.__jeu.selection.length);
 check('sélection rectangulaire', boxSelection >= 1, boxSelection + ' unité(s)');
 
+// Affectation manuelle des ouvriers
+check('barre des ouvriers visible', await page.isVisible('#worker-bar'));
+const before = await page.evaluate(() => window.__jeu.workerStats());
+await page.click('#btn-workers');
+await page.waitForTimeout(200);
+check('panneau d’affectation ouvert', await page.isVisible('#worker-list'));
+check('affectation manuelle par défaut',
+  (await page.isChecked('#auto-workers')) === false);
+
+await page.click('[data-give="wood"]');
+await page.waitForTimeout(400);
+const afterGive = await page.evaluate(() => window.__jeu.workerStats());
+check('un ouvrier envoyé au bois', afterGive.wood > before.wood,
+  `${before.wood} → ${afterGive.wood}`);
+
+await page.click('[data-take="wood"]');
+await page.waitForTimeout(300);
+const afterTake = await page.evaluate(() => window.__jeu.workerStats());
+check('un ouvrier retiré du bois', afterTake.wood < afterGive.wood,
+  `${afterGive.wood} → ${afterTake.wood}`);
+
+await page.click('[data-select="wood"]');
+await page.waitForTimeout(250);
+const grouped = await page.evaluate(() => window.__jeu.selection.length);
+check('sélection du groupe « bois »', grouped >= 1, grouped + ' villageois');
+check('panneau refermé après sélection', await page.isHidden('#worker-list'));
+
+// Le compteur de la barre suit l'état réel
+const barCount = await page.evaluate(() => ({
+  affiche: Number(document.getElementById('wk-wood').textContent),
+  reel: window.__jeu.workerStats().wood,
+}));
+check('compteur de la barre à jour', barCount.affiche === barCount.reel,
+  `barre=${barCount.affiche} réel=${barCount.reel}`);
+
 // Menu pause
 await page.evaluate(() => window.__jeu.togglePause());
 await page.waitForTimeout(150);

@@ -23,6 +23,26 @@ const UNREACHABLE_AFTER = 7;
 let nextId = 1;
 export function resetEntityIds() { nextId = 1; }
 
+/**
+ * Métier courant d'un villageois : 'food' | 'wood' | 'gold' | 'build'
+ * | 'move' (en route sur ordre) | 'idle'. Sert à l'affichage comme à l'IA.
+ */
+export function villagerTask(unit) {
+  if (!unit || !unit.isVillager) return null;
+  // L'état prime : un villageois à l'arrêt peut conserver la mémoire de son
+  // ancien gisement, et le compter comme actif le rendrait invisible.
+  if (unit.state === STATE.IDLE) return 'idle';
+  if (unit.state === STATE.BUILD) return 'build';
+  if (unit.resourceTile) {
+    const res = unit.world.map.resourceAt(unit.resourceTile.tx, unit.resourceTile.ty);
+    if (res) return res.type;
+  }
+  if (unit.target && unit.target.type === 'farm') return 'food';
+  if ((unit.state === STATE.GATHER || unit.state === STATE.RETURN) && unit.carry.type) return unit.carry.type;
+  if (unit.state === STATE.IDLE) return 'idle';
+  return 'move';
+}
+
 /** Dégâts infligés par `attackerDef` (appartenant à `player`) à `target`. */
 export function computeDamage(attackerDef, player, target) {
   const type = attackerDef.attackType || 'melee';
@@ -109,6 +129,7 @@ export class Unit extends Entity {
     this.aggressive = type !== 'villager';
     this.gatherAnim = 0;
     this.pathPending = false;
+    this.pendingJob = null; // poste à prendre après la livraison en cours
     this.blockedTime = 0;   // temps passé sans pouvoir atteindre sa cible
     this.fleeUntil = 0;     // mise à l'abri en cours (piloté par l'IA)
     this.spawnTime = world.time;
@@ -139,6 +160,26 @@ export class Unit extends Entity {
     this.target = null;
     this.destination = null;
     this.resourceTile = null;
+    this.pendingJob = null;
+  }
+
+  /**
+   * Nouveau métier alors que les bras sont pleins d'une autre ressource :
+   * on passe d'abord par l'entrepôt, puis on prend le poste demandé.
+   * Le travail déjà fourni n'est jamais jeté.
+   * @returns {boolean} true si l'ordre a été différé le temps de la livraison.
+   */
+  deliverBeforeJob(job) {
+    if (this.carry.amount < 3 || this.carry.type === job.resType) return false;
+    const drop = this.world.findNearestDropoff(this, this.carry.type);
+    if (!drop) return false;
+    this.pendingJob = job;
+    this.resourceTile = null;
+    this.target = null;
+    this.returnTo = drop;
+    this.state = STATE.RETURN;
+    this.requestPathToEntity(drop);
+    return true;
   }
 
   moveTo(x, y, aggressive = false) {
@@ -161,9 +202,9 @@ export class Unit extends Entity {
   gatherAt(tx, ty) {
     const res = this.world.map.resourceAt(tx, ty);
     if (!res || !this.isVillager) return;
-    if (this.carry.type && this.carry.type !== res.type) {
-      this.carry = { type: null, amount: 0 }; // on lâche ce qu'on porte en changeant de métier
-    }
+    if (this.deliverBeforeJob({ kind: 'tile', tx, ty, resType: res.type })) return;
+    if (this.carry.type && this.carry.type !== res.type) this.carry = { type: null, amount: 0 };
+    this.pendingJob = null;
     this.resourceTile = { tx, ty };
     this.target = null;
     this.state = STATE.GATHER;
@@ -172,7 +213,9 @@ export class Unit extends Entity {
 
   gatherFarm(farm) {
     if (!this.isVillager || !farm || farm.dead) return;
+    if (this.deliverBeforeJob({ kind: 'farm', farm, resType: 'food' })) return;
     if (this.carry.type && this.carry.type !== 'food') this.carry = { type: null, amount: 0 };
+    this.pendingJob = null;
     this.target = farm;
     this.resourceTile = null;
     this.state = STATE.GATHER;
@@ -418,6 +461,18 @@ export class Unit extends Entity {
     const resType = this.carry.type;
     this.carry = { type: resType, amount: 0 };
     this.path = null;
+    // Poste demandé pendant le trajet : on l'honore maintenant.
+    if (this.pendingJob) {
+      const job = this.pendingJob;
+      this.pendingJob = null;
+      if (job.kind === 'farm' && !job.farm.dead) { this.gatherFarm(job.farm); return; }
+      if (job.kind === 'tile' && this.world.map.resourceAt(job.tx, job.ty)) {
+        this.gatherAt(job.tx, job.ty);
+        return;
+      }
+      this.findNextResource(job.resType);
+      return;
+    }
     // Retour au travail
     if (this.target && this.target.type === 'farm' && !this.target.dead) {
       this.state = STATE.GATHER;
@@ -430,9 +485,14 @@ export class Unit extends Entity {
     }
   }
 
-  /** Cherche automatiquement le gisement suivant du même type. */
+  /**
+   * Le gisement est épuisé (ou inaccessible). Par défaut le villageois rapporte
+   * son chargement puis attend les ordres : c'est au joueur d'affecter ses
+   * ouvriers. La réaffectation automatique est une option, activée pour l'IA.
+   */
   findNextResource(type) {
-    if (!type) { this.state = STATE.IDLE; return; }
+    if (!type) type = this.carry.type;            // on livre avant de s'arrêter
+    if (!type) { this.state = STATE.IDLE; this.world.notifyIdleWorker(this); return; }
     if (this.carry.amount > 0) {
       // On rapporte d'abord ce qu'on a dans les bras.
       const drop = this.world.findNearestDropoff(this, type);
@@ -445,8 +505,15 @@ export class Unit extends Entity {
         return;
       }
     }
+    this.resourceTile = null;
+    this.target = null;
+    if (!this.player.autoWorkers) {
+      this.state = STATE.IDLE;
+      this.world.notifyIdleWorker(this);
+      return;
+    }
     const next = this.world.findNearestResource(this.x, this.y, type, 18 * TILE, this.playerIndex);
-    if (!next) { this.state = STATE.IDLE; this.resourceTile = null; this.target = null; return; }
+    if (!next) { this.state = STATE.IDLE; this.world.notifyIdleWorker(this); return; }
     if (next.kind === 'building') this.gatherFarm(next);
     else this.gatherAt(next.tx, next.ty);
   }
@@ -459,7 +526,10 @@ export class Unit extends Entity {
       const finished = site;
       this.target = null;
       this.state = STATE.IDLE;
+      // Bâtir une ferme vaut ordre de la cultiver : c'est la suite directe de
+      // l'ordre du joueur, pas une réaffectation décidée par le jeu.
       if (finished.type === 'farm') this.gatherFarm(finished);
+      else this.world.notifyIdleWorker(this);
       return;
     }
     if (site.edgeDistanceTo(this.x, this.y) > TILE * 1.1) {

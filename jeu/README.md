@@ -31,6 +31,22 @@ Sur un téléphone : ouvrez l'URL, puis « Ajouter à l'écran d'accueil ». Le
 | Appui long puis glisser | Sélection rectangulaire |
 | Toucher le sol / un arbre / un ennemi (avec une sélection) | Ordre contextuel : se déplacer, récolter, construire, attaquer |
 | Bouton 🏗️ puis toucher la carte | Poser un bâtiment |
+| Barre 👷 en bas | Voir qui fait quoi · toucher un métier pour sélectionner le groupe |
+| Bouton 👷 | Panneau d'affectation : − / + pour déplacer un ouvrier d'un poste à l'autre |
+
+### Ce sont vos ouvriers, c'est vous qui les affectez
+
+Le jeu ne réaffecte **jamais** vos villageois à votre place. Quand un arbre, un
+buisson ou un filon s'épuise, le villageois rapporte son chargement à l'entrepôt
+puis attend vos ordres : le compteur 💤 de la barre 👷 s'allume et une
+notification vous prévient. De même, une ferme épuisée n'est pas replantée
+d'office, et changer un ouvrier de métier ne jette jamais ce qu'il porte — il
+passe d'abord livrer.
+
+Si vous préférez le confort à la maîtrise, l'option **Réaffectation
+automatique** (panneau 👷) rend la main au jeu : le villageois repart seul sur
+le gisement suivant. Le réglage est conservé d'une partie à l'autre. L'IA
+adverse, elle, joue toujours avec l'automatisme.
 
 Souris : clic gauche pour sélectionner ou tracer un rectangle, clic droit pour
 donner un ordre, molette pour zoomer, `WASD`/flèches pour la vue, `Échap` pour
@@ -49,6 +65,8 @@ annuler, `.` pour trouver un villageois inactif, `H` pour revenir au Centre-Vill
 - **4 technologies** : brouette, armes forgées, flèches barbelées, armure d'écailles.
 - **Brouillard de guerre**, minimap, points de ralliement, files de production,
   réparation, annulation de chantier avec remboursement.
+- **Affectation manuelle des ouvriers** : barre de répartition permanente et
+  panneau d'affectation (voir plus haut).
 - **Victoire** : détruire tous les bâtiments adverses et leurs villageois.
 
 ### L'IA adverse

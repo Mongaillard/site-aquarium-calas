@@ -40,6 +40,7 @@
         <li><b>Toucher</b> une unité pour la sélectionner, <b>double tap</b> pour toutes celles du même type</li>
         <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
         <li>Avec une sélection, toucher le sol / un arbre / un ennemi donne l'ordre correspondant</li>
+        <li>Vos villageois n'abandonnent jamais leur poste tout seuls : la barre 👷 en bas à gauche montre qui fait quoi, et permet de les réaffecter</li>
         <li>Objectif : détruire tous les bâtiments et villageois adverses</li>
       </ul>
     </div>
@@ -81,7 +82,14 @@
   <div id="alerts"></div>
   <div id="build-hint" class="hidden"></div>
 
-  <button id="idle-villager" class="floating hidden">🧑‍🌾 <span id="idle-count">0</span></button>
+  <div id="worker-bar">
+    <button id="btn-workers" class="worker-open" aria-label="Affecter les ouvriers">👷</button>
+    <button class="worker-chip" data-task="food"><span>🍖</span><b id="wk-food">0</b></button>
+    <button class="worker-chip" data-task="wood"><span>🪵</span><b id="wk-wood">0</b></button>
+    <button class="worker-chip" data-task="gold"><span>🪙</span><b id="wk-gold">0</b></button>
+    <button class="worker-chip" data-task="build"><span>🏗️</span><b id="wk-build">0</b></button>
+    <button class="worker-chip idle" data-task="idle"><span>💤</span><b id="wk-idle">0</b></button>
+  </div>
 
   <footer id="bottombar">
     <div id="selection-panel"></div>
@@ -96,6 +104,23 @@
       <button id="btn-close-build" class="icon-btn">✕</button>
     </div>
     <div id="build-list" class="build-list"></div>
+  </div>
+</div>
+
+<div id="worker-menu" class="overlay hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>👷 Affectation des ouvriers</h2>
+      <button id="btn-close-workers" class="icon-btn">✕</button>
+    </div>
+    <div id="worker-list" class="worker-list"></div>
+    <label class="switch-row">
+      <input type="checkbox" id="auto-workers">
+      <span>
+        <b>Réaffectation automatique</b>
+        <small>Quand un gisement s'épuise, le villageois repart seul sur le suivant. Désactivé, il rapporte son chargement puis attend vos ordres.</small>
+      </span>
+    </label>
   </div>
 </div>
 

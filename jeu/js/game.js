@@ -20,6 +20,10 @@ const FOG_INTERVAL = 0.25;
 function makePlayer(index, name, isAI) {
   return {
     index, name, isAI,
+    // Réaffectation automatique des villageois quand un gisement s'épuise.
+    // Toujours active pour l'IA ; côté joueur c'est un choix, désactivé par
+    // défaut : les ouvriers sont affectés à la main.
+    autoWorkers: isAI,
     color: PLAYER_COLORS[index % PLAYER_COLORS.length],
     resources: { ...START_RESOURCES },
     pop: 0,
@@ -357,8 +361,13 @@ export class World {
       if (!silent) {
         this.effects.push({ kind: 'rubble', x: entity.x, y: entity.y, life: 12, max: 12, size: entity.size });
       }
-      // Une ferme épuisée est replantée automatiquement si le bois le permet.
-      if (silent && entity.type === 'farm') this.reseedFarm(entity);
+      // Une ferme épuisée n'est replantée d'office que si l'automatisme est actif.
+      if (silent && entity.type === 'farm') {
+        if (owner.autoWorkers) this.reseedFarm(entity);
+        else if (entity.playerIndex === this.humanIndex) {
+          this.pushEvent({ type: 'notice', text: 'Ferme épuisée — reconstruisez-la pour continuer.' });
+        }
+      }
     }
 
     const e = this.entities.indexOf(entity);
@@ -396,6 +405,25 @@ export class World {
       this.players[b.playerIndex].popCap += b.def.popBonus;
     }
     for (const p of this.players) p.popCap = Math.min(POP_MAX, p.popCap);
+  }
+
+  /** Un villageois vient de se retrouver sans travail (gisement épuisé). */
+  notifyIdleWorker(unit) {
+    if (unit.playerIndex !== this.humanIndex) return;
+    this.pushEvent({ type: 'idleWorker', unit, x: unit.x, y: unit.y });
+  }
+
+  /**
+   * Affecte un villageois à une ressource : il rejoint le gisement le plus
+   * proche de lui (ou une ferme alliée pour la nourriture).
+   * @returns {boolean} false si plus rien à récolter de ce type dans la zone.
+   */
+  assignVillager(villager, type) {
+    const target = this.findNearestResource(villager.x, villager.y, type, 40 * TILE, villager.playerIndex);
+    if (!target) return false;
+    if (target.kind === 'building') villager.gatherFarm(target);
+    else villager.gatherAt(target.tx, target.ty);
+    return true;
   }
 
   notifyPopBlocked(playerIndex) {

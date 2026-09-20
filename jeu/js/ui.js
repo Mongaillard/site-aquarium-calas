@@ -22,7 +22,13 @@ export class UI {
       timer: el('game-timer'),
       selection: el('selection-panel'), commands: el('command-panel'),
       alerts: el('alerts'), buildMenu: el('build-menu'), modal: el('modal'),
-      idleBtn: el('idle-villager'), idleCount: el('idle-count'),
+      workerBar: el('worker-bar'), workerMenu: el('worker-menu'),
+      workerList: el('worker-list'), autoWorkers: el('auto-workers'),
+      workerCounts: {
+        food: el('wk-food'), wood: el('wk-wood'), gold: el('wk-gold'),
+        build: el('wk-build'), idle: el('wk-idle'),
+      },
+      bottombar: el('bottombar'),
       minimap: el('minimap'), hud: el('hud'),
     };
     this.lastValues = {};
@@ -34,8 +40,22 @@ export class UI {
   bind() {
     el('btn-menu').addEventListener('click', () => this.game.togglePause());
     el('btn-sound').addEventListener('click', () => this.game.toggleSound());
-    this.nodes.idleBtn.addEventListener('click', () => this.game.focusIdleVillager());
     el('btn-close-build').addEventListener('click', () => this.game.cancelBuild());
+
+    // Barre des ouvriers : un appui sélectionne le groupe, 👷 ouvre le panneau.
+    el('btn-workers').addEventListener('click', () => this.openWorkerMenu());
+    el('btn-close-workers').addEventListener('click', () => this.closeWorkerMenu());
+    this.nodes.workerBar.querySelectorAll('[data-task]').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const task = chip.dataset.task;
+        if (task === 'idle') this.game.focusIdleVillager();
+        else this.game.selectWorkerGroup(task);
+      });
+    });
+    this.nodes.autoWorkers.addEventListener('change', (e) => {
+      this.game.setAutoWorkers(e.target.checked);
+      this.renderWorkerRows();
+    });
 
     const minimap = this.nodes.minimap;
     const handleMinimap = (e) => {
@@ -79,12 +99,83 @@ export class UI {
     }
     this.setText('timer', this.nodes.timer, formatTime(this.world.time));
 
-    const idle = this.game.idleVillagers().length;
-    this.setText('idle', this.nodes.idleCount, String(idle));
-    this.nodes.idleBtn.classList.toggle('hidden', idle === 0);
-
+    this.refreshWorkerBar();
     this.refreshSelection();
     this.refreshDisabledStates();
+    if (!this.nodes.workerMenu.classList.contains('hidden')) this.renderWorkerRows();
+  }
+
+  // --- Ouvriers -------------------------------------------------------------
+
+  refreshWorkerBar() {
+    const stats = this.game.workerStats();
+    for (const task of ['food', 'wood', 'gold', 'build', 'idle']) {
+      this.setText('wk' + task, this.nodes.workerCounts[task], String(stats[task] || 0));
+    }
+    this.nodes.workerBar.querySelector('[data-task="idle"]')
+      .classList.toggle('has-idle', (stats.idle || 0) > 0);
+  }
+
+  openWorkerMenu() {
+    this.nodes.autoWorkers.checked = this.game.autoWorkers();
+    this.renderWorkerRows();
+    this.nodes.workerMenu.classList.remove('hidden');
+  }
+
+  closeWorkerMenu() { this.nodes.workerMenu.classList.add('hidden'); }
+
+  renderWorkerRows() {
+    const stats = this.game.workerStats();
+    const rows = [
+      { task: 'food', icon: '🍖', name: 'Nourriture', hint: 'buissons et fermes', assignable: true },
+      { task: 'wood', icon: '🪵', name: 'Bois', hint: 'forêts', assignable: true },
+      { task: 'gold', icon: '🪙', name: 'Or', hint: 'filons', assignable: true },
+      { task: 'build', icon: '🏗️', name: 'Chantiers', hint: 'en construction', assignable: false },
+      { task: 'idle', icon: '💤', name: 'Sans affectation', hint: 'en attente d’ordres', assignable: false },
+    ];
+    const html = rows.map((row) => {
+      const count = stats[row.task] || 0;
+      const controls = row.assignable
+        ? `<button class="wr-btn" data-take="${row.task}" ${count === 0 ? 'disabled' : ''}>−</button>
+           <span class="wr-count">${count}</span>
+           <button class="wr-btn" data-give="${row.task}">+</button>`
+        : `<span class="wr-count">${count}</span>`;
+      return `<div class="worker-row">
+        <button class="wr-label" data-select="${row.task}">
+          <span class="wr-icon">${row.icon}</span>
+          <span>
+            <span class="wr-name">${row.name}</span>
+            <span class="wr-hint">${row.hint}</span>
+          </span>
+        </button>
+        <div class="wr-controls">${controls}</div>
+      </div>`;
+    }).join('');
+    const moving = stats.move || 0;
+    this.nodes.workerList.innerHTML = html
+      + (moving > 0 ? `<div class="wr-hint" style="padding-left:4px">${moving} en déplacement</div>` : '');
+
+    this.nodes.workerList.querySelectorAll('[data-give]').forEach((btn) => {
+      btn.addEventListener('click', () => { this.game.assignWorker(btn.dataset.give); this.renderWorkerRows(); });
+    });
+    this.nodes.workerList.querySelectorAll('[data-take]').forEach((btn) => {
+      btn.addEventListener('click', () => { this.game.unassignWorker(btn.dataset.take); this.renderWorkerRows(); });
+    });
+    this.nodes.workerList.querySelectorAll('[data-select]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.game.selectWorkerGroup(btn.dataset.select);
+        this.closeWorkerMenu();
+      });
+    });
+  }
+
+  /** La barre des ouvriers se cale au-dessus du panneau du bas, dont la hauteur varie. */
+  measureBottomBar() {
+    const height = this.nodes.bottombar.offsetHeight;
+    if (height && height !== this.lastBottomHeight) {
+      this.lastBottomHeight = height;
+      document.documentElement.style.setProperty('--bottom-height', height + 6 + 'px');
+    }
   }
 
   setText(key, node, value) {
@@ -120,10 +211,12 @@ export class UI {
       this.nodes.commands.innerHTML = '';
       this.commandNodes = [];
       this.commandButtons = [];
+      this.measureBottomBar();
       return;
     }
     this.renderSelectionPanel(selection);
     this.renderCommands(selection);
+    this.measureBottomBar();
   }
 
   renderSelectionPanel(selection) {
@@ -363,8 +456,17 @@ export class UI {
   // --- Notifications --------------------------------------------------------
 
   toast(message, kind = 'info') {
+    // Message identique déjà affiché : on incrémente plutôt que d'empiler.
+    const last = this.nodes.alerts.lastElementChild;
+    if (last && last.dataset.message === message && !last.classList.contains('leaving')) {
+      const count = Number(last.dataset.count || 1) + 1;
+      last.dataset.count = count;
+      last.innerHTML = `${message} <span class="toast-count">×${count}</span>`;
+      return;
+    }
     const node = document.createElement('div');
     node.className = `toast ${kind}`;
+    node.dataset.message = message;
     node.textContent = message;
     this.nodes.alerts.appendChild(node);
     setTimeout(() => {
@@ -407,6 +509,7 @@ export class UI {
         <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant</li>
         <li><b>🏗️ Construire</b> : choisissez un bâtiment, puis touchez l'emplacement</li>
         <li>Les villageois récoltent 🍖 nourriture, 🪵 bois et 🪙 or ; il faut des <b>maisons</b> pour agrandir la population</li>
+        <li><b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le villageois rapporte son chargement puis attend vos ordres. La barre <b>👷</b> montre qui fait quoi et permet de réaffecter d'un doigt</li>
         <li>Passez les <b>âges</b> depuis le Centre-Ville pour débloquer de nouvelles unités</li>
         <li><b>Objectif</b> : détruire tous les bâtiments adverses et leurs villageois</li>
       </ul>

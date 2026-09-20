@@ -4,7 +4,7 @@
 
 import { World } from '../js/game.js';
 import { AIPlayer } from '../js/ai.js';
-import { DIFFICULTIES, TICKS_PER_SECOND } from '../js/config.js';
+import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
 import { formatTime } from '../js/utils.js';
 
 const DT = 1 / TICKS_PER_SECOND;
@@ -19,6 +19,9 @@ function check(label, condition, detail = '') {
 function runMatch({ seed, mapSize, difficulty, minutes }) {
   const world = new World({ seed, mapSize, difficulty });
   // On confie aussi le joueur humain à une IA pour que la partie se joue seule.
+  // Un camp piloté par l'IA récolte comme l'IA : réaffectation automatique
+  // comprise (le mode manuel du joueur est testé séparément plus bas).
+  world.players[0].autoWorkers = true;
   world.ais.push(new AIPlayer(world, 0, DIFFICULTIES[difficulty]));
   const ticks = Math.round(minutes * 60 * TICKS_PER_SECOND);
   const started = Date.now();
@@ -94,13 +97,77 @@ check('seconde partie stable', alt.world.time > 60, formatTime(alt.world.time));
 check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches > 50,
   alt.world.pathfinder.searches + ' recherches');
 
+// --- Affectation manuelle des ouvriers --------------------------------------
+// Par défaut le joueur affecte lui-même ses villageois : quand un gisement
+// s'épuise, l'ouvrier livre son chargement puis attend les ordres.
+{
+  const world = new World({ seed: 5, mapSize: 'small', difficulty: 'normal' });
+  const player = world.players[0];
+  check('affectation manuelle par défaut', player.autoWorkers === false);
+  check('l’IA garde la réaffectation automatique', world.players[1].autoWorkers === true);
+
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  // On place l'ouvrier sur un arbre presque vide, juste à côté du Centre-Ville.
+  const tree = [...world.map.resources.values()]
+    .filter((r) => r.type === 'wood')
+    .sort((a, b) => (a.tx * TILE - tc.x) ** 2 + (a.ty * TILE - tc.y) ** 2
+      - ((b.tx * TILE - tc.x) ** 2 + (b.ty * TILE - tc.y) ** 2))[0];
+  tree.amount = 6;
+  villager.x = tree.tx * TILE + TILE * 1.2;
+  villager.y = tree.ty * TILE + TILE / 2;
+  villager.gatherAt(tree.tx, tree.ty);
+
+  let sawIdleEvent = false;
+  for (let i = 0; i < 90 * TICKS_PER_SECOND && villager.state !== 'idle'; i++) {
+    world.update(DT);
+    for (const ev of world.drainEvents()) if (ev.type === 'idleWorker') sawIdleEvent = true;
+  }
+  check('l’ouvrier s’arrête quand le gisement est épuisé', villager.state === 'idle', villager.state);
+  check('le joueur est prévenu du villageois sans travail', sawIdleEvent);
+  check('le chargement a bien été livré', villager.carry.amount < 1 && player.stats.gathered.wood > 0,
+    Math.round(player.stats.gathered.wood) + ' bois rapportés');
+  check('l’arbre épuisé a disparu', !world.map.resourceAt(tree.tx, tree.ty));
+
+  // Avec l'automatisme, le même villageois repart de lui-même sur un autre arbre.
+  player.autoWorkers = true;
+  const second = [...world.map.resources.values()].find((r) => r.type === 'wood');
+  second.amount = 5;
+  villager.gatherAt(second.tx, second.ty);
+  for (let i = 0; i < 120 * TICKS_PER_SECOND; i++) {
+    world.update(DT);
+    if (villager.resourceTile && villager.resourceTile.tx !== second.tx) break;
+  }
+  check('avec l’automatisme, l’ouvrier enchaîne tout seul',
+    villager.state !== 'idle' || villager.carry.amount > 0, villager.state);
+}
+
+// Changer un villageois de métier ne doit pas jeter son chargement.
+{
+  const world = new World({ seed: 8, mapSize: 'small', difficulty: 'normal' });
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  villager.carry = { type: 'wood', amount: 10 };
+  const before = world.players[0].resources.wood;
+  const gold = [...world.map.resources.values()].find((r) => r.type === 'gold');
+  villager.gatherAt(gold.tx, gold.ty);
+  check('un changement de métier passe d’abord par l’entrepôt', villager.state === 'return');
+  for (let i = 0; i < 120 * TICKS_PER_SECOND; i++) {
+    world.update(DT);
+    if (world.players[0].resources.wood > before) break;
+  }
+  check('le chargement n’est pas perdu', world.players[0].resources.wood >= before + 9,
+    Math.round(world.players[0].resources.wood - before) + ' bois livrés');
+}
+
 // Déterminisme : une même graine doit rejouer exactement la même partie.
 const runA = runMatch({ seed: 99, mapSize: 'small', difficulty: 'normal', minutes: 3 });
 const runB = runMatch({ seed: 99, mapSize: 'small', difficulty: 'normal', minutes: 3 });
 const fingerprint = (w) => w.players.map((p) =>
   [p.age, p.pop, Math.round(p.resources.food), Math.round(p.resources.wood), p.stats.trained].join('/')).join('|');
 check('parties reproductibles à graine égale', fingerprint(runA.world) === fingerprint(runB.world),
-  fingerprint(runA.world));
+  fingerprint(runA.world) === fingerprint(runB.world)
+    ? fingerprint(runA.world)
+    : `A=${fingerprint(runA.world)} B=${fingerprint(runB.world)}`);
 
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : '❌ ' + failures + ' test(s) en échec'}`);
 process.exit(failures === 0 ? 0 : 1);
