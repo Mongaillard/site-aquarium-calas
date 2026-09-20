@@ -414,7 +414,9 @@ export class Unit extends Entity {
       return;
     }
 
-    const reach = this.rangePx();
+    // La portée part du corps de l'attaquant : mesurée depuis son centre, un
+    // fantassin s'arrête à portée de bras... sans pouvoir frapper.
+    const reach = this.rangePx() + this.radius;
     const d = target.edgeDistanceTo(this.x, this.y);
 
     // Poursuite bornée : une cible prise d'initiative n'entraîne jamais
@@ -435,10 +437,16 @@ export class Unit extends Entity {
     }
     // Cible hors de portée : on la poursuit (recalcul périodique si elle bouge).
     if (!this.path || this.path.length === 0 || this.pathIndex >= this.path.length) {
+      // Chemin épuisé mais toujours trop loin : les derniers pas se font en
+      // ligne droite. Un chemin s'arrête sur une case voisine, ce qui peut
+      // rester hors d'allonge — sans cela, l'unité reste plantée devant sa
+      // cible sans jamais la toucher.
+      if (!this.pathPending) this.stepToward(target.x, target.y, dt);
       if (this.repathCooldown <= 0) {
         this.repathCooldown = 0.6;
         this.requestPathToEntity(target);
       }
+      return;
     } else if (target.kind === 'unit' && this.repathCooldown <= 0) {
       const last = this.path[this.path.length - 1];
       if (dist2(last.tx * TILE + TILE / 2, last.ty * TILE + TILE / 2, target.x, target.y) > (TILE * 2.5) ** 2) {
@@ -743,6 +751,16 @@ export class Unit extends Entity {
 
   faceTowards(x, y) {
     this.facing = Math.atan2(y - this.y, x - this.x);
+  }
+
+  /** Approche directe, pour les derniers pas qu'un chemin ne couvre pas. */
+  stepToward(x, y, dt) {
+    const dx = x - this.x, dy = y - this.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.001) return;
+    this.facing = Math.atan2(dy, dx);
+    const step = this.speedPx() * dt;
+    this.tryMove((dx / len) * step, (dy / len) * step);
   }
 
   /** Avance le long du chemin. Renvoie true quand il est terminé (ou absent). */

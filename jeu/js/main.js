@@ -192,7 +192,7 @@ class Game {
     if (this.garrisonArmed) {
       this.garrisonArmed = false;
       this.ui.setBuildHint('');
-      const shelter = this.world.entityAt(p.x, p.y, this.world.humanIndex);
+      const shelter = this.world.entityAt(p.x, p.y, this.world.humanIndex, this.tapTolerance());
       if (shelter && shelter.kind === 'building' && shelter.def.garrison && ownUnits.length) {
         const sent = this.world.garrisonUnits(ownUnits, shelter);
         if (sent > 0) {
@@ -208,7 +208,21 @@ class Game {
       return;
     }
 
-    const entity = this.world.entityAt(p.x, p.y);
+    // Avec ses troupes en main, un ennemi sous le doigt passe avant un allié :
+    // sinon, dans une mêlée, chaque appui change la sélection au lieu de donner
+    // l'ordre d'attaquer.
+    const tolerance = this.tapTolerance();
+    // Exception : le doigt posé franchement sur un de ses bâtiments le
+    // sélectionne quand même — en plein raid, il faut pouvoir produire.
+    const ownBuilding = this.world.entityAt(p.x, p.y, this.world.humanIndex, 0);
+    const enemy = ownUnits.length > 0 && !(ownBuilding && ownBuilding.kind === 'building')
+      ? this.world.enemyAt(p.x, p.y, this.world.humanIndex, tolerance) : null;
+    if (enemy && this.renderer.isEntityVisible(enemy)) {
+      this.issueOrder(p.x, p.y);
+      return;
+    }
+
+    const entity = this.world.entityAt(p.x, p.y, null, tolerance);
     const isMine = entity && entity.playerIndex === this.world.humanIndex;
     const visible = entity && (isMine || this.renderer.isEntityVisible(entity));
 
@@ -251,11 +265,19 @@ class Game {
     this.issueOrder(p.x, p.y);
   }
 
+  /**
+   * Rayon de pointage en unités monde : on vise une cible d'environ 22 pixels
+   * à l'écran quel que soit le zoom — la taille d'un bout de doigt.
+   */
+  tapTolerance() {
+    return clamp(16 / this.camera.zoom, 10, 40);
+  }
+
   issueOrder(worldX, worldY) {
     const units = this.selection.filter(
       (e) => e.kind === 'unit' && e.playerIndex === this.world.humanIndex);
     if (units.length === 0) return;
-    const result = this.world.commandUnits(units, worldX, worldY);
+    const result = this.world.commandUnits(units, worldX, worldY, { tolerance: this.tapTolerance() });
     // Retour explicite : sur un petit écran, on ne voit pas d'un coup d'œil
     // que le groupe s'est étalé sur plusieurs arbres.
     if (result && result.kind === 'gather' && result.workers > 1) {

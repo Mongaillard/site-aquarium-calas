@@ -284,10 +284,14 @@ function advance(world, seconds, stop) {
   // Un Centre-Ville occupé tire ; vide, il encaisse sans riposter.
   const world = sandbox(7);
   const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  // On veut mesurer le seul tir du bâtiment : la garnison de départ (dont
+  // l'éclaireur, agressif) ne doit pas s'en mêler.
+  for (const u of world.units) if (u.playerIndex === 0) u.setStance('passive');
   const attacker = world.spawnUnit(1, 'militia', tc.x + TILE * 3, tc.y);
   attacker.setStance('passive');
   advance(world, 4);
-  check('Centre-Ville vide : aucune riposte', attacker.hp === attacker.maxHp);
+  check('Centre-Ville vide : aucune riposte', attacker.hp === attacker.maxHp,
+    Math.round(attacker.hp) + '/' + attacker.maxHp + ' PV');
 
   for (const v of world.units.filter((u) => u.playerIndex === 0 && u.isVillager).slice(0, 3)) {
     tc.addToGarrison(v);
@@ -466,6 +470,45 @@ function advance(world, seconds, stop) {
   villager.carry = { type: 'wood', amount: 10 };
   villager.startReturn();
   check('sac plein : il part livrer, il ne s’arrête pas', villager.state === 'return', villager.state);
+}
+
+// --- Viser l'ennemi au doigt --------------------------------------------------
+
+{
+  const world = sandbox(45);
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const soldat = world.spawnUnit(0, 'militia', tc.x + 3 * TILE, tc.y + 3 * TILE);
+  const ennemi = world.spawnUnit(1, 'militia', tc.x + 2 * TILE, tc.y + 2 * TILE);
+
+  // Au doigt, une unité n'offrait qu'une cible de neuf pixels à l'écran.
+  const rate = world.commandUnits([soldat], ennemi.x + 28, ennemi.y + 10);
+  check('un appui à côté de l’ennemi lance quand même l’attaque',
+    rate && rate.kind === 'attack' && soldat.target === ennemi,
+    `ordre « ${rate ? rate.kind : 'aucun'} »`);
+
+  // Mêlée : l'ennemi l'emporte sur l'allié tout proche.
+  const allie = world.spawnUnit(0, 'villager', ennemi.x + 12, ennemi.y + 6);
+  soldat.stop();
+  const melee = world.commandUnits([soldat], allie.x, allie.y);
+  check('dans une mêlée, l’ennemi est visé avant l’allié',
+    melee && melee.kind === 'attack' && soldat.target === ennemi,
+    `ordre « ${melee ? melee.kind : 'aucun'} »`);
+
+  // Sans tolérance, un ordre lointain reste un déplacement.
+  soldat.stop();
+  const loin = world.commandUnits([soldat], ennemi.x + 6 * TILE, ennemi.y + 6 * TILE);
+  check('un ordre loin de l’ennemi reste un déplacement',
+    loin && loin.kind === 'move', `ordre « ${loin ? loin.kind : 'aucun'} »`);
+
+  // Un villageois aussi doit pouvoir riposter sur ordre.
+  const paysan = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  world.commandUnits([paysan], ennemi.x, ennemi.y);
+  check('un villageois attaque sur ordre du joueur',
+    paysan.target === ennemi && paysan.state === 'attack', paysan.state);
+
+  // Et l'attaque ordonnée ne subit pas la limite de poursuite d'attitude.
+  check('une attaque ordonnée n’est pas une prise de cible automatique',
+    paysan.autoTarget === false);
 }
 
 // --- Répartition d'un groupe sur les ressources ------------------------------

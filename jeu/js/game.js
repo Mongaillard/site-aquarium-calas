@@ -334,22 +334,41 @@ export class World {
     return this.entities.filter((e) => !e.dead && e.playerIndex === playerIndex && (!filter || filter(e)));
   }
 
-  entityAt(x, y, playerIndex = null) {
+  /**
+   * Distance² si le point touche l'entité (tolérance comprise), sinon -1.
+   * La tolérance existe pour le tactile : sans elle, une unité n'offre qu'une
+   * cible de neuf pixels à l'écran, invisable au doigt.
+   */
+  hitTest(entity, x, y, tolerance = 0) {
+    const d = dist2(x, y, entity.x, entity.y);
+    if (entity.kind === 'building') {
+      const half = (entity.size * TILE) / 2 + tolerance;
+      const inside = x >= entity.x - half && x <= entity.x + half
+        && y >= entity.y - half && y <= entity.y + half;
+      return inside ? d : -1;
+    }
+    const r = entity.radius + 8 + tolerance;
+    return d <= r * r ? d : -1;
+  }
+
+  entityAt(x, y, playerIndex = null, tolerance = 0) {
     let best = null, bestD = Infinity;
     for (const e of this.entities) {
       if (e.dead || e.garrisonedIn) continue;
       if (playerIndex !== null && e.playerIndex !== playerIndex) continue;
-      let hit = false, d = 0;
-      if (e.kind === 'building') {
-        const halfW = (e.size * TILE) / 2, halfH = (e.size * TILE) / 2;
-        hit = x >= e.x - halfW && x <= e.x + halfW && y >= e.y - halfH && y <= e.y + halfH;
-        d = dist2(x, y, e.x, e.y);
-      } else {
-        d = dist2(x, y, e.x, e.y);
-        const r = e.radius + 8;
-        hit = d <= r * r;
-      }
-      if (hit && d < bestD) { bestD = d; best = e; }
+      const d = this.hitTest(e, x, y, tolerance);
+      if (d >= 0 && d < bestD) { bestD = d; best = e; }
+    }
+    return best;
+  }
+
+  /** Cible hostile sous le doigt : sert à donner la priorité à l'attaque. */
+  enemyAt(x, y, playerIndex, tolerance = 0) {
+    let best = null, bestD = Infinity;
+    for (const e of this.entities) {
+      if (e.dead || e.garrisonedIn || e.playerIndex === playerIndex) continue;
+      const d = this.hitTest(e, x, y, tolerance);
+      if (d >= 0 && d < bestD) { bestD = d; best = e; }
     }
     return best;
   }
@@ -693,7 +712,14 @@ export class World {
   commandUnits(units, worldX, worldY, options = {}) {
     if (!units || units.length === 0) return null;
     const playerIndex = units[0].playerIndex;
-    const target = this.entityAt(worldX, worldY);
+    // Tolérance par défaut généreuse : le moteur doit rester jouable même
+    // appelé sans contexte d'affichage (tests, IA). L'interface la remplace par
+    // une valeur calculée sur le zoom courant.
+    const tolerance = options.tolerance ?? TILE * 0.6;
+    // Un ennemi sous le doigt l'emporte sur un allié : quand on a ses troupes
+    // en main et qu'on touche une mêlée, l'intention est d'attaquer.
+    const target = this.enemyAt(worldX, worldY, playerIndex, tolerance)
+      || this.entityAt(worldX, worldY, null, tolerance);
     const res = this.resourceNear(worldX, worldY);
 
     if (target && target.playerIndex !== playerIndex && !target.dead) {

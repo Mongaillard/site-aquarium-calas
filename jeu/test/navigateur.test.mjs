@@ -267,6 +267,31 @@ check('appui long : la sélection multiple fonctionne',
   longPress.skipped || longPress.selected >= 2,
   longPress.skipped ? 'ignoré' : longPress.selected + ' unités');
 
+// Attaquer un ennemi au doigt, sans viser au pixel près.
+const combat = await page.evaluate(async () => {
+  const g = window.__jeu;
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const soldat = g.world.spawnUnit(0, 'militia', tc.x + 96, tc.y + 96);
+  const ennemi = g.world.spawnUnit(1, 'militia', tc.x + 64, tc.y + 64);
+  ennemi.setStance('passive');
+  g.camera.centerOn(tc.x, tc.y);
+  g.setSelection([soldat]);
+
+  // On touche à côté de l'ennemi, comme un pouce sur un petit écran.
+  const p = g.camera.worldToScreen(ennemi.x + 22, ennemi.y + 14);
+  g.tapAt(p.x, p.y, false);
+  const ordonne = soldat.target === ennemi;
+
+  const pvAvant = ennemi.hp;
+  for (let i = 0; i < 20 * 25; i++) {
+    g.world.update(1 / 20);
+    if (ennemi.hp < pvAvant) break;
+  }
+  return { ordonne, touche: ennemi.hp < pvAvant, pv: Math.round(ennemi.hp) };
+});
+check('appui à côté de l’ennemi : l’ordre d’attaque part', combat.ordonne);
+check('l’ennemi encaisse réellement', combat.touche, combat.pv + ' PV restants');
+
 // Attitudes de combat (principe d'AoE)
 const stanceCheck = await page.evaluate(() => {
   const g = window.__jeu;
