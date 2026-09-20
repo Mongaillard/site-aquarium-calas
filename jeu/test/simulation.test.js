@@ -6,7 +6,8 @@ import { World } from '../js/game.js';
 import { AIPlayer } from '../js/ai.js';
 import { serializeWorld, restoreWorld } from '../js/save.js';
 import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
-import { formatTime, dist } from '../js/utils.js';
+import { formatTime, dist, RNG } from '../js/utils.js';
+import { STATE } from '../js/entities.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 let failures = 0;
@@ -864,6 +865,146 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
   fingerprint(runA.world) === fingerprint(runB.world)
     ? fingerprint(runA.world)
     : `A=${fingerprint(runA.world)} B=${fingerprint(runB.world)}`);
+
+
+// ---------------------------------------------------------------------------
+// Déplacement : plus personne ne reste coincé.
+//
+// Avant : le chemin était lissé une fois pour toutes entre centres de cases,
+// et un point de passage validé à 17 px de son centre sans y être entré.
+// L'unité visait alors le nœud suivant depuis une case d'où la ligne droite
+// était bouchée, glissait du mauvais côté, recalculait… et retombait sur le
+// même chemin : jusqu'à cent recalculs pour un seul ordre, l'unité figée.
+// ---------------------------------------------------------------------------
+{
+  const passif = (w) => { w.ais = []; for (const u of w.units) u.setStance('passive'); return w; };
+  const tirage = new RNG(777);
+  // Cases atteignables depuis (tx, ty), même règle diagonale que l'A* ;
+  // renvoie la distance en cases (−1 : inaccessible).
+  const atteignables = (map, tx, ty) => {
+    const { w, h } = map;
+    const d = new Int32Array(w * h).fill(-1);
+    const file = [ty * w + tx]; d[file[0]] = 0;
+    for (let tete = 0; tete < file.length; tete++) {
+      const cur = file[tete], cx = cur % w, cy = (cur / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = cx + dx, ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const ni = ny * w + nx;
+        if (d[ni] >= 0 || map.blocked[ni]) continue;
+        if (dx && dy && (map.blocked[cy * w + nx] || map.blocked[ny * w + cx])) continue;
+        d[ni] = d[cur] + 1; file.push(ni);
+      }
+    }
+    return d;
+  };
+  // Une case ouverte, atteignable, loin de tout ce qui détournerait l'ordre
+  // (ennemi → attaque, bâtiment → chantier, gisement → récolte).
+  const cibleLibre = (w, d, minCases) => {
+    const cands = [];
+    for (let i = 0; i < d.length; i++) if (d[i] >= minCases && w.map.isOpenTile(i % w.map.w, (i / w.map.w) | 0)) cands.push(i);
+    for (let essai = 0; essai < 200; essai++) {
+      const i = cands[tirage.int(0, cands.length - 1)];
+      const tx = i % w.map.w, ty = (i / w.map.w) | 0;
+      const x = tx * TILE + TILE / 2, y = ty * TILE + TILE / 2;
+      if (w.enemyAt(x, y, 0, TILE * 2) || w.entityAt(x, y, null, TILE * 2) || w.resourceNear(x, y)) continue;
+      return { tx, ty, x, y, cases: d[i] };
+    }
+    return null;
+  };
+  const arrive = (u, x, y, marge) => u.state === STATE.IDLE && dist(u.x, u.y, x, y) <= marge;
+
+  // 1. Seule, vers des cibles tirées au hasard, sur les trois tailles de carte.
+  let ordres = 0, arrivees = 0, recalculsMax = 0;
+  for (const taille of ['small', 'medium', 'large']) {
+    for (let g = 0; g < 2; g++) {
+      const w = passif(new World({ seed: 900 + g, mapSize: taille, difficulty: 'normal' }));
+      const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+      const u = w.spawnUnit(0, 'militia', tc.x + TILE * 3, tc.y);
+      u.setStance('passive');
+      for (let k = 0; k < 5; k++) {
+        const d = atteignables(w.map, Math.floor(u.x / TILE), Math.floor(u.y / TILE));
+        const c = cibleLibre(w, d, 8);
+        if (!c) continue;
+        w.commandUnits([u], c.x, c.y);
+        const attendu = (c.cases * TILE) / u.speedPx();
+        advance(w, attendu * 2 + 6, () => u.state === STATE.IDLE);
+        ordres++;
+        if (arrive(u, c.x, c.y, TILE * 1.5)) arrivees++;
+        recalculsMax = Math.max(recalculsMax, u.repathAttempts);
+      }
+    }
+  }
+  check('seule, une unité arrive partout où un chemin existe', ordres >= 25 && arrivees === ordres, `${arrivees}/${ordres} ordres, trois tailles de carte`);
+  check('sans tourner en rond : au plus trois recalculs par ordre', recalculsMax <= 3, `${recalculsMax} recalcul(s) au pire`);
+
+  // 2. Un groupe de douze soldats, par l'ordre de formation.
+  {
+    const w = passif(new World({ seed: 910, mapSize: 'medium', difficulty: 'normal' }));
+    const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+    const types = ['militia', 'spearman', 'scout', 'archer', 'knight'];
+    const grp = [];
+    for (let i = 0; i < 12; i++) {
+      const u = w.spawnUnit(0, types[i % types.length], tc.x + TILE * (2 + (i % 4)), tc.y + TILE * (2 + Math.floor(i / 4)));
+      u.setStance('passive'); grp.push(u);
+    }
+    let n = 0, ok = 0;
+    for (let k = 0; k < 4; k++) {
+      const d = atteignables(w.map, Math.floor(grp[0].x / TILE), Math.floor(grp[0].y / TILE));
+      const c = cibleLibre(w, d, 8);
+      if (!c) continue;
+      w.commandUnits(grp, c.x, c.y);
+      const lent = Math.min(...grp.map((u) => u.speedPx()));
+      advance(w, (c.cases * TILE) / lent * 2 + 8, () => grp.every((u) => u.state === STATE.IDLE));
+      for (const u of grp) { n++; if (arrive(u, c.x, c.y, TILE * 3.5)) ok++; }
+    }
+    check('un groupe de douze arrive au complet', n >= 36 && ok === n, `${ok}/${n} unités en formation autour de la cible`);
+  }
+
+  // 3. Une maison posée sur quatre villageois à l'arrêt.
+  {
+    const w = passif(new World({ seed: 920, mapSize: 'small', difficulty: 'normal' }));
+    const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+    w.players[0].resources.wood = 5000;
+    let spot = null;
+    for (let r = 3; r <= 10 && !spot; r++) {
+      for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r && !spot; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (w.canPlace(0, 'house', tc.tx + dx, tc.ty + dy, true)) spot = { tx: tc.tx + dx, ty: tc.ty + dy };
+      }
+    }
+    const grp = [];
+    for (let i = 0; i < 4; i++) {
+      const u = w.spawnUnit(0, 'villager', (spot.tx + (i % 2)) * TILE + TILE / 2, (spot.ty + Math.floor(i / 2)) * TILE + TILE / 2);
+      u.setStance('passive'); grp.push(u);
+    }
+    advance(w, 0.5);
+    const site = w.placeBuilding(0, 'house', spot.tx, spot.ty, []);
+    const pieges = grp.filter((u) => w.map.isBlocked(Math.floor(u.x / TILE), Math.floor(u.y / TILE))).length;
+    check('une maison posée sur des villageois les pousse dehors', !!site && pieges === 0, `${pieges} villageois sous le bâtiment`);
+    const d = atteignables(w.map, Math.floor(grp[0].x / TILE), Math.floor(grp[0].y / TILE));
+    const c = cibleLibre(w, d, 6);
+    w.commandUnits(grp, c.x, c.y);
+    advance(w, 40, () => grp.every((u) => u.state === STATE.IDLE));
+    check('et ils repartent normalement', grp.every((u) => arrive(u, c.x, c.y, TILE * 3.5)),
+      grp.map((u) => `${u.state} à ${Math.round(dist(u.x, u.y, c.x, c.y))}px`).join(' · '));
+  }
+
+  // 4. Une unité prise dans une case bloquée (partie restaurée, bâtiment de
+  // l'IA…) en ressort d'elle-même au premier pas.
+  {
+    const w = passif(sandbox(930));
+    const u = w.units.find((v) => v.playerIndex === 0 && v.isVillager);
+    const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+    const tree = w.findNearestResource(u.x, u.y, 'wood', 20 * TILE, 0);
+    u.x = tree.tx * TILE + TILE / 2; u.y = tree.ty * TILE + TILE / 2;
+    u.moveTo(tc.x, tc.y + TILE * 5);
+    advance(w, 1);
+    check('une unité prise dans une case bloquée en ressort', !w.map.isBlocked(Math.floor(u.x / TILE), Math.floor(u.y / TILE)),
+      `case ${Math.floor(u.x / TILE)},${Math.floor(u.y / TILE)}`);
+  }
+}
 
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : '❌ ' + failures + ' test(s) en échec'}`);
 process.exit(failures === 0 ? 0 : 1);

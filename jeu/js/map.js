@@ -73,6 +73,32 @@ export class GameMap {
   }
   isWalkable(tx, ty) { return !this.isBlocked(tx, ty); }
 
+  /**
+   * Une unité peut-elle se tenir en (x, y) ? Elle occupe un carré de demi-côté
+   * `r` dont les quatre coins doivent tomber sur des cases libres. Le suivi de
+   * chemin et la marche passent tous deux par ici : ils voient le même monde.
+   */
+  canStand(x, y, r) {
+    const l = Math.floor((x - r) / TILE), rt = Math.floor((x + r) / TILE);
+    const t = Math.floor((y - r) / TILE), b = Math.floor((y + r) / TILE);
+    return !(this.isBlocked(l, t) || this.isBlocked(rt, t) || this.isBlocked(l, b) || this.isBlocked(rt, b));
+  }
+
+  /**
+   * Le segment (x0,y0)→(x1,y1) est-il franchissable par un corps de demi-côté
+   * `r` ? Échantillonné tous les `r` pixels au plus : une case fait 32 px,
+   * rien ne peut passer entre deux échantillons.
+   */
+  segmentClear(x0, y0, x1, y1, r) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const n = Math.max(1, Math.ceil(Math.hypot(dx, dy) / Math.max(4, r)));
+    for (let i = 1; i <= n; i++) {
+      const t = i / n;
+      if (!this.canStand(x0 + dx * t, y0 + dy * t, r)) return false;
+    }
+    return true;
+  }
+
   block(tx, ty, mask) {
     if (this.inBounds(tx, ty)) this.blocked[ty * this.w + tx] |= mask;
   }
@@ -345,6 +371,51 @@ export class GameMap {
       }
     }
     return false;
+  }
+
+  /**
+   * Case libre la plus proche de (tx, ty) qui DÉBOUCHE : depuis laquelle un
+   * remplissage atteint au moins `seuil` cases. Une poche d'une ou deux cases
+   * au cœur d'une forêt est libre, parfois bordée de plusieurs cases libres,
+   * mais sans issue ; ce critère-là ne s'y trompe pas. À défaut, la case libre
+   * la plus proche.
+   */
+  findOpenTile(tx, ty, maxRadius = 8, seuil = 40) {
+    tx = clamp(tx, 0, this.w - 1);
+    ty = clamp(ty, 0, this.h - 1);
+    for (let r = 0; r <= maxRadius; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const nx = tx + dx, ny = ty + dy;
+          if (this.inBounds(nx, ny) && !this.isBlocked(nx, ny) && this.floodSize(nx, ny, seuil) >= seuil) return { tx: nx, ty: ny };
+        }
+      }
+    }
+    return this.findFreeTile(tx, ty, maxRadius);
+  }
+
+  /** Nombre de cases atteignables depuis (tx, ty), compté jusqu'à `limite`. */
+  floodSize(tx, ty, limite) {
+    const { w, h } = this;
+    const vus = new Set([ty * w + tx]);
+    const file = [ty * w + tx];
+    for (let tete = 0; tete < file.length && vus.size < limite; tete++) {
+      const cur = file[tete], cx = cur % w, cy = (cur / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const ni = ny * w + nx;
+          if (vus.has(ni) || this.blocked[ni]) continue;
+          if (dx && dy && (this.blocked[cy * w + nx] || this.blocked[ny * w + cx])) continue;
+          vus.add(ni); file.push(ni);
+          if (vus.size >= limite) return vus.size;
+        }
+      }
+    }
+    return vus.size;
   }
 
   /** Case libre la plus proche de (tx, ty), en spirale. */

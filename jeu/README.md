@@ -114,6 +114,41 @@ une seule unité lui rend sa vitesse propre.
 **Chantiers.** Plusieurs bâtisseurs accélèrent la construction, avec un
 rendement décroissant : quatre villageois valent 2,8 villageois, pas 4.
 
+### Le déplacement : le chemin se lisse en marchant
+
+Le chercheur de chemin (A*, huit directions) raisonne sur des **centres de
+cases**. Une unité, elle, occupe un carré de dix pixels et ne se trouve à peu
+près jamais au centre de sa case. Toute la difficulté du déplacement tient dans
+cet écart, et la première version s'y est prise les pieds : le chemin était
+lissé une fois pour toutes en vérifiant la ligne droite *entre centres*, puis
+chaque point de passage était validé à 17 px de son centre — sans y être entré.
+L'unité visait alors le nœud suivant depuis une case d'où la ligne droite était
+bouchée, glissait du mauvais côté le long du mur, ne progressait pas,
+recalculait au bout de 0,8 s… et retombait sur le même chemin. **C'était le
+« personnage coincé »** : jusqu'à cent recalculs pour un seul ordre.
+
+Désormais l'unité garde la suite **complète** des cases, et lisse elle-même à
+chaque pas, **depuis sa position réelle et avec son gabarit** : elle vise le
+nœud le plus lointain qu'elle peut atteindre en ligne droite sans accrocher,
+coupe les angles quand c'est ouvert, passe de centre en centre quand c'est
+étroit. Entrer dans la case d'un nœud le valide — pas le frôler. Si rien n'est
+visible devant (poussée hors du couloir par ses voisines), elle cherche
+derrière ; si rien nulle part, elle avance en aveugle et recalcule vite, un
+nombre borné de fois. Un dernier nœud se rejoint au centre, et à portée de
+bras d'un gisement ou d'un dépôt on marche droit dessus plutôt que de
+redemander un chemin qui reviendrait vide.
+
+Deux protections de plus : poser un bâtiment sur des unités les **pousse
+dehors** (avant, la grille se bloquait sous leurs pieds et plus aucun pas ne
+leur était permis), et une unité qui se retrouve malgré tout dans une case
+bloquée en ressort d'elle-même au premier pas.
+
+Le banc de mesure — plusieurs centaines d'ordres tirés au hasard vers des cases
+atteignables, sur trois tailles de carte, seul et en groupe — est passé de
+**11 échecs sur 32** ordres en carte moyenne à **zéro**, avec au plus trois
+recalculs par ordre. Et sur une même partie de 16 minutes entre deux IA, le
+joueur récolte **50 % de plus** : les villageois coincés bridaient l'économie.
+
 ### Chantiers : file d'attente et renforts
 
 Posez plusieurs bâtiments d'affilée : les ouvriers **terminent le chantier en

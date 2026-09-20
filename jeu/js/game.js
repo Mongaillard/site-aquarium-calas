@@ -136,6 +136,24 @@ export class World {
     return unit;
   }
 
+  /** Sort de l'emprise d'un bâtiment les unités qui s'y trouvent. */
+  evictUnitsFrom(building) {
+    const { tx, ty, size } = building;
+    for (const u of this.units) {
+      if (u.dead || u.garrisonedIn) continue;
+      const utx = Math.floor(u.x / TILE), uty = Math.floor(u.y / TILE);
+      if (utx < tx || utx >= tx + size || uty < ty || uty >= ty + size) continue;
+      // Une case OUVERTE : la plus proche des cases libres peut être une poche
+      // fermée de la forêt voisine, d'où l'unité ne sortirait jamais.
+      const free = this.map.findOpenTile(utx, uty, 8);
+      if (!free) continue;
+      u.x = free.tx * TILE + TILE / 2;
+      u.y = free.ty * TILE + TILE / 2;
+      u.path = null; u.pathIndex = 0; u.stuckTime = 0;
+      if (u.destination) u.requestPathTo(u.destination.x, u.destination.y);
+    }
+  }
+
   spawnBuilding(playerIndex, type, tx, ty, complete = false) {
     const size = BUILDING_TYPES[type].size;
     tx = clamp(tx, 0, this.map.w - size);
@@ -249,10 +267,11 @@ export class World {
         if (!free) { unit.setPath([]); continue; }
         gx = free.tx; gy = free.ty; adjacent = false;
       }
-      let path = this.pathfinder.find(sx, sy, gx, gy, { adjacent });
+      // Chemin complet, sans lissage : l'unité lisse elle-même en marchant.
+      let path = this.pathfinder.find(sx, sy, gx, gy, { adjacent, smooth: false });
       if (!path && !adjacent) {
         const free = this.map.findFreeTile(gx, gy, 6);
-        if (free) path = this.pathfinder.find(sx, sy, free.tx, free.ty, {});
+        if (free) path = this.pathfinder.find(sx, sy, free.tx, free.ty, { smooth: false });
       }
       unit.setPath(path || []);
     }
@@ -775,6 +794,11 @@ export class World {
     }
     payCost(player.resources, def.cost);
     const site = this.spawnBuilding(playerIndex, type, tx, ty, false);
+    // Poser un bâtiment sur des unités les emprisonnait : la grille se bloque
+    // sous leurs pieds et plus aucun pas ne leur est permis. On les pousse dehors.
+    // (Ici et pas dans spawnBuilding : la reprise d'une sauvegarde passe par
+    // spawnBuilding, et elle doit rejouer l'état tel quel.)
+    if (!def.walkable) this.evictUnitsFrom(site);
     player.stats.built++;
     // Pose d'un nouveau bâtiment : les ouvriers déjà sur un chantier
     // l'ajoutent à leur file au lieu d'abandonner ce qu'ils font.

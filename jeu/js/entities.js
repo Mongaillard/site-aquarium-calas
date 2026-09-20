@@ -20,6 +20,15 @@ export const STATE = {
   GARRISON: 'garrison',
 };
 
+// Suivi de chemin. BODY : demi-côté du corps en fraction du rayon (l'unité est
+// dessinée plus large qu'elle ne se cogne, comme dans AoE). LOOKAHEAD : nœuds
+// examinés devant soi pour couper au plus court. MAX_REPATHS : relances de
+// trajet par ordre, toutes causes confondues ; au-delà, l'unité s'arrête là où
+// elle est plutôt que de tourner en rond.
+const BODY = 0.6;
+const LOOKAHEAD = 12;
+const MAX_REPATHS = 10;
+
 /** Au bout de ce nombre de secondes sans progrès, une cible est déclarée inatteignable. */
 const UNREACHABLE_AFTER = 7;
 
@@ -515,6 +524,11 @@ export class Unit extends Entity {
     const d = farm ? farm.edgeDistanceTo(this.x, this.y) : dist(this.x, this.y, targetX, targetY);
     const limit = farm ? TILE * 1.1 : reach;
     if (d > limit) {
+      // Approche finale : tout près mais pas encore à portée (arrêt au bord
+      // d'une case, poussée par un voisin), on marche droit sur le gisement
+      // plutôt que de redemander un chemin — qui reviendrait vide, la case
+      // étant déjà adjacente.
+      if (this.approach(targetX, targetY, dt, farm ? farm.radius : 0)) return;
       if (this.followPath(dt)) {
         // Chemin terminé mais cible toujours hors de portée : elle est
         // probablement enclavée (buisson cerné d'arbres). On insiste un peu,
@@ -593,6 +607,7 @@ export class Unit extends Entity {
     const drop = this.returnTo;
     if (!drop || drop.dead) { this.startReturn(); return; }
     if (drop.edgeDistanceTo(this.x, this.y) > TILE * 1.1) {
+      if (this.approach(drop.x, drop.y, dt, drop.radius)) return;
       if (this.followPath(dt)) {
         this.blockedTime += dt;
         if (this.blockedTime > UNREACHABLE_AFTER) {
@@ -707,6 +722,7 @@ export class Unit extends Entity {
       return;
     }
     if (site.edgeDistanceTo(this.x, this.y) > TILE * 1.1) {
+      if (this.approach(site.x, site.y, dt, site.radius)) return;
       if (this.followPath(dt)) {
         this.blockedTime += dt;
         if (this.blockedTime > UNREACHABLE_AFTER) {
@@ -797,15 +813,55 @@ export class Unit extends Entity {
     this.tryMove((dx / len) * step, (dy / len) * step);
   }
 
-  /** Avance le long du chemin. Renvoie true quand il est terminé (ou absent). */
+  /**
+   * Approche finale : tout près de la cible (`extra` : rayon d'un bâtiment) et
+   * sans chemin en cours, on marche droit dessus. L'obstacle — arbre, mur —
+   * arrête le pas au bon endroit, et l'état appelant juge ensuite la portée.
+   * Renvoie true si on s'en est chargé ce tick. Sans rapprochement pendant
+   * 0,8 s (arbre derrière un angle), on rend la main à la logique de chemin
+   * pour un moment : `stuckTime` et `repathCooldown` servent de compteurs,
+   * ils sont déjà sauvegardés.
+   */
+  approach(targetX, targetY, dt, extra = 0) {
+    if (this.pathPending || this.repathCooldown > 0) return false;
+    if (this.path && this.pathIndex < this.path.length) return false;
+    const d = dist(this.x, this.y, targetX, targetY);
+    if (d > TILE * 2.5 + extra || d < 0.5) return false;
+    this.faceTowards(targetX, targetY);
+    const step = this.speedPx() * dt;
+    this.tryMove(((targetX - this.x) / d) * step, ((targetY - this.y) / d) * step);
+    const after = dist(this.x, this.y, targetX, targetY);
+    if (after > d - step * 0.3) {
+      this.stuckTime += dt;
+      if (this.stuckTime > 0.8) { this.stuckTime = 0; this.repathCooldown = 0.5; return false; }
+    } else if (this.stuckTime > 0) {
+      this.stuckTime = Math.max(0, this.stuckTime - dt * 2);
+    }
+    return true;
+  }
+
+  /**
+   * Avance le long du chemin. Renvoie true quand il est terminé (ou absent).
+   *
+   * Le chemin est la suite COMPLÈTE des cases de l'A*, et le lissage se fait
+   * ici, à chaque tick, depuis la position réelle et avec le gabarit : on vise
+   * le nœud le plus lointain atteignable en ligne droite, on coupe les angles
+   * quand c'est ouvert, on passe de centre en centre quand c'est étroit.
+   *
+   * L'ancienne version lissait une fois pour toutes entre CENTRES de cases,
+   * puis validait un nœud à 17 px de son centre — sans y être entré. L'unité
+   * visait alors le nœud suivant depuis une case d'où la ligne droite était
+   * bouchée, glissait du mauvais côté, ne progressait pas, recalculait… et
+   * retombait sur le même chemin. C'était le « personnage coincé » : jusqu'à
+   * cent recalculs pour un seul ordre.
+   */
   followPath(dt) {
     if (this.pathPending) return false;
-    if (!this.path || this.pathIndex >= this.path.length) {
-      // Chemin épuisé sans être arrivé : on relance, avec son propre compteur.
-      // (Il partageait autrefois `stuckTime` avec la détection de progression,
-      // et les deux mécanismes s'épuisaient mutuellement.)
+    const path = this.path;
+    if (!path || this.pathIndex >= path.length) {
+      // Chemin épuisé sans être arrivé : on relance, dans la limite du plafond.
       if (this.destination && dist(this.x, this.y, this.destination.x, this.destination.y) > TILE * 1.2
-          && this.repathCooldown <= 0 && this.repathAttempts < 6) {
+          && this.repathCooldown <= 0 && this.repathAttempts < MAX_REPATHS) {
         this.repathCooldown = 0.9;
         this.repathAttempts++;
         this.requestPathTo(this.destination.x, this.destination.y);
@@ -814,16 +870,52 @@ export class Unit extends Entity {
       return true;
     }
 
-    const node = this.path[this.pathIndex];
-    const nodeX = node.tx * TILE + TILE / 2;
-    const nodeY = node.ty * TILE + TILE / 2;
+    const map = this.world.map;
+    const r = this.radius * BODY;
+    const tx = Math.floor(this.x / TILE), ty = Math.floor(this.y / TILE);
+    const last = path.length - 1;
+
+    // Entrer dans la case d'un nœud intermédiaire le valide — pas le frôler.
+    // On prend le plus lointain des nœuds dont on occupe la case : on a pu
+    // couper devant. Le DERNIER nœud, lui, se rejoint au centre : un villageois
+    // arrêté au bord de la case voisine d'un arbre serait hors de portée.
+    for (let j = Math.min(last - 1, this.pathIndex + LOOKAHEAD); j >= this.pathIndex; j--) {
+      if (path[j].tx === tx && path[j].ty === ty) { this.pathIndex = j + 1; break; }
+    }
+    const goalX = path[last].tx * TILE + TILE / 2, goalY = path[last].ty * TILE + TILE / 2;
+    const dGoal = Math.hypot(goalX - this.x, goalY - this.y);
+    if (dGoal < TILE * 0.3) { this.pathIndex = path.length; return true; }
+    // Destination encombrée par des camarades : à portée de bras et sans
+    // progrès, on se considère arrivé — c'est ce que fait AoE.
+    if (dGoal < TILE * 1.2 && this.stuckTime > 0.6) { this.pathIndex = path.length; return true; }
+
+    // Lissage dynamique : le nœud le plus lointain visible, avec le gabarit.
+    // Examen croissant depuis le nœud courant, arrêté au premier nœud caché :
+    // un ou deux tests par tick dans le cas courant. Viser un nœud lointain
+    // acquiert ceux d'avant — on n'a plus à passer par leurs cases.
+    const fin = Math.min(last, this.pathIndex + LOOKAHEAD);
+    let target = -1;
+    for (let j = this.pathIndex; j <= fin; j++) {
+      if (!map.segmentClear(this.x, this.y, path[j].tx * TILE + TILE / 2, path[j].ty * TILE + TILE / 2, r)) break;
+      target = j;
+    }
+    // Rien devant (poussée hors du couloir par ses voisines, ou nœud courant
+    // passé de biais) : le couloir est derrière, on y revient.
+    if (target < 0) {
+      for (let j = this.pathIndex - 1; j >= Math.max(0, this.pathIndex - LOOKAHEAD); j--) {
+        if (map.segmentClear(this.x, this.y, path[j].tx * TILE + TILE / 2, path[j].ty * TILE + TILE / 2, r)) { target = j; break; }
+      }
+    }
+    // Rien nulle part : on marche en aveugle vers le nœud courant — les
+    // glissements font le reste — et le blocage compte double, pour recalculer
+    // vite depuis ici plutôt que de rester planté.
+    const aveugle = target < 0;
+    if (aveugle) target = Math.min(last, this.pathIndex); else this.pathIndex = target;
+    const nodeX = path[target].tx * TILE + TILE / 2;
+    const nodeY = path[target].ty * TILE + TILE / 2;
     const dx = nodeX - this.x, dy = nodeY - this.y;
     const d = Math.hypot(dx, dy);
-    const last = this.pathIndex === this.path.length - 1;
-    if (d < (last ? TILE * 0.3 : TILE * 0.55)) {
-      this.pathIndex++;
-      return this.pathIndex >= this.path.length;
-    }
+    if (aveugle) this.stuckTime += dt;
 
     let vx = dx / d, vy = dy / d;
     const sep = this.world.separationForce(this);
@@ -835,18 +927,19 @@ export class Unit extends Entity {
     const step = this.speedPx() * dt;
     this.tryMove(vx * step, vy * step);
 
-    // Ce qui compte n'est pas de bouger, mais de se RAPPROCHER du prochain
-    // point de passage : en longeant un obstacle, une unité avance à pleine
-    // vitesse tout en s'éloignant de sa cible. Sans progression réelle, on
-    // recalcule un chemin depuis la position courante.
+    // Ce qui compte n'est pas de bouger, mais de se RAPPROCHER du point visé :
+    // en longeant un obstacle, une unité avance à pleine vitesse tout en
+    // s'éloignant de sa cible. Sans progression réelle, on recalcule un chemin
+    // depuis la position courante — un nombre borné de fois.
     const after = Math.hypot(nodeX - this.x, nodeY - this.y);
     if (after > d - step * 0.3) {
       this.stuckTime += dt;
       if (this.stuckTime > 0.8 && this.repathCooldown <= 0) {
         this.repathCooldown = 0.8;
         this.stuckTime = 0;
-        const goal = this.path[this.path.length - 1];
-        this.requestPathToTile(goal.tx, goal.ty, this.state !== STATE.MOVE && this.state !== STATE.ATTACK_MOVE);
+        if (this.repathAttempts >= MAX_REPATHS) { this.pathIndex = path.length; return true; }
+        this.repathAttempts++;
+        this.requestPathToTile(path[last].tx, path[last].ty, this.state !== STATE.MOVE && this.state !== STATE.ATTACK_MOVE);
       }
     } else if (this.stuckTime > 0) {
       this.stuckTime = Math.max(0, this.stuckTime - dt * 2);
@@ -865,16 +958,17 @@ export class Unit extends Entity {
    */
   tryMove(dx, dy) {
     const map = this.world.map;
-    const r = this.radius * 0.6;
-    const canStand = (x, y) => {
-      const t1 = map.isBlocked(Math.floor((x - r) / TILE), Math.floor((y - r) / TILE));
-      const t2 = map.isBlocked(Math.floor((x + r) / TILE), Math.floor((y - r) / TILE));
-      const t3 = map.isBlocked(Math.floor((x - r) / TILE), Math.floor((y + r) / TILE));
-      const t4 = map.isBlocked(Math.floor((x + r) / TILE), Math.floor((y + r) / TILE));
-      return !(t1 || t2 || t3 || t4);
-    };
+    const r = this.radius * BODY;
+    // Prise dans une case bloquée (bâtiment posé dessus, partie restaurée…) :
+    // aucun pas n'y serait permis. On la remet sur la case libre la plus proche.
+    const tx = Math.floor(this.x / TILE), ty = Math.floor(this.y / TILE);
+    if (map.isBlocked(tx, ty)) {
+      const free = map.findOpenTile(tx, ty, 6);
+      if (free) { this.x = free.tx * TILE + TILE / 2; this.y = free.ty * TILE + TILE / 2; }
+      return;
+    }
     const apply = (ox, oy) => {
-      if ((ox === 0 && oy === 0) || !canStand(this.x + ox, this.y + oy)) return false;
+      if ((ox === 0 && oy === 0) || !map.canStand(this.x + ox, this.y + oy, r)) return false;
       this.x = clamp(this.x + ox, 2, map.pixelWidth - 2);
       this.y = clamp(this.y + oy, 2, map.pixelHeight - 2);
       return true;

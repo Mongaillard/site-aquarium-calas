@@ -1,6 +1,8 @@
 // ---------------------------------------------------------------------------
 // Recherche de chemin A* sur grille (8 directions), avec budget de nœuds,
-// repli « case la plus proche » et lissage du chemin.
+// repli « case la plus proche » et lissage du chemin — optionnel : les unités
+// ne le demandent plus, elles lissent elles-mêmes à chaque pas, depuis leur
+// position réelle et avec leur gabarit (voir Unit.followPath).
 // ---------------------------------------------------------------------------
 
 import { MinHeap } from './utils.js';
@@ -32,8 +34,9 @@ export class PathFinder {
   /**
    * @param {number} sx,sy case de départ
    * @param {number} gx,gy case d'arrivée
-   * @param {{adjacent?:boolean, budget?:number, ignore?:(i:number)=>boolean}} opts
+   * @param {{adjacent?:boolean, budget?:number, smooth?:boolean, passable?:(i:number)=>boolean}} opts
    *   adjacent : s'arrêter dès qu'on touche la case cible (cible bloquée : arbre, bâtiment…)
+   *   smooth : false pour obtenir la suite complète des cases, sans lissage
    * @returns {{tx:number,ty:number}[] | null}
    */
   find(sx, sy, gx, gy, opts = {}) {
@@ -43,6 +46,7 @@ export class PathFinder {
     const adjacent = !!opts.adjacent;
     const budget = opts.budget || 6000;
     const passable = opts.passable || ((i) => map.blocked[i] === 0);
+    const smooth = opts.smooth !== false;
 
     const start = sy * w + sx;
     const goal = gy * w + gx;
@@ -77,7 +81,7 @@ export class PathFinder {
 
       const dx = Math.abs(cx - gx), dy = Math.abs(cy - gy);
       const reached = adjacent ? (dx <= 1 && dy <= 1) : current === goal;
-      if (reached) return this.buildPath(current, start);
+      if (reached) return this.buildPath(current, start, smooth);
 
       const hCur = this.heuristic(cx, cy, gx, gy);
       if (hCur < bestH) { bestH = hCur; best = current; }
@@ -114,11 +118,11 @@ export class PathFinder {
 
     this.searches++;
     // Cible inatteignable : on s'approche au maximum plutôt que de ne rien faire.
-    if (best !== start) return this.buildPath(best, start);
+    if (best !== start) return this.buildPath(best, start, smooth);
     return null;
   }
 
-  buildPath(end, start) {
+  buildPath(end, start, smooth = true) {
     this.searches++;
     const w = this.map.w;
     const path = [];
@@ -129,7 +133,7 @@ export class PathFinder {
       cur = this.cameFrom[cur];
     }
     path.reverse();
-    return this.smooth(path, start % w, (start / w) | 0);
+    return smooth ? this.smooth(path, start % w, (start / w) | 0) : path;
   }
 
   /**
