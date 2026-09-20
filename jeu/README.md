@@ -390,12 +390,12 @@ Le raccord bord à bord des textures, qui ne l'étaient pas, est décrit dans
 `assets/SOURCES.md` — avec la ligne à mi-période qu'un premier fondu laissait
 en jeu, mesurée puis éliminée.
 
-### Les arbres et les buissons sont dessinés
+### Les arbres, les baies et l'or sont dessinés
 
-Six essences d'arbres et six buissons fleuris (`assets/arbres.webp`,
-`assets/buissons.webp`, 46 Ko), à une seule échelle qui garde les proportions
-de la planche : le cyprès fait un chevalier et demi, un buisson tient dans sa
-case. Plus hauts que leur case, ils entrent dans l'**ordre du peintre** avec les
+Six essences d'arbres, un buisson à baies et un gisement d'or
+(`assets/arbres.webp`, `baies.webp`, `or.webp`), à une seule échelle qui garde
+les proportions des planches : le cyprès fait un chevalier et demi, un buisson
+ou un rocher tient dans sa case. Plus hauts que leur case, ils entrent dans l'**ordre du peintre** avec les
 unités et les bâtiments : une unité passe derrière un arbre quand elle est
 derrière, devant quand elle est devant. Un gisement qui s'épuise rapetisse un
 peu — de loin, on voit ce qu'il reste. Le gisement d'or (`or.webp`, 9 Ko) suit

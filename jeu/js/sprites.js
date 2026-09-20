@@ -63,10 +63,12 @@ const ATLAS = {
     cellW: 82, cellH: 146, cases: 6, images: 1,
     ancreY: 146, hauteurMonde: 73,
   },
-  buissons: {
-    src: 'assets/buissons.webp',
-    cellW: 72, cellH: 77, cases: 6, images: 1,
-    ancreY: 77, hauteurMonde: 38.5,
+  // Le buisson à baies : une seule illustration et son miroir, à la taille
+  // d'une case — c'est la nourriture, il faut que les baies se voient.
+  baies: {
+    src: 'assets/baies.webp',
+    cellW: 87, cellH: 82, cases: 2, images: 1,
+    ancreY: 82, hauteurMonde: 41.0,
   },
   // Le gisement d'or : une seule illustration, et son miroir en seconde case ;
   // la taille varie un peu d'une case à l'autre (voir dessinerVegetation).

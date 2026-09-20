@@ -438,7 +438,7 @@ export class Renderer {
    */
   drawResources(view) {
     const map = this.world.map;
-    const arbres = spriteDe('arbres'), buissons = spriteDe('buissons'), or = spriteDe('or');
+    const arbres = spriteDe('arbres'), buissons = spriteDe('baies'), or = spriteDe('or');
     for (const res of map.resources.values()) {
       if (res.tx < view.x0 || res.tx > view.x1 || res.ty < view.y0 || res.ty > view.y1) continue;
       if (!this.world.fog.explored[res.ty * map.w + res.tx]) continue;
@@ -580,7 +580,7 @@ export class Renderer {
     }
     // Arbres et buissons illustrés : plus hauts que leur case, ils se classent
     // avec le reste — une unité qui passe derrière un arbre passe derrière.
-    const arbres = spriteDe('arbres'), buissons = spriteDe('buissons'), or = spriteDe('or');
+    const arbres = spriteDe('arbres'), buissons = spriteDe('baies'), or = spriteDe('or');
     if (arbres || buissons || or) {
       const map = this.world.map;
       const explored = this.world.fog.explored;

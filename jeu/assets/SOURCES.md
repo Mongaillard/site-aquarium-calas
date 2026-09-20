@@ -10,7 +10,8 @@
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 288×287, dessiné sur 144 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 264×264, dessinée sur 132 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
 | `sol-herbe.webp`, `sol-herbe-sombre.webp`, `sol-terre.webp`, `sol-sable.webp` | Les quatre **nappes de sol** (herbe, herbe sombre, terre, sable), 384×384, raccordées bord à bord | Planche de six textures générée par l'auteur du dépôt ; deux (herbe sèche, terre sombre) restent en réserve |
-| `arbres.webp`, `buissons.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux) et six **buissons** fleuris, 82×146 et 72×77 par case | Planche générée par l'auteur du dépôt, avec transparence |
+| `arbres.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux), 82×146 par case | Planche générée par l'auteur du dépôt, avec transparence ; ses six buissons fleuris ne sont pas utilisés — ils ne disaient pas « nourriture » |
+| `baies.webp` | Le **buisson à baies** rouges et bleues sur son socle, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
 | `or.webp` | Le **gisement d'or** : rochers veinés d'or sur leur socle, 101×74 par case, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
@@ -157,7 +158,7 @@ Réduites à 384 px et encodées en WebP avec pertes (qualité 72) : **149 Ko** 
 les quatre. Les couleurs moyennes des nappes servent à la minimap et à la tuile
 de secours affichée le temps du chargement.
 
-## Les arbres et les buissons
+## Les arbres, les baies et l'or
 
 La planche est livrée avec sa transparence, mais aucun pixel n'y est tout à
 fait opaque — le détourage automatique laisse un voile d'alpha (252 au lieu de
@@ -179,10 +180,12 @@ case — une unité qui passe derrière un arbre passe derrière. Un gisement qu
 s'épuise rapetisse un peu (jusqu'à 80 %) : de loin, on voit ce qu'il reste à
 prendre.
 
-Le gisement d'or suit la même voie : une seule illustration, mise en atlas avec
-son miroir, et une pointe de variation de taille par case (±8 %, figée par la
-variante de la case) pour qu'un filon de sept cases ne soit pas une frise.
-9 Ko.
+Le buisson à baies et le gisement d'or suivent la même voie : une seule
+illustration chacun, mise en atlas avec son miroir, et une pointe de variation
+de taille par case (±8 %, figée par la variante de la case) pour qu'un filon de
+sept cases ne soit pas une frise. Les six buissons fleuris de la planche des
+arbres ont été essayés pour la nourriture : jolis, mais ils ne disaient pas
+« à manger » ; les baies, si.
 
 ## Format
 
