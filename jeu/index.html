@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Âge des Empires Mobile — un jeu de stratégie temps réel jouable au doigt, directement dans le navigateur.">
+  <meta name="theme-color" content="#1b2430">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Âge des Empires Mobile</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🏰</text></svg>">
+  <link rel="stylesheet" href="css/jeu.css">
+</head>
+<body>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- Écran d'accueil                                                     -->
+<!-- ------------------------------------------------------------------ -->
+<div id="start-screen" class="screen">
+  <div class="start-card">
+    <h1><span class="crest">🏰</span> Âge des Empires <em>Mobile</em></h1>
+    <p class="tagline">Récoltez, bâtissez, traversez les âges et écrasez l'adversaire — au doigt.</p>
+
+    <h2>Difficulté</h2>
+    <div id="difficulty-options" class="options"></div>
+
+    <h2>Taille de la carte</h2>
+    <div id="map-options" class="options row"></div>
+
+    <div class="start-actions">
+      <button id="btn-play" class="btn primary large">⚔️ Jouer</button>
+      <button id="btn-howto" class="btn">Comment jouer</button>
+    </div>
+
+    <div id="howto" class="howto hidden">
+      <ul>
+        <li><b>Glisser</b> : déplacer la vue · <b>pincer</b> : zoomer</li>
+        <li><b>Toucher</b> une unité pour la sélectionner, <b>double tap</b> pour toutes celles du même type</li>
+        <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
+        <li>Avec une sélection, toucher le sol / un arbre / un ennemi donne l'ordre correspondant</li>
+        <li>Objectif : détruire tous les bâtiments et villageois adverses</li>
+      </ul>
+    </div>
+    <p class="credits">Jeu web autonome — aucune donnée envoyée, fonctionne hors ligne une fois chargé.</p>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- Jeu                                                                 -->
+<!-- ------------------------------------------------------------------ -->
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden">
+  <header id="topbar">
+    <div class="top-left">
+      <div class="res-group">
+        <div class="res"><span class="res-icon">🍖</span><span id="res-food">0</span></div>
+        <div class="res"><span class="res-icon">🪵</span><span id="res-wood">0</span></div>
+        <div class="res"><span class="res-icon">🪙</span><span id="res-gold">0</span></div>
+        <div class="res"><span class="res-icon">👥</span><span id="res-pop">0/0</span></div>
+      </div>
+      <div id="age-box">
+        <span id="age-label">Âge Sombre</span>
+        <span class="sep">·</span>
+        <span id="game-timer">0:00</span>
+        <div class="age-progress hidden"><span id="age-bar"></span></div>
+      </div>
+    </div>
+    <div class="top-right">
+      <button id="btn-sound" class="icon-btn" aria-label="Son">🔊</button>
+      <button id="btn-menu" class="icon-btn" aria-label="Menu">☰</button>
+    </div>
+  </header>
+
+  <div id="minimap-wrap">
+    <canvas id="minimap" width="160" height="160"></canvas>
+  </div>
+
+  <div id="alerts"></div>
+  <div id="build-hint" class="hidden"></div>
+
+  <button id="idle-villager" class="floating hidden">🧑‍🌾 <span id="idle-count">0</span></button>
+
+  <footer id="bottombar">
+    <div id="selection-panel"></div>
+    <div id="command-panel"></div>
+  </footer>
+</div>
+
+<div id="build-menu" class="overlay hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>Construire</h2>
+      <button id="btn-close-build" class="icon-btn">✕</button>
+    </div>
+    <div id="build-list" class="build-list"></div>
+  </div>
+</div>
+
+<div id="modal" class="overlay hidden"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { TILE, BUILDING_TYPES, UNIT_TYPES, POP_MAX, AGES } from './config.js';
-import { dist2, canAfford } from './utils.js';
+import { dist2, canAfford, RNG } from './utils.js';
 import { STATE } from './entities.js';
 
 const JOB_RATIOS = [
@@ -26,7 +26,10 @@ export class AIPlayer {
     this.world = world;
     this.index = playerIndex;
     this.difficulty = difficulty;
-    this.timer = 1 + Math.random();
+    // Générateur dédié, dérivé de la graine de la partie : l'IA reste
+    // imprévisible d'une partie à l'autre, mais rejouable à l'identique.
+    this.rng = new RNG((world.seed || 1) + 7919 * (playerIndex + 1));
+    this.timer = 1 + this.rng.next();
     this.attackTimer = difficulty.attackDelay * 0.35;
     this.armyTarget = difficulty.armyTrigger;
     this.waveCount = 0;
@@ -104,7 +107,9 @@ export class AIPlayer {
     const ratios = JOB_RATIOS[Math.min(player.age, JOB_RATIOS.length - 1)];
     const jobs = { food: 0, wood: 0, gold: 0 };
     const idle = [];
+    const now = this.world.time;
     for (const v of this.villagers) {
+      if (v.fleeUntil > now) continue;          // en train de se mettre à l'abri
       const job = this.jobOf(v);
       if (job) jobs[job]++;
       else idle.push(v);
@@ -224,7 +229,9 @@ export class AIPlayer {
       if (!this.has('tower', 2)) return 'tower';
     }
     if (this.wantFarm && this.has('mill') && this.countFarms() < 10) { this.wantFarm = false; return 'farm'; }
-    if (player.resources.wood > 350 && player.popCap < POP_MAX) return 'house';
+    // Maison d'avance seulement quand la marge de population se réduit :
+    // sinon l'IA couvre la carte de maisons inutiles.
+    if (popRoom <= 7 && player.resources.wood > 250 && player.popCap < POP_MAX) return 'house';
     return null;
   }
 
@@ -272,7 +279,7 @@ export class AIPlayer {
       }
       // Un peu d'aléatoire : la base ne pousse pas toujours dans la même direction.
       for (let i = candidates.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = Math.floor(this.rng.next() * (i + 1));
         [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
       }
       for (const c of candidates) {
@@ -339,11 +346,12 @@ export class AIPlayer {
       const def = UNIT_TYPES[pick];
       // On s'autorise une garnison minimale, puis on met de côté le coût de
       // l'âge suivant : sans cette réserve l'armée mange tous les revenus et
-      // l'IA reste bloquée au premier âge.
-      // Le plancher grandit avec le temps : même en épargnant pour l'âge
-      // suivant, l'IA finit par constituer une armée.
-      const armyFloor = 3 + player.age * 3 + Math.floor(this.world.time / 180);
-      const saving = this.ageTarget && this.army.length >= armyFloor ? this.ageTarget.cost : null;
+      // l'IA reste bloquée au premier âge. Le plancher monte lentement avec le
+      // temps, et la réserve saute net si la base est attaquée.
+      const underThreat = this.world.time < this.defendUntil;
+      const armyFloor = 3 + player.age * 3 + Math.floor(this.world.time / 420);
+      const saving = !underThreat && this.ageTarget && this.army.length >= armyFloor
+        ? this.ageTarget.cost : null;
       const affordable = Object.keys(def.cost).every((k) => {
         const keep = (k === 'wood' ? reserve : 0) + (saving && saving[k] ? saving[k] : 0);
         return player.resources[k] >= def.cost[k] + keep;
@@ -357,10 +365,16 @@ export class AIPlayer {
       for (const u of this.army) {
         if (u.state === STATE.IDLE || u.state === STATE.MOVE || !u.target) u.attackEntity(threat);
       }
-      // En cas d'attaque sur la base, les villageois proches se réfugient.
-      for (const v of this.villagers) {
-        if (dist2(v.x, v.y, threat.x, threat.y) < (TILE * 5) ** 2 && this.townCenter) {
-          v.moveTo(this.townCenter.x, this.townCenter.y + TILE * 2);
+      // Les villageois vraiment menacés se réfugient — une seule fois, et
+      // pour quelques secondes : les renvoyer au Centre-Ville à chaque cycle
+      // reviendrait à saborder sa propre économie.
+      const now = this.world.time;
+      if (this.townCenter) {
+        for (const v of this.villagers) {
+          if (v.fleeUntil > now) continue;
+          if (dist2(v.x, v.y, threat.x, threat.y) > (TILE * 3.5) ** 2) continue;
+          v.fleeUntil = now + 6;
+          v.moveTo(this.townCenter.x, this.townCenter.y + TILE * 2.5);
         }
       }
       return;
@@ -384,7 +398,8 @@ export class AIPlayer {
       for (const u of this.army) {
         if (u.state !== STATE.IDLE) continue;
         if (dist2(u.x, u.y, tc.x, tc.y) > (TILE * 11) ** 2) {
-          u.moveTo(tc.x + (Math.random() - 0.5) * TILE * 6, tc.y + TILE * 4 + (Math.random() - 0.5) * TILE * 4, true);
+          u.moveTo(tc.x + (this.rng.next() - 0.5) * TILE * 6,
+            tc.y + TILE * 4 + (this.rng.next() - 0.5) * TILE * 4, true);
         }
       }
     }

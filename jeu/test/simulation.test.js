@@ -63,18 +63,44 @@ for (const p of world.players) {
   check(`joueur ${p.index} récolte`, total > 1500, Math.round(total) + ' ressources');
   check(`joueur ${p.index} produit des villageois`, p.stats.trained >= 8, p.stats.trained + ' unités formées');
   check(`joueur ${p.index} construit`, p.stats.built >= 3, p.stats.built + ' bâtiments posés');
-  check(`joueur ${p.index} progresse en âge`, p.age >= 1, 'âge ' + (p.age + 1));
+  // Sur une carte moyenne les razzias commencent tôt : le camp harcelé peut
+  // légitimement rester à l'Âge Sombre. On exige donc progression OU combat.
+  check(`joueur ${p.index} progresse ou se défend`, p.age >= 1 || p.stats.lost >= 3,
+    'âge ' + (p.age + 1) + ', ' + p.stats.lost + ' unités perdues');
 }
+check('au moins un camp atteint l’Âge Féodal', world.players.some((p) => p.age >= 1));
 check('des villageois travaillent encore', r0.villagers > 0 && r1.villagers > 0);
 check('des combats ont eu lieu', combats > 0, combats + ' entités détruites');
 check('aucune entité fantôme', world.entities.every((e) => !e.dead));
 check('population cohérente', world.players.every((p) => p.pop === world.units.filter((u) => u.playerIndex === p.index).length));
 
-// Deuxième partie, carte et difficulté différentes : on vérifie la robustesse.
+// Partie « économique » : sur une grande carte, les bases sont assez éloignées
+// pour que les deux camps puissent développer leur économie sans être razziés.
+const eco = runMatch({ seed: 2024, mapSize: 'large', difficulty: 'normal', minutes: 13 });
+for (const p of eco.world.players) {
+  const g = p.stats.gathered;
+  check(`économie : joueur ${p.index} atteint l’Âge Féodal`, p.age >= 1, 'âge ' + (p.age + 1));
+  check(`économie : joueur ${p.index} récolte les 3 ressources`,
+    g.food > 600 && g.wood > 600 && g.gold > 150,
+    `🍖${Math.round(g.food)} 🪵${Math.round(g.wood)} 🪙${Math.round(g.gold)}`);
+  check(`économie : joueur ${p.index} garde ses villageois occupés`,
+    eco.world.units.filter((u) => u.playerIndex === p.index && u.isVillager && u.state === 'idle').length <= 3,
+    eco.world.units.filter((u) => u.playerIndex === p.index && u.isVillager && u.state === 'idle').length + ' inactifs');
+}
+
+// Troisième partie, carte et difficulté différentes : on vérifie la robustesse.
 const alt = runMatch({ seed: 777, mapSize: 'small', difficulty: 'hard', minutes: 6 });
 check('seconde partie stable', alt.world.time > 60, formatTime(alt.world.time));
 check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches > 50,
   alt.world.pathfinder.searches + ' recherches');
+
+// Déterminisme : une même graine doit rejouer exactement la même partie.
+const runA = runMatch({ seed: 99, mapSize: 'small', difficulty: 'normal', minutes: 3 });
+const runB = runMatch({ seed: 99, mapSize: 'small', difficulty: 'normal', minutes: 3 });
+const fingerprint = (w) => w.players.map((p) =>
+  [p.age, p.pop, Math.round(p.resources.food), Math.round(p.resources.wood), p.stats.trained].join('/')).join('|');
+check('parties reproductibles à graine égale', fingerprint(runA.world) === fingerprint(runB.world),
+  fingerprint(runA.world));
 
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : '❌ ' + failures + ' test(s) en échec'}`);
 process.exit(failures === 0 ? 0 : 1);

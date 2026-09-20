@@ -8,7 +8,7 @@ import {
   TILE, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
   START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS,
 } from './config.js';
-import { GameMap, BLOCK } from './map.js';
+import { GameMap } from './map.js';
 import { PathFinder } from './pathfinding.js';
 import { Unit, Building, Projectile, STATE, computeDamage, resetEntityIds } from './entities.js';
 import { SpatialGrid, RNG, dist, dist2, canAfford, payCost, clamp } from './utils.js';
@@ -152,7 +152,7 @@ export class World {
     if (this.accessResetTimer <= 0) {
       this.accessResetTimer = 45;
       for (const res of this.map.resources.values()) res.inaccessible = false;
-      for (const b of this.buildings) b.unreachable = false;
+      for (const b of this.buildings) { b.unreachable = false; b.gatherUnreachable = false; }
     }
 
     this.fogTimer -= dt;
@@ -273,8 +273,8 @@ export class World {
       }
       if (type === 'food') {
         for (const b of this.buildings) {
-          if (b.dead || b.type !== 'farm' || b.playerIndex !== playerIndex) continue;
-          if (b.foodLeft <= 0 || b.unreachable) continue;
+          if (b.dead || b.type !== 'farm' || b.playerIndex !== playerIndex || !b.complete) continue;
+          if (b.foodLeft <= 0 || b.gatherUnreachable) continue;
           const d = dist2(x, y, b.x, b.y);
           if (d < bestD) { bestD = d; best = b; }
         }

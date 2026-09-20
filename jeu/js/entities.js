@@ -100,14 +100,17 @@ export class Unit extends Entity {
     this.resourceTile = null;     // {tx, ty} en cours de récolte
     this.carry = { type: null, amount: 0 };
     this.attackCooldown = 0;
-    this.facing = Math.random() * Math.PI * 2;
+    // Toute l'aléa de simulation passe par le générateur du monde : une même
+    // graine rejoue exactement la même partie (tests reproductibles).
+    this.facing = world.rng.next() * Math.PI * 2;
     this.stuckTime = 0;
     this.repathCooldown = 0;
-    this.scanCooldown = Math.random() * 0.5;
+    this.scanCooldown = world.rng.next() * 0.5;
     this.aggressive = type !== 'villager';
     this.gatherAnim = 0;
     this.pathPending = false;
     this.blockedTime = 0;   // temps passé sans pouvoir atteindre sa cible
+    this.fleeUntil = 0;     // mise à l'abri en cours (piloté par l'IA)
     this.spawnTime = world.time;
   }
 
@@ -216,6 +219,13 @@ export class Unit extends Entity {
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     if (this.repathCooldown > 0) this.repathCooldown -= dt;
     if (this.gatherAnim > 0) this.gatherAnim -= dt;
+
+    // Désempilement : les unités à l'arrêt ou au corps à corps se repoussent
+    // doucement, sinon une escouade finit dessinée sur un seul pixel.
+    if (this.state === STATE.IDLE || this.state === STATE.ATTACK) {
+      const sep = this.world.separationForce(this);
+      if (sep.x !== 0 || sep.y !== 0) this.tryMove(sep.x * 14 * dt, sep.y * 14 * dt);
+    }
 
     switch (this.state) {
       case STATE.IDLE: this.updateIdle(dt); break;
@@ -338,7 +348,7 @@ export class Unit extends Entity {
         this.blockedTime += dt;
         if (this.blockedTime > UNREACHABLE_AFTER) {
           this.blockedTime = 0;
-          if (farm) farm.unreachable = true;
+          if (farm) farm.gatherUnreachable = true;
           else {
             const res = this.world.map.resourceAt(this.resourceTile.tx, this.resourceTile.ty);
             if (res) res.inaccessible = true;
@@ -575,7 +585,7 @@ export class Building extends Entity {
     this.productionTime = 0;
     this.rally = null;
     this.attackCooldown = 0;
-    this.scanCooldown = Math.random() * 0.5;
+    this.scanCooldown = world.rng.next() * 0.5;
     this.target = null;
     this.foodLeft = def.farmFood || 0;
     this.createdAt = world.time;
@@ -602,6 +612,7 @@ export class Building extends Entity {
 
   addBuildProgress(dt) {
     if (this.complete) return;
+    this.unreachable = false;
     this.buildProgress += dt;
     const ratio = clamp(this.buildProgress / this.def.buildTime, 0, 1);
     this.hp = Math.max(this.hp, this.maxHp * (0.05 + 0.95 * ratio));
