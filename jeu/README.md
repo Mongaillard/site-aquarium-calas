@@ -3,7 +3,7 @@
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
 très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 409 Ko d'illustrations et de textures — dont un cycle de marche
+pictogrammes vectoriels et 413 Ko d'illustrations et de textures — dont un cycle de marche
 complet.
 
 ## Lancer le jeu
@@ -344,7 +344,7 @@ qui se lit n'est pas le détail d'un personnage mais son mouvement ; la peinture
 réduite devient une tache sombre. Elle garde sa place là où elle est vue en
 grand — accueil, portrait, écran de fin.
 
-### Le Centre-Ville est un palais, la caserne une forteresse
+### Le Centre-Ville est un palais, la caserne une forteresse, la maison une maison
 
 `assets/centre-ville.webp` (36 Ko) : un palais à dômes bleus, tridents dorés et
 fontaines, sur son parvis. Il est dessiné **plus grand que son emprise** — 144 px

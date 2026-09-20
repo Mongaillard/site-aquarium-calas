@@ -13,6 +13,7 @@
 | `arbres.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux), 82×146 par case | Planche générée par l'auteur du dépôt, avec transparence ; ses six buissons fleuris ne sont pas utilisés — ils ne disaient pas « nourriture » |
 | `baies.webp` | Le **buisson à baies** rouges et bleues sur son socle, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
 | `or.webp` | Le **gisement d'or** : rochers veinés d'or sur leur socle, 101×74 par case, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
+| `maison.webp` | La **maison** : un dôme de cristal, un toit bleu, une échoppe, 180×155, dessinée sur 90 px pour une emprise de 64 | Illustration générée par l'auteur du dépôt, livrée avec sa transparence |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
 Ces images viennent d'une planche de référence fournie par l'auteur du dépôt, qui
@@ -107,7 +108,7 @@ Un test le vérifie à chaque exécution : 20 % des pixels sont repeints, **aucu
 pixel d'acier n'est touché** (40 434 sur 40 434 intacts), et il ne reste aucun
 bleu franc côté adverse.
 
-## Le Centre-Ville et la caserne
+## Le Centre-Ville, la caserne, la maison
 
 L'illustration est en vue de trois quarts sur une carte vue de dessus — c'est
 exactement le compromis d'Age of Empires, où bâtiments et unités sont dessinés
@@ -125,7 +126,9 @@ les bâtiments à leur **bord nord** dans l'ordre du peintre, pas à leur centre
 
 La caserne suit la même chaîne (`decoupe-batiment.py` : fond, cadre, réduction,
 palette, aperçu), dessinée sur 132 px pour rester un peu moins large que le
-palais. Réduits à deux fois la taille dessinée et quantifiés à 64 couleurs avant
+palais ; la maison, emprise 2×2, sur 90 px. Le script accepte les deux cas :
+un fond uni à retirer, ou une transparence fournie (renormalisée, le détourage
+automatique laissant un voile d'alpha). Réduits à deux fois la taille dessinée et quantifiés à 64 couleurs avant
 l'encodage WebP sans pertes : **36 Ko** et **29 Ko**. La couleur d'équipe suit la règle du
 chevalier animé — seule la fenêtre du bleu franc (200°–255°) bascule : dômes,
 bannières et auvents passent au rouge, la pierre blanche et l'eau cyan des
@@ -189,5 +192,5 @@ arbres ont été essayés pour la nourriture : jolis, mais ils ne disaient pas
 
 ## Format
 
-WebP partout où c'est possible : 409 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
+WebP partout où c'est possible : 413 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
 PNG, sans différence visible à l'œil même agrandi trois fois.

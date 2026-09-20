@@ -600,6 +600,7 @@ check('il ne reste aucun bleu franc côté adverse',
 // recolorés sans toucher la pierre blanche ni l'eau.
 const batimentsIllustres = await page.evaluate(async () => {
   const mod = await import('./js/sprites.js');
+  const { BUILDING_TYPES, TILE } = await import('./js/config.js');
   const lire = (src) => {
     const c = document.createElement('canvas');
     c.width = src.width; c.height = src.height;
@@ -621,7 +622,7 @@ const batimentsIllustres = await page.evaluate(async () => {
     return [h * 360, sa, l];
   };
   const out = {};
-  for (const type of ['towncenter', 'barracks']) {
+  for (const type of ['towncenter', 'barracks', 'house']) {
     const s = mod.spriteDe(type);
     if (!s) { out[type] = null; continue; }
     const bleu = lire(mod.imagePourJoueur(s, 0)), rouge = lire(mod.imagePourJoueur(s, 1));
@@ -636,15 +637,17 @@ const batimentsIllustres = await page.evaluate(async () => {
       const [hr, sr] = hsl(rouge[i], rouge[i + 1], rouge[i + 2]);
       if (hr >= 200 && hr <= 255 && sr > 0.32) bleusRestants++;
     }
-    out[type] = { largeur: s.def.largeurMonde, opaques, changes, pierre, pierreIntacte, bleusRestants };
+    // L'illustration déborde de l'emprise (dômes, toits) : elle doit être
+    // plus large que les cases que le bâtiment occupe vraiment.
+    out[type] = { largeur: s.def.largeurMonde, emprise: BUILDING_TYPES[type].size * TILE, opaques, changes, pierre, pierreIntacte, bleusRestants };
   }
   return out;
 });
-for (const [type, nom] of [['towncenter', 'le Centre-Ville'], ['barracks', 'la caserne']]) {
+for (const [type, nom] of [['towncenter', 'le Centre-Ville'], ['barracks', 'la caserne'], ['house', 'la maison']]) {
   const b = batimentsIllustres[type];
-  check(`${nom} porte son illustration`, !!b && b.largeur > 96, b ? `${b.largeur} px de large pour une emprise de 96` : 'absente');
-  check(`${nom} adverse est repeint${type === 'barracks' ? 'e' : ''}`, !!b && b.changes > b.opaques * 0.02, b && `${Math.round((b.changes / b.opaques) * 100)} % des pixels`);
-  check(`la pierre blanche ${type === 'towncenter' ? 'du palais' : 'de la caserne'} reste blanche`, !!b && b.pierre > 1000 && b.pierreIntacte === b.pierre, b && `${b.pierreIntacte}/${b.pierre} pixels de pierre intacts`);
+  check(`${nom} porte son illustration`, !!b && b.largeur > b.emprise, b ? `${b.largeur} px de large pour une emprise de ${b.emprise}` : 'absente');
+  check(`${nom} adverse est repeint${type === 'towncenter' ? '' : 'e'}`, !!b && b.changes > b.opaques * 0.02, b && `${Math.round((b.changes / b.opaques) * 100)} % des pixels`);
+  check(`la pierre blanche ${type === 'towncenter' ? 'du palais' : type === 'barracks' ? 'de la caserne' : 'de la maison'} reste blanche`, !!b && b.pierre > 1000 && b.pierreIntacte === b.pierre, b && `${b.pierreIntacte}/${b.pierre} pixels de pierre intacts`);
   check(`aucun bleu franc ne subsiste côté adverse (${type})`, !!b && b.bleusRestants === 0, b && b.bleusRestants + ' pixels bleus restants');
 }
 

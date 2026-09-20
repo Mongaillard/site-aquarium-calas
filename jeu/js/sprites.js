@@ -77,6 +77,14 @@ const ATLAS = {
     cellW: 101, cellH: 74, cases: 2, images: 1,
     ancreY: 74, hauteurMonde: 37,
   },
+  // La maison : emprise 2×2 (64 px), dessinée sur 90 — un dôme de cristal, un
+  // toit, une échoppe ; nettement plus petite qu'une caserne.
+  house: {
+    src: 'assets/maison.webp',
+    cellW: 180, cellH: 155, cases: 1, images: 1,
+    largeurMonde: 90, sol: 0.93, natif: 'bleu',
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
   spearman: {
     src: 'assets/lancier.png',
     cellW: 48, cellH: 48, cases: 8, images: 1,
