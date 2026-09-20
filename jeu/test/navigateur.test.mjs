@@ -39,6 +39,19 @@ await page.goto(BASE, { waitUntil: 'networkidle' });
 check('page chargée', await page.title() === 'Âge des Empires Mobile', await page.title());
 await page.screenshot({ path: `${SHOTS}/jeu-accueil.png` });
 
+// Aucune clé d'icône ne doit s'afficher en toutes lettres : « express Express »
+// au lieu du pictogramme, c'est le défaut que ce contrôle attrape.
+const ecranAccueil = await page.evaluate(() => {
+  const carte = document.querySelector('.start-card');
+  return { texte: carte.innerText, traces: carte.querySelectorAll('svg.ic').length };
+});
+check('l’accueil ne montre aucune clé d’icône en clair',
+  !/\b(modeExpress|modeClassique|towncenter|villager|aggressive)\b/.test(ecranAccueil.texte),
+  ecranAccueil.texte.split('\n').filter((l) => /mode[EC]/.test(l)).join(' | ') || 'propre');
+check('les formats de partie ont leur pictogramme', ecranAccueil.traces >= 2,
+  ecranAccueil.traces + ' tracés');
+
+
 await page.click('#btn-play');
 await page.waitForTimeout(2500);
 check('HUD affiché', await page.isVisible('#topbar'));

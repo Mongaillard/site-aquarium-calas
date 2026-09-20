@@ -875,7 +875,7 @@ function refreshResumeCard() {
     : formatClock(save.time);
   box.innerHTML = `
     <button id="btn-resume" class="btn primary large">Reprendre la partie</button>
-    <p class="resume-info">${mode.icon} ${mode.name} · ${age.name} · ${chrono}
+    <p class="resume-info">${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
       · ${DIFFICULTIES[save.difficulty] ? DIFFICULTIES[save.difficulty].name : ''}</p>
     <button id="btn-drop-save" class="btn ghost small">Abandonner cette partie</button>`;
   document.getElementById('btn-resume').addEventListener('click', () => {
@@ -906,7 +906,7 @@ function setupStartScreen() {
   const modeBox = document.getElementById('mode-options');
   modeBox.innerHTML = Object.values(GAME_MODES).map((m) => `
     <button class="option ${m.id === settings.mode ? 'active' : ''}" data-mode="${m.id}">
-      <span class="option-name">${m.icon} ${m.name}</span>
+      <span class="option-name">${iconeSVG(m.icon, 17, 'inline')} ${m.name}</span>
       <span class="option-desc">${m.desc}</span>
     </button>`).join('');
 

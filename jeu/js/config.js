@@ -275,7 +275,7 @@ export const DEFAULT_SPEED = 'normal';
  */
 export const GAME_MODES = {
   express: {
-    id: 'express', name: 'Express', icon: 'express',
+    id: 'express', name: 'Express', icon: 'modeExpress',
     desc: '10 min chrono · départ Féodal · raser le Centre-Ville adverse, sinon le meilleur score',
     mapSize: 'small', startAge: 1, popMax: 40, villagers: 7,
     // Sept villageois et un éclaireur saturent déjà le Centre-Ville : sans cette
@@ -290,7 +290,7 @@ export const GAME_MODES = {
     townCenterHp: 0.5, timeLimit: 600,
   },
   classique: {
-    id: 'classique', name: 'Classique', icon: 'classique',
+    id: 'classique', name: 'Classique', icon: 'modeClassique',
     desc: '20 à 30 min · trois âges, victoire par conquête',
     mapSize: 'medium', startAge: 0, popMax: POP_MAX, villagers: 4, popStart: 0,
     resources: START_RESOURCES,
