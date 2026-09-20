@@ -437,10 +437,17 @@ class Game {
     }
     const builders = this.selection.filter((e) => e.kind === 'unit' && e.isVillager);
     const crew = builders.length ? builders : this.pickNearestVillagers(tx, ty, 2);
+    // Qui était déjà sur un chantier ? Pour eux, la pose s'ajoute à la file.
+    const dejaOccupes = crew.filter((v) => v.state === 'build').length;
     const site = this.world.placeBuilding(this.world.humanIndex, type, tx, ty, crew);
     if (site) {
       this.audio.play('place');
       this.vibrate(14);
+      const nom = BUILDING_TYPES[type].name;
+      const ouvriers = `${crew.length} ouvrier${crew.length > 1 ? 's' : ''}`;
+      this.ui.toast(dejaOccupes === crew.length && crew.length > 0
+        ? `${nom} ajouté${BUILDING_TYPES[type].fem ? 'e' : ''} à la file — ${ouvriers}`
+        : `${nom} lancé${BUILDING_TYPES[type].fem ? 'e' : ''} — ${ouvriers}`);
       this.cancelBuild();
     }
   }

@@ -267,6 +267,59 @@ check('appui long : la sélection multiple fonctionne',
   longPress.skipped || longPress.selected >= 2,
   longPress.skipped ? 'ignoré' : longPress.selected + ' unités');
 
+// Chantiers : file d'attente et renforts, depuis l'interface.
+const chantiers = await page.evaluate(() => {
+  const g = window.__jeu;
+  g.world.players[0].resources.wood = 1000;
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const spots = [];
+  for (let r = 3; r <= 12 && spots.length < 2; r++) {
+    for (let dy = -r; dy <= r && spots.length < 2; dy++) {
+      for (let dx = -r; dx <= r && spots.length < 2; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const tx = tc.tx + dx, ty = tc.ty + dy;
+        if (!g.world.canPlace(0, 'house', tx, ty)) continue;
+        if (spots.some((s2) => Math.abs(s2.tx - tx) < 3 && Math.abs(s2.ty - ty) < 3)) continue;
+        spots.push({ tx, ty });
+      }
+    }
+  }
+  if (spots.length < 2) return { skipped: true };
+
+  // Deux villageois sélectionnés : ils doivent TOUS deux aller bâtir.
+  const equipe = g.world.units
+    .filter((u) => u.playerIndex === 0 && u.isVillager && !u.garrisonedIn).slice(0, 2);
+  g.setSelection(equipe);
+
+  g.startBuildMode('house');
+  g.updateGhostWorld((spots[0].tx + 1) * 32, (spots[0].ty + 1) * 32);
+  g.confirmBuild();
+  const surLePremier = equipe.filter((v) => v.state === 'build').length;
+
+  g.setSelection(equipe);
+  g.startBuildMode('house');
+  g.updateGhostWorld((spots[1].tx + 1) * 32, (spots[1].ty + 1) * 32);
+  g.confirmBuild();
+
+  const enFile = equipe.map((v) => v.buildQueue.length);
+  const premier = g.world.buildings.find((b) => b.tx === spots[0].tx && b.ty === spots[0].ty);
+  const second = g.world.buildings.find((b) => b.tx === spots[1].tx && b.ty === spots[1].ty);
+  for (let i = 0; i < 20 * 200 && !(premier.complete && second.complete); i++) g.world.update(1 / 20);
+  return {
+    surLePremier, enFile,
+    ouvriers: premier.builderCount,
+    finis: premier.complete && second.complete,
+  };
+});
+check('les villageois sélectionnés vont tous bâtir',
+  chantiers.skipped || chantiers.surLePremier === 2,
+  chantiers.skipped ? 'ignoré' : chantiers.surLePremier + ' ouvriers');
+check('une seconde pose part en file',
+  chantiers.skipped || chantiers.enFile.every((n) => n === 1),
+  chantiers.skipped ? 'ignoré' : JSON.stringify(chantiers.enFile));
+check('les deux chantiers aboutissent',
+  chantiers.skipped || chantiers.finis, chantiers.skipped ? 'ignoré' : String(chantiers.finis));
+
 // Attaquer un ennemi au doigt, sans viser au pixel près.
 const combat = await page.evaluate(async () => {
   const g = window.__jeu;

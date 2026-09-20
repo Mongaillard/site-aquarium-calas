@@ -675,7 +675,10 @@ export class World {
     const stock = this.players[site.playerIndex].resources;
     for (const key in site.def.cost) stock[key] += site.def.cost[key];
     for (const u of this.units) {
-      if (u.target === site) { u.target = null; u.state = STATE.IDLE; }
+      if (u.target !== site) continue;
+      u.target = null;
+      u.state = STATE.IDLE;
+      if (u.nextQueuedBuild) u.nextQueuedBuild();   // on enchaîne sur la file
     }
     this.killEntity(site, null, true);
     return true;
@@ -695,7 +698,9 @@ export class World {
     payCost(player.resources, def.cost);
     const site = this.spawnBuilding(playerIndex, type, tx, ty, false);
     player.stats.built++;
-    for (const b of builders) if (b.isVillager) b.buildAt(site);
+    // Pose d'un nouveau bâtiment : les ouvriers déjà sur un chantier
+    // l'ajoutent à leur file au lieu d'abandonner ce qu'ils font.
+    for (const b of builders) if (b.isVillager) b.buildAt(site, true);
     this.pushEvent({ type: 'placed', building: site, player: playerIndex });
     return site;
   }

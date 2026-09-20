@@ -143,6 +143,7 @@ export class Unit extends Entity {
     this.gatherAnim = 0;
     this.pathPending = false;
     this.pendingJob = null; // poste à prendre après la livraison en cours
+    this.buildQueue = [];   // chantiers à enchaîner après celui en cours
     this.failedDropoffs = null; // dépôts que CE villageois n'a pas pu rejoindre
     this.lastResourceTile = null; // dernière case réellement exploitée
     this.blockedTime = 0;   // temps passé sans pouvoir atteindre sa cible
@@ -191,6 +192,7 @@ export class Unit extends Entity {
     this.destination = null;
     this.resourceTile = null;
     this.pendingJob = null;
+    this.buildQueue.length = 0;
   }
 
   /**
@@ -218,6 +220,7 @@ export class Unit extends Entity {
     this.destination = { x, y };
     this.autoTarget = false;
     this.groupSpeed = 0;   // un ordre individuel rend sa vitesse à l'unité
+    this.buildQueue.length = 0;
     this.repathAttempts = 0;
     this.guardPoint = { x, y };   // le poste devient le point d'arrivée
     this.state = aggressive ? STATE.ATTACK_MOVE : STATE.MOVE;
@@ -275,6 +278,7 @@ export class Unit extends Entity {
       tx = reachable.tx; ty = reachable.ty; res = reachable;
     }
     if (this.deliverBeforeJob({ kind: 'tile', tx, ty, resType: res.type })) return;
+    this.buildQueue.length = 0;
     if (this.carry.type && this.carry.type !== res.type) this.carry = { type: null, amount: 0 };
     this.pendingJob = null;
     this.resourceTile = { tx, ty };
@@ -286,6 +290,7 @@ export class Unit extends Entity {
   gatherFarm(farm) {
     if (!this.isVillager || !farm || farm.dead) return;
     if (this.deliverBeforeJob({ kind: 'farm', farm, resType: 'food' })) return;
+    this.buildQueue.length = 0;
     if (this.carry.type && this.carry.type !== 'food') this.carry = { type: null, amount: 0 };
     this.pendingJob = null;
     this.target = farm;
@@ -294,12 +299,32 @@ export class Unit extends Entity {
     this.requestPathToEntity(farm);
   }
 
-  buildAt(building) {
+  /**
+   * @param {boolean} queue vrai quand l'ordre vient d'une nouvelle pose de
+   *   bâtiment : l'ouvrier termine son chantier en cours puis enchaîne.
+   *   Un ordre direct (appui sur un chantier) remplace au contraire la file.
+   */
+  buildAt(building, queue = false) {
     if (!this.isVillager || !building || building.dead) return;
+    if (queue && this.state === STATE.BUILD && this.target && !this.target.dead
+        && this.target !== building) {
+      if (!this.buildQueue.includes(building)) this.buildQueue.push(building);
+      return;
+    }
+    if (!queue) this.buildQueue.length = 0;
     this.target = building;
     this.resourceTile = null;
     this.state = STATE.BUILD;
     this.requestPathToEntity(building);
+  }
+
+  /** Passe au chantier suivant de la file. Renvoie false si elle est vide. */
+  nextQueuedBuild() {
+    while (this.buildQueue.length > 0) {
+      const next = this.buildQueue.shift();
+      if (next && !next.dead && !next.complete) { this.buildAt(next, true); return true; }
+    }
+    return false;
   }
 
   requestPathTo(x, y, adjacent = false) {
@@ -661,12 +686,19 @@ export class Unit extends Entity {
 
   updateBuild(dt) {
     const site = this.target;
-    if (!site || site.dead) { this.state = STATE.IDLE; this.target = null; return; }
+    if (!site || site.dead) {
+      this.state = STATE.IDLE;
+      this.target = null;
+      this.nextQueuedBuild();   // le chantier a disparu : on passe au suivant
+      return;
+    }
     if (site.complete && site.hp >= site.maxHp) {
-      // Chantier terminé : on enchaîne sur la ferme qu'on vient de bâtir.
       const finished = site;
       this.target = null;
       this.state = STATE.IDLE;
+      // Chantier suivant de la file avant tout le reste : c'est la suite des
+      // ordres du joueur.
+      if (this.nextQueuedBuild()) return;
       // Bâtir une ferme vaut ordre de la cultiver : c'est la suite directe de
       // l'ordre du joueur, pas une réaffectation décidée par le jeu.
       if (finished.type === 'farm') this.gatherFarm(finished);
@@ -704,6 +736,7 @@ export class Unit extends Entity {
   /** Ordre « va t'abriter » : l'unité rejoint le bâtiment puis y entre. */
   garrisonAt(building) {
     if (!building || !building.canGarrison(this)) return false;
+    this.buildQueue.length = 0;
     this.target = building;
     this.resourceTile = null;
     this.destination = null;

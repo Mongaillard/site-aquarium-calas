@@ -472,6 +472,93 @@ function advance(world, seconds, stop) {
   check('sac plein : il part livrer, il ne s’arrête pas', villager.state === 'return', villager.state);
 }
 
+// --- Chantiers : file d'attente et renforts ----------------------------------
+
+/** Emplacements constructibles distincts autour du Centre-Ville. */
+function freeSpots(world, type, count) {
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const spots = [];
+  for (let r = 3; r <= 12 && spots.length < count; r++) {
+    for (let dy = -r; dy <= r && spots.length < count; dy++) {
+      for (let dx = -r; dx <= r && spots.length < count; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const tx = tc.tx + dx, ty = tc.ty + dy;
+        if (!world.canPlace(0, type, tx, ty)) continue;
+        if (spots.some((s2) => Math.abs(s2.tx - tx) < 3 && Math.abs(s2.ty - ty) < 3)) continue;
+        spots.push({ tx, ty });
+      }
+    }
+  }
+  return spots;
+}
+
+{
+  // Enchaîner deux poses : l'ouvrier termine la première puis attaque la seconde.
+  const world = sandbox(52);
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  world.players[0].resources.wood = 1000;
+  const spots = freeSpots(world, 'house', 2);
+  check('deux emplacements trouvés', spots.length === 2);
+
+  const premier = world.placeBuilding(0, 'house', spots[0].tx, spots[0].ty, [villager]);
+  const second = world.placeBuilding(0, 'house', spots[1].tx, spots[1].ty, [villager]);
+  check('le premier chantier reste la cible', villager.target === premier);
+  check('le second part en file d’attente',
+    villager.buildQueue.length === 1 && villager.buildQueue[0] === second,
+    villager.buildQueue.length + ' en file');
+
+  const finis = advance(world, 200, () => premier.complete && second.complete);
+  check('les deux chantiers sont menés à terme', finis,
+    `premier ${Math.round(premier.progressRatio * 100)} % · second ${Math.round(second.progressRatio * 100)} %`);
+}
+
+{
+  // Un ordre direct remplace la file : le joueur a changé d'avis.
+  const world = sandbox(53);
+  const villager = world.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  world.players[0].resources.wood = 1000;
+  const spots = freeSpots(world, 'house', 3);
+  const a = world.placeBuilding(0, 'house', spots[0].tx, spots[0].ty, [villager]);
+  world.placeBuilding(0, 'house', spots[1].tx, spots[1].ty, [villager]);
+  check('file constituée', villager.buildQueue.length === 1);
+
+  const c = world.placeBuilding(0, 'house', spots[2].tx, spots[2].ty, []);
+  villager.buildAt(c);   // appui direct sur un chantier
+  check('un appui direct remplace la file',
+    villager.target === c && villager.buildQueue.length === 0,
+    `cible ${villager.target === c ? 'nouvelle' : 'inchangée'}, file ${villager.buildQueue.length}`);
+  check('le premier chantier est bien abandonné', villager.target !== a);
+
+  // Et un ordre de récolte la vide aussi.
+  villager.buildQueue.push(a);
+  const arbre = world.findNearestResource(villager.x, villager.y, 'wood', 30 * TILE, 0);
+  villager.gatherAt(arbre.tx, arbre.ty);
+  check('un ordre de récolte vide la file', villager.buildQueue.length === 0);
+}
+
+{
+  // Renforts : plusieurs ouvriers accélèrent réellement, avec rendement décroissant.
+  const duree = (n) => {
+    const world = sandbox(51);
+    world.players[0].resources.wood = 1000;
+    const spots = freeSpots(world, 'house', 1);
+    const equipe = world.units.filter((u) => u.playerIndex === 0 && u.isVillager).slice(0, n);
+    equipe.forEach((v, i) => {
+      v.x = (spots[0].tx + i * 0.3) * TILE;
+      v.y = (spots[0].ty - 1) * TILE;
+    });
+    const site = world.placeBuilding(0, 'house', spots[0].tx, spots[0].ty, equipe);
+    let t = 0;
+    for (let i = 0; i < 200 * TICKS_PER_SECOND && !site.complete; i++) { world.update(DT); t += DT; }
+    return site.complete ? t : Infinity;
+  };
+  const solo = duree(1), trio = duree(3);
+  check('trois ouvriers construisent plus vite qu’un', trio < solo * 0.65,
+    `1 ouvrier ${solo.toFixed(1)} s · 3 ouvriers ${trio.toFixed(1)} s`);
+  check('le rendement reste décroissant', trio > solo / 3,
+    `gain ×${(solo / trio).toFixed(2)} pour trois fois plus de bras`);
+}
+
 // --- Viser l'ennemi au doigt --------------------------------------------------
 
 {

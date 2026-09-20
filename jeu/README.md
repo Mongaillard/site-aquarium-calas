@@ -81,6 +81,20 @@ une seule unité lui rend sa vitesse propre.
 **Chantiers.** Plusieurs bâtisseurs accélèrent la construction, avec un
 rendement décroissant : quatre villageois valent 2,8 villageois, pas 4.
 
+### Chantiers : file d'attente et renforts
+
+Posez plusieurs bâtiments d'affilée : les ouvriers **terminent le chantier en
+cours puis enchaînent** sur le suivant, dans l'ordre où vous les avez posés. Le
+panneau de sélection d'un villageois indique combien de chantiers l'attendent.
+Un appui direct sur un chantier, lui, remplace la file — vous avez changé
+d'avis.
+
+Tous les villageois sélectionnés au moment de la pose vont bâtir, et **plus ils
+sont nombreux, plus c'est rapide**, avec le rendement décroissant d'AoE : un
+ouvrier met 18 s pour une maison, trois en mettent 8. Pour renforcer un chantier
+déjà lancé, sélectionnez des villageois et touchez-le. Le nombre d'ouvriers
+présents s'affiche sur le chantier et dans le panneau de sélection.
+
 ### Répartition d'un groupe sur une ressource
 
 Sélectionnez dix villageois, touchez une forêt : chacun rejoint **l'arbre libre

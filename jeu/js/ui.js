@@ -197,6 +197,7 @@ export class UI {
     return Object.entries(counts).map(([k, v]) => k + v).join('|')
       + '#' + selection.length + '#' + Math.round(first.hp) + '#' + queue
       + '#' + (first.stance || '') + '#' + (first.garrison ? first.garrison.length : '')
+      + '#' + (first.buildQueue ? first.buildQueue.length : '') + '#' + (first.builderCount || 0)
       + '#' + (first.complete === false ? Math.round(first.progressRatio * 20) : '')
       + '#' + this.world.players[this.world.humanIndex].age;
   }
@@ -231,6 +232,9 @@ export class UI {
       if (first.kind === 'unit') {
         rows.push(`⚔️ ${def.attack} · 🛡️ ${first.meleeArmor()}/${first.pierceArmor()}`);
         rows.push(`${first.stanceDef.icon} ${first.stanceDef.name}`);
+        if (first.buildQueue && first.buildQueue.length > 0) {
+          rows.push(`🏗️ ${first.buildQueue.length} chantier(s) en file`);
+        }
         if (def.range > 1.5) rows.push(`🎯 portée ${def.range}`);
         if (first.isVillager && first.carry.amount > 0.5) {
           rows.push(`${RESOURCE_ICONS[first.carry.type]} ${Math.floor(first.carry.amount)}/${first.carryCapacity()}`);
@@ -240,7 +244,12 @@ export class UI {
         if (def.popBonus) rows.push(`👥 +${def.popBonus}`);
         if (def.garrison) rows.push(`🚪 ${first.garrison.length}/${def.garrison.capacity}`);
         if (first.type === 'farm') rows.push(`🍖 ${Math.max(0, Math.round(first.foodLeft))}`);
-        if (!first.complete) rows.push(`🏗️ ${Math.round(first.progressRatio * 100)} %`);
+        if (!first.complete) {
+          rows.push(`🏗️ ${Math.round(first.progressRatio * 100)} %`);
+          rows.push(first.builderCount > 0
+            ? `👷 ${first.builderCount} ouvrier${first.builderCount > 1 ? 's' : ''}`
+            : '👷 aucun ouvrier — sélectionnez des villageois et touchez le chantier');
+        }
       }
       node.innerHTML = `
         <div class="portrait" style="--team:${first.player.color.main}">${def.icon}</div>
@@ -544,7 +553,8 @@ export class UI {
         <li><b>Toucher</b> une unité : la sélectionner · <b>double tap</b> : toutes les unités du même type visibles</li>
         <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
         <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant</li>
-        <li><b>🏗️ Construire</b> : choisissez un bâtiment, puis touchez l'emplacement</li>
+        <li><b>🏗️ Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les villageois sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant</li>
+        <li>Pour renforcer un chantier en cours : sélectionnez des villageois et <b>touchez le chantier</b></li>
         <li>Les villageois récoltent 🍖 nourriture, 🪵 bois et 🪙 or ; il faut des <b>maisons</b> pour agrandir la population</li>
         <li><b>Attitudes</b> (unité sélectionnée) : ⚔️ agressif poursuit loin, 🛡️ défensif revient à son poste, 🧱 position tenue ne bouge pas, 🕊️ sans attaque ignore l'ennemi</li>
         <li><b>Garnison</b> : touchez votre Centre-Ville ou une tour avec des unités sélectionnées pour les abriter — elles s'y soignent et chaque occupant ajoute une flèche. La <b>🔔 cloche</b> y envoie tous les villageois d'un coup</li>
