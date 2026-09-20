@@ -26,17 +26,17 @@ Trois réglages se choisissent sur l'écran d'accueil, avant de lancer la partie
 
 | Format | Durée | Ce qui change |
 | --- | --- | --- |
-| ⚡ **Express** | **10 min chrono** | Départ à l'**Âge Féodal** avec 7 villageois et des ressources garnies, petite carte, population plafonnée à 40, IA agressive dès la première minute. **Raser le Centre-Ville adverse met fin à la partie sur-le-champ** (il y est deux fois moins résistant) ; sinon, au temps écoulé, **le meilleur score l'emporte** |
+| ⚡ **Express** | **10 min chrono** | Départ à l'**Âge Féodal** avec 7 villageois, des ressources garnies et de la place pour produire tout de suite, petite carte, population plafonnée à 40, IA agressive dès la première minute. **Raser le Centre-Ville adverse met fin à la partie sur-le-champ** (il y est deux fois moins résistant) ; sinon, au temps écoulé, **le meilleur score l'emporte** |
 | 🏰 **Classique** | 20 à 30 min | La partie complète : trois âges, population 60, victoire par conquête (tous les bâtiments **et** villageois adverses) |
 
 Le score d'une partie Express : *ressources récoltées + 10 par unité vivante +
 25 par bâtiment debout*. Il s'affiche sur l'écran de fin, et le compte à rebours
 remplace le chronomètre en haut de l'écran (il rougit dans la dernière minute).
 
-Mesuré sur huit parties IA contre IA : **toutes se terminent en 10 minutes**,
-score moyen autour de 2 500. Entre deux IA, la victoire par Centre-Ville reste
-rare — elles défendent bien ; un joueur qui masse ses troupes, lui, peut la
-provoquer.
+Mesuré sur huit parties IA contre IA : **toutes se terminent dans les dix
+minutes**, durée moyenne 9 min 21 s, dont deux par destruction du Centre-Ville
+(7 min 23 s et 7 min 29 s). Un joueur qui masse ses troupes finit plus vite
+encore.
 
 La **vitesse de jeu** — Tranquille ×0,75, Normal, Rapide ×1,5, Blitz ×2 —
 multiplie le nombre de pas de simulation par seconde réelle. Elle se change

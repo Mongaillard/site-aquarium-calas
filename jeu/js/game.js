@@ -514,7 +514,8 @@ export class World {
       if (b.dead || !b.complete || !b.def.popBonus) continue;
       this.players[b.playerIndex].popCap += b.def.popBonus;
     }
-    for (const p of this.players) p.popCap = Math.min(this.popMax, p.popCap);
+    const marge = this.mode.popStart || 0;
+    for (const p of this.players) p.popCap = Math.min(this.popMax, p.popCap + marge);
   }
 
   /** Un villageois vient de se retrouver sans travail (gisement épuisé). */

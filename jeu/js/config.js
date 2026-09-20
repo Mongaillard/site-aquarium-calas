@@ -273,6 +273,9 @@ export const GAME_MODES = {
     id: 'express', name: 'Express', icon: '⚡',
     desc: '10 min chrono · départ Féodal · raser le Centre-Ville adverse, sinon le meilleur score',
     mapSize: 'small', startAge: 1, popMax: 40, villagers: 7,
+    // Sept villageois et un éclaireur saturent déjà le Centre-Ville : sans cette
+    // marge, la partie démarre bloquée, à devoir bâtir une maison avant tout.
+    popStart: 6,
     resources: { food: 500, wood: 500, gold: 250 },
     victory: 'towncenter', aiRush: 0.4,
     // Un Centre-Ville de 1400 points de vie tient tête à toute une armée : en
@@ -284,7 +287,7 @@ export const GAME_MODES = {
   classique: {
     id: 'classique', name: 'Classique', icon: '🏰',
     desc: '20 à 30 min · trois âges, victoire par conquête',
-    mapSize: 'medium', startAge: 0, popMax: POP_MAX, villagers: 4,
+    mapSize: 'medium', startAge: 0, popMax: POP_MAX, villagers: 4, popStart: 0,
     resources: START_RESOURCES,
     victory: 'conquest', aiRush: 1, townCenterHp: 1, timeLimit: 0,
   },

@@ -689,6 +689,9 @@ function empreinte(world) {
   check('Express démarre avec plus de villageois', villageois === 7, villageois + ' villageois');
   check('Express plafonne la population plus bas', world.popMax === 40, String(world.popMax));
   check('Express part avec des ressources garnies', world.players[0].resources.food === 500);
+  check('Express laisse de la place pour produire tout de suite',
+    world.players[0].pop < world.players[0].popCap,
+    `${world.players[0].pop}/${world.players[0].popCap}`);
 
   const tc = world.buildings.find((b) => b.playerIndex === 1 && b.type === 'towncenter');
   world.killEntity(tc, null, true);
