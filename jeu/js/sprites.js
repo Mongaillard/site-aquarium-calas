@@ -223,6 +223,75 @@ export function chargerSprites() {
   for (const alt of Object.values(ALTERNATIVES)) chargerAtlas(alt[style]);
 }
 
+// ---------------------------------------------------------------------------
+// Textures de sol.
+//
+// Une nappe CONTINUE par type de terrain, échantillonnée aux coordonnées monde :
+// deux cases voisines d'herbe montrent deux morceaux contigus de la même
+// nappe, pas deux copies d'une tuile — rien ne trahit la grille. La nappe se
+// répète toutes les `n × TEXEL` unités monde ; elle est raccordée bord à bord
+// à la fabrication (assets/SOURCES.md).
+//
+// Chaque nappe est recopiée dans un canvas avec une MARGE repliée tout autour,
+// pour qu'un échantillon qui déborde de la période (les débordements de
+// lisière) reste dans l'image. Une version demi-taille sert au zoom arrière :
+// sans elle, réduire 384 texels sur 96 pixels scintille au défilement.
+// ---------------------------------------------------------------------------
+
+export const TEXEL = 0.5;          // pixels monde par texel, à zoom 1
+const MARGE = 128;                 // texels repliés autour de la nappe
+const TEXTURES = {
+  grass: 'assets/sol-herbe.webp',
+  grassDark: 'assets/sol-herbe-sombre.webp',
+  dirt: 'assets/sol-terre.webp',
+  sand: 'assets/sol-sable.webp',
+};
+const nappes = new Map();
+
+function nappeRepliee(image, n, marge) {
+  const c = document.createElement('canvas');
+  c.width = n + 2 * marge; c.height = n + 2 * marge;
+  const g = c.getContext('2d');
+  for (let oy = -1; oy <= 1; oy++) {
+    for (let ox = -1; ox <= 1; ox++) g.drawImage(image, 0, 0, image.width, image.height, marge + ox * n, marge + oy * n, n, n);
+  }
+  return c;
+}
+
+function chargerTexture(cle) {
+  if (nappes.has(cle) || typeof document === 'undefined') return;
+  const entree = { pret: false, niveaux: null };
+  nappes.set(cle, entree);
+  const image = new Image();
+  image.decoding = 'async';
+  image.onload = () => {
+    const n = image.width;
+    entree.niveaux = [
+      { canvas: nappeRepliee(image, n, MARGE), n, marge: MARGE, texel: TEXEL },
+      { canvas: nappeRepliee(image, n / 2, MARGE / 2), n: n / 2, marge: MARGE / 2, texel: TEXEL * 2 },
+    ];
+    entree.pret = true;
+  };
+  image.onerror = () => { nappes.set(cle, { pret: false, absent: true }); };
+  image.src = TEXTURES[cle];
+}
+
+export function chargerTextures() {
+  if (typeof document === 'undefined') return;
+  for (const cle of Object.keys(TEXTURES)) chargerTexture(cle);
+}
+
+/**
+ * Niveau de nappe à utiliser pour ce zoom (0 : pleine, 1 : demi-taille), ou
+ * null si la texture n'est pas prête — le rendu garde alors sa tuile de
+ * couleur.
+ */
+export function textureSol(cle, zoom = 1) {
+  const e = nappes.get(cle);
+  if (!e || !e.pret) return null;
+  return e.niveaux[zoom < 0.7 ? 1 : 0];
+}
+
 /** Sprite prêt à dessiner pour ce type d'unité, ou null. */
 export function spriteDe(type) {
   const alt = ALTERNATIVES[type];

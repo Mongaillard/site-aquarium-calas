@@ -697,6 +697,38 @@ const tapPalais = await page.evaluate(() => {
 check('un doigt sur les dômes sélectionne le Centre-Ville', tapPalais.selection);
 check('un doigt sur les toits ennemis ordonne l’attaque du palais', tapPalais.attaque, tapPalais.etat);
 
+// Le sol est une nappe de texture continue : les quatre nappes sont chargées,
+// et deux pixels voisins d'une case d'herbe ne sont pas de la même couleur —
+// une tuile plate le serait.
+const sol = await page.evaluate(async () => {
+  const g = window.__jeu; const T = 32;
+  const mod = await import('./js/sprites.js');
+  const nappes = ['grass', 'grassDark', 'dirt', 'sand'].map((k) => !!mod.textureSol(k));
+  const map = g.world.map;
+  // une case explorée d'herbe près du Centre-Ville
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  let case_ = null;
+  for (let r = 3; r <= 12 && !case_; r++) for (let dy = -r; dy <= r && !case_; dy++) for (let dx = -r; dx <= r; dx++) {
+    const tx = tc.tx + dx, ty = tc.ty + dy;
+    if (!map.inBounds(tx, ty)) continue;
+    const i = ty * map.w + tx;
+    if ((map.terrain[i] === 0 || map.terrain[i] === 1) && g.world.fog.explored[i] && !map.resourceAt(tx, ty)) { case_ = { tx, ty }; break; }
+  }
+  if (!case_) return { nappes, variance: -1 };
+  g.camera.zoom = 1.5;
+  g.camera.centerOn(case_.tx * T + 16, case_.ty * T + 16);
+  await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+  const c = g.renderer.canvas; const x = c.getContext('2d'); const dpr = g.renderer.dpr;
+  const p = g.camera.worldToScreen(case_.tx * T + 4, case_.ty * T + 4);
+  const d = x.getImageData(Math.round(p.x * dpr), Math.round(p.y * dpr), 36, 36).data;
+  let somme = 0, somme2 = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) { const l = (d[i] + d[i + 1] + d[i + 2]) / 3; somme += l; somme2 += l * l; n++; }
+  const moy = somme / n; const variance = somme2 / n - moy * moy;
+  return { nappes, variance: Math.round(variance), moyenne: Math.round(moy) };
+});
+check('les quatre nappes de sol sont chargées', sol.nappes.every(Boolean), sol.nappes.join(' '));
+check('le sol est texturé, pas une couleur plate', sol.variance > 30, `variance ${sol.variance} sur 36×36 px (une tuile plate : ~0)`);
+
 check('les orientations tombent sur les bonnes cases',
   chevalier.sud === 0 && chevalier.est === 2 && chevalier.nord === 4 && chevalier.ouest === 6,
   `sud ${chevalier.sud} · est ${chevalier.est} · nord ${chevalier.nord} · ouest ${chevalier.ouest}`);

@@ -8,20 +8,41 @@
 import { TILE, BUILDING_TYPES } from './config.js';
 import { iconePath, ICON_BOX } from './icones.js';
 import {
-  chargerSprites, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche,
+  chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche,
 } from './sprites.js';
 import { TERRAIN } from './map.js';
 import { clamp } from './utils.js';
 
 // Variantes volontairement proches : un écart trop marqué transforme la
 // prairie en damier et fatigue l'œil sur un petit écran.
+// Couleurs moyennes des nappes de sol (assets/sol-*.webp) : la tuile de
+// secours, affichée le temps du chargement, et la minimap leur ressemblent.
 const TERRAIN_COLORS = {
-  [TERRAIN.GRASS]: ['#5d8b41', '#608e44', '#5a883f'],
-  [TERRAIN.GRASS_DARK]: ['#4d7a3c', '#507d3f', '#4a763a'],
-  [TERRAIN.DIRT]: ['#8a7146', '#8d7449', '#877044'],
-  [TERRAIN.SAND]: ['#c9b07a', '#ccb37e', '#c6ad77'],
+  [TERRAIN.GRASS]: ['#4a6217', '#4c6419', '#486015'],
+  [TERRAIN.GRASS_DARK]: ['#5c6123', '#5e6325', '#5a5f21'],
+  [TERRAIN.DIRT]: ['#805a3a', '#835d3d', '#7d5737'],
+  [TERRAIN.SAND]: ['#a17954', '#a47c57', '#9e7651'],
   [TERRAIN.WATER]: ['#2f6d9e', '#32709f', '#2c6a9a'],
 };
+
+// Nappe de sol par terrain, et priorité de lisière : un terrain déborde en
+// fondu sur ses voisins de priorité inférieure (l'herbe mord sur la terre,
+// pas l'inverse). L'eau, sans nappe, se dessine par-dessus tout.
+const NAPPES = {
+  [TERRAIN.GRASS]: 'grass', [TERRAIN.GRASS_DARK]: 'grassDark',
+  [TERRAIN.DIRT]: 'dirt', [TERRAIN.SAND]: 'sand',
+};
+const PRIORITE = {
+  [TERRAIN.DIRT]: 0, [TERRAIN.SAND]: 1, [TERRAIN.GRASS]: 2, [TERRAIN.GRASS_DARK]: 3, [TERRAIN.WATER]: 4,
+};
+const MARGE_LISIERE = 8;           // pixels monde de débordement fondu
+const TRONCON = 8;                 // cases de côté d'un tronçon de sol pré-rendu
+const TRONCONS_MAX = 40;           // tronçons gardés en cache (≈ 1,1 Mo chacun en fin)
+// Recouvrement entre tronçons voisins, en pixels monde : à zoom fractionnaire,
+// deux images posées bord à bord laissent une couture anticrénelée ; en les
+// faisant se chevaucher sur les MÊMES texels, il n'y a plus de bord à voir.
+const RECOUVREMENT = 8;
+const STAMP = (TILE + 2 * MARGE_LISIERE) * 2;   // le tampon de lisière, à 2 px par pixel monde
 
 const BUILDING_SKINS = {
   towncenter: { wall: '#d9c9a3', roof: '#a8452f', accent: '#8b6f47' },
@@ -106,6 +127,7 @@ export class Camera {
 export class Renderer {
   constructor(canvas, world, camera) {
     this.canvas = canvas;
+    this.troncons = new Map();
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.world = world;
     this.camera = camera;
@@ -119,7 +141,9 @@ export class Renderer {
     this.particles = [];
     this.effetsVus = new WeakSet();
     chargerSprites();
+    chargerTextures();
     this.buildTileAtlas();
+    this.buildLisiere();
     this.initFogCanvas();
     this.resize();
   }
@@ -183,6 +207,35 @@ export class Renderer {
 
   // --- Boucle de rendu ------------------------------------------------------
 
+  /**
+   * Le tampon de lisière : un canvas de travail et un masque — opaque sur la
+   * case, qui s'estompe sur MARGE_LISIERE pixels monde tout autour. Un tampon
+   * d'herbe passé par ce masque et posé sur une case de terre voisine fait la
+   * transition ; posé sur une case d'herbe, il y peint les mêmes texels — rien
+   * ne change, et c'est ce qui rend l'astuce sûre.
+   */
+  buildLisiere() {
+    const masque = document.createElement('canvas');
+    masque.width = STAMP; masque.height = STAMP;
+    const g = masque.getContext('2d');
+    const img = g.createImageData(STAMP, STAMP);
+    const m = MARGE_LISIERE * 2, d = img.data;
+    for (let y = 0; y < STAMP; y++) {
+      for (let x = 0; x < STAMP; x++) {
+        const dehors = Math.max(0, m - x, x - (STAMP - 1 - m), m - y, y - (STAMP - 1 - m));
+        const t = Math.max(0, 1 - dehors / m);
+        const o = (y * STAMP + x) * 4;
+        d[o] = 255; d[o + 1] = 255; d[o + 2] = 255;
+        d[o + 3] = Math.round(255 * t * t * (3 - 2 * t));
+      }
+    }
+    g.putImageData(img, 0, 0);
+    this.masqueLisiere = masque;
+    this.tampon = document.createElement('canvas');
+    this.tampon.width = STAMP; this.tampon.height = STAMP;
+    this.tamponCtx = this.tampon.getContext('2d');
+  }
+
   render(dt = 1 / 60) {
     const ctx = this.ctx;
     this.frame++;
@@ -230,6 +283,139 @@ export class Renderer {
   }
 
   drawTerrain(view) {
+    const zoom = this.camera.zoom;
+    const nappes = {};
+    for (const t of Object.keys(NAPPES)) { nappes[t] = textureSol(NAPPES[t], zoom); if (!nappes[t]) { this.drawTerrainTuiles(view); return; } }
+
+    // Le sol est pré-rendu par TRONÇONS de TRONCON × TRONCON cases, mis en
+    // cache : le terrain ne change jamais, et le brouillard se peint par-dessus.
+    // Une image affiche une dizaine de tronçons, là où le rendu case par case
+    // coûtait des centaines de tampons de lisière. Deux résolutions : fine
+    // (2 px par pixel monde) pour le jeu, grossière au zoom arrière — réduire
+    // une nappe de trop scintille au défilement.
+    const niveau = zoom < 0.75 ? 1 : 0;
+    const taille = TRONCON * TILE;
+    const cx0 = Math.floor(Math.max(0, view.left) / taille), cx1 = Math.floor(Math.min(this.world.map.pixelWidth - 1, view.right) / taille);
+    const cy0 = Math.floor(Math.max(0, view.top) / taille), cy1 = Math.floor(Math.min(this.world.map.pixelHeight - 1, view.bottom) / taille);
+    const r = RECOUVREMENT;
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        this.ctx.drawImage(this.troncon(cx, cy, niveau, nappes), cx * taille - r, cy * taille - r, taille + 2 * r, taille + 2 * r);
+      }
+    }
+  }
+
+  /** Le tronçon (cx, cy) au niveau demandé, rendu à la première demande. */
+  troncon(cx, cy, niveau, nappes) {
+    const cle = `${niveau}:${cx}:${cy}`;
+    if (!this.troncons) this.troncons = new Map();
+    const cache = this.troncons;
+    let c = cache.get(cle);
+    if (c) { cache.delete(cle); cache.set(cle, c); return c; }   // le plus récent en dernier
+    if (cache.size >= TRONCONS_MAX) cache.delete(cache.keys().next().value);
+    c = this.rendreTroncon(cx, cy, niveau === 0 ? 2 : 1, nappes);
+    cache.set(cle, c);
+    return c;
+  }
+
+  rendreTroncon(cx, cy, echelle, nappes) {
+    const map = this.world.map;
+    const taille = TRONCON * TILE;
+    const r = RECOUVREMENT;
+    const canvas = document.createElement('canvas');
+    canvas.width = (taille + 2 * r) * echelle; canvas.height = (taille + 2 * r) * echelle;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(echelle, echelle);
+    ctx.translate(-(cx * taille - r), -(cy * taille - r));
+    // Une case de plus tout autour : elle fournit le recouvrement et les
+    // débordements de lisière qui entrent chez nous ; le canvas rogne le reste.
+    const x0 = Math.max(0, cx * TRONCON - 1), y0 = Math.max(0, cy * TRONCON - 1);
+    const x1 = Math.min(map.w - 1, (cx + 1) * TRONCON), y1 = Math.min(map.h - 1, (cy + 1) * TRONCON);
+
+    // 1. Le sol, par PLAGES : une suite de cases de même terrain sur une ligne
+    // est un seul drawImage, dont la source est le morceau de nappe
+    // correspondant. On coupe aux changements de terrain et à la période de
+    // la nappe (un multiple entier de cases, par construction).
+    const eau = [];
+    for (let ty = y0; ty <= y1; ty++) {
+      const row = ty * map.w;
+      let tx = x0;
+      while (tx <= x1) {
+        const terrain = map.terrain[row + tx];
+        if (terrain === TERRAIN.WATER) { eau.push(row + tx); tx++; continue; }
+        const nappe = nappes[terrain];
+        const periodeCases = (nappe.n * nappe.texel) / TILE;
+        let fin = tx + 1;
+        while (fin <= x1 && fin % periodeCases !== 0 && map.terrain[row + fin] === terrain) fin++;
+        this.dessinerPlage(ctx, nappe, tx * TILE, ty * TILE, (fin - tx) * TILE, TILE);
+        tx = fin;
+      }
+    }
+
+    // 2. Les lisières, par priorité croissante : chaque case qui touche un
+    // terrain de moindre priorité est repeinte élargie, en fondu. La couronne
+    // d'une case autour du tronçon en fait partie : son débordement entre
+    // chez nous, et le canvas rogne le reste.
+    for (let p = 1; p <= 3; p++) {
+      for (let ty = y0 - 1; ty <= y1 + 1; ty++) {
+        for (let tx = x0 - 1; tx <= x1 + 1; tx++) {
+          if (!map.inBounds(tx, ty)) continue;
+          const terrain = map.terrain[ty * map.w + tx];
+          if (PRIORITE[terrain] !== p || !this.toucheMoindre(tx, ty, p)) continue;
+          this.dessinerLisiere(ctx, nappes[terrain], tx, ty);
+        }
+      }
+    }
+
+    // 3. L'eau, par-dessus les débordements : elle garde sa tuile dessinée.
+    for (const i of eau) {
+      const variants = this.atlas[TERRAIN.WATER];
+      ctx.drawImage(variants[map.variant[i] % variants.length], (i % map.w) * TILE, Math.floor(i / map.w) * TILE);
+    }
+    return canvas;
+  }
+
+  /** Une case touche-t-elle (8 voisins) un terrain de priorité < p ? */
+  toucheMoindre(tx, ty, p) {
+    const map = this.world.map;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = tx + dx, ny = ty + dy;
+        if (map.inBounds(nx, ny) && PRIORITE[map.terrain[ny * map.w + nx]] < p) return true;
+      }
+    }
+    return false;
+  }
+
+  /** Morceau de nappe couvrant le rectangle monde (x, y, w, h). */
+  dessinerPlage(ctx, nappe, x, y, w, h) {
+    const { canvas, n, marge, texel } = nappe;
+    const sx = marge + (((x / texel) % n) + n) % n;
+    const sy = marge + (((y / texel) % n) + n) % n;
+    ctx.drawImage(canvas, sx, sy, w / texel, h / texel, x, y, w, h);
+  }
+
+  /** La case (tx, ty) élargie de MARGE_LISIERE et passée par le masque. */
+  dessinerLisiere(ctx, nappe, tx, ty) {
+    const { canvas, n, marge, texel } = nappe;
+    const m = MARGE_LISIERE;
+    const x = tx * TILE, y = ty * TILE;
+    // L'origine de la case est ramenée dans la période ; la marge repliée de
+    // la nappe absorbe le débordement de part et d'autre.
+    const sx = marge + (((x / texel) % n) + n) % n - m / texel;
+    const sy = marge + (((y / texel) % n) + n) % n - m / texel;
+    const g = this.tamponCtx;
+    g.clearRect(0, 0, STAMP, STAMP);
+    g.drawImage(canvas, sx, sy, (TILE + 2 * m) / texel, (TILE + 2 * m) / texel, 0, 0, STAMP, STAMP);
+    g.globalCompositeOperation = 'destination-in';
+    g.drawImage(this.masqueLisiere, 0, 0);
+    g.globalCompositeOperation = 'source-over';
+    ctx.drawImage(this.tampon, x - m, y - m, TILE + 2 * m, TILE + 2 * m);
+  }
+
+  /** Le sol en tuiles de couleur : le temps que les nappes arrivent. */
+  drawTerrainTuiles(view) {
     const ctx = this.ctx;
     const map = this.world.map;
     for (let ty = view.y0; ty <= view.y1; ty++) {
@@ -1069,8 +1255,8 @@ export class Renderer {
     const img = ctx.createImageData(map.w, map.h);
     const data = img.data;
     const palette = {
-      [TERRAIN.GRASS]: [93, 139, 65], [TERRAIN.GRASS_DARK]: [72, 116, 58],
-      [TERRAIN.DIRT]: [138, 113, 70], [TERRAIN.SAND]: [201, 176, 122],
+      [TERRAIN.GRASS]: [74, 98, 23], [TERRAIN.GRASS_DARK]: [92, 97, 35],
+      [TERRAIN.DIRT]: [128, 90, 58], [TERRAIN.SAND]: [161, 121, 84],
       [TERRAIN.WATER]: [47, 109, 158],
     };
     for (let i = 0; i < map.w * map.h; i++) {

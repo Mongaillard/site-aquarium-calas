@@ -3,7 +3,7 @@
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
 très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 205 Ko d'illustrations — dont un cycle de marche
+pictogrammes vectoriels et 354 Ko d'illustrations et de textures — dont un cycle de marche
 complet.
 
 ## Lancer le jeu
@@ -297,7 +297,7 @@ n'avait pas la même tête sur un Samsung et sur un iPhone.
 couleur vient du texte qui les porte. Les auteurs sont cités dans l'écran
 **Crédits**, accessible depuis le menu de pause — c'est ce que la licence exige.
 
-Les **illustrations** (`assets/`, 205 Ko) viennent de planches de personnage
+Les **illustrations** (`assets/`, 205 Ko, plus 149 Ko de textures de sol) viennent de planches de personnage
 fournies par l'auteur du dépôt : le chevalier de l'écran d'accueil,
 le portrait du milicien dans le panneau de sélection, et le chevalier à terre
 de l'écran de défaite. Le portrait de l'adversaire est le même fichier, passé
@@ -365,6 +365,30 @@ La **caserne** (`caserne.webp`, 29 Ko) suit la même chaîne : enceinte crénel�
 cour d'entraînement, deux tours à dôme, dessinée sur 132 px — un peu moins que
 le palais, qui doit rester le plus grand bâtiment de la base. Les dix autres
 bâtiments gardent leur rendu dessiné au code, comme les cinq unités sans planche.
+
+### Le sol est une nappe, pas un damier
+
+Quatre textures de sol (`assets/sol-*.webp`, 149 Ko) — herbe, herbe sombre,
+terre, sable. Elles sont dessinées comme des **nappes continues** : chaque case
+montre le morceau de nappe qui correspond à sa position dans le monde, si bien
+que deux cases voisines se prolongent sans couture et que rien ne trahit la
+grille. Aux **lisières**, un terrain déborde en fondu sur son voisin de moindre
+priorité (l'herbe mord sur la terre) : chaque case de lisière est repeinte
+élargie de 8 px à travers un masque qui s'estompe — posée sur une case du même
+terrain, elle y peint les mêmes texels, ce qui rend l'astuce sûre.
+
+Le sol est **pré-rendu par tronçons** de 8×8 cases dans des canvas hors écran
+mis en cache (le terrain ne change jamais, le brouillard se peint par-dessus) :
+une image affiche une dizaine de tronçons au lieu de trois cents cases et de
+deux cents tampons de lisière — c'était 48 images par seconde en direct, c'est
+60 en cache. Les tronçons se recouvrent de 8 px sur les mêmes texels, sans quoi
+un zoom fractionnaire laissait voir une couture anticrénelée entre deux images
+posées bord à bord. Une version demi-taille sert au zoom arrière, où réduire
+une nappe de trop scintille au défilement.
+
+Le raccord bord à bord des textures, qui ne l'étaient pas, est décrit dans
+`assets/SOURCES.md` — avec la ligne à mi-période qu'un premier fondu laissait
+en jeu, mesurée puis éliminée.
 
 ### La couleur d'équipe se calcule au chargement
 

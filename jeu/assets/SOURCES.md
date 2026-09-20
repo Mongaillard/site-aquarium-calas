@@ -9,6 +9,7 @@
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 288×287, dessiné sur 144 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 264×264, dessinée sur 132 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
+| `sol-herbe.webp`, `sol-herbe-sombre.webp`, `sol-terre.webp`, `sol-sable.webp` | Les quatre **nappes de sol** (herbe, herbe sombre, terre, sable), 384×384, raccordées bord à bord | Planche de six textures générée par l'auteur du dépôt ; deux (herbe sèche, terre sombre) restent en réserve |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
 Ces images viennent d'une planche de référence fournie par l'auteur du dépôt, qui
@@ -127,7 +128,34 @@ chevalier animé — seule la fenêtre du bleu franc (200°–255°) bascule : d
 bannières et auvents passent au rouge, la pierre blanche et l'eau cyan des
 fontaines ne bougent pas. Un test le vérifie pixel à pixel.
 
+## Le sol
+
+Les textures sont des **nappes continues**, pas des tuiles : une case d'herbe
+montre le morceau de nappe qui correspond à sa position dans le monde, et deux
+cases voisines montrent deux morceaux contigus — rien ne trahit la grille. La
+nappe se répète toutes les six cases (384 texels à 0,5 px monde par texel).
+
+Générées, elles ne se raccordaient pas : écart de 70 à 120 niveaux entre le bord
+droit et le bord gauche, pour un grain de 14 à 19. Trois traitements, dans
+l'ordre (`textures-sol.py`) :
+
+1. **Aplatissement** : ajustement d'un polynôme du second degré par canal, puis
+   retrait des profils moyens par colonne et par ligne lissés périodiquement —
+   le vignettage des images générées (centre plus clair que les bords) part,
+   le grain reste.
+2. **Fondu à quatre images** : l'originale, sa copie décalée d'une demi-période
+   en x, en y, et dans les deux sens, pondérées par un produit de fenêtres 1-D
+   (plateau au centre, rampe sur les bords). Chaque image pèse zéro exactement
+   là où passe sa propre couture. Un fondu à *deux* images laissait la croix
+   centrale de la copie visible près des bords : en jeu, une ligne claire à
+   mi-période, mesurée à 15 niveaux au-dessus du bruit. À quatre images : 3.
+3. Un second aplatissement, le fondu réintroduisant un léger biais de bord.
+
+Réduites à 384 px et encodées en WebP avec pertes (qualité 72) : **149 Ko** pour
+les quatre. Les couleurs moyennes des nappes servent à la minimap et à la tuile
+de secours affichée le temps du chargement.
+
 ## Format
 
-WebP partout où c'est possible : 205 Ko pour l'ensemble, contre environ 600 Ko en
+WebP partout où c'est possible : 354 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
 PNG, sans différence visible à l'œil même agrandi trois fois.
