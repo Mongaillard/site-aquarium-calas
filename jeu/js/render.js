@@ -7,7 +7,7 @@
 
 import { TILE, BUILDING_TYPES } from './config.js';
 import { iconePath, ICON_BOX } from './icones.js';
-import { chargerSprites, spriteDe, caseDirection } from './sprites.js';
+import { chargerSprites, spriteDe, imagePourJoueur, caseDirection } from './sprites.js';
 import { TERRAIN } from './map.js';
 import { clamp } from './utils.js';
 
@@ -690,8 +690,8 @@ export class Renderer {
    */
   dessinerSprite(u, sprite, x, y, anim) {
     const ctx = this.ctx;
-    const { cellW, cellH, cases, hauteurMonde } = sprite.def;
-    const source = u.playerIndex === this.world.humanIndex ? sprite.image : sprite.adverse;
+    const { cellW, cellH, cases, hauteurMonde, ancreY, pixel } = sprite.def;
+    const source = imagePourJoueur(sprite, u.playerIndex);
     const k = caseDirection(u.facing, cases);
     // Socle aux couleurs du joueur : de loin, une armure reste une tache
     // sombre, et l'appartenance doit se lire d'un coup d'œil. C'est la
@@ -714,8 +714,13 @@ export class Renderer {
     const fente = anim.coup >= 0 ? Math.sin(anim.coup * Math.PI) * h * 0.14 : 0;
     const px = x + Math.cos(u.facing) * fente;
     const py = y + Math.sin(u.facing) * fente;
+    // L'ancre est la ligne des pieds dans la case, pas son bas : certaines
+    // illustrations laissent du vide dessous.
+    const pieds = (ancreY || cellH) / cellH;
+    if (pixel) ctx.imageSmoothingEnabled = false;   // du pixel art ne s'interpole pas
     ctx.drawImage(source, k * cellW, 0, cellW, cellH,
-      px - w / 2, py + u.radius * 0.45 - h, w, h);
+      px - w / 2, py + u.radius * 0.45 - h * pieds, w, h);
+    if (pixel) ctx.imageSmoothingEnabled = true;
 
     if (anim.coup >= 0 && anim.coup < 0.55) {
       const p = anim.coup / 0.55;

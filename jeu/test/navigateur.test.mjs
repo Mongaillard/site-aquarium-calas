@@ -473,7 +473,16 @@ const chevalier = await page.evaluate(async () => {
   const s = mod.spriteDe('militia');
   return {
     pret: !!s,
-    adverse: !!(s && s.adverse),
+    adverse: !!(s && s.variantes && s.variantes.rouge && s.variantes.bleu),
+    lancier: !!mod.spriteDe('spearman'),
+    lancierPixel: !!(mod.spriteDe('spearman') || {}).def?.pixel,
+    lancierDeuxCamps: (() => {
+      const l = mod.spriteDe('spearman');
+      if (!l) return false;
+      // Les deux camps doivent recevoir une image, et pas la même.
+      return !!mod.imagePourJoueur(l, 0) && !!mod.imagePourJoueur(l, 1)
+        && mod.imagePourJoueur(l, 0) !== mod.imagePourJoueur(l, 1);
+    })(),
     // Le sud est la première case (le personnage fait face au joueur), puis on
     // tourne par l'est : on le lit à la cape, toujours dans le dos.
     sud: mod.caseDirection(Math.PI / 2, 8),
@@ -489,6 +498,9 @@ const chevalier = await page.evaluate(async () => {
 });
 check('l’illustration du milicien est chargée', chevalier.pret);
 check('sa version adverse est préparée', chevalier.adverse);
+check('le lancier a son atlas en pixel art',
+  chevalier.lancier && chevalier.lancierPixel && chevalier.lancierDeuxCamps,
+  JSON.stringify({ pret: chevalier.lancier, pixel: chevalier.lancierPixel }));
 check('les orientations tombent sur les bonnes cases',
   chevalier.sud === 0 && chevalier.est === 2 && chevalier.nord === 4 && chevalier.ouest === 6,
   `sud ${chevalier.sud} · est ${chevalier.est} · nord ${chevalier.nord} · ouest ${chevalier.ouest}`);

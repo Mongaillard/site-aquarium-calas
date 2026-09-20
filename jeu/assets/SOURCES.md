@@ -5,7 +5,8 @@
 | `heros.webp` | Chevalier en pied, vue de face | Planche de personnage générée par l'auteur du dépôt, découpée et détourée pour le jeu |
 | `portrait-milicien.webp` | Buste du même chevalier | idem |
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
-| `chevalier.webp` | Atlas des **huit orientations** du chevalier, utilisé comme sprite du milicien sur la carte | idem |
+| `chevalier.webp` | Atlas des **huit orientations** du chevalier, sprite du milicien sur la carte | idem |
+| `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
 Ces images viennent d'une planche de référence fournie par l'auteur du dépôt, qui
 en est l'auteur. Aucune image tierce n'est utilisée ici.
@@ -25,6 +26,17 @@ La version adverse est calculée au chargement : seuls les pixels à dominante b
 passent au rouge, l'acier et l'or ne bougent pas. C'est plus sûr qu'une rotation de
 teinte globale, et identique sur tous les navigateurs — le filtre d'un contexte 2D,
 lui, ne l'est pas.
+
+Le lancier, lui, est du pixel art natif : ses huit images étaient déjà calées sur
+une grille de 48 pixels, pieds à la même hauteur, fond transparent — il a suffi de
+les mettre bout à bout. Il est dessiné **sans lissage** (`imageSmoothingEnabled`),
+faute de quoi l'interpolation le réduirait en bouillie. Son atlas pèse 4 Ko en PNG
+indexé, contre 11 en PNG brut.
+
+Sa recoloration d'équipe ne peut pas suivre la même règle que l'illustration peinte :
+le rouge du tabard y voisine avec la peau du visage et le cuir. Une bascule large
+repeignait le visage en bleu ; on ne prend donc que les rouges francs (teinte
+338°–14°), ce qui épargne la peau et le cuir, dont la teinte est orangée.
 
 Format WebP : 70 Ko pour les quatre fichiers, contre 205 Ko en PNG, sans différence
 visible à l'œil même agrandi trois fois.

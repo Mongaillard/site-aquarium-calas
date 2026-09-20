@@ -272,7 +272,7 @@ une seule couleur**, et deux concepts voisins ne doivent pas se ressembler.
 D'où, par exemple, le trio caserne / archerie / écurie rendu par trois formes
 sans recouvrement possible — un X d'épées, un disque de cible, un fer à cheval.
 
-### Le milicien porte l'illustration
+### Deux unités portent une illustration
 
 Les **huit orientations** de la planche sont découpées en atlas (`assets/chevalier.webp`,
 40 Ko) et servent de sprite au milicien sur la carte. Le personnage est dessiné
@@ -280,8 +280,17 @@ plus grand que l'emprise de l'unité — comme dans AoE, sinon un chevalier de d
 pixels ne se lirait pas — et posé sur un **socle aux couleurs du joueur** : de loin
 une armure reste une tache sombre, et l'appartenance doit se lire d'un coup d'œil.
 
+Le **lancier**, lui, est du **pixel art natif** (`assets/lancier.png`, 4 Ko) :
+huit orientations de 48 pixels, dessinées pour cette taille. Il est rendu sans
+lissage, sinon l'interpolation le réduirait en bouillie.
+
+La comparaison à l'écran est nette : **le pixel art l'emporte largement** sur la
+peinture réduite, qui devient sombre et illisible à la taille d'une unité. La
+peinture garde sa place là où elle est vue en grand — accueil, portrait, écran de
+fin — et le terrain appartient au pixel art.
+
 Toute unité sans illustration garde son rendu dessiné au code, et le jeu reste
-jouable si l'image ne charge pas.
+jouable si une image ne charge pas.
 
 ### Animation des unités
 
