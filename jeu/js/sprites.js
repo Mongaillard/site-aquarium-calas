@@ -18,17 +18,46 @@
  */
 const ATLAS = {
   militia: {
+    src: 'assets/milicien-marche.webp',
+    cellW: 44, cellH: 76, cases: 8, images: 8, cycle: 40,
+    ancreY: 73, hauteurMonde: 44, natif: 'bleu',
+  },
+  // Même unité, l'autre style : l'illustration peinte, sans marche animée.
+  // Elle sert à comparer les deux partis pris sans relancer de partie.
+  militiaPeint: {
     src: 'assets/chevalier.webp',
-    cellW: 76, cellH: 104, cases: 8, ancreY: 104, hauteurMonde: 40, natif: 'bleu',
+    cellW: 76, cellH: 104, cases: 8, images: 1,
+    ancreY: 104, hauteurMonde: 40, natif: 'bleu',
   },
   spearman: {
     src: 'assets/lancier.png',
-    cellW: 48, cellH: 48, cases: 8, ancreY: 46, hauteurMonde: 44, natif: 'rouge', pixel: true,
+    cellW: 48, cellH: 48, cases: 8, images: 1,
+    ancreY: 46, hauteurMonde: 44, natif: 'rouge', pixel: true,
   },
 };
 
 const PAS = Math.PI / 4;
 const charges = new Map();
+
+/**
+ * Deux styles cohabitent pour la même unité : `anime` (marche dessinée, huit
+ * images par direction) et `peint` (illustration réduite, pose unique). Le
+ * choix se fait en cours de partie, et l'atlas correspondant n'est téléchargé
+ * qu'au moment où on le demande.
+ */
+const ALTERNATIVES = { militia: { anime: 'militia', peint: 'militiaPeint' } };
+export const STYLES = [
+  { id: 'anime', nom: 'Animé', desc: 'Marche dessinée' },
+  { id: 'peint', nom: 'Peint', desc: 'Illustration réduite' },
+];
+let style = 'anime';
+
+export function styleUnites() { return style; }
+
+export function setStyleUnites(nouveau) {
+  style = STYLES.some((s) => s.id === nouveau) ? nouveau : 'anime';
+  for (const alt of Object.values(ALTERNATIVES)) chargerAtlas(alt[style]);
+}
 
 function versHSL(r, g, b) {
   const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
@@ -117,36 +146,72 @@ function enBleu(image, l, h) {
   return canvas;
 }
 
-/** Démarre le chargement des atlas. À appeler une fois, au lancement d'une partie. */
+/** Charge un atlas donné, une seule fois. */
+function chargerAtlas(cle) {
+  const def = ATLAS[cle];
+  if (!def || charges.has(cle) || typeof document === 'undefined') return;
+  const entree = { def, pret: false, variantes: null };
+  charges.set(cle, entree);
+  const image = new Image();
+  image.decoding = 'async';
+  image.onload = () => {
+    const l = image.width, h = image.height;
+    entree.variantes = def.natif === 'bleu'
+      ? { bleu: image, rouge: enRouge(image, l, h) }
+      : { rouge: image, bleu: enBleu(image, l, h) };
+    entree.pret = true;
+  };
+  image.onerror = () => { charges.set(cle, { def, pret: false, absent: true }); };
+  image.src = def.src;
+}
+
+/**
+ * Démarre le chargement des atlas nécessaires. Les variantes de style, elles,
+ * n'arrivent que si on les demande : inutile de télécharger les deux.
+ */
 export function chargerSprites() {
   if (typeof document === 'undefined') return;
-  for (const [type, def] of Object.entries(ATLAS)) {
-    if (charges.has(type)) continue;
-    const entree = { def, pret: false, variantes: null };
-    charges.set(type, entree);
-    const image = new Image();
-    image.decoding = 'async';
-    image.onload = () => {
-      const l = image.width, h = image.height;
-      entree.variantes = def.natif === 'bleu'
-        ? { bleu: image, rouge: enRouge(image, l, h) }
-        : { rouge: image, bleu: enBleu(image, l, h) };
-      entree.pret = true;
-    };
-    image.onerror = () => { charges.set(type, { def, pret: false, absent: true }); };
-    image.src = def.src;
+  const variantes = new Set(Object.values(ALTERNATIVES).flatMap((a) => Object.values(a)));
+  for (const cle of Object.keys(ATLAS)) {
+    if (!variantes.has(cle) || ALTERNATIVES[cle]) chargerAtlas(cle);
   }
+  for (const alt of Object.values(ALTERNATIVES)) chargerAtlas(alt[style]);
 }
 
 /** Sprite prêt à dessiner pour ce type d'unité, ou null. */
 export function spriteDe(type) {
-  const e = charges.get(type);
+  const alt = ALTERNATIVES[type];
+  const e = charges.get(alt ? alt[style] : type);
   return e && e.pret ? e : null;
 }
 
 /** Le joueur 0 est bleu, le joueur 1 rouge (voir PLAYER_COLORS). */
 export function imagePourJoueur(sprite, playerIndex) {
   return playerIndex === 0 ? sprite.variantes.bleu : sprite.variantes.rouge;
+}
+
+/**
+ * Position de la case dans l'atlas.
+ * - Une seule image par orientation : les huit directions se suivent en ligne.
+ * - Une marche animée : les colonnes sont les images, les lignes les directions.
+ */
+export function cadreSource(def, direction, image) {
+  const multi = (def.images || 1) > 1;
+  return multi
+    ? { sx: image * def.cellW, sy: direction * def.cellH }
+    : { sx: direction * def.cellW, sy: 0 };
+}
+
+/**
+ * Image de la marche, choisie sur la DISTANCE parcourue et non sur l'horloge :
+ * les jambes suivent le sol, une unité lente marche lentement, et une unité
+ * arrêtée reprend sa pose de repos.
+ */
+export function imageDeMarche(def, distance, enMouvement) {
+  const n = def.images || 1;
+  if (n <= 1 || !enMouvement) return 0;
+  const cycle = def.cycle || 40;
+  return Math.floor((distance / cycle) * n) % n;
 }
 
 /**

@@ -83,6 +83,23 @@ const fps = await page.evaluate(() => new Promise((resolve) => {
 }));
 check('fluidité', fps >= 30, fps + ' images/s');
 
+// Les deux styles de personnage cohabitent et se changent en cours de partie.
+const styles = await page.evaluate(async () => {
+  const g = window.__jeu;
+  const mod = await import('./js/sprites.js');
+  const avant = mod.spriteDe('militia').def.src;
+  g.setStyleUnites('peint');
+  await new Promise((r) => setTimeout(r, 900));
+  const apres = mod.spriteDe('militia').def.src;
+  g.setStyleUnites('anime');
+  await new Promise((r) => setTimeout(r, 400));
+  return { avant, apres, retour: mod.spriteDe('militia').def.src, choix: mod.STYLES.length };
+});
+check('deux styles de personnage sont proposés', styles.choix === 2, styles.choix + ' styles');
+check('le style bascule en cours de partie',
+  styles.avant !== styles.apres && styles.retour === styles.avant,
+  `${styles.avant.split('/').pop()} → ${styles.apres.split('/').pop()} → ${styles.retour.split('/').pop()}`);
+
 // La marche ne doit pas trembler : la simulation avance vingt fois par seconde
 // quand l'écran en affiche soixante, et cadencer l'animation sur la distance
 // brute d'une image à l'autre faisait vibrer les personnages.
@@ -474,6 +491,25 @@ const chevalier = await page.evaluate(async () => {
   return {
     pret: !!s,
     adverse: !!(s && s.variantes && s.variantes.rouge && s.variantes.bleu),
+    images: (mod.spriteDe('militia') || {}).def?.images,
+    // Huit images doivent défiler sur un cycle complet, et revenir à zéro.
+    cycleComplet: (() => {
+      const def = (mod.spriteDe('militia') || {}).def;
+      if (!def) return false;
+      const vues = new Set();
+      for (let d = 0; d < def.cycle; d += def.cycle / 32) vues.add(mod.imageDeMarche(def, d, true));
+      return vues.size === def.images;
+    })(),
+    marcheSuitLaDistance: (() => {
+      const def = (mod.spriteDe('militia') || {}).def;
+      if (!def) return false;
+      // Deux distances différentes donnent deux images différentes.
+      return mod.imageDeMarche(def, 0, true) !== mod.imageDeMarche(def, def.cycle / 2, true);
+    })(),
+    arretPoseZero: (() => {
+      const def = (mod.spriteDe('militia') || {}).def;
+      return !!def && mod.imageDeMarche(def, 999, false) === 0;
+    })(),
     lancier: !!mod.spriteDe('spearman'),
     lancierPixel: !!(mod.spriteDe('spearman') || {}).def?.pixel,
     lancierDeuxCamps: (() => {
@@ -498,6 +534,11 @@ const chevalier = await page.evaluate(async () => {
 });
 check('l’illustration du milicien est chargée', chevalier.pret);
 check('sa version adverse est préparée', chevalier.adverse);
+check('le milicien a une marche animée',
+  chevalier.images === 8 && chevalier.cycleComplet,
+  chevalier.images + ' images par direction');
+check('l’image de marche suit la distance, pas l’horloge', chevalier.marcheSuitLaDistance);
+check('une unité à l’arrêt reprend sa pose de repos', chevalier.arretPoseZero);
 check('le lancier a son atlas en pixel art',
   chevalier.lancier && chevalier.lancierPixel && chevalier.lancierDeuxCamps,
   JSON.stringify({ pret: chevalier.lancier, pixel: chevalier.lancierPixel }));

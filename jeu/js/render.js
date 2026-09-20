@@ -7,7 +7,9 @@
 
 import { TILE, BUILDING_TYPES } from './config.js';
 import { iconePath, ICON_BOX } from './icones.js';
-import { chargerSprites, spriteDe, imagePourJoueur, caseDirection } from './sprites.js';
+import {
+  chargerSprites, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche,
+} from './sprites.js';
 import { TERRAIN } from './map.js';
 import { clamp } from './utils.js';
 
@@ -597,7 +599,10 @@ export class Renderer {
     // barre de vie et particules valent pour tout le monde.
     const sprite = spriteDe(u.type);
     if (sprite) {
-      this.dessinerSprite(u, sprite, x, y, anim);
+      // Une marche dessinée a son propre balancement : y ajouter le nôtre
+      // donnerait deux rythmes superposés.
+      const anime = (sprite.def.images || 1) > 1;
+      this.dessinerSprite(u, sprite, anime ? u.x : x, anime ? u.y : y, anim);
       if (u.isVillager && u.carry.amount > 0.5) this.dessinerCharge(u, x, y, r);
       if (u.hp < u.maxHp) this.drawHealthBar(u.x, u.y - r * 2.6, r * 1.7, u.hp / u.maxHp);
       this.eclatsDeTravail(u, x, y, r);
@@ -693,6 +698,8 @@ export class Renderer {
     const { cellW, cellH, cases, hauteurMonde, ancreY, pixel } = sprite.def;
     const source = imagePourJoueur(sprite, u.playerIndex);
     const k = caseDirection(u.facing, cases);
+    const image = imageDeMarche(sprite.def, anim.distance || 0, anim.avance);
+    const { sx, sy } = cadreSource(sprite.def, k, image);
     // Socle aux couleurs du joueur : de loin, une armure reste une tache
     // sombre, et l'appartenance doit se lire d'un coup d'œil. C'est la
     // solution d'AoE, et elle vaut mieux qu'un personnage repeint en entier.
@@ -718,7 +725,7 @@ export class Renderer {
     // illustrations laissent du vide dessous.
     const pieds = (ancreY || cellH) / cellH;
     if (pixel) ctx.imageSmoothingEnabled = false;   // du pixel art ne s'interpole pas
-    ctx.drawImage(source, k * cellW, 0, cellW, cellH,
+    ctx.drawImage(source, sx, sy, cellW, cellH,
       px - w / 2, py + u.radius * 0.45 - h * pieds, w, h);
     if (pixel) ctx.imageSmoothingEnabled = true;
 
@@ -835,6 +842,8 @@ export class Renderer {
     const force = clamp(u._vitesse / (u.def.speed * TILE * 0.5), 0, 1);
     const foulee = Math.max(2.5, u.radius * 0.5);
     u._walk = ((u._walk || 0) + (u._vitesse * dt) / foulee) % (Math.PI * 2);
+    // Distance cumulée : c'est elle qui choisit l'image d'une marche animée.
+    u._distance = (u._distance || 0) + u._vitesse * dt;
 
     const cadence = u.def.attackSpeed || 2;
     const ecoule = cadence - u.attackCooldown;
@@ -842,6 +851,8 @@ export class Renderer {
     return {
       marche: Math.sin(u._walk) * force,
       coup: enCoup ? ecoule / (cadence * 0.34) : -1,
+      distance: u._distance,
+      avance: u._vitesse > 3,
     };
   }
 

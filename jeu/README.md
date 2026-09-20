@@ -2,8 +2,9 @@
 
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
-presque aucune image : ~7 000 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et trois illustrations de 30 Ko en tout.
+très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
+pictogrammes vectoriels et 134 Ko d'illustrations — dont un cycle de marche
+complet.
 
 ## Lancer le jeu
 
@@ -261,8 +262,8 @@ n'avait pas la même tête sur un Samsung et sur un iPhone.
 couleur vient du texte qui les porte. Les auteurs sont cités dans l'écran
 **Crédits**, accessible depuis le menu de pause — c'est ce que la licence exige.
 
-Quatre **illustrations** (`assets/`, 70 Ko en WebP) viennent d'une planche de
-personnage fournie par l'auteur du dépôt : le chevalier de l'écran d'accueil,
+Les **illustrations** (`assets/`, 134 Ko) viennent de planches de personnage
+fournies par l'auteur du dépôt : le chevalier de l'écran d'accueil,
 le portrait du milicien dans le panneau de sélection, et le chevalier à terre
 de l'écran de défaite. Le portrait de l'adversaire est le même fichier, passé
 en rouge par rotation de teinte — plutôt qu'une seconde image à télécharger.
@@ -272,25 +273,41 @@ une seule couleur**, et deux concepts voisins ne doivent pas se ressembler.
 D'où, par exemple, le trio caserne / archerie / écurie rendu par trois formes
 sans recouvrement possible — un X d'épées, un disque de cible, un fer à cheval.
 
-### Deux unités portent une illustration
+### Les unités portent une illustration, et deux styles cohabitent
 
-Les **huit orientations** de la planche sont découpées en atlas (`assets/chevalier.webp`,
-40 Ko) et servent de sprite au milicien sur la carte. Le personnage est dessiné
-plus grand que l'emprise de l'unité — comme dans AoE, sinon un chevalier de dix-huit
-pixels ne se lirait pas — et posé sur un **socle aux couleurs du joueur** : de loin
-une armure reste une tache sombre, et l'appartenance doit se lire d'un coup d'œil.
+Le milicien marche pour de vrai : `assets/milicien-marche.webp` (61 Ko) tient
+**huit orientations × huit images**, soit 64 cases de 44×76 px, découpées d'une
+planche de cycle de marche. L'image affichée est choisie sur la **distance
+parcourue** et non sur l'horloge — les jambes suivent donc le sol, une unité
+lente marche lentement, et une unité arrêtée reprend sa pose de repos plutôt que
+de pédaler sur place.
 
-Le **lancier**, lui, est du **pixel art natif** (`assets/lancier.png`, 4 Ko) :
-huit orientations de 48 pixels, dessinées pour cette taille. Il est rendu sans
-lissage, sinon l'interpolation le réduirait en bouillie.
+Le **lancier** est du **pixel art natif** (`assets/lancier.png`, 4 Ko) : huit
+orientations de 48 px, dessinées pour cette taille. Il est rendu sans lissage,
+sinon l'interpolation le réduirait en bouillie.
 
-La comparaison à l'écran est nette : **le pixel art l'emporte largement** sur la
-peinture réduite, qui devient sombre et illisible à la taille d'une unité. La
-peinture garde sa place là où elle est vue en grand — accueil, portrait, écran de
-fin — et le terrain appartient au pixel art.
+Le personnage est dessiné plus grand que l'emprise de l'unité — comme dans AoE,
+sinon un chevalier de dix-huit pixels ne se lirait pas — et posé sur un **socle
+aux couleurs du joueur** : de loin une armure reste une tache sombre, et
+l'appartenance doit se lire d'un coup d'œil.
+
+**Deux partis pris sont jouables**, au choix dans le menu de pause :
+
+| Style | Sprite du milicien | Ce qu'on y gagne |
+| --- | --- | --- |
+| **Animé** (par défaut) | `milicien-marche.webp`, 8 images par direction | Le mouvement se lit : on voit qui avance, qui est bloqué |
+| **Peint** | `chevalier.webp`, une pose par direction | Le détail de l'armure, au prix d'une silhouette figée |
+
+Le choix est retenu d'un lancement à l'autre, et l'atlas de l'autre style n'est
+téléchargé que si on le demande — inutile de payer les deux. Le verdict à
+l'écran est net : **la marche dessinée l'emporte**. À la taille d'une unité, ce
+qui se lit n'est pas le détail d'un personnage mais son mouvement ; la peinture
+réduite devient une tache sombre. Elle garde sa place là où elle est vue en
+grand — accueil, portrait, écran de fin.
 
 Toute unité sans illustration garde son rendu dessiné au code, et le jeu reste
-jouable si une image ne charge pas.
+jouable si une image ne charge pas. Avec 60 unités en marche à l'écran, les deux
+styles tiennent **60 images par seconde** sur un Pixel 7 émulé.
 
 ### Animation des unités
 

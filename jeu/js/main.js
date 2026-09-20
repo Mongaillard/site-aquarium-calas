@@ -15,6 +15,7 @@ import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
+import { setStyleUnites, styleUnites } from './sprites.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 const MAX_CATCHUP = 5;
@@ -25,6 +26,7 @@ const audio = new AudioEngine();
 const AUTO_WORKERS_KEY = 'aem.autoWorkers';
 const SPEED_KEY = 'aem.vitesse';
 const SETUP_KEY = 'aem.reglages';
+const STYLE_KEY = 'aem.styleUnites';
 /** Intervalle de sauvegarde automatique, en secondes réelles. */
 const AUTOSAVE_INTERVAL = 30;
 
@@ -56,6 +58,11 @@ function storeSetup(setup) {
   try { localStorage.setItem(SETUP_KEY, JSON.stringify(setup)); } catch { /* stockage indisponible */ }
 }
 
+/** Style des personnages (animé ou peint) : conservé d'une partie à l'autre. */
+function loadStyle() {
+  try { return localStorage.getItem(STYLE_KEY) || 'anime'; } catch { return 'anime'; }
+}
+
 export function speedDef(id) {
   return GAME_SPEEDS.find((s) => s.id === id) || GAME_SPEEDS.find((s) => s.id === DEFAULT_SPEED);
 }
@@ -82,6 +89,7 @@ class Game {
     this.speed = speedDef(this.speedId).mult;
     this.accumulator = 0;
     this.saveTimer = AUTOSAVE_INTERVAL;
+    setStyleUnites(loadStyle());
     this.lastFrame = performance.now();
     this.alertCooldown = 0;
     this.idleNoticeCooldown = 0;
@@ -785,6 +793,17 @@ class Game {
     }
     return ok;
   }
+
+  /** Style des personnages : illustration animée ou peinture réduite. */
+  setStyleUnites(id) {
+    setStyleUnites(id);
+    try { localStorage.setItem(STYLE_KEY, styleUnites()); } catch { /* stockage indisponible */ }
+    this.ui.toast(styleUnites() === 'anime'
+      ? 'Personnages : marche dessinée'
+      : 'Personnages : illustration peinte');
+  }
+
+  styleUnites() { return styleUnites(); }
 
   /** Vitesse de jeu : un multiplicateur sur la boucle, la simulation ne change pas. */
   setSpeed(id) {

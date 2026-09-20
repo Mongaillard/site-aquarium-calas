@@ -10,6 +10,7 @@ import {
 } from './config.js';
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
 import { iconeSVG, ICONES_LICENCE } from './icones.js';
+import { STYLES } from './sprites.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -634,11 +635,18 @@ export class UI {
         <span class="option-name">${sp.name}</span>
         <span class="option-desc">${sp.short}</span>
       </button>`).join('');
+    const styles = STYLES.map((st) => `
+      <button class="option compact ${st.id === this.game.styleUnites() ? 'active' : ''}" data-style="${st.id}">
+        <span class="option-name">${st.nom}</span>
+        <span class="option-desc">${st.desc}</span>
+      </button>`).join('');
     const modal = this.showModal(`
       <h2>Partie en pause</h2>
       <p class="hint">La partie est sauvegardée : vous pouvez fermer l'onglet et la reprendre plus tard.</p>
       <h3 class="modal-sub">Vitesse de jeu</h3>
       <div class="options row">${vitesses}</div>
+      <h3 class="modal-sub">Style des personnages</h3>
+      <div class="options row">${styles}</div>
       <div class="modal-actions">
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="help">Comment jouer</button>
@@ -649,6 +657,12 @@ export class UI {
       btn.addEventListener('click', () => {
         this.game.setSpeed(btn.dataset.speed);
         modal.querySelectorAll('[data-speed]').forEach((b) => b.classList.toggle('active', b === btn));
+      });
+    });
+    modal.querySelectorAll('[data-style]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.game.setStyleUnites(btn.dataset.style);
+        modal.querySelectorAll('[data-style]').forEach((b) => b.classList.toggle('active', b === btn));
       });
     });
     modal.querySelector('[data-act="resume"]').addEventListener('click', () => this.game.togglePause());
