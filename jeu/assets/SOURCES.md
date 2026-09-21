@@ -10,7 +10,7 @@
 | `cerf.webp` | Le **cerf** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en ordre de face et de dos | Planche générée par l'auteur du dépôt, fond noir dé-prémultiplié |
 | `cochon.webp` | Le **cochon** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en balancier | Planche générée par l'auteur du dépôt, fond gris uni |
 | `decor.webp` | Le **décor de la carte** : 97 pièces — amas de rochers, rochers, roseaux, touffes sèches, pampas, touffes d'herbe, buissons fleuris, fougères, couvre-sol, agaves, nénuphars, fleurs en quatre couleurs, galets — de tailles diverses dans un atlas à 2×, table dans `js/decor-pieces.js` | Découpées dans les planches d'eau, la planche d'arbres et la planche d'ornements de l'auteur du dépôt (voir plus bas) |
-| `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 56×86 par case | Planche générée par l'auteur du dépôt, fond dégradé retiré en deux passes (voir plus bas) |
+| `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 55×86 par case, pas intermédiaires interpolés | Planche générée par l'auteur du dépôt, fond dégradé retiré par rembg (voir plus bas) |
 | `eclaireur.webp` | L'**éclaireur** : cavalier à la lance, huit orientations × quatre foulées, 106×111 par case | Planche générée par l'auteur du dépôt, livrée avec sa transparence |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 316×315, dessinée sur 158 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
@@ -127,8 +127,8 @@ quatre orientations seulement : en diagonale, l'unité prend la cardinale la
 plus proche.
 
 Le fond n'était ni uni ni transparent : un dégradé sombre, un halo clair
-derrière chaque personnage, des légendes. Il part en deux passes
-(`analyse-villageois.py`, `matte-villageois.py`) :
+derrière chaque personnage, des légendes. Une première chaîne maison
+(`analyse-villageois.py`, `matte-villageois.py`) le retirait en deux passes :
 
 1. **Croissance de région** depuis les bords, avec un seuil (7 niveaux) sur la
    différence entre pixels *voisins* : le dégradé et le halo sont doux, le
@@ -142,9 +142,21 @@ derrière chaque personnage, des légendes. Il part en deux passes
    pas, on y ramassait une ombre derrière les épaules. Fermeture de 2 px, trous
    bouchés. Cinquante-six mille pixels regagnés.
 
+Il en restait des **trous et des zones mal reprises** : pantalons rongés,
+jambes coupées, une pose de profil réduite à sa chemise, des bouts de fond
+gardés. Le détourage est refait par **rembg** (modèle IS-Net, réseau de
+segmentation d'objet saillant, licence MIT, sur processeur) : une passe par
+personnage sur un recadrage centré sur son ancienne boîte, agrandi ×2, dont on
+ne garde que les composantes du matte qui recouvrent la boîte — les voisins
+qui dépassent dans le recadrage sont écartés (`rematte-villageois.py`). Le
+matte est doux (anticrénelage conservé) et sans trou ; l'ombre portée peinte
+sous les pieds, qui appartenait au halo, n'est plus reprise — le socle aux
+couleurs du joueur tient ce rôle.
+
 Chaque image est posée au bas de sa case, centrée ; un villageois debout fait
 **40 px monde** (le chevalier : 44), atlas à 2× avec le même peps que les
-bâtiments : 448×688, **90 Ko**. La couleur d'équipe est celle du chevalier —
+bâtiments : 440×688 avant interpolation (cases de 55×86), **99 Ko** ; 1320×688 et
+**226 Ko** avec les pas intermédiaires. La couleur d'équipe est celle du chevalier —
 l'écharpe bleue bascule, la peau, le cuir et la chemise restent ; le test le
 vérifie sur 14 440 pixels de peau.
 
@@ -173,12 +185,11 @@ v4.6, tourne sur processeur via lavapipe). Couleur et transparence sont
 interpolées séparément : la couleur composée sur gris moyen, l'alpha en
 niveaux de gris, puis les deux sont recombinés ; les images sont rembourrées
 à un multiple de 32 px, sans quoi le binaire écrit de travers. Avant cela,
-les miettes détachées du matting sont effacées et la pose fantôme de la
-rangée est (image 1) écartée ; les rangées de profil sont remises dans
-l'ordre le plus lisse (cycle de moindre écart entre images successives,
-départ pieds joints). Résultat : S et N 18 images, O 24, E 21, et la
-marche chargée (« porter ») 12 ; repos, cueillir et construire restent à
-quatre. Atlas 24 colonnes × 8 rangées de 56×86.
+les miettes détachées sont effacées et les rangées de profil sont remises
+dans l'ordre le plus lisse (cycle de moindre écart entre images successives,
+départ pieds joints). Résultat : S et N 18 images, O et E 24, et la marche
+chargée (« porter ») 12 ; repos, cueillir et construire restent à quatre.
+Atlas 24 colonnes × 8 rangées de 55×86.
 
 ## L'éclaireur
 

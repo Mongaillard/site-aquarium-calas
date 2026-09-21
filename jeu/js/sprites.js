@@ -94,16 +94,16 @@ const ATLAS = {
   // Renderer.poseDe). Debout, 40 px : un peu moins que le chevalier.
   villager: {
     src: 'assets/villageois.webp',
-    cellW: 56, cellH: 86, cases: 4, images: 24, cycle: 36,
+    cellW: 55, cellH: 86, cases: 4, images: 24, cycle: 36,
     lignes: [0, 3, 1, 2],
     // Les huit foulées de la planche n'alternent pas les pieds (de face :
-    // droit, droit, puis quatre fois le gauche) et l'une d'elles, de profil,
-    // est un fantôme du matting. Mesurées image par image, on retient six à
-    // huit poses par rangée dans l'ordre d'une vraie marche, puis RIFE
-    // intercale deux pas entre chaque paire (voir SOURCES.md, « Des pas
-    // intermédiaires ») : la rangée joue ses images dans l'ordre, la
-    // première étant la foulée neutre où le villageois s'arrête.
-    sequences: { 0: suite(18), 1: suite(18), 2: suite(24), 3: suite(21) },
+    // droit, droit, puis quatre fois le gauche). Mesurées image par image,
+    // on retient six poses de face et de dos dans l'ordre d'une vraie marche,
+    // les huit de profil dans l'ordre le plus lisse, puis RIFE intercale deux
+    // pas entre chaque paire (voir SOURCES.md, « Des pas intermédiaires ») :
+    // la rangée joue ses images dans l'ordre, la première étant la foulée
+    // neutre où le villageois s'arrête.
+    sequences: { 0: suite(18), 1: suite(18), 2: suite(24), 3: suite(24) },
     poses: {
       repos: { ligne: 4, images: 4, cadence: 2.5 },
       cueillir: { ligne: 5, images: 4, cadence: 5, sens: -1 },
