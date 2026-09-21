@@ -91,6 +91,11 @@ const ATLAS = {
     src: 'assets/villageois.webp',
     cellW: 56, cellH: 86, cases: 4, images: 8, cycle: 36,
     lignes: [0, 3, 1, 2],
+    // Les huit foulées de la planche n'alternent pas les pieds (de face :
+    // droit, droit, puis quatre fois le gauche). Mesurées image par image,
+    // on en garde six qui font une vraie marche : neutre, droit, droit,
+    // neutre, gauche, gauche. De profil, on ne distingue pas les pieds.
+    sequences: { 0: [0, 1, 2, 3, 5, 6], 1: [7, 1, 4, 0, 2, 3] },
     poses: {
       repos: { ligne: 4, images: 4, cadence: 2.5 },
       cueillir: { ligne: 5, images: 4, cadence: 5, sens: -1 },
@@ -391,11 +396,16 @@ export function poseSource(def, pose, image) {
  * les jambes suivent le sol, une unité lente marche lentement, et une unité
  * arrêtée reprend sa pose de repos.
  */
-export function imageDeMarche(def, distance, enMouvement) {
-  const n = def.images || 1;
-  if (n <= 1 || !enMouvement) return 0;
+export function imageDeMarche(def, distance, enMouvement, ligne = 0) {
+  // Une planche mal cadencée (deux fois le même pied, images en double) se
+  // remonte sans la redessiner : `sequences[ligne]` donne l'ordre des images
+  // à jouer, la première étant la foulée neutre où l'unité s'arrête.
+  const seq = def.sequences && def.sequences[ligne];
+  const n = seq ? seq.length : (def.images || 1);
+  if (n <= 1 || !enMouvement) return seq ? seq[0] : 0;
   const cycle = def.cycle || 40;
-  return Math.floor((distance / cycle) * n) % n;
+  const i = Math.floor((distance / cycle) * n) % n;
+  return seq ? seq[i] : i;
 }
 
 /**

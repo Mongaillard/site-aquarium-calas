@@ -974,6 +974,39 @@ const quatre = await page.evaluate(async () => {
 check('le villageois marche sur quatre orientations, la cardinale la plus proche en diagonale',
   quatre.sud === 0 && quatre.nord === 1 && quatre.ouest === 2 && quatre.est === 3 && quatre.sudEst === 3 && quatre.sudEstBis === 0, JSON.stringify(quatre));
 
+// La planche de face n'alterne pas les pieds : une séquence par rangée remonte
+// une vraie marche avec six des huit images, et l'arrêt tombe sur la neutre.
+const cadenceVillageois = await page.evaluate(async () => {
+  const mod = await import('./js/sprites.js');
+  const def = mod.spriteDe('villager').def;
+  const jouees = (ligne) => {
+    const suite = [];
+    for (let d = 0; d < def.cycle * 2; d += 0.5) {
+      const i = mod.imageDeMarche(def, d, true, ligne);
+      if (suite[suite.length - 1] !== i) suite.push(i);
+    }
+    return suite;
+  };
+  return {
+    sud: jouees(0), nord: jouees(1), ouest: jouees(2),
+    attendueSud: def.sequences[0], attendueNord: def.sequences[1],
+    arretSud: mod.imageDeMarche(def, 999, false, 0), arretOuest: mod.imageDeMarche(def, 999, false, 2),
+    neutreSud: def.sequences[0][0],
+  };
+});
+{
+  const memes = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const deuxTours = (jouee, seq) => memes(jouee, [...seq, ...seq]);
+  check('de face et de dos, le villageois joue sa séquence de six pas, deux tours par double cycle',
+    deuxTours(cadenceVillageois.sud, cadenceVillageois.attendueSud) && deuxTours(cadenceVillageois.nord, cadenceVillageois.attendueNord),
+    `sud ${cadenceVillageois.sud.join('')} · nord ${cadenceVillageois.nord.join('')}`);
+  check('de profil, il joue les huit images dans l’ordre de la planche',
+    memes(cadenceVillageois.ouest, [0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7]), cadenceVillageois.ouest.join(''));
+  check('à l’arrêt, la foulée neutre de la séquence, ou la première image sans séquence',
+    cadenceVillageois.arretSud === cadenceVillageois.neutreSud && cadenceVillageois.arretOuest === 0,
+    `sud ${cadenceVillageois.arretSud} · ouest ${cadenceVillageois.arretOuest}`);
+}
+
 // L'éclaireur illustré : huit orientations × quatre foulées, planche lue du
 // nord au nord-ouest et remise sur les secteurs du jeu ; la cape bascule, la
 // robe du cheval reste.

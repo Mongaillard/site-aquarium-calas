@@ -1170,7 +1170,8 @@ export class Renderer {
       miroir = choix.miroir;
     } else {
       const k = caseDirection(u.facing, cases);
-      const image = imageDeMarche(sprite.def, anim.distance || 0, anim.avance);
+      const ligne = sprite.def.lignes ? sprite.def.lignes[k] : k;
+      const image = imageDeMarche(sprite.def, anim.distance || 0, anim.avance, ligne);
       ({ sx, sy } = cadreSource(sprite.def, k, image));
     }
     // Socle aux couleurs du joueur : de loin, une armure reste une tache

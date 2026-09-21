@@ -145,6 +145,20 @@ bâtiments : 448×688, **90 Ko**. La couleur d'équipe est celle du chevalier �
 l'écharpe bleue bascule, la peau, le cuir et la chemise restent ; le test le
 vérifie sur 14 440 pixels de peau.
 
+### La cadence des pas
+
+Les huit foulées de la planche n'alternent pas les pieds. Mesuré image par
+image (`analyse-pas.py` : silhouette, bas des jambes, pied le plus bas à
+gauche et à droite), le villageois vu de face pose deux fois le pied droit
+puis **quatre fois le gauche** ; de dos, c'est à peine mieux. Plutôt que de
+redessiner, `cadence-pas.py` retient six des huit images et les remet dans
+l'ordre d'une vraie marche — neutre, droit, droit, neutre, gauche, gauche —
+en écartant les doublons. Le moteur joue ces `sequences` par rangée
+(`sprites.js`, `imageDeMarche`), toujours cadencées sur la distance
+parcourue ; de profil, la mesure ne distingue pas les pieds et la planche est
+jouée telle quelle. Le chevalier n'a pas d'image nette de chaque côté : rien
+à remonter, il faudra une nouvelle planche.
+
 ## L'éclaireur
 
 La planche tient huit orientations × quatre foulées d'un cavalier à la lance,
