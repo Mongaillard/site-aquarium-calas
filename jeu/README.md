@@ -3,7 +3,7 @@
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
 très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 413 Ko d'illustrations et de textures — dont un cycle de marche
+pictogrammes vectoriels et 856 Ko d'illustrations et de textures — dont un cycle de marche
 complet.
 
 ## Lancer le jeu
@@ -344,27 +344,39 @@ qui se lit n'est pas le détail d'un personnage mais son mouvement ; la peinture
 réduite devient une tache sombre. Elle garde sa place là où elle est vue en
 grand — accueil, portrait, écran de fin.
 
-### Le Centre-Ville est un palais, la caserne une forteresse, la maison une maison
+### Douze bâtiments illustrés, un palais en tête
 
-`assets/centre-ville.webp` (36 Ko) : un palais à dômes bleus, tridents dorés et
-fontaines, sur son parvis. Il est dessiné **plus grand que son emprise** — 144 px
-pour trois cases — et posé par sa ligne de sol sur le bord sud : le palais monte
-au-dessus des cases situées derrière, le parvis déborde devant, sur les cases
-praticables, où les unités marchent. C'est le compromis d'Age of Empires : des
-bâtiments de trois quarts sur un sol vu de dessus.
+Tous les bâtiments portent une illustration (`assets/*.webp`, 490 Ko pour les
+douze) : un palais à dômes bleus pour le Centre-Ville, une forteresse pour la
+caserne, puis archerie, écurie, atelier de siège, forge, maison, moulin, camp de
+bûcherons, camp minier, ferme et tour de guet — même cité, même vue de trois
+quarts, mêmes tridents. Ils sont dessinés **plus grands que leur emprise** —
+172 px pour le palais, 158 pour les autres 3×3, 108 pour les 2×2 (64 px) — et
+posés par leur ligne de sol sur le bord sud : le bâtiment monte au-dessus des
+cases situées derrière, le parvis déborde devant, sur les cases praticables, où
+les unités marchent. C'est le compromis d'Age of Empires : des bâtiments de
+trois quarts sur un sol vu de dessus.
 
 Deux détails de rendu qui comptent : les bâtiments sont classés à leur **bord
 nord** dans l'ordre du peintre (pas à leur centre), pour qu'une unité qui longe
 le mur passe toujours devant le débord ; et un chantier **sort de terre** — on
 ne révèle l'illustration que jusqu'à la hauteur atteinte, parvis d'abord, murs
-ensuite, dômes à la fin. Le Centre-Ville adverse est le même fichier passé au
-rouge par la fenêtre de teinte du chevalier : dômes et bannières changent de
+ensuite, dômes à la fin. Un bâtiment adverse est le même fichier passé au rouge
+par la fenêtre de teinte du chevalier : dômes, toits et bannières changent de
 camp, la pierre blanche et l'eau des fontaines restent.
 
-La **caserne** (`caserne.webp`, 29 Ko) suit la même chaîne : enceinte crénelée,
-cour d'entraînement, deux tours à dôme, dessinée sur 132 px — un peu moins que
-le palais, qui doit rester le plus grand bâtiment de la base. Les dix autres
-bâtiments gardent leur rendu dessiné au code, comme les cinq unités sans planche.
+Le doigt suit la peinture : sous un point, le bâtiment retenu est celui dont
+l'image y est **opaque** et qui est peint en dernier — un chantier ne compte que
+pour la part déjà sortie de terre. Sans cela, avec douze bâtiments qui se
+chevauchent, toucher une maison en chantier au pied du palais sélectionnait le
+palais ; le test navigateur l'a pris sur le fait.
+
+Le « peps » : réduites de 1254 à 150 px, les illustrations sortaient ternes, et
+la quantification à 64 couleurs de la première chaîne aplatissait les dégradés.
+Chaque atlas reçoit désormais, après réduction, un masque flou léger, +16 % de
+saturation et +10 % de contraste, puis un WebP avec pertes (qualité 86) à
+l'alpha intact ; les arbres passent de 73 à 95 px de haut — trois cases, un
+arbre dépasse une maison. La chaîne est décrite dans `assets/SOURCES.md`.
 
 ### Le sol est une nappe, pas un damier
 
@@ -409,7 +421,7 @@ en jeu, mesurée puis éliminée.
 
 Six essences d'arbres, un buisson à baies et un gisement d'or
 (`assets/arbres.webp`, `baies.webp`, `or.webp`), à une seule échelle qui garde
-les proportions des planches : le cyprès fait un chevalier et demi, un buisson
+les proportions des planches : le cyprès fait deux chevaliers, un buisson
 ou un rocher tient dans sa case. Plus hauts que leur case, ils entrent dans l'**ordre du peintre** avec les
 unités et les bâtiments : une unité passe derrière un arbre quand elle est
 derrière, devant quand elle est devant. Un gisement qui s'épuise rapetisse un

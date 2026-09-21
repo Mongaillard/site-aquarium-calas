@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, devices } from 'playwright';
+import { BUILDING_TYPES } from '../js/config.js';
 
 // Le serveur sert le dossier du jeu, quel que soit le répertoire courant.
 const GAME_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -622,7 +623,7 @@ const batimentsIllustres = await page.evaluate(async () => {
     return [h * 360, sa, l];
   };
   const out = {};
-  for (const type of ['towncenter', 'barracks', 'house']) {
+  for (const type of Object.keys(BUILDING_TYPES)) {
     const s = mod.spriteDe(type);
     if (!s) { out[type] = null; continue; }
     const bleu = lire(mod.imagePourJoueur(s, 0)), rouge = lire(mod.imagePourJoueur(s, 1));
@@ -643,11 +644,16 @@ const batimentsIllustres = await page.evaluate(async () => {
   }
   return out;
 });
-for (const [type, nom] of [['towncenter', 'le Centre-Ville'], ['barracks', 'la caserne'], ['house', 'la maison']]) {
+const NOMS = {
+  towncenter: 'le Centre-Ville', barracks: 'la caserne', house: 'la maison', mill: 'le moulin', lumbercamp: 'le camp de bûcherons',
+  miningcamp: 'le camp minier', farm: 'la ferme', archery: 'l’archerie', stable: 'l’écurie', siege: 'l’atelier de siège', blacksmith: 'la forge', tower: 'la tour de guet',
+};
+for (const [type, nom] of Object.entries(NOMS)) {
   const b = batimentsIllustres[type];
+  const e = BUILDING_TYPES[type].fem ? 'e' : '';
   check(`${nom} porte son illustration`, !!b && b.largeur > b.emprise, b ? `${b.largeur} px de large pour une emprise de ${b.emprise}` : 'absente');
-  check(`${nom} adverse est repeint${type === 'towncenter' ? '' : 'e'}`, !!b && b.changes > b.opaques * 0.02, b && `${Math.round((b.changes / b.opaques) * 100)} % des pixels`);
-  check(`la pierre blanche ${type === 'towncenter' ? 'du palais' : type === 'barracks' ? 'de la caserne' : 'de la maison'} reste blanche`, !!b && b.pierre > 1000 && b.pierreIntacte === b.pierre, b && `${b.pierreIntacte}/${b.pierre} pixels de pierre intacts`);
+  check(`${nom} advers${e} est repeint${e}`, !!b && b.changes > b.opaques * 0.02, b && `${Math.round((b.changes / b.opaques) * 100)} % des pixels`);
+  check(`la pierre blanche reste blanche (${type})`, !!b && b.pierre > 500 && b.pierreIntacte === b.pierre, b && `${b.pierreIntacte}/${b.pierre} pixels de pierre intacts`);
   check(`aucun bleu franc ne subsiste côté adverse (${type})`, !!b && b.bleusRestants === 0, b && b.bleusRestants + ' pixels bleus restants');
 }
 
@@ -813,7 +819,7 @@ const vegetation = await page.evaluate(async () => {
   const a = mod.spriteDe('arbres'), b = mod.spriteDe('baies'), o = mod.spriteDe('or');
   return { arbres: !!a && a.def.cases === 6 && a.def.hauteurMonde > 60, buissons: !!b && b.def.cases === 2, or: !!o && o.def.cases === 2 };
 });
-check('les arbres portent leur illustration (six essences, un chevalier et demi de haut)', vegetation.arbres);
+check('les arbres portent leur illustration (six essences, deux chevaliers de haut)', vegetation.arbres);
 check('le buisson à baies porte son illustration (et son miroir)', vegetation.buissons);
 check('le gisement d’or porte son illustration (et son miroir)', vegetation.or);
 

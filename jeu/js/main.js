@@ -67,6 +67,13 @@ export function speedDef(id) {
   return GAME_SPEEDS.find((s) => s.id === id) || GAME_SPEEDS.find((s) => s.id === DEFAULT_SPEED);
 }
 
+/** Le pixel (u, v) de l'atlas est-il opaque ? Une image sans canvas l'est. */
+function pixelOpaque(sprite, u, v) {
+  const image = sprite.variantes.bleu;
+  if (!image.getContext) return true;
+  return image.getContext('2d').getImageData(u | 0, v | 0, 1, 1).data[3] > 40;
+}
+
 class Game {
   constructor(options) {
     this.options = options;
@@ -350,29 +357,33 @@ class Game {
    * à l'écran quel que soit le zoom — la taille d'un bout de doigt.
    */
   /**
-   * Un bâtiment illustré se touche là où on le VOIT : le palais monte bien
-   * au-dessus de son emprise, et personne ne vise le sol. Renvoie le bâtiment
-   * dont l'image contient le point, ou null. Sert de repli quand le test sur
-   * l'emprise n'a rien trouvé : une unité devant le palais garde la priorité.
+   * Le bâtiment illustré visible sous le point monde (x, y), ou null : parmi
+   * ceux dont l'image contient le point — un pixel opaque, et pour un chantier
+   * dans la partie déjà sortie de terre —, le dernier peint dans l'ordre du
+   * peintre : bord nord le plus au sud, puis ordre de création.
    */
   batimentIllustreSous(x, y, playerIndex = null) {
+    let meilleur = null;
     for (const b of this.world.buildings) {
       if (b.dead || (playerIndex !== null && b.playerIndex !== playerIndex)) continue;
+      if (meilleur && b.ty < meilleur.ty) continue;   // peint avant : recouvert
       const s = spriteDe(b.type);
       if (!s) continue;
       const { cellW, cellH, largeurMonde, sol } = s.def;
       const dw = largeurMonde, dh = (cellH / cellW) * dw;
-      const sud = (b.ty + b.size) * TILE;
-      const haut = sud - dh * (sol ?? 1);
-      if (x >= b.x - dw / 2 && x <= b.x + dw / 2 && y >= haut && y <= sud) return b;
+      const dx = b.x - dw / 2, sud = (b.ty + b.size) * TILE, dy = sud - dh * (sol ?? 1);
+      if (x < dx || x >= dx + dw || y < dy || y >= sud) continue;
+      if (!b.complete && y < dy + dh * (1 - Math.max(0.12, b.progressRatio))) continue;
+      if (!pixelOpaque(s, ((x - dx) / dw) * cellW, ((y - dy) / dh) * cellH)) continue;
+      meilleur = b;   // à bord nord égal, le plus récent est peint en dernier
     }
-    return null;
+    return meilleur;
   }
 
   /**
    * Ce qui est réellement sous le doigt, compte tenu des illustrations. Une
-   * unité garde la priorité. Un bâtiment illustré prime sur un bâtiment plat
-   * qu'il recouvre — une ferme au nord du palais est peinte AVANT ses dômes,
+   * unité garde la priorité. Entre bâtiments, celui qu'on voit est celui peint
+   * en dernier : une ferme plate au nord du palais est peinte AVANT ses dômes,
    * le joueur voit les dômes, il veut le palais. `playerIndex` restreint à un
    * camp, comme pour entityAt.
    */
@@ -380,8 +391,11 @@ class Game {
     if (trouve && trouve.kind === 'unit') return trouve;
     const illustre = this.batimentIllustreSous(p.x, p.y, playerIndex);
     if (!illustre) return trouve;
-    if (!trouve || (trouve.kind === 'building' && trouve !== illustre && illustre.ty > trouve.ty)) return illustre;
-    return trouve;
+    if (!trouve || trouve.kind !== 'building' || spriteDe(trouve.type)) return illustre;
+    // Un bâtiment plat sous le doigt : il gagne s'il est peint après l'illustré.
+    const apres = trouve.ty > illustre.ty
+      || (trouve.ty === illustre.ty && this.world.buildings.indexOf(trouve) > this.world.buildings.indexOf(illustre));
+    return apres ? trouve : illustre;
   }
 
   tapTolerance() {

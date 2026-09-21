@@ -7,13 +7,15 @@
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
-| `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 288×287, dessiné sur 144 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
-| `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 264×264, dessinée sur 132 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
+| `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
+| `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 316×315, dessinée sur 158 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
 | `sol-herbe.webp`, `sol-herbe-sombre.webp`, `sol-terre.webp`, `sol-sable.webp` | Les quatre **nappes de sol** (herbe, herbe sombre, terre, sable), 384×384, raccordées bord à bord | Planche de six textures générée par l'auteur du dépôt ; deux (herbe sèche, terre sombre) restent en réserve |
-| `arbres.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux), 82×146 par case | Planche générée par l'auteur du dépôt, avec transparence ; ses six buissons fleuris ne sont pas utilisés — ils ne disaient pas « nourriture » |
+| `arbres.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux), 107×190 par case | Planche générée par l'auteur du dépôt, avec transparence ; ses six buissons fleuris ne sont pas utilisés — ils ne disaient pas « nourriture » |
 | `baies.webp` | Le **buisson à baies** rouges et bleues sur son socle, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
 | `or.webp` | Le **gisement d'or** : rochers veinés d'or sur leur socle, 101×74 par case, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
-| `maison.webp` | La **maison** : un dôme de cristal, un toit bleu, une échoppe, 180×155, dessinée sur 90 px pour une emprise de 64 | Illustration générée par l'auteur du dépôt, livrée avec sa transparence |
+| `maison.webp` | La **maison** : un dôme de cristal, un toit bleu, une échoppe, 216×186, dessinée sur 108 px pour une emprise de 64 | Illustration générée par l'auteur du dépôt, livrée avec sa transparence |
+| `archerie.webp`, `ecurie.webp`, `atelier-siege.webp`, `forge.webp` | Les quatre autres bâtiments **3×3** : cibles et râteliers de flèches, box à foin et selles, catapulte sous sa halle, forge à la cheminée fumante — 316 px de large, dessinés sur 158 | Illustrations générées par l'auteur du dépôt, livrées avec leur transparence |
+| `moulin.webp`, `camp-bucherons.webp`, `camp-mineurs.webp`, `ferme.webp`, `tour-guet.webp` | Les cinq autres bâtiments **2×2** : ailes à voiles, billes et haches, galerie et wagonnet, potager et charrette de foin, tour au belvédère — 216 px de large, dessinés sur 108 | idem |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
 Ces images viennent d'une planche de référence fournie par l'auteur du dépôt, qui
@@ -108,7 +110,7 @@ Un test le vérifie à chaque exécution : 20 % des pixels sont repeints, **aucu
 pixel d'acier n'est touché** (40 434 sur 40 434 intacts), et il ne reste aucun
 bleu franc côté adverse.
 
-## Le Centre-Ville, la caserne, la maison
+## Les bâtiments
 
 L'illustration est en vue de trois quarts sur une carte vue de dessus — c'est
 exactement le compromis d'Age of Empires, où bâtiments et unités sont dessinés
@@ -117,22 +119,35 @@ bord), part par un remplissage depuis les bords ; le sol peint autour du parvis
 — rochers, buissons, dallage — est conservé : sur l'herbe du jeu, il fait un
 parvis crédible.
 
-Le bâtiment est dessiné **plus grand que son emprise** : 144 px de large pour
+Le bâtiment est dessiné **plus grand que son emprise** : 172 px de large pour
 3 cases (96 px), posé par sa ligne de sol (93 % de la hauteur) sur le bord sud de
 l'emprise. Le palais monte au-dessus des cases situées derrière lui, le parvis
 déborde sur les cases praticables devant — les unités marchent dessus. Pour
 qu'une unité qui longe le mur ne passe jamais *sous* le débord, le rendu classe
 les bâtiments à leur **bord nord** dans l'ordre du peintre, pas à leur centre.
 
-La caserne suit la même chaîne (`decoupe-batiment.py` : fond, cadre, réduction,
-palette, aperçu), dessinée sur 132 px pour rester un peu moins large que le
-palais ; la maison, emprise 2×2, sur 90 px. Le script accepte les deux cas :
-un fond uni à retirer, ou une transparence fournie (renormalisée, le détourage
-automatique laissant un voile d'alpha). Réduits à deux fois la taille dessinée et quantifiés à 64 couleurs avant
-l'encodage WebP sans pertes : **36 Ko** et **29 Ko**. La couleur d'équipe suit la règle du
-chevalier animé — seule la fenêtre du bleu franc (200°–255°) bascule : dômes,
-bannières et auvents passent au rouge, la pierre blanche et l'eau cyan des
-fontaines ne bougent pas. Un test le vérifie pixel à pixel.
+Les onze autres bâtiments suivent la même chaîne (`decoupe-batiment.py` :
+fond, cadre, réduction, peps, aperçu) : les 3×3 sur 158 px pour rester un peu
+moins larges que le palais, les 2×2 (maison, moulin, camps, ferme, tour de
+guet) sur 108. Le script accepte les deux cas : un fond uni à retirer, ou une
+transparence fournie (renormalisée, le détourage automatique laissant un voile
+d'alpha).
+
+Le **peps** (`peps.py`), appliqué à tous les atlas — bâtiments, arbres, baies,
+or — après leur réduction : la réduction de 1254 à 150 px moyenne les pixels et
+lisse les contrastes, et la première chaîne quantifiait à 64 couleurs, ce qui
+aplatissait les dégradés. Trois corrections légères, dans cet ordre : un
+masque flou (rayon 1,4, 55 %), +16 % de saturation, +10 % de contraste ; puis
+un WebP avec pertes (qualité 86) dont l'alpha reste sans pertes. Avant de
+filtrer, la couleur des pixels opaques est étendue sous les pixels
+transparents voisins, sinon le masque flou aspire le fond retiré dans les
+bords. Le palais pèse 71 Ko, un 3×3 une cinquantaine, un 2×2 entre 23 et 33 :
+**490 Ko** pour les douze bâtiments.
+
+La couleur d'équipe suit la règle du chevalier animé — seule la fenêtre du bleu
+franc (200°–255°) bascule : dômes, toits, bannières et auvents passent au
+rouge, la pierre blanche, l'eau cyan des fontaines et les cristaux ne bougent
+pas. Un test le vérifie pixel à pixel pour chacun des douze.
 
 ## Le sol
 
@@ -171,7 +186,7 @@ la simple projection par colonnes agglomérait les arbres, dont les socles de
 rochers et les branches se touchent presque.
 
 Une seule échelle pour toute la planche, qui garde ses proportions : l'arbre
-le plus haut (le cyprès) fait **73 px monde**, soit un chevalier et demi ; les
+le plus haut (le cyprès) fait **73 px monde**, soit deux chevaliers ; les
 buissons tombent autour de 36 px, la taille d'une case. Chaque case d'atlas a
 son sprite posé au bas et centré : l'ancre est le bas de la case, le socle de
 rochers vient s'asseoir sur la case de la carte. Atlas à deux fois la taille
@@ -192,5 +207,5 @@ arbres ont été essayés pour la nourriture : jolis, mais ils ne disaient pas
 
 ## Format
 
-WebP partout où c'est possible : 413 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
+WebP partout où c'est possible : 856 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
 PNG, sans différence visible à l'œil même agrandi trois fois.

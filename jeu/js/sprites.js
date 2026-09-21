@@ -18,6 +18,11 @@ import { bruitPeriodique } from './utils.js';
  * case, et `pixel` coupe le lissage : agrandir du pixel art en l'interpolant le
  * transforme en bouillie.
  */
+const batiment = (src, cellW, cellH, largeurMonde) => ({
+  src, cellW, cellH, cases: 1, images: 1, largeurMonde, sol: 0.93, natif: 'bleu',
+  recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+});
+
 const ATLAS = {
   militia: {
     src: 'assets/milicien-marche.webp',
@@ -38,32 +43,32 @@ const ATLAS = {
     recolorage: 'echange',
   },
   // Bâtiments : une seule image, dessinée sur `largeurMonde` pixels et posée
-  // sur l'emprise par sa ligne de sol (`sol`, fraction de la hauteur). Le
-  // Centre-Ville déborde de son emprise 3×3 : un palais qui se lit de loin, et
-  // un parvis qui empiète sur les cases voisines — les unités marchent dessus.
-  towncenter: {
-    src: 'assets/centre-ville.webp',
-    cellW: 288, cellH: 287, cases: 1, images: 1,
-    largeurMonde: 144, sol: 0.93, natif: 'bleu',
-    // Dômes et bannières sont bleu franc ; la pierre est blanche, l'eau et les
-    // cristaux sont cyan (teinte < 200°) : seule la fenêtre du bleu bascule.
-    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
-  },
-  // La caserne : même cité, même vue, un peu moins large que le palais — le
-  // Centre-Ville doit rester le plus grand bâtiment de la base.
-  barracks: {
-    src: 'assets/caserne.webp',
-    cellW: 264, cellH: 264, cases: 1, images: 1,
-    largeurMonde: 132, sol: 0.93, natif: 'bleu',
-    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
-  },
+  // sur l'emprise par sa ligne de sol (`sol`, fraction de la hauteur). Ils
+  // débordent de leur emprise : un palais qui se lit de loin, un parvis qui
+  // empiète sur les cases voisines — les unités marchent dessus. Le Centre-Ville
+  // reste le plus grand ; les 3×3 sont dessinés sur 158 px, les 2×2 sur 108.
+  // Dômes, toits et bannières sont bleu franc ; la pierre est blanche, l'eau
+  // et les cristaux sont cyan (teinte < 200°) : seule la fenêtre du bleu bascule.
+  towncenter: batiment('assets/centre-ville.webp', 344, 343, 172),
+  barracks: batiment('assets/caserne.webp', 316, 315, 158),
+  archery: batiment('assets/archerie.webp', 316, 313, 158),
+  stable: batiment('assets/ecurie.webp', 316, 282, 158),
+  siege: batiment('assets/atelier-siege.webp', 316, 309, 158),
+  blacksmith: batiment('assets/forge.webp', 316, 306, 158),
+  house: batiment('assets/maison.webp', 216, 186, 108),
+  mill: batiment('assets/moulin.webp', 216, 235, 108),
+  lumbercamp: batiment('assets/camp-bucherons.webp', 216, 191, 108),
+  miningcamp: batiment('assets/camp-mineurs.webp', 216, 187, 108),
+  farm: batiment('assets/ferme.webp', 216, 176, 108),
+  tower: batiment('assets/tour-guet.webp', 216, 313, 108),
   // Végétation : six arbres et six buissons, sans couleur d'équipe. Chaque
   // case a son sprite posé au bas, centré : l'ancre est le bas de la case, et
-  // la planche dicte les proportions — l'arbre le plus haut fait 73 px monde.
+  // la planche dicte les proportions — l'arbre le plus haut fait 95 px monde,
+  // trois cases : un arbre doit dépasser une maison.
   arbres: {
     src: 'assets/arbres.webp',
-    cellW: 82, cellH: 146, cases: 6, images: 1,
-    ancreY: 146, hauteurMonde: 73,
+    cellW: 107, cellH: 190, cases: 6, images: 1,
+    ancreY: 190, hauteurMonde: 95,
   },
   // Le buisson à baies : une seule illustration et son miroir, à la taille
   // d'une case — c'est la nourriture, il faut que les baies se voient.
@@ -78,14 +83,6 @@ const ATLAS = {
     src: 'assets/or.webp',
     cellW: 101, cellH: 74, cases: 2, images: 1,
     ancreY: 74, hauteurMonde: 37,
-  },
-  // La maison : emprise 2×2 (64 px), dessinée sur 90 — un dôme de cristal, un
-  // toit, une échoppe ; nettement plus petite qu'une caserne.
-  house: {
-    src: 'assets/maison.webp',
-    cellW: 180, cellH: 155, cases: 1, images: 1,
-    largeurMonde: 90, sol: 0.93, natif: 'bleu',
-    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
   spearman: {
     src: 'assets/lancier.png',
