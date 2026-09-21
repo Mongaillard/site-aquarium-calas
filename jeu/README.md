@@ -440,18 +440,21 @@ masques de plus par tronçon riverain, composés comme les couches de terrain.
 
 **La carte est décorée.** Les planches d'eau ne montraient pas que de l'eau :
 rochers, galets, touffes d'herbe, roseaux, nénuphars et fleurs en bordent les
-rives. Ces pièces sont découpées une à une (`assets/rivage.webp`, 69 pièces avec
-les buissons fleuris de la planche d'arbres et des fleurs en quatre couleurs) et
-le jeu les pose lui-même (`js/decor.js`). Le long de l'eau, un plan d'eau de 40
+rives ; une planche d'ornements a suivi. Ces pièces sont découpées une à une
+(`assets/decor.webp`, 97 pièces : rochers, galets, touffes, roseaux, buissons
+fleuris, fougères, couvre-sol, agaves, pampas, nénuphars, fleurs en quatre
+couleurs) et le jeu les pose lui-même (`js/decor.js`). Le long de l'eau, un plan d'eau de 40
 cases ou moins est une **mare**, ceinte de rochers serrés, de roseaux et de
 nénuphars ; au-delà, un **lac** prend une plage de rochers épars, de galets et
 de touffes. Partout ailleurs, la **campagne** suit le sol : herbe, bouquets de
-fleurs et buissons sur les prés, cailloux et touffes sèches sur la terre et le
-sable, un peu plus de tout au pied des forêts. Tout se déduit de la carte par un
+fleurs, buissons et couvre-sol sur les prés ; cailloux, agaves, pampas et touffes
+sèches sur la terre et le sable ; fougères et un peu plus de tout au pied des
+forêts. Tout se déduit de la carte par un
 hachage de la case et de la graine — la simulation n'en sait rien, une unité
-traverse un rocher, et une partie reprise retrouve son décor. Rochers, roseaux
-et buissons entrent dans l'ordre du peintre avec les unités ; le reste est cuit
-dans les tronçons de sol mis en cache, et ne coûte rien à chaque image.
+traverse un rocher, et une partie reprise retrouve son décor. Rochers, roseaux,
+buissons, fougères et agaves entrent dans l'ordre du peintre avec les unités ; le
+reste est cuit dans les tronçons de sol mis en cache, et ne coûte rien à chaque
+image.
 
 Le sol est **pré-rendu par tronçons** de 8×8 cases dans des canvas hors écran
 mis en cache (le terrain ne change jamais, le brouillard se peint par-dessus) :

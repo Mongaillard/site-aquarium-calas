@@ -216,6 +216,11 @@ check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches >
     && cToutes.some((d) => d.piece.classe === 'buisson') && cToutes.some((d) => d.piece.classe.startsWith('fleur')),
     `${cToutes.filter((d) => d.piece.classe === 'buisson').length} buissons, ${cToutes.filter((d) => d.piece.classe.startsWith('fleur')).length} fleurs`);
   check('les touffes sèches poussent sur la terre et le sable', cToutes.filter((d) => d.piece.classe === 'touffe').every((d) => !pre(d)) && cToutes.some((d) => d.piece.classe === 'touffe'));
+  check('agaves et pampas aussi', cToutes.filter((d) => d.piece.classe === 'agave' || d.piece.classe === 'pampa').every((d) => !pre(d)) && cToutes.some((d) => d.piece.classe === 'agave'),
+    `${cToutes.filter((d) => d.piece.classe === 'agave').length} agaves, ${cToutes.filter((d) => d.piece.classe === 'pampa').length} pampas`);
+  check('les fougères poussent au pied des forêts', cToutes.filter((d) => d.piece.classe === 'fougere').every(foret) && cToutes.some((d) => d.piece.classe === 'fougere'),
+    cToutes.filter((d) => d.piece.classe === 'fougere').length + ' fougères');
+  check('le couvre-sol pousse sur les prés ou au pied des forêts', cToutes.filter((d) => d.piece.classe === 'couvre').every((d) => pre(d) || foret(d)) && cToutes.some((d) => d.piece.classe === 'couvre'));
   check('cuit dans le sol ou debout, selon la classe', cPlats.every((d) => CUITES.has(d.piece.classe)) && cDebout.every((d) => !CUITES.has(d.piece.classe)));
   const tout = planterDecor(map);
   check('le décor complet est la somme du rivage et de la campagne', tout.total === decor.total + campagne.total && tout.rivage === decor.total && tout.campagne === campagne.total

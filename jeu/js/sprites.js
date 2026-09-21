@@ -21,7 +21,7 @@ const batiment = (src, cellW, cellH, largeurMonde) => ({
   recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
 });
 
-import { PIECES_RIVAGE } from './rivage-pieces.js';
+import { PIECES_DECOR } from './decor-pieces.js';
 
 const ATLAS = {
   militia: {
@@ -121,12 +121,13 @@ const ATLAS = {
     // la tunique sont brunes ou crème.
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
-  // Le décor des rivages : rochers, galets, touffes, roseaux, nénuphars et
-  // fleurs, pièces de tailles diverses rangées dans un même atlas (voir
-  // rivage-pieces.js et decor.js) ; pas de couleur d'équipe.
-  rivage: {
-    src: 'assets/rivage.webp',
-    pieces: PIECES_RIVAGE,
+  // Le décor de la carte : rochers, galets, touffes, roseaux, buissons,
+  // fougères, agaves, nénuphars et fleurs, pièces de tailles diverses rangées
+  // dans un même atlas (voir decor-pieces.js et decor.js) ; pas de couleur
+  // d'équipe.
+  decor: {
+    src: 'assets/decor.webp',
+    pieces: PIECES_DECOR,
   },
   spearman: {
     src: 'assets/lancier.png',

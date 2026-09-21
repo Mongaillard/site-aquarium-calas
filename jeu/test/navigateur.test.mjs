@@ -1017,7 +1017,7 @@ const cadenceVillageois = await page.evaluate(async () => {
 const decorRivage = await page.evaluate(async () => {
   const g = window.__jeu; const map = g.world.map;
   const mod = await import('./js/sprites.js');
-  const s = mod.spriteDe('rivage');
+  const s = mod.spriteDe('decor');
   const r = g.renderer;
   const decor = r.decorCarte();
   let meilleur = null, score = -1;
@@ -1041,7 +1041,7 @@ const decorRivage = await page.evaluate(async () => {
   g.camera.zoom = zoom; g.camera.x = cx; g.camera.y = cy;
   return { ...base, diff, autour: score };
 });
-check('l’atlas du décor est chargé : une soixantaine de pièces en douze classes', decorRivage.pret && decorRivage.pieces >= 60 && decorRivage.classes === 12, `${decorRivage.pieces} pièces, ${decorRivage.classes} classes`);
+check('l’atlas du décor est chargé : près de cent pièces en seize classes', decorRivage.pret && decorRivage.pieces >= 90 && decorRivage.classes === 16, `${decorRivage.pieces} pièces, ${decorRivage.classes} classes`);
 check('la carte est décorée, et ça se voit', decorRivage.total > 0 && decorRivage.diff > 2000, `${decorRivage.total} pièces (${decorRivage.autour} autour du point de vue), ${decorRivage.diff} pixels changés`);
 
 // L'éclaireur illustré : huit orientations × quatre foulées, planche lue du

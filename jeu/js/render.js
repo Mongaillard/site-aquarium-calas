@@ -11,7 +11,7 @@ import {
   chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche, poseSource,
 } from './sprites.js';
 import { TERRAIN, BLOCK } from './map.js';
-import { planterDecor, ECHELLE_RIVAGE } from './decor.js';
+import { planterDecor, ECHELLE_DECOR } from './decor.js';
 import { STATE, villagerTask } from './entities.js';
 import { clamp, bruitPeriodique } from './utils.js';
 
@@ -194,7 +194,7 @@ function etendre(e, u, v) {
 
 export class Renderer {
   constructor(canvas, world, camera) {
-    this.decorActif = true;      // le décor des rivages (decor.js) ; débrayable pour les mesures
+    this.decorActif = true;      // le décor de la carte (decor.js) ; débrayable pour les mesures
     this.canvas = canvas;
     this.troncons = new Map();
     this.ctx = canvas.getContext('2d', { alpha: false });
@@ -337,8 +337,8 @@ export class Renderer {
   drawTerrain(view) {
     // Les tronçons cuits avant l'arrivée de l'atlas du décor n'en ont pas :
     // dès qu'il est là (ou que le décor bascule), on repart de zéro.
-    const rivage = spriteDe('rivage');
-    const decorPret = !!(rivage && rivage.pret && this.decorActif);
+    const atlas = spriteDe('decor');
+    const decorPret = !!(atlas && atlas.pret && this.decorActif);
     if (decorPret !== this.decorCuit) { this.decorCuit = decorPret; this.troncons.clear(); }
     const zoom = this.camera.zoom;
     const nappes = this.nappesPour(zoom);
@@ -649,15 +649,15 @@ export class Renderer {
    * monde — les recouvrements restent identiques.
    */
   cuireDecor(ctx, X0, Y0, cote) {
-    const rivage = this.decorActif ? spriteDe('rivage') : null;
-    if (!rivage || !rivage.pret) return;
+    const atlas = this.decorActif ? spriteDe('decor') : null;
+    if (!atlas || !atlas.pret) return;
     const map = this.world.map, decor = this.decorCarte();
     const y0 = Math.max(0, Math.floor(Y0 / TILE) - 2), y1 = Math.min(map.h - 1, Math.floor((Y0 + cote) / TILE) + 1);
     for (let ty = y0; ty <= y1; ty++) {
       for (const d of decor.cuits[ty]) {
-        const w = d.piece.w * ECHELLE_RIVAGE * d.echelle, h = d.piece.h * ECHELLE_RIVAGE * d.echelle;
+        const w = d.piece.w * ECHELLE_DECOR * d.echelle, h = d.piece.h * ECHELLE_DECOR * d.echelle;
         if (d.x + w / 2 < X0 || d.x - w / 2 > X0 + cote || d.y < Y0 || d.y - h > Y0 + cote) continue;
-        this.dessinerPiece(d, rivage, ctx);
+        this.dessinerPiece(d, atlas, ctx);
       }
     }
   }
@@ -678,7 +678,7 @@ export class Renderer {
   /** Une pièce du décor, posée par son pied ; en miroir une fois sur deux. */
   dessinerPiece(d, sprite, ctx = this.ctx) {
     const p = d.piece;
-    const w = p.w * ECHELLE_RIVAGE * d.echelle, h = p.h * ECHELLE_RIVAGE * d.echelle;
+    const w = p.w * ECHELLE_DECOR * d.echelle, h = p.h * ECHELLE_DECOR * d.echelle;
     if (d.miroir) {
       ctx.save();
       ctx.translate(d.x * 2, 0);
@@ -836,8 +836,8 @@ export class Renderer {
     // de chaque pièce, comme un arbre — une unité qui passe derrière un rocher
     // passe derrière. Un roseau de deux cases de haut oblige à regarder
     // quelques lignes sous le bord bas de l'écran.
-    const rivage = this.decorActif ? spriteDe('rivage') : null;
-    if (rivage && rivage.pret) {
+    const atlas = this.decorActif ? spriteDe('decor') : null;
+    if (atlas && atlas.pret) {
       const map = this.world.map, explored = this.world.fog.explored;
       const decor = this.decorCarte();
       for (let ty = Math.max(0, view.y0 - 1); ty <= Math.min(map.h - 1, view.y1 + 3); ty++) {
@@ -845,7 +845,7 @@ export class Renderer {
           if (d.tx < view.x0 - 3 || d.tx > view.x1 + 3) continue;
           const i = d.ty * map.w + d.tx;
           if (!explored[i] || (map.blocked[i] & BLOCK.BUILDING)) continue;
-          list.push({ kind: 'decor', d, sprite: rivage });
+          list.push({ kind: 'decor', d, sprite: atlas });
         }
       }
     }

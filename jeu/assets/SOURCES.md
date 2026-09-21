@@ -7,7 +7,7 @@
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
-| `rivage.webp` | Le **décor de la carte** : 69 pièces — amas de rochers, rochers, roseaux, touffes sèches, touffes d'herbe, buissons fleuris, nénuphars, fleurs en quatre couleurs, galets — de tailles diverses dans un atlas à 2× (768×440), table dans `js/rivage-pieces.js` | Découpées dans les planches d'eau et la planche d'arbres de l'auteur du dépôt (voir plus bas) |
+| `decor.webp` | Le **décor de la carte** : 97 pièces — amas de rochers, rochers, roseaux, touffes sèches, pampas, touffes d'herbe, buissons fleuris, fougères, couvre-sol, agaves, nénuphars, fleurs en quatre couleurs, galets — de tailles diverses dans un atlas à 2×, table dans `js/decor-pieces.js` | Découpées dans les planches d'eau, la planche d'arbres et la planche d'ornements de l'auteur du dépôt (voir plus bas) |
 | `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 56×86 par case | Planche générée par l'auteur du dépôt, fond dégradé retiré en deux passes (voir plus bas) |
 | `eclaireur.webp` | L'**éclaireur** : cavalier à la lance, huit orientations × quatre foulées, 106×111 par case | Planche générée par l'auteur du dépôt, livrée avec sa transparence |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
@@ -291,6 +291,16 @@ changent — jaune, rose, blanc —, les feuilles restent) et les **six buissons
 fleuris** de la planche d'arbres, qui n'avaient pas convaincu comme
 nourriture mais font de beaux buissons, à 0,72 de leur taille d'alors.
 
+Puis une **planche d'ornements** est arrivée, à fond transparent celle-là :
+vingt-huit pièces sur leur socle de pierre — touffes, buissons fleuris de
+toutes les couleurs, fougères, couvre-sol et lierre, agaves, une pampa, des
+roseaux à massettes. Découpe par composantes connexes sur l'alpha
+(`decoupe-ornements.py`), à 0,40 pixel monde par pixel de planche : un
+buisson fait un peu plus d'une case. Chaque pièce est classée selon le sol où
+elle poussera — buissons et couvre-sol sur les prés, fougères et couvre-sol
+au pied des forêts, agaves et pampas sur la terre et le sable, roseaux et
+fougères autour des mares.
+
 Le plantage est déterministe : un hachage de la case et de la graine décide
 de tout, la simulation n'en sait rien, et une partie reprise retrouve son
 décor. Chaque case de terre qui touche l'eau reçoit, au plus, un rocher (ou
@@ -300,14 +310,15 @@ mares portent des nénuphars. Un **plan d'eau de 40 cases ou moins** est une
 mare, ceinte de rochers serrés, de roseaux et de nénuphars comme la planche
 « eau-mare » ; au-delà, un lac prend la plage de « eau-rivage » : rochers
 épars, galets, touffes. Partout ailleurs, la
-**campagne** suit le sol : herbe, fleurs en bouquets d'une couleur et
-buissons sur les prés, cailloux et touffes sèches sur la terre et le sable,
-un peu plus de tout au pied des forêts.
+**campagne** suit le sol : herbe, fleurs en bouquets d'une couleur, buissons
+et couvre-sol sur les prés ; cailloux, agaves, pampas et touffes sèches sur la
+terre et le sable ; fougères, couvre-sol et un peu plus de tout au pied des
+forêts — une seule pièce de volume par case.
 
-Rochers, amas, roseaux et buissons entrent dans l'ordre du peintre avec les
-unités, et ne sont pas dessinés sous un bâtiment ni dans le brouillard. Le
-reste — galets, nénuphars, fleurs, touffes — est **cuit dans les tronçons de
-sol** mis en cache, une fois pour toutes : sans cela, les quelque six cents
+Rochers, amas, roseaux, buissons, fougères, agaves et pampas entrent dans
+l'ordre du peintre avec les unités, et ne sont pas dessinés sous un bâtiment
+ni dans le brouillard. Le reste — galets, nénuphars, fleurs, touffes,
+couvre-sol — est **cuit dans les tronçons de sol** mis en cache, une fois pour toutes : sans cela, les quelque six cents
 petites pièces visibles à zoom arrière coûtaient six millisecondes par image.
 Une pièce à cheval sur deux tronçons est peinte dans les deux, aux mêmes
 coordonnées, et les tronçons cuits avant l'arrivée de l'atlas sont refaits.

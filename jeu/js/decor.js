@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Le décor de la carte : rochers, galets, touffes d'herbe, roseaux, nénuphars,
-// fleurs et buissons, découpés dans les planches de l'auteur (voir
+// fleurs, buissons, fougères, agaves, découpés dans les planches de l'auteur (voir
 // assets/SOURCES.md). Présentation pure : rien ici n'entre dans la simulation
 // — une unité traverse un rocher —, et tout se déduit de la carte par un
 // hachage de la case et de la graine : même carte, même décor, sur tous les
@@ -10,29 +10,29 @@
 // se ceint de rochers serrés, de roseaux, de nénuphars et de fleurs, comme la
 // planche « eau-mare » ; un LAC prend la plage de « eau-rivage » : rochers
 // épars, galets et touffes sur le sable. La CAMPAGNE, partout ailleurs, selon
-// le sol : de l'herbe, des fleurs et des buissons sur les prés, des cailloux
-// et des touffes sèches sur la terre et le sable, un peu plus de tout au pied
-// des forêts.
+// le sol : de l'herbe, des fleurs, des buissons et du couvre-sol sur les prés,
+// des cailloux, des agaves, des pampas et des touffes sèches sur la terre et le
+// sable, des fougères et un peu plus de tout au pied des forêts.
 // ---------------------------------------------------------------------------
 import { TILE } from './config.js';
 import { TERRAIN } from './map.js';
-import { PIECES_RIVAGE } from './rivage-pieces.js';
+import { PIECES_DECOR } from './decor-pieces.js';
 
-export const ECHELLE_RIVAGE = 0.5;   // pixels monde par pixel d'atlas (atlas à 2×)
+export const ECHELLE_DECOR = 0.5;    // pixels monde par pixel d'atlas (atlas à 2×)
 export const MARE_MAX = 40;          // cases d'eau : au-delà, c'est un lac
 export const STYLE = { LAC: 0, MARE: 1 };
 /**
  * Les classes CUITES dans le sol : peintes une fois dans les tronçons de sol
- * mis en cache, sous tout le reste — galets, nénuphars, fleurs, et les
- * touffes d'herbe, assez basses pour ne pas réclamer l'ordre du peintre. Les
- * autres (rochers, amas, roseaux, buissons) sont DEBOUT : classées avec les
- * unités à chaque image.
+ * mis en cache, sous tout le reste — galets, nénuphars, fleurs, touffes
+ * d'herbe et couvre-sol, assez bas pour ne pas réclamer l'ordre du peintre.
+ * Les autres (rochers, amas, roseaux, buissons, fougères, agaves) sont
+ * DEBOUT : classées avec les unités à chaque image.
  */
-export const CUITES = new Set(['galet', 'nenuphar', 'fleurBleu', 'fleurJaune', 'fleurRose', 'fleurBlanc', 'herbe', 'touffe']);
+export const CUITES = new Set(['galet', 'nenuphar', 'fleurBleu', 'fleurJaune', 'fleurRose', 'fleurBlanc', 'herbe', 'touffe', 'couvre']);
 const FLEURS = ['fleurBleu', 'fleurJaune', 'fleurRose', 'fleurBlanc'];
 
 const PAR_CLASSE = {};
-for (const p of PIECES_RIVAGE) (PAR_CLASSE[p.classe] ||= []).push(p);
+for (const p of PIECES_DECOR) (PAR_CLASSE[p.classe] ||= []).push(p);
 
 /** Hachage d'une case et d'un rang → [0, 1), identique partout. */
 export function hacher(x, y, graine, k) {
@@ -132,6 +132,10 @@ export function planterRivage(map, corps = plansDEau(map)) {
       if (mare) decor.mares++; else decor.lacs++;
       const pRoc = mare ? 0.66 : 0.58, pAmas = mare ? 0.16 : 0.06;
       const pHerbe = mare ? 0.55 : 0.45, pRoseau = mare ? 0.6 : 0;
+      const pre = terrain[i] === TERRAIN.GRASS || terrain[i] === TERRAIN.GRASS_DARK;
+      // Autour d'une mare, des fougères côté terre ; sur une plage, une pampa.
+      if (mare && pre && r(28) < 0.14) poser(decor, h, tx, ty, 'fougere', r(29), cx - nx * (8 + r(80) * 8) + tx_ * (r(81) * 20 - 10), cy - ny * (8 + r(80) * 8) + ty_ * (r(81) * 20 - 10), r(82) < 0.5, 0.85 + r(83) * 0.3);
+      else if (!mare && !pre && r(28) < 0.08) poser(decor, h, tx, ty, 'pampa', r(29), cx - nx * (6 + r(80) * 8) + tx_ * (r(81) * 20 - 10), cy - ny * (6 + r(80) * 8) + ty_ * (r(81) * 20 - 10), r(82) < 0.5, 0.85 + r(83) * 0.3);
       // Un rocher (ou un amas) au bord de l'eau, sur le sable.
       if (r(1) < pRoc) {
         const a = r(8) * 9, b = r(9) * 20 - 10;   // du centre de la case au sable, près de l'eau
@@ -142,7 +146,6 @@ export function planterRivage(map, corps = plansDEau(map)) {
       if (r(5) < pHerbe) {
         const roseau = r(6) < pRoseau;
         const a = roseau ? 2 + r(10) * 8 : -(6 + r(10) * 10), b = r(11) * 20 - 10;
-        const pre = terrain[i] === TERRAIN.GRASS || terrain[i] === TERRAIN.GRASS_DARK;
         poser(decor, h, tx, ty, roseau ? 'roseau' : pre ? 'herbe' : 'touffe', r(19), cx + nx * a + tx_ * b, cy + ny * a + ty_ * b, r(20) < 0.5, 0.85 + r(21) * 0.3);
       }
       // Des galets épars, à plat.
@@ -192,17 +195,25 @@ export function planterCampagne(map) {
       const cx = tx * TILE + TILE / 2, cy = ty * TILE + TILE / 2;
       const pre = t === TERRAIN.GRASS || t === TERRAIN.GRASS_DARK;
       const sombre = t === TERRAIN.GRASS_DARK;
-      // Probabilités : [herbe, fleurs, buisson, rocher, galets, amas]
-      let pHerbe, pFleurs, pBuisson, pRoc, pGalets, pAmas;
-      if (pre) { pHerbe = sombre ? 0.07 : 0.05; pFleurs = sombre ? 0.025 : 0.035; pBuisson = sombre ? 0.02 : 0.012; pRoc = 0.008; pGalets = 0.015; pAmas = 0.002; }
-      else if (t === TERRAIN.DIRT) { pHerbe = 0.06; pFleurs = 0; pBuisson = 0; pRoc = 0.06; pGalets = 0.12; pAmas = 0.006; }
-      else { pHerbe = 0.04; pFleurs = 0; pBuisson = 0; pRoc = 0.03; pGalets = 0.10; pAmas = 0.003; }
-      // Au pied d'une forêt : plus d'herbe, des buissons (même sur la terre), quelques rochers ; les fleurs restent aux prés.
-      if (foret) { pHerbe += 0.12; pBuisson += pre ? 0.05 : 0.03; pRoc += 0.02; if (pre) pFleurs += 0.02; }
+      // Probabilités par sol : herbe, fleurs, buisson, rocher, galets, amas,
+      // couvre-sol, fougère, agave, pampa.
+      let pHerbe, pFleurs, pBuisson, pRoc, pGalets, pAmas, pCouvre = 0, pFougere = 0, pAgave = 0, pPampa = 0;
+      if (pre) { pHerbe = sombre ? 0.07 : 0.05; pFleurs = sombre ? 0.025 : 0.035; pBuisson = sombre ? 0.03 : 0.02; pRoc = 0.008; pGalets = 0.015; pAmas = 0.002; pCouvre = 0.012; }
+      else if (t === TERRAIN.DIRT) { pHerbe = 0.06; pFleurs = 0; pBuisson = 0; pRoc = 0.06; pGalets = 0.12; pAmas = 0.006; pAgave = 0.02; pPampa = 0.015; }
+      else { pHerbe = 0.04; pFleurs = 0; pBuisson = 0; pRoc = 0.03; pGalets = 0.10; pAmas = 0.003; pAgave = 0.03; pPampa = 0.025; }
+      // Au pied d'une forêt : fougères, couvre-sol, plus d'herbe, des buissons
+      // (même sur la terre), quelques rochers ; les fleurs restent aux prés.
+      if (foret) { pHerbe += 0.10; pBuisson += pre ? 0.05 : 0.03; pRoc += 0.02; pFougere += 0.10; pCouvre += 0.06; if (pre) pFleurs += 0.02; }
       const dans = (k) => r(k) * 22 - 11;          // une position dans la case, à l'écart des bords
 
       if (r(1) < pHerbe) poser(decor, h, tx, ty, pre ? 'herbe' : 'touffe', r(2), cx + dans(3), cy + dans(4) + 4, r(5) < 0.5, 0.8 + r(6) * 0.35);
-      if (r(7) < pBuisson) poser(decor, h, tx, ty, 'buisson', r(8), cx + dans(9) * 0.5, cy + dans(10) * 0.5 + 6, r(11) < 0.5, 0.85 + r(12) * 0.3);
+      // Une seule pièce « de volume » par case : buisson, fougère, agave ou pampa.
+      const u = r(7);
+      if (u < pBuisson) poser(decor, h, tx, ty, 'buisson', r(8), cx + dans(9) * 0.5, cy + dans(10) * 0.5 + 6, r(11) < 0.5, 0.85 + r(12) * 0.3);
+      else if (u < pBuisson + pFougere) poser(decor, h, tx, ty, 'fougere', r(8), cx + dans(9) * 0.5, cy + dans(10) * 0.5 + 6, r(11) < 0.5, 0.85 + r(12) * 0.3);
+      else if (u < pBuisson + pFougere + pAgave) poser(decor, h, tx, ty, 'agave', r(8), cx + dans(9) * 0.5, cy + dans(10) * 0.5 + 6, r(11) < 0.5, 0.8 + r(12) * 0.35);
+      else if (u < pBuisson + pFougere + pAgave + pPampa) poser(decor, h, tx, ty, 'pampa', r(8), cx + dans(9) * 0.5, cy + dans(10) * 0.5 + 6, r(11) < 0.5, 0.85 + r(12) * 0.3);
+      if (r(27) < pCouvre) poser(decor, h, tx, ty, 'couvre', r(28), cx + dans(29) * 0.6, cy + dans(30) * 0.6 + 6, r(31) < 0.5, 0.85 + r(32) * 0.3);
       if (r(13) < pRoc + pAmas) poser(decor, h, tx, ty, r(13) < pAmas ? 'amas' : 'roche', r(14), cx + dans(15), cy + dans(16) + 4, r(17) < 0.5, 0.8 + r(18) * 0.35);
       if (r(19) < pGalets) {
         const nb = 1 + Math.floor(r(20) * 3);
