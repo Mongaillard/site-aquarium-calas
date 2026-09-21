@@ -390,8 +390,10 @@ const auChantier = await page.evaluate(() => {
   g.world.players[0].resources.wood = 1000;
   const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
   let spot = null;
+  // Au sud du palais de préférence : au nord, le chantier passerait derrière
+  // les dômes, et c'est le palais qu'on toucherait — à juste titre.
   for (let r = 3; r <= 12 && !spot; r++) {
-    for (let dy = -r; dy <= r && !spot; dy++) {
+    for (let dy = r; dy >= -r && !spot; dy--) {
       for (let dx = -r; dx <= r && !spot; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         if (g.world.canPlace(0, 'house', tc.tx + dx, tc.ty + dy)) spot = { tx: tc.tx + dx, ty: tc.ty + dy };
@@ -403,6 +405,9 @@ const auChantier = await page.evaluate(() => {
   const v = g.world.units.find(
     (u) => u.playerIndex === 0 && u.isVillager && !u.garrisonedIn && u.state !== 'build');
   v.stop();
+  // L'ouvrier se tient à trois cases du chantier : sous le doigt, une unité
+  // passe avant un bâtiment, et il n'est pas question de toucher l'ouvrier.
+  v.x = site.x - 3 * 32; v.y = site.y + 3 * 32;
   g.setSelection([v]);
   g.camera.centerOn(site.x, site.y);
   window.__chantier = site.id;
@@ -822,6 +827,73 @@ const vegetation = await page.evaluate(async () => {
 check('les arbres portent leur illustration (six essences, deux chevaliers de haut)', vegetation.arbres);
 check('le buisson à baies porte son illustration (et son miroir)', vegetation.buissons);
 check('le gisement d’or porte son illustration (et son miroir)', vegetation.or);
+
+// Le villageois illustré : quatre orientations de marche et quatre poses de
+// travail dessinées d'un seul côté, retournées quand la cible est de l'autre.
+const villageois = await page.evaluate(async () => {
+  const g = window.__jeu; const T = 32; const map = g.world.map;
+  const mod = await import('./js/sprites.js');
+  const s = mod.spriteDe('villager');
+  if (!s) return null;
+  const def = s.def;
+  // couleur d'équipe : l'écharpe bascule, la peau reste
+  const lire = (src) => { const c = document.createElement('canvas'); c.width = src.width; c.height = src.height; const x = c.getContext('2d'); x.drawImage(src, 0, 0); return x.getImageData(0, 0, c.width, c.height).data; };
+  const hsl = (r, g, b) => { const mx = Math.max(r, g, b) / 255, mn = Math.min(r, g, b) / 255, l = (mx + mn) / 2; if (mx === mn) return [0, 0, l]; const d = mx - mn, sa = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); const R = r / 255, G = g / 255, B = b / 255; let h; if (mx === R) h = ((G - B) / d + (G < B ? 6 : 0)) / 6; else if (mx === G) h = ((B - R) / d + 2) / 6; else h = ((R - G) / d + 4) / 6; return [h * 360, sa, l]; };
+  const bleu = lire(mod.imagePourJoueur(s, 0)), rouge = lire(mod.imagePourJoueur(s, 1));
+  let opaques = 0, changes = 0, peau = 0, peauIntacte = 0, bleusRestants = 0;
+  for (let i = 0; i < bleu.length; i += 4) {
+    if (bleu[i + 3] < 128) continue;
+    opaques++;
+    const memes = bleu[i] === rouge[i] && bleu[i + 1] === rouge[i + 1] && bleu[i + 2] === rouge[i + 2];
+    if (!memes) changes++;
+    const [hb, sb, lb] = hsl(bleu[i], bleu[i + 1], bleu[i + 2]);
+    if (hb >= 15 && hb <= 40 && sb > 0.3 && lb > 0.45) { peau++; if (memes) peauIntacte++; }
+    const [hr, sr] = hsl(rouge[i], rouge[i + 1], rouge[i + 2]);
+    if (hr >= 200 && hr <= 255 && sr > 0.32) bleusRestants++;
+  }
+  // les poses, sur un vrai villageois
+  const r = g.renderer;
+  const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const v = g.world.spawnUnit(0, 'villager', tc.x, tc.y + 5 * T);
+  const trouve = (type) => { let best = null, bd = 1e9; for (const res of map.resources.values()) { if (res.type !== type || res.amount <= 0) continue; const d = Math.hypot(res.tx * T - v.x, res.ty * T - v.y); if (d < bd) { bd = d; best = res; } } return best; };
+  const poses = {};
+  const immobile = { avance: false, distance: 0 }, marche = { avance: true, distance: 20 };
+  const baies = trouve('food'), arbre = trouve('wood'), or = trouve('gold');
+  const nom = (c) => c ? Object.keys(def.poses).find((k) => def.poses[k] === c.pose) + (c.miroir ? '·miroir' : '') : 'marche';
+  if (baies) { v.gatherAt(baies.tx, baies.ty); v.x = baies.tx * T + T / 2 - 40; v.y = baies.ty * T + T / 2; poses.baiesEst = nom(r.poseDe(v, def, immobile)); v.x = baies.tx * T + T / 2 + 40; poses.baiesOuest = nom(r.poseDe(v, def, immobile)); }
+  if (arbre) { v.gatherAt(arbre.tx, arbre.ty); v.x = arbre.tx * T + T / 2 - 40; v.y = arbre.ty * T + T / 2; poses.arbreEst = nom(r.poseDe(v, def, immobile)); }
+  if (or) { v.gatherAt(or.tx, or.ty); v.x = or.tx * T + T / 2 + 40; v.y = or.ty * T + T / 2; poses.orOuest = nom(r.poseDe(v, def, immobile)); }
+  v.stop(); poses.repos = nom(r.poseDe(v, def, immobile));
+  poses.marche = nom(r.poseDe(v, def, marche));
+  v.carry = { type: 'wood', amount: 8 }; v.facing = 0; poses.porteEst = nom(r.poseDe(v, def, marche)); v.facing = Math.PI; poses.porteOuest = nom(r.poseDe(v, def, marche));
+  v.carry = { type: null, amount: 0 };
+  g.world.players[0].resources.wood = 1000;
+  let site = null;
+  for (let rr = 3; rr <= 12 && !site; rr++) for (let dy = -rr; dy <= rr && !site; dy++) for (let dx = -rr; dx <= rr && !site; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== rr) continue; if (g.world.canPlace(0, 'house', tc.tx + dx, tc.ty + dy)) site = g.world.placeBuilding(0, 'house', tc.tx + dx, tc.ty + dy, []); }
+  if (site) { v.buildAt(site); v.x = site.x + 60; v.y = site.y; poses.chantierOuest = nom(r.poseDe(v, def, immobile)); g.world.cancelConstruction(site); }
+  v.dead = true;
+  return { cases: def.cases, images: def.images, lignes: def.lignes, opaques, changes, peau, peauIntacte, bleusRestants, poses };
+});
+check('le villageois porte son illustration : quatre orientations, huit pas', !!villageois && villageois.cases === 4 && villageois.images === 8 && villageois.lignes.length === 4, villageois ? `${villageois.cases} orientations × ${villageois.images}` : 'absent');
+check('le villageois adverse est repeint (l’écharpe)', !!villageois && villageois.changes > villageois.opaques * 0.02, villageois && `${Math.round((villageois.changes / villageois.opaques) * 100)} % des pixels`);
+check('la peau du villageois reste la même', !!villageois && villageois.peau > 500 && villageois.peauIntacte === villageois.peau, villageois && `${villageois.peauIntacte}/${villageois.peau} pixels de peau intacts`);
+check('aucun bleu franc ne subsiste côté adverse (villageois)', !!villageois && villageois.bleusRestants === 0, villageois && villageois.bleusRestants + ' pixels');
+const P = villageois ? villageois.poses : {};
+check('devant des baies, le villageois cueille, tourné vers elles', P.baiesEst === 'cueillir·miroir' && P.baiesOuest === 'cueillir', `à l’est : ${P.baiesEst} · à l’ouest : ${P.baiesOuest}`);
+check('devant un arbre ou un gisement, il frappe, tourné vers eux', P.arbreEst === 'construire' && P.orOuest === 'construire·miroir', `arbre à l’est : ${P.arbreEst} · or à l’ouest : ${P.orOuest}`);
+check('chargé, il porte ; à l’arrêt, il se repose ; sinon il marche', P.porteEst === 'porter' && P.porteOuest === 'porter·miroir' && P.repos === 'repos' && P.marche === 'marche', JSON.stringify(P));
+check('sur un chantier, il construit, tourné vers lui', P.chantierOuest === 'construire·miroir', String(P.chantierOuest));
+
+// Quatre orientations : la marche du villageois prend la cardinale la plus
+// proche, et chaque secteur tombe sur la bonne ligne de l'atlas.
+const quatre = await page.evaluate(async () => {
+  const mod = await import('./js/sprites.js');
+  const def = mod.spriteDe('villager').def;
+  const ligne = (facing) => mod.cadreSource(def, mod.caseDirection(facing, 4), 0).sy / def.cellH;
+  return { sud: ligne(Math.PI / 2), est: ligne(0), nord: ligne(-Math.PI / 2), ouest: ligne(Math.PI), sudEst: ligne(Math.PI / 4 - 0.05), sudEstBis: ligne(Math.PI / 4 + 0.05) };
+});
+check('le villageois marche sur quatre orientations, la cardinale la plus proche en diagonale',
+  quatre.sud === 0 && quatre.nord === 1 && quatre.ouest === 2 && quatre.est === 3 && quatre.sudEst === 3 && quatre.sudEstBis === 0, JSON.stringify(quatre));
 
 check('les orientations tombent sur les bonnes cases',
   chevalier.sud === 0 && chevalier.est === 2 && chevalier.nord === 4 && chevalier.ouest === 6,

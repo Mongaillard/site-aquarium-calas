@@ -8,9 +8,10 @@
 import { TILE, BUILDING_TYPES } from './config.js';
 import { iconePath, ICON_BOX } from './icones.js';
 import {
-  chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche,
+  chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche, poseSource,
 } from './sprites.js';
 import { TERRAIN } from './map.js';
+import { STATE, villagerTask } from './entities.js';
 import { clamp, bruitPeriodique } from './utils.js';
 
 // Variantes volontairement proches : un écart trop marqué transforme la
@@ -214,6 +215,7 @@ export class Renderer {
   // --- Boucle de rendu ------------------------------------------------------
 
   render(dt = 1 / 60) {
+    this.horloge = (this.horloge || 0) + dt;   // cadence des poses de travail
     const ctx = this.ctx;
     this.frame++;
     this.dt = Math.min(0.05, dt);
@@ -1032,9 +1034,22 @@ export class Renderer {
     const ctx = this.ctx;
     const { cellW, cellH, cases, hauteurMonde, ancreY, pixel } = sprite.def;
     const source = imagePourJoueur(sprite, u.playerIndex);
-    const k = caseDirection(u.facing, cases);
-    const image = imageDeMarche(sprite.def, anim.distance || 0, anim.avance);
-    const { sx, sy } = cadreSource(sprite.def, k, image);
+    let sx, sy, miroir = false;
+    const choix = sprite.def.poses && u.isVillager ? this.poseDe(u, sprite.def, anim) : null;
+    if (choix) {
+      const { pose } = choix;
+      // Une pose de travail se cadence sur l'horloge, décalée par unité pour
+      // que dix bûcherons ne frappent pas en chœur ; le port suit la distance.
+      const image = choix.parDistance
+        ? Math.floor(((anim.distance || 0) / (sprite.def.cycle || 40)) * pose.images) % pose.images
+        : Math.floor(this.horloge * pose.cadence + (u.id % 7) * 0.53) % pose.images;
+      ({ sx, sy } = poseSource(sprite.def, pose, image));
+      miroir = choix.miroir;
+    } else {
+      const k = caseDirection(u.facing, cases);
+      const image = imageDeMarche(sprite.def, anim.distance || 0, anim.avance);
+      ({ sx, sy } = cadreSource(sprite.def, k, image));
+    }
     // Socle aux couleurs du joueur : de loin, une armure reste une tache
     // sombre, et l'appartenance doit se lire d'un coup d'œil. C'est la
     // solution d'AoE, et elle vaut mieux qu'un personnage repeint en entier.
@@ -1060,8 +1075,10 @@ export class Renderer {
     // illustrations laissent du vide dessous.
     const pieds = (ancreY || cellH) / cellH;
     if (pixel) ctx.imageSmoothingEnabled = false;   // du pixel art ne s'interpole pas
+    if (miroir) { ctx.save(); ctx.translate(px * 2, 0); ctx.scale(-1, 1); }   // x devient 2·px − x : même place, retourné
     ctx.drawImage(source, sx, sy, cellW, cellH,
       px - w / 2, py + u.radius * 0.45 - h * pieds, w, h);
+    if (miroir) ctx.restore();
     if (pixel) ctx.imageSmoothingEnabled = true;
 
     if (anim.coup >= 0 && anim.coup < 0.55) {
@@ -1072,6 +1089,31 @@ export class Renderer {
       ctx.arc(px, py - u.radius * 0.4, u.radius * 1.6, u.facing - 0.9, u.facing + 0.3);
       ctx.stroke();
     }
+  }
+
+  /**
+   * La pose d'un villageois illustré, ou null pour la marche ordinaire. Au
+   * travail il cueille (nourriture) ou frappe (bois, or, chantier, combat),
+   * tourné vers sa cible ; en chemin avec sa charge il la porte ; à l'arrêt il
+   * se repose. Les poses sont dessinées d'un seul côté (`sens`) : `miroir`
+   * les retourne quand la cible est de l'autre.
+   */
+  poseDe(u, def, anim) {
+    const P = def.poses;
+    const charge = u.carry.amount > 0.5;
+    const cote = (dx) => (dx >= 0 ? 1 : -1);
+    const porter = () => ({ pose: P.porter, parDistance: true, miroir: cote(Math.cos(u.facing)) !== P.porter.sens });
+    if (anim.avance) return charge ? porter() : null;
+    let cible = u.target;
+    if (u.resourceTile) cible = { x: u.resourceTile.tx * TILE + TILE / 2, y: u.resourceTile.ty * TILE + TILE / 2 };
+    const dx = cible ? cible.x - u.x : Math.cos(u.facing);
+    if (u.state === STATE.GATHER && cible) {
+      const pose = villagerTask(u) === 'food' ? P.cueillir : P.construire;
+      return { pose, miroir: cote(dx) !== pose.sens };
+    }
+    if ((u.state === STATE.BUILD || u.state === STATE.ATTACK) && cible) return { pose: P.construire, miroir: cote(dx) !== P.construire.sens };
+    if (charge) return porter();
+    return { pose: P.repos, miroir: false };
   }
 
   /** Pastille de la ressource portée par un villageois. */

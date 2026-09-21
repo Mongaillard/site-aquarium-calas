@@ -84,6 +84,25 @@ const ATLAS = {
     cellW: 101, cellH: 74, cases: 2, images: 1,
     ancreY: 74, hauteurMonde: 37,
   },
+  // Le villageois : quatre orientations de marche (sud, nord, ouest, est —
+  // `lignes` donne la ligne de l'atlas pour chaque secteur) et quatre poses
+  // de travail, dessinées d'un seul côté (`sens` : 1 vers l'est, -1 vers
+  // l'ouest) — un miroir les retourne quand la cible est de l'autre (voir
+  // Renderer.poseDe). Debout, 40 px : un peu moins que le chevalier.
+  villager: {
+    src: 'assets/villageois.webp',
+    cellW: 56, cellH: 86, cases: 4, images: 8, cycle: 36,
+    lignes: [0, 3, 1, 2],
+    poses: {
+      repos: { ligne: 4, images: 4, cadence: 2.5 },
+      cueillir: { ligne: 5, images: 4, cadence: 5, sens: -1 },
+      construire: { ligne: 6, images: 4, cadence: 7, sens: 1 },
+      porter: { ligne: 7, images: 4, sens: 1 },
+    },
+    ancreY: 85, hauteurMonde: 40, natif: 'bleu',
+    // L'écharpe est bleu franc ; peau, cuir et chemise sont orangés ou crème.
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
   spearman: {
     src: 'assets/lancier.png',
     cellW: 48, cellH: 48, cases: 8, images: 1,
@@ -381,9 +400,15 @@ export function imagePourJoueur(sprite, playerIndex) {
  */
 export function cadreSource(def, direction, image) {
   const multi = (def.images || 1) > 1;
+  const ligne = def.lignes ? def.lignes[direction] : direction;
   return multi
-    ? { sx: image * def.cellW, sy: direction * def.cellH }
+    ? { sx: image * def.cellW, sy: ligne * def.cellH }
     : { sx: direction * def.cellW, sy: 0 };
+}
+
+/** Position d'une image d'une pose (repos, cueillir, construire, porter). */
+export function poseSource(def, pose, image) {
+  return { sx: image * def.cellW, sy: pose.ligne * def.cellH };
 }
 
 /**
@@ -403,6 +428,7 @@ export function imageDeMarche(def, distance, enMouvement) {
  * et croît vers le sud (l'axe des y descend), d'où le sens de lecture.
  */
 export function caseDirection(facing, cases = 8) {
-  const k = Math.round((Math.PI / 2 - facing) / PAS);
+  const pas = (2 * Math.PI) / cases;
+  const k = Math.round((Math.PI / 2 - facing) / pas);
   return ((k % cases) + cases) % cases;
 }

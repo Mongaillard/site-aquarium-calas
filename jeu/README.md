@@ -3,7 +3,7 @@
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
 très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 856 Ko d'illustrations et de textures — dont un cycle de marche
+pictogrammes vectoriels et 946 Ko d'illustrations et de textures — dont un cycle de marche
 complet.
 
 ## Lancer le jeu
@@ -329,6 +329,16 @@ Le personnage est dessiné plus grand que l'emprise de l'unité — comme dans A
 sinon un chevalier de dix-huit pixels ne se lirait pas — et posé sur un **socle
 aux couleurs du joueur** : de loin une armure reste une tache sombre, et
 l'appartenance doit se lire d'un coup d'œil.
+
+**Le villageois travaille pour de vrai** (`villageois.webp`, 90 Ko) : quatre
+orientations de marche × huit pas, et quatre poses de quatre images — repos,
+cueillir, construire, porter. La pose suit l'état de la simulation : devant des
+baies ou une ferme il cueille, devant un arbre, un gisement, un chantier ou un
+ennemi il frappe, en chemin avec sa charge il la porte, à l'arrêt il souffle.
+Les poses sont dessinées d'un seul côté et retournées en miroir quand la cible
+est de l'autre ; elles se cadencent sur l'horloge, décalées par unité pour que
+dix bûcherons ne frappent pas en chœur, et le port suit la distance comme la
+marche.
 
 **Deux partis pris sont jouables**, au choix dans le menu de pause :
 

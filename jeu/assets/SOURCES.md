@@ -7,6 +7,7 @@
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
+| `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 56×86 par case | Planche générée par l'auteur du dépôt, fond dégradé retiré en deux passes (voir plus bas) |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 316×315, dessinée sur 158 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
 | `sol-herbe.webp`, `sol-herbe-sombre.webp`, `sol-terre.webp`, `sol-sable.webp` | Les quatre **nappes de sol** (herbe, herbe sombre, terre, sable), 384×384, raccordées bord à bord | Planche de six textures générée par l'auteur du dépôt ; deux (herbe sèche, terre sombre) restent en réserve |
@@ -110,6 +111,38 @@ Un test le vérifie à chaque exécution : 20 % des pixels sont repeints, **aucu
 pixel d'acier n'est touché** (40 434 sur 40 434 intacts), et il ne reste aucun
 bleu franc côté adverse.
 
+## Le villageois
+
+La planche tient quatre orientations de marche (sud, nord, ouest, est — huit
+pas chacune) et quatre poses de travail de quatre images : au repos, cueillir,
+construire, porter une ressource. Les poses sont dessinées **d'un seul côté**
+(la cueillette tournée vers l'ouest, le marteau et le rondin vers l'est) : le
+jeu les retourne en miroir quand la cible est de l'autre côté. Une marche à
+quatre orientations seulement : en diagonale, l'unité prend la cardinale la
+plus proche.
+
+Le fond n'était ni uni ni transparent : un dégradé sombre, un halo clair
+derrière chaque personnage, des légendes. Il part en deux passes
+(`analyse-villageois.py`, `matte-villageois.py`) :
+
+1. **Croissance de région** depuis les bords, avec un seuil (7 niveaux) sur la
+   différence entre pixels *voisins* : le dégradé et le halo sont doux, le
+   contour des personnages est net. Quarante-huit composantes, une par image ;
+   les légendes et les numéros, plus petits, sont écartés.
+2. Les vues de côté y avaient perdu leurs jambes — pantalon brun sur halo brun,
+   la croissance passait au travers. Dans chaque boîte, une **surface du second
+   degré** par canal est ajustée sur les pixels tenus pour fond, et tout pixel
+   qui s'en écarte de plus de 12 niveaux redevient personnage — dans la moitié
+   basse seulement : derrière le torse, le halo culmine et la surface ne le suit
+   pas, on y ramassait une ombre derrière les épaules. Fermeture de 2 px, trous
+   bouchés. Cinquante-six mille pixels regagnés.
+
+Chaque image est posée au bas de sa case, centrée ; un villageois debout fait
+**40 px monde** (le chevalier : 44), atlas à 2× avec le même peps que les
+bâtiments : 448×688, **90 Ko**. La couleur d'équipe est celle du chevalier —
+l'écharpe bleue bascule, la peau, le cuir et la chemise restent ; le test le
+vérifie sur 14 440 pixels de peau.
+
 ## Les bâtiments
 
 L'illustration est en vue de trois quarts sur une carte vue de dessus — c'est
@@ -186,7 +219,7 @@ la simple projection par colonnes agglomérait les arbres, dont les socles de
 rochers et les branches se touchent presque.
 
 Une seule échelle pour toute la planche, qui garde ses proportions : l'arbre
-le plus haut (le cyprès) fait **73 px monde**, soit deux chevaliers ; les
+le plus haut (le cyprès) fait **95 px monde**, soit trois cases, deux chevaliers ; les
 buissons tombent autour de 36 px, la taille d'une case. Chaque case d'atlas a
 son sprite posé au bas et centré : l'ancre est le bas de la case, le socle de
 rochers vient s'asseoir sur la case de la carte. Atlas à deux fois la taille
@@ -207,5 +240,5 @@ arbres ont été essayés pour la nourriture : jolis, mais ils ne disaient pas
 
 ## Format
 
-WebP partout où c'est possible : 856 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
+WebP partout où c'est possible : 946 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
 PNG, sans différence visible à l'œil même agrandi trois fois.
