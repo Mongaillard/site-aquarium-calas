@@ -9,7 +9,7 @@ import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
 import { formatTime, dist, RNG } from '../js/utils.js';
 import { STATE } from '../js/entities.js';
 import { TERRAIN } from '../js/map.js';
-import { planterRivage, plansDEau, hacher, MARE_MAX } from '../js/decor.js';
+import { planterRivage, planterCampagne, planterDecor, plansDEau, hacher, MARE_MAX, CUITES } from '../js/decor.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 let failures = 0;
@@ -179,9 +179,9 @@ check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches >
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && eau(tx + dx, ty + dy)) return true;
     return false;
   };
-  const debout = decor.debout.flat(), plats = decor.plats.flat(), toutes = [...debout, ...plats];
+  const debout = decor.debout.flat(), plats = decor.cuits.flat(), toutes = [...debout, ...plats];
   check('le rivage est décoré', decor.total > 100 && toutes.length === decor.total, decor.total + ' pièces');
-  check('chaque pièce debout tient sur la terre, au bord de l’eau', debout.length > 0 && debout.every((d) => !eau(d.tx, d.ty) && bordEau(d.tx, d.ty)), debout.length + ' pièces debout');
+  check('chaque pièce du rivage tient sur la terre au bord de l’eau — ou flotte', toutes.length > 0 && toutes.every((d) => eau(d.tx, d.ty) ? d.piece.classe === 'nenuphar' : bordEau(d.tx, d.ty)), toutes.length + ' pièces');
   const nenuphars = plats.filter((d) => d.piece.classe === 'nenuphar');
   check('les nénuphars flottent sur l’eau', nenuphars.length > 0 && nenuphars.every((d) => eau(d.tx, d.ty)), nenuphars.length + ' nénuphars');
   check('rien sur un arbre ni un buisson', toutes.every((d) => eau(d.tx, d.ty) || !map.resources.has(d.ty * map.w + d.tx)));
@@ -195,12 +195,31 @@ check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches >
   const roseaux = debout.filter((d) => d.piece.classe === 'roseau').length;
   check('chaque case d’eau connaît la taille de son plan d’eau', [...corps].every((c, i) => (map.terrain[i] === TERRAIN.WATER) === (c > 0)));
   check('une mare a ses roseaux, un lac n’en a pas', mares > 0 ? roseaux > 0 : roseaux === 0, `${mares} mare(s), ${roseaux} roseaux`);
-  const cle = (d) => JSON.stringify([...d.debout.flat(), ...d.plats.flat()].map((p) => [p.tx, p.ty, p.piece.nom, Math.round(p.x * 100), Math.round(p.y * 100), p.miroir, Math.round(p.echelle * 1000)]));
+  const cle = (d) => JSON.stringify([...d.debout.flat(), ...d.cuits.flat()].map((p) => [p.tx, p.ty, p.piece.nom, Math.round(p.x * 100), Math.round(p.y * 100), p.miroir, Math.round(p.echelle * 1000)]));
   check('même carte, même décor', cle(planterRivage(map)) === cle(decor));
   const autre = planterRivage(new World({ seed: 12, mapSize: 'small', difficulty: 'normal' }).map);
   check('une autre graine, un autre décor', cle(autre) !== cle(decor));
   const h = hacher(3, 4, 5, 6);
   check('le hachage est stable et borné', h === hacher(3, 4, 5, 6) && h >= 0 && h < 1 && h !== hacher(3, 4, 5, 7) && h !== hacher(4, 3, 5, 6));
+
+  // La campagne : le reste de la carte, selon le sol.
+  const campagne = planterCampagne(map);
+  const cDebout = campagne.debout.flat(), cPlats = campagne.cuits.flat(), cToutes = [...cDebout, ...cPlats];
+  const terre = (d) => map.terrain[d.ty * map.w + d.tx];
+  const pre = (d) => terre(d) === TERRAIN.GRASS || terre(d) === TERRAIN.GRASS_DARK;
+  check('la campagne est décorée', campagne.total > 200 && cToutes.length === campagne.total, campagne.total + ' pièces');
+  check('rien dans l’eau, rien au bord de l’eau, rien sur une ressource', cToutes.every((d) => !eau(d.tx, d.ty) && !bordEau(d.tx, d.ty) && !map.resources.has(d.ty * map.w + d.tx)));
+  check('ni roseau ni nénuphar hors des rivages', cToutes.every((d) => d.piece.classe !== 'roseau' && d.piece.classe !== 'nenuphar'));
+  const foret = (d) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const q = map.resources.get((d.ty + dy) * map.w + d.tx + dx); if (q && q.type === 'wood') return true; } return false; };
+  check('fleurs et herbe verte poussent sur les prés ; les buissons aussi, ou au pied d’une forêt', cToutes.filter((d) => d.piece.classe.startsWith('fleur') || d.piece.classe === 'herbe').every(pre)
+    && cToutes.filter((d) => d.piece.classe === 'buisson').every((d) => pre(d) || foret(d))
+    && cToutes.some((d) => d.piece.classe === 'buisson') && cToutes.some((d) => d.piece.classe.startsWith('fleur')),
+    `${cToutes.filter((d) => d.piece.classe === 'buisson').length} buissons, ${cToutes.filter((d) => d.piece.classe.startsWith('fleur')).length} fleurs`);
+  check('les touffes sèches poussent sur la terre et le sable', cToutes.filter((d) => d.piece.classe === 'touffe').every((d) => !pre(d)) && cToutes.some((d) => d.piece.classe === 'touffe'));
+  check('cuit dans le sol ou debout, selon la classe', cPlats.every((d) => CUITES.has(d.piece.classe)) && cDebout.every((d) => !CUITES.has(d.piece.classe)));
+  const tout = planterDecor(map);
+  check('le décor complet est la somme du rivage et de la campagne', tout.total === decor.total + campagne.total && tout.rivage === decor.total && tout.campagne === campagne.total
+    && tout.debout.reduce((n, l) => n + l.length, 0) + tout.cuits.reduce((n, l) => n + l.length, 0) === tout.total, `${tout.total} = ${decor.total} + ${campagne.total}`);
 }
 
 // --- Collé au gisement ---------------------------------------------------------

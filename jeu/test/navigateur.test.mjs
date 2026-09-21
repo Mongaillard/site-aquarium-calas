@@ -787,9 +787,11 @@ const lisieres = await page.evaluate(() => {
     }
   }
   const nappes = r.nappesPour(1);
+  r.decorActif = false;   // les pixels lus ici sont ceux du sol, pas d'un galet
   const t0 = performance.now();
   const { presents, masques } = r.couverturesTroncon(X0, Y0, cote);
   const canvas = r.rendreTroncon(cx, cy, 2, nappes);
+  r.decorActif = true;
   const scratch = document.createElement('canvas'); scratch.width = 4; scratch.height = 4;
   const sc = scratch.getContext('2d'); sc.drawImage(canvas, 0, 0, 4, 4); sc.getImageData(0, 0, 1, 1);   // force le rendu
   const ms = performance.now() - t0;
@@ -855,8 +857,10 @@ const rivage = await page.evaluate(() => {
   const sauve = [];
   for (let ty = ty0; ty < ty0 + cols; ty++) for (let tx = tx0; tx < tx0 + cols; tx++) { const i = ty * map.w + tx; sauve.push([i, map.terrain[i]]); map.terrain[i] = tx < tx0 + 6 ? 2 : 4; }
   const nappes = r.nappesPour(1);
+  r.decorActif = false;
   const { presents, masques, rivage } = r.couverturesTroncon(X0, Y0, cote);
   const canvas = r.rendreTroncon(cx, cy, 2, nappes);
+  r.decorActif = true;
   const out = { present: !!rivage };
   if (rivage) {
     const lire = (img) => (u, v) => img.data[(v * n + u) * 4 + 3];
@@ -1007,7 +1011,7 @@ const cadenceVillageois = await page.evaluate(async () => {
     `sud ${cadenceVillageois.arretSud} · ouest ${cadenceVillageois.arretOuest}`);
 }
 
-// Le décor des rivages : l'atlas des pièces est chargé, le décor planté sur la
+// Le décor de la carte : l'atlas des pièces est chargé, le décor planté sur la
 // carte, et il se voit — la même vue avec et sans décor diffère sur des
 // milliers de pixels.
 const decorRivage = await page.evaluate(async () => {
@@ -1015,7 +1019,7 @@ const decorRivage = await page.evaluate(async () => {
   const mod = await import('./js/sprites.js');
   const s = mod.spriteDe('rivage');
   const r = g.renderer;
-  const decor = r.decorRivage();
+  const decor = r.decorCarte();
   let meilleur = null, score = -1;
   for (let ty = 0; ty < map.h; ty++) for (const d of decor.debout[ty]) {
     let n = 0;
@@ -1037,8 +1041,8 @@ const decorRivage = await page.evaluate(async () => {
   g.camera.zoom = zoom; g.camera.x = cx; g.camera.y = cy;
   return { ...base, diff, autour: score };
 });
-check('l’atlas du décor de rivage est chargé : 46 pièces de 7 classes', decorRivage.pret && decorRivage.pieces >= 40 && decorRivage.classes === 7, `${decorRivage.pieces} pièces, ${decorRivage.classes} classes`);
-check('le rivage est décoré, et ça se voit', decorRivage.total > 0 && decorRivage.diff > 2000, `${decorRivage.total} pièces (${decorRivage.autour} autour du point de vue), ${decorRivage.diff} pixels changés`);
+check('l’atlas du décor est chargé : une soixantaine de pièces en douze classes', decorRivage.pret && decorRivage.pieces >= 60 && decorRivage.classes === 12, `${decorRivage.pieces} pièces, ${decorRivage.classes} classes`);
+check('la carte est décorée, et ça se voit', decorRivage.total > 0 && decorRivage.diff > 2000, `${decorRivage.total} pièces (${decorRivage.autour} autour du point de vue), ${decorRivage.diff} pixels changés`);
 
 // L'éclaireur illustré : huit orientations × quatre foulées, planche lue du
 // nord au nord-ouest et remise sur les secteurs du jeu ; la cape bascule, la

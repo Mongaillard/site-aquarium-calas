@@ -11,7 +11,7 @@ import {
   chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche, poseSource,
 } from './sprites.js';
 import { TERRAIN, BLOCK } from './map.js';
-import { planterRivage, ECHELLE_RIVAGE } from './decor.js';
+import { planterDecor, ECHELLE_RIVAGE } from './decor.js';
 import { STATE, villagerTask } from './entities.js';
 import { clamp, bruitPeriodique } from './utils.js';
 
@@ -335,6 +335,11 @@ export class Renderer {
   }
 
   drawTerrain(view) {
+    // Les tronçons cuits avant l'arrivée de l'atlas du décor n'en ont pas :
+    // dès qu'il est là (ou que le décor bascule), on repart de zéro.
+    const rivage = spriteDe('rivage');
+    const decorPret = !!(rivage && rivage.pret && this.decorActif);
+    if (decorPret !== this.decorCuit) { this.decorCuit = decorPret; this.troncons.clear(); }
     const zoom = this.camera.zoom;
     const nappes = this.nappesPour(zoom);
     if (!nappes) { this.drawTerrainTuiles(view); return; }
@@ -386,7 +391,7 @@ export class Renderer {
 
     const { presents, masques, etendues, rivage } = this.couverturesTroncon(X0, Y0, cote);
     this.dessinerNappe(ctx, nappes[TERRAIN_PAR_PRIORITE[presents[0]]], X0, Y0, cote, cote);
-    if (presents.length === 1) return canvas;
+    if (presents.length === 1) { this.cuireDecor(ctx, X0, Y0, cote); return canvas; }
 
     // Chaque couche, sur le rectangle où son masque n'est pas nul : son contenu
     // sur un tampon, passé par le masque (agrandi avec lissage : 2 px monde par
@@ -427,6 +432,7 @@ export class Renderer {
         composer(rivage.ecume.img, rivage.ecume.e, teinte(TEINTE_ECUME));
       }
     }
+    this.cuireDecor(ctx, X0, Y0, cote);
     return canvas;
   }
 
@@ -633,37 +639,45 @@ export class Renderer {
       else if (res.type === 'wood' && !arbres) this.drawTree(x, y, res);
       else if (res.type === 'food' && !buissons) this.drawBush(x, y, res);
     }
-    // Le décor plat des rivages (galets, nénuphars, fleurs) : sous tout le reste.
+  }
+
+  /**
+   * Le décor cuit dans un tronçon de sol : galets, fleurs, nénuphars, herbe —
+   * tout ce qui est assez bas pour vivre sous les unités. Peint une fois par
+   * tronçon, puis gardé avec lui : rien à payer à chaque image. Une pièce à
+   * cheval sur deux tronçons est peinte dans les deux, aux mêmes coordonnées
+   * monde — les recouvrements restent identiques.
+   */
+  cuireDecor(ctx, X0, Y0, cote) {
     const rivage = this.decorActif ? spriteDe('rivage') : null;
-    if (rivage && rivage.pret) {
-      const decor = this.decorRivage(), explored = this.world.fog.explored;
-      for (let ty = Math.max(0, view.y0 - 1); ty <= Math.min(map.h - 1, view.y1 + 1); ty++) {
-        for (const d of decor.plats[ty]) {
-          if (d.tx < view.x0 - 1 || d.tx > view.x1 + 1) continue;
-          const i = d.ty * map.w + d.tx;
-          if (!explored[i] || (map.blocked[i] & BLOCK.BUILDING)) continue;
-          this.dessinerPiece(d, rivage);
-        }
+    if (!rivage || !rivage.pret) return;
+    const map = this.world.map, decor = this.decorCarte();
+    const y0 = Math.max(0, Math.floor(Y0 / TILE) - 2), y1 = Math.min(map.h - 1, Math.floor((Y0 + cote) / TILE) + 1);
+    for (let ty = y0; ty <= y1; ty++) {
+      for (const d of decor.cuits[ty]) {
+        const w = d.piece.w * ECHELLE_RIVAGE * d.echelle, h = d.piece.h * ECHELLE_RIVAGE * d.echelle;
+        if (d.x + w / 2 < X0 || d.x - w / 2 > X0 + cote || d.y < Y0 || d.y - h > Y0 + cote) continue;
+        this.dessinerPiece(d, rivage, ctx);
       }
     }
   }
 
   /**
-   * Le décor des rivages se déduit de la carte (decor.js) ; il est planté une
-   * fois par carte et gardé.
+   * Le décor de la carte — rivages et campagne — se déduit de la carte
+   * (decor.js) ; il est planté une fois par carte et gardé.
    */
-  decorRivage() {
+  decorCarte() {
     const map = this.world.map;
     if (!this.decor || this.decor.carte !== map) {
-      this.decor = planterRivage(map);
+      this.decor = planterDecor(map);
       this.decor.carte = map;
     }
     return this.decor;
   }
 
   /** Une pièce du décor, posée par son pied ; en miroir une fois sur deux. */
-  dessinerPiece(d, sprite) {
-    const ctx = this.ctx, p = d.piece;
+  dessinerPiece(d, sprite, ctx = this.ctx) {
+    const p = d.piece;
     const w = p.w * ECHELLE_RIVAGE * d.echelle, h = p.h * ECHELLE_RIVAGE * d.echelle;
     if (d.miroir) {
       ctx.save();
@@ -818,14 +832,14 @@ export class Renderer {
         if (sprite) list.push({ kind: 'vegetation', res, sprite, ty: res.ty });
       }
     }
-    // Le décor debout des rivages (rochers, touffes, roseaux) : classé au pied
+    // Le décor debout (rochers, touffes, roseaux, buissons) : classé au pied
     // de chaque pièce, comme un arbre — une unité qui passe derrière un rocher
     // passe derrière. Un roseau de deux cases de haut oblige à regarder
     // quelques lignes sous le bord bas de l'écran.
     const rivage = this.decorActif ? spriteDe('rivage') : null;
     if (rivage && rivage.pret) {
       const map = this.world.map, explored = this.world.fog.explored;
-      const decor = this.decorRivage();
+      const decor = this.decorCarte();
       for (let ty = Math.max(0, view.y0 - 1); ty <= Math.min(map.h - 1, view.y1 + 3); ty++) {
         for (const d of decor.debout[ty]) {
           if (d.tx < view.x0 - 3 || d.tx > view.x1 + 3) continue;
