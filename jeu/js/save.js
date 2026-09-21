@@ -28,11 +28,13 @@ function serializeMap(map) {
   // rechargée de la partie d'origine dès la première récolte.
   const restant = [];
   const injoignables = [];   // gisements marqués injoignables, jusqu'à la prochaine remise à zéro
+  const ajoutes = [];        // gisements nés en cours de partie : les carcasses
   for (const [i, res] of map.resources) {
-    if (res.amount < res.max - 1e-9) restant.push([i, res.amount]);
+    if (res.gibier) ajoutes.push({ i, type: res.type, amount: res.amount, max: res.max, tx: res.tx, ty: res.ty, variant: res.variant, gibier: res.gibier });
+    else if (res.amount < res.max - 1e-9) restant.push([i, res.amount]);
     if (res.inaccessible) injoignables.push(i);
   }
-  return { disparus: [...map.removed], restant, injoignables };
+  return { disparus: [...map.removed], restant, injoignables, ajoutes };
 }
 
 function serializeProjectile(pr) {
@@ -87,6 +89,8 @@ function serializeUnit(u) {
     buildQueue: u.buildQueue.map(refId).filter((id) => id !== null),
     failedDropoffs: u.failedDropoffs ? [...u.failedDropoffs] : null,
     fleeUntil: u.fleeUntil, spawnTime: u.spawnTime,
+    // Un animal : sa pâture et ses minuteries (voir Animal).
+    animal: u.isAnimal ? { home: point(u.home), wanderTimer: u.wanderTimer, fleeTimer: u.fleeTimer, captureCooldown: u.captureCooldown } : null,
   };
 }
 
@@ -191,6 +195,9 @@ export function restoreWorld(data) {
 
   // 1. La carte : gisements disparus, puis contenu restant.
   for (const i of data.map.disparus) world.map.clearResource(i);
+  for (const a of data.map.ajoutes || []) {
+    world.map.resources.set(a.i, { type: a.type, amount: a.amount, max: a.max, tx: a.tx, ty: a.ty, variant: a.variant, gibier: a.gibier, passable: true });
+  }
   for (const [i, amount] of data.map.restant) {
     const res = world.map.resources.get(i);
     if (res) res.amount = amount;
@@ -235,8 +242,16 @@ export function restoreWorld(data) {
     paires.push([saved, b]);
   }
   for (const saved of data.units) {
-    const u = world.spawnUnit(saved.player, saved.type, saved.x, saved.y);
+    const u = saved.animal
+      ? world.spawnAnimal(saved.type, saved.x, saved.y, saved.player)
+      : world.spawnUnit(saved.player, saved.type, saved.x, saved.y);
     u.x = saved.x; u.y = saved.y;          // position exacte, sans recalage
+    if (saved.animal) {
+      u.home = saved.animal.home ? { ...saved.animal.home } : { x: saved.x, y: saved.y };
+      u.wanderTimer = saved.animal.wanderTimer || 0;
+      u.fleeTimer = saved.animal.fleeTimer || 0;
+      u.captureCooldown = saved.animal.captureCooldown || 0;
+    }
     u.hp = saved.hp;
     u.state = saved.state;
     u.facing = saved.facing;
@@ -274,6 +289,10 @@ export function restoreWorld(data) {
   world.byId.clear();
   for (const [, entity] of paires) world.byId.set(entity.id, entity);
   world.nextId = Math.max(world.nextId, data.nextId || 1);
+  // Les constructions ci-dessus ont tiré au sort (orientations, minuteries) :
+  // on remet le générateur là où la sauvegarde l'a laissé, sinon la partie
+  // reprise ne rejoue pas les mêmes hasards — la pâture des animaux, d'abord.
+  world.rng.s = data.rng >>> 0;
   world.pathQueue = (data.pathQueue || []).map((id) => parId.get(id)).filter((u) => u && u.pathPending);
 
   // 5. Les renvois d'une entité à l'autre, maintenant que toutes existent.

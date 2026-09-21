@@ -635,6 +635,7 @@ export class Renderer {
       if (res.tx < view.x0 || res.tx > view.x1 || res.ty < view.y0 || res.ty > view.y1) continue;
       if (!this.world.fog.explored[res.ty * map.w + res.tx]) continue;
       const x = res.tx * TILE, y = res.ty * TILE;
+      if (res.gibier) { this.dessinerCarcasse(res); continue; }
       if (res.type === 'gold' && !or) this.drawGold(x, y, res);
       else if (res.type === 'wood' && !arbres) this.drawTree(x, y, res);
       else if (res.type === 'food' && !buissons) this.drawBush(x, y, res);
@@ -688,6 +689,32 @@ export class Renderer {
     } else {
       ctx.drawImage(sprite.variantes.bleu, p.x, p.y, p.w, p.h, d.x - w / 2, d.y - h, w, h);
     }
+  }
+
+  /**
+   * Une carcasse : l'animal de profil, couché sur le flanc, qui rapetisse à
+   * mesure qu'on la dépèce.
+   */
+  dessinerCarcasse(res) {
+    const ctx = this.ctx;
+    const cx = res.tx * TILE + TILE / 2, cy = res.ty * TILE + TILE / 2;
+    const sprite = spriteDe(res.gibier);
+    const ratio = res.max ? res.amount / res.max : 1;
+    if (!sprite) {
+      ctx.fillStyle = '#7a4a3a';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 11 * (0.6 + 0.4 * ratio), 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    const { cellW, cellH, hauteurMonde } = sprite.def;
+    const h = hauteurMonde * (0.7 + 0.3 * ratio), w = (cellW / cellH) * h;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(res.variant % 2 ? Math.PI / 2 : -Math.PI / 2);
+    ctx.globalAlpha = 0.92;
+    ctx.drawImage(sprite.variantes.bleu, 0, cellH, cellW, cellH, -w / 2, -h / 2, w, h);
+    ctx.restore();
   }
 
   /**
@@ -827,7 +854,7 @@ export class Renderer {
       const explored = this.world.fog.explored;
       for (const res of map.resources.values()) {
         if (res.tx < view.x0 - 1 || res.tx > view.x1 + 1 || res.ty < view.y0 - 2 || res.ty > view.y1 + 1) continue;
-        if (!explored[res.ty * map.w + res.tx]) continue;
+        if (!explored[res.ty * map.w + res.tx] || res.gibier) continue;
         const sprite = res.type === 'wood' ? arbres : res.type === 'food' ? buissons : res.type === 'gold' ? or : null;
         if (sprite) list.push({ kind: 'vegetation', res, sprite, ty: res.ty });
       }
@@ -1248,20 +1275,24 @@ export class Renderer {
       const ligne = sprite.def.lignes ? sprite.def.lignes[k] : k;
       const image = imageDeMarche(sprite.def, anim.distance || 0, anim.avance, ligne);
       ({ sx, sy } = cadreSource(sprite.def, k, image));
+      miroir = !!(sprite.def.miroirs && sprite.def.miroirs[k]);   // l'ouest est l'est retourné
     }
     // Socle aux couleurs du joueur : de loin, une armure reste une tache
     // sombre, et l'appartenance doit se lire d'un coup d'œil. C'est la
     // solution d'AoE, et elle vaut mieux qu'un personnage repeint en entier.
-    const sol = y + u.radius * 0.45;
-    ctx.fillStyle = u.player.color.main;
-    ctx.globalAlpha = 0.55;
-    ctx.beginPath();
-    ctx.ellipse(x, sol - 1, u.radius * 0.78, u.radius * 0.34, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = u.player.color.light;
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
+    // Un animal sauvage n'a pas de camp : pas de socle.
+    if (!u.isAnimal || u.playerIndex >= 0) {
+      const sol = y + u.radius * 0.45;
+      ctx.fillStyle = u.player.color.main;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.ellipse(x, sol - 1, u.radius * 0.78, u.radius * 0.34, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = u.player.color.light;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
 
     const h = hauteurMonde;
     const w = (cellW / cellH) * h;
@@ -1628,7 +1659,7 @@ export class Renderer {
     ctx.drawImage(this.fogCanvas, 0, 0, size, size);
 
     for (const e of this.world.entities) {
-      if (e.dead || e.garrisonedIn) continue;
+      if (e.dead || e.garrisonedIn || (e.isAnimal && e.playerIndex < 0)) continue;
       if (e.playerIndex !== this.world.humanIndex && !this.isEntityVisible(e)) continue;
       ctx.fillStyle = e.player.color.main;
       const s = e.kind === 'building' ? Math.max(3, e.size * scale) : Math.max(2, scale * 1.2);

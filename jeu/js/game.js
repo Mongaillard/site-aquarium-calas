@@ -8,9 +8,9 @@ import {
   TILE, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
   START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, GAME_MODES, DEFAULT_MODE,
 } from './config.js';
-import { GameMap } from './map.js';
+import { GameMap, BLOCK } from './map.js';
 import { PathFinder } from './pathfinding.js';
-import { Unit, Building, Projectile, STATE, computeDamage } from './entities.js';
+import { Unit, Animal, Building, Projectile, STATE, computeDamage } from './entities.js';
 import { SpatialGrid, RNG, dist, dist2, canAfford, payCost, clamp } from './utils.js';
 import { AIPlayer } from './ai.js';
 
@@ -76,6 +76,9 @@ export class World {
       makePlayer(1, 'Adversaire', true),
     ];
     this.players[1].mods.gatherRate = this.difficulty.gatherBonus;
+    // « La nature » : le camp des animaux sauvages, qui n'est pas un joueur.
+    this.gaia = makePlayer(-1, 'Nature', false);
+    this.gaia.color = { main: '#8b7d66', light: '#c2b59f', dark: '#5c5142', name: 'Nature' };
 
     this.fog = this.createFog();
     this.ais = [];
@@ -112,7 +115,94 @@ export class World {
       this.spawnUnit(index, 'scout', spawn.x + TILE * 2.5, spawn.y + TILE * 1.2);
     });
     this.addAI(1);
+    this.spawnHerds();
     this.recomputePopulation();
+  }
+
+  /**
+   * Les hardes : quatre cochons à sept ou huit cases de chaque Centre-Ville,
+   * à capturer, et des hardes de cerfs loin des bases. Un tirage à part de la
+   * graine : la mise en place du reste ne bouge pas d'un pixel.
+   */
+  spawnHerds() {
+    const map = this.map;
+    const rng = new RNG((this.seed ^ 0x5eed) >>> 0 || 1);
+    const bases = map.startPositions;
+    const loinDesBases = (tx, ty, min) => bases.every((b) => Math.hypot(tx - b.tx, ty - b.ty) >= min);
+    const poserHarde = (type, cx, cy, n) => {
+      let poses = 0;
+      for (let k = 0; k < n * 6 && poses < n; k++) {
+        const a = rng.next() * Math.PI * 2, r = rng.next() * 1.8;
+        const tx = Math.round(cx + Math.cos(a) * r), ty = Math.round(cy + Math.sin(a) * r);
+        if (!map.isOpenTile(tx, ty)) continue;
+        const animal = this.spawnAnimal(type, tx * TILE + TILE / 2, ty * TILE + TILE / 2);
+        animal.home = { x: cx * TILE + TILE / 2, y: cy * TILE + TILE / 2 };
+        poses++;
+      }
+      return poses;
+    };
+    for (const b of bases) {
+      for (let essai = 0; essai < 40; essai++) {
+        const a = rng.next() * Math.PI * 2, d = 6 + rng.next() * 3;
+        const tx = Math.round(b.tx + Math.cos(a) * d), ty = Math.round(b.ty + Math.sin(a) * d);
+        if (!map.isOpenTile(tx, ty) || map.floodSize(tx, ty, 30) < 30) continue;
+        if (poserHarde('pig', tx, ty, 4) >= 3) break;
+      }
+    }
+    const hardes = Math.max(3, Math.round((map.w * map.h) / 1400));
+    let posees = 0;
+    for (let essai = 0; essai < hardes * 40 && posees < hardes; essai++) {
+      const tx = 3 + Math.floor(rng.next() * (map.w - 6)), ty = 3 + Math.floor(rng.next() * (map.h - 6));
+      if (!map.isOpenTile(tx, ty) || !loinDesBases(tx, ty, 14) || map.floodSize(tx, ty, 40) < 40) continue;
+      if (poserHarde('deer', tx, ty, 3 + Math.floor(rng.next() * 3)) >= 2) posees++;
+    }
+  }
+
+  spawnAnimal(type, x, y, playerIndex = -1) {
+    const animal = new Animal(this, type, x, y, playerIndex);
+    this.entities.push(animal);
+    this.units.push(animal);
+    this.byId.set(animal.id, animal);
+    return animal;
+  }
+
+  onAnimalCaptured(animal) {
+    if (animal.playerIndex === this.humanIndex) {
+      this.pushEvent({ type: 'notice', text: 'Cochon capturé : menez-le au village, un villageois l’abattra.' });
+    }
+  }
+
+  /** L'unité (pas un animal) la plus proche dans le rayon, tous camps confondus. */
+  unitePres(entity, radius) {
+    let best = null, bestD = Infinity;
+    this.grid.forEachNear(entity.x, entity.y, radius, (other) => {
+      if (other.dead || other.kind !== 'unit' || other.isAnimal || other.garrisonedIn) return;
+      const d = dist(entity.x, entity.y, other.x, other.y);
+      if (d <= radius && d < bestD) { bestD = d; best = other; }
+    });
+    return best;
+  }
+
+  /**
+   * Un animal abattu laisse sa carcasse : une case de nourriture qui ne bloque
+   * pas le passage, posée là où il est tombé (ou tout à côté). Les villageois
+   * qui le chassaient enchaînent dessus.
+   */
+  deposerCarcasse(animal) {
+    const map = this.map;
+    let tx = Math.floor(animal.x / TILE), ty = Math.floor(animal.y / TILE);
+    if (!map.inBounds(tx, ty) || map.resources.has(map.idx(tx, ty)) || (map.blocked[map.idx(tx, ty)] & (BLOCK.BUILDING | BLOCK.TERRAIN))) {
+      const libre = map.findFreeTile(tx, ty, 3);
+      if (!libre) return null;
+      tx = libre.tx; ty = libre.ty;
+    }
+    const res = map.addResource(tx, ty, 'food', this.rng, { amount: animal.def.food, gibier: animal.type });
+    if (!res) return null;
+    for (const u of this.units) {
+      if (u.dead || !u.isVillager || u.target !== animal) continue;
+      u.gatherAt(tx, ty);
+    }
+    return res;
   }
 
   newEntityId() { return this.nextId++; }
@@ -302,7 +392,7 @@ export class World {
   findEnemyNear(entity, radius) {
     let best = null, bestScore = Infinity;
     this.grid.forEachNear(entity.x, entity.y, radius, (other) => {
-      if (other.dead || other.playerIndex === entity.playerIndex) return;
+      if (other.dead || other.playerIndex === entity.playerIndex || other.isAnimal) return;
       if (other.kind === 'building' && !other.complete && other.hp <= 1) return;
       const d = entity.kind === 'building' || other.kind === 'building'
         ? Math.max(entity.edgeDistanceTo(other.x, other.y), other.edgeDistanceTo(entity.x, entity.y))
@@ -456,7 +546,9 @@ export class World {
         && source.kind === 'unit' && source.isVillager && entity.state === STATE.IDLE) {
       entity.attackEntity(source, true);
     }
-    if (entity.playerIndex === this.humanIndex) {
+    // Abattre son propre cochon n'est pas une attaque.
+    const abattage = entity.isAnimal && source && source.playerIndex === entity.playerIndex;
+    if (entity.playerIndex === this.humanIndex && !abattage) {
       this.pushEvent({ type: 'underAttack', x: entity.x, y: entity.y, entity });
     }
   }
@@ -466,14 +558,17 @@ export class World {
     entity.dead = true;
     entity.selected = false;
     this.byId.delete(entity.id);
-    const owner = this.players[entity.playerIndex];
+    const owner = this.players[entity.playerIndex] || this.gaia;
 
     if (entity.kind === 'unit') {
       const i = this.units.indexOf(entity);
       if (i >= 0) this.units.splice(i, 1);
-      owner.stats.lost++;
-      if (source && this.players[source.playerIndex]) this.players[source.playerIndex].stats.killed++;
+      if (!entity.isAnimal) {
+        owner.stats.lost++;
+        if (source && this.players[source.playerIndex]) this.players[source.playerIndex].stats.killed++;
+      }
       this.effects.push({ kind: 'death', x: entity.x, y: entity.y, life: 1.2, max: 1.2, color: owner.color.main });
+      if (entity.isAnimal) this.deposerCarcasse(entity);
     } else {
       const i = this.buildings.indexOf(entity);
       if (i >= 0) this.buildings.splice(i, 1);
@@ -528,7 +623,7 @@ export class World {
 
   recomputePopulation() {
     for (const p of this.players) { p.pop = 0; p.popCap = 0; }
-    for (const u of this.units) if (!u.dead) this.players[u.playerIndex].pop++;
+    for (const u of this.units) if (!u.dead && !u.isAnimal) this.players[u.playerIndex].pop++;
     for (const b of this.buildings) {
       if (b.dead || !b.complete || !b.def.popBonus) continue;
       this.players[b.playerIndex].popCap += b.def.popBonus;
@@ -825,16 +920,28 @@ export class World {
     const tolerance = options.tolerance ?? TILE * 0.6;
     // Un ennemi sous le doigt l'emporte sur un allié : quand on a ses troupes
     // en main et qu'on touche une mêlée, l'intention est d'attaquer.
-    const target = this.enemyAt(worldX, worldY, playerIndex, tolerance)
-      || this.entityAt(worldX, worldY, null, tolerance);
+    // Un animal ne se vise qu'en le touchant vraiment : avec la tolérance du
+    // doigt, un cerf qui passe transformerait chaque ordre de marche en chasse.
+    const sansBeteFrolee = (e) => (e && e.isAnimal && this.hitTest(e, worldX, worldY, 0) < 0 ? null : e);
+    const target = sansBeteFrolee(this.enemyAt(worldX, worldY, playerIndex, tolerance))
+      || sansBeteFrolee(this.entityAt(worldX, worldY, null, tolerance));
     const res = this.resourceNear(worldX, worldY);
 
+    // Sa propre bête sous le doigt : les villageois l'abattent — elle finit en
+    // nourriture au village.
+    if (target && target.isAnimal && target.playerIndex === playerIndex && !target.dead) {
+      const villagers = units.filter((u) => u.isVillager);
+      if (villagers.length) {
+        for (const v of villagers) v.attackEntity(target);
+        return { kind: 'hunt', target, workers: villagers.length };
+      }
+    }
     if (target && target.playerIndex !== playerIndex && !target.dead) {
       for (const u of units) {
         if (u.isVillager && target.kind === 'building' && !target.complete) continue;
         u.attackEntity(target);
       }
-      return { kind: 'attack', target };
+      return { kind: target.isAnimal ? 'hunt' : 'attack', target, workers: units.filter((u) => u.isVillager).length };
     }
     if (target && target.playerIndex === playerIndex && target.kind === 'building') {
       const villagers = units.filter((u) => u.isVillager);
@@ -1187,7 +1294,7 @@ export class World {
    */
   score(player) {
     const g = player.stats.gathered;
-    const unites = this.units.filter((u) => !u.dead && u.playerIndex === player.index).length;
+    const unites = this.units.filter((u) => !u.dead && !u.isAnimal && u.playerIndex === player.index).length;
     const batiments = this.buildings.filter(
       (b) => !b.dead && b.complete && b.playerIndex === player.index).length;
     return Math.round(g.food + g.wood + g.gold + unites * 10 + batiments * 25);

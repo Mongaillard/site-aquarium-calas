@@ -283,6 +283,27 @@ des combats ont lieu et que l'état reste cohérent. Le test navigateur vérifie
 qu'il n'y a aucune erreur console, que le rendu tient 30+ images/s, et que les
 gestes (sélection, ordre, pose de bâtiment, zoom) répondent.
 
+## Le troupeau
+
+Des **hardes** vivent sur la carte : quatre **cochons** à sept ou huit cases de
+chaque Centre-Ville, et des hardes de **cerfs** loin des bases. Ils pâturent
+autour de leur point d'attache, ne comptent pas dans la population et ne sont
+la cible de personne d'eux-mêmes — les soldats les ignorent.
+
+- **Le cerf se chasse** : touchez-le avec des villageois en main. Frappé, il
+  détale quelques cases puis s'arrête, et le chasseur le rattrape à l'arrêt.
+  Abattu, il laisse une **carcasse** de 140 de nourriture, qui ne bloque pas le
+  passage ; le chasseur la dépèce sans nouvel ordre et rapporte la viande au
+  dépôt le plus proche.
+- **Le cochon se capture** : un villageois qui passe à moins de deux cases le
+  fait sien. Il cesse alors d'errer, se sélectionne et se mène au doigt comme
+  une unité ; menez-le au village, puis touchez-le avec un villageois pour
+  l'abattre — 100 de nourriture. Les unités adverses peuvent capturer les
+  vôtres de la même façon.
+
+Un ordre donné *à côté* d'un animal reste un ordre de déplacement : seul un
+doigt posé sur la bête déclenche la chasse.
+
 ## Les images et les icônes
 
 Le jeu n'a longtemps affiché **aucune image** : tout était dessiné au code, et

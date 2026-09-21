@@ -87,7 +87,7 @@ class Entity {
     this.selected = false;
     this.lastHitAt = -999;
   }
-  get player() { return this.world.players[this.playerIndex]; }
+  get player() { return this.world.players[this.playerIndex] || this.world.gaia; }
   meleeArmor() { return (this.def.meleeArmor || 0) + this.player.mods.meleeArmor; }
   pierceArmor() { return (this.def.pierceArmor || 0) + this.player.mods.pierceArmor; }
   get combatClass() { return this.kind === 'building' ? 'building' : this.def.class; }
@@ -1061,6 +1061,106 @@ export class Unit extends Entity {
     // Coincé dans un angle : on s'écarte perpendiculairement pour le contourner.
     if (apply(-uy * len, ux * len)) return;
     apply(uy * len, -ux * len);
+  }
+}
+
+// ===========================================================================
+// ANIMAUX
+// ===========================================================================
+
+/**
+ * Un animal : une unité sans camp (playerIndex -1, « la nature ») qui pâture
+ * autour d'un point, détale quand on la frappe si elle est sauvage, et laisse
+ * une carcasse à récolter (voir World.deposerCarcasse). Un cochon se capture :
+ * il devient l'unité du premier joueur qui l'approche, cesse d'errer, se mène
+ * comme une unité et s'abat au village. Toute l'aléa passe par le générateur
+ * du monde : même graine, mêmes hardes, même pâture.
+ */
+export class Animal extends Unit {
+  constructor(world, type, x, y, playerIndex = -1) {
+    super(world, playerIndex, type, x, y);
+    this.isAnimal = true;
+    this.stance = 'passive';       // ni riposte, ni cible prise d'initiative
+    this.home = { x, y };          // centre de pâture
+    this.wanderTimer = 1 + world.rng.next() * 4;
+    this.fleeTimer = 0;
+    this.captureCooldown = 0;
+  }
+
+  get sauvage() { return this.playerIndex < 0; }
+
+  speedPx() { return this.def.speed * TILE * (this.fleeTimer > 0 ? 1.6 : 1); }
+
+  takeDamage(amount, source) {
+    super.takeDamage(amount, source);
+    // Frappé, un animal sauvage détale — quelques cases, puis il s'arrête :
+    // le chasseur le rattrape à l'arrêt, comme dans AoE.
+    if (!this.dead && this.def.sauvage && this.sauvage && source) this.fuir(source, 4);
+  }
+
+  update(dt) {
+    if (this.dead) return;
+    if (this.repathCooldown > 0) this.repathCooldown -= dt;
+    if (this.fleeTimer > 0) this.fleeTimer -= dt;
+    if (this.captureCooldown > 0) this.captureCooldown -= dt;
+    if (this.state === STATE.IDLE) {
+      const sep = this.world.separationForce(this);
+      if (sep.x !== 0 || sep.y !== 0) this.tryMove(sep.x * 14 * dt, sep.y * 14 * dt);
+    }
+    if (this.state === STATE.MOVE) {
+      if (this.followPath(dt)) { this.state = STATE.IDLE; this.destination = null; this.repathAttempts = 0; }
+    } else if (this.state !== STATE.IDLE) {
+      // Un animal ne connaît que l'arrêt et la marche.
+      this.state = STATE.IDLE; this.target = null; this.path = null;
+    }
+    if (!this.sauvage) return;     // capturé : il attend les ordres de son maître
+    if (this.def.capturable && this.captureCooldown <= 0) {
+      this.captureCooldown = 0.5;
+      const maitre = this.world.unitePres(this, TILE * 1.6);
+      if (maitre) { this.capturer(maitre.playerIndex); return; }
+    }
+    this.wanderTimer -= dt;
+    if (this.wanderTimer <= 0 && this.state === STATE.IDLE) {
+      this.wanderTimer = 4 + this.world.rng.next() * 7;
+      this.brouter();
+    }
+  }
+
+  /** Un pas de pâture : un point à portée du centre de la harde. */
+  brouter() {
+    const rng = this.world.rng;
+    const a = rng.next() * Math.PI * 2, r = (0.4 + rng.next() * 0.6) * (this.def.patureCases || 2) * TILE;
+    this.allerVers(this.home.x + Math.cos(a) * r, this.home.y + Math.sin(a) * r);
+  }
+
+  fuir(menace, cases) {
+    const dx = this.x - menace.x, dy = this.y - menace.y;
+    const n = Math.hypot(dx, dy) || 1;
+    this.fleeTimer = 1.5;
+    this.wanderTimer = 3 + this.world.rng.next() * 3;
+    const x = this.x + (dx / n) * cases * TILE, y = this.y + (dy / n) * cases * TILE;
+    this.home = { x, y };          // la harde ne revient pas sous le couteau
+    this.allerVers(x, y);
+  }
+
+  allerVers(x, y) {
+    const map = this.world.map;
+    const tx = Math.max(0, Math.min(map.w - 1, Math.floor(x / TILE)));
+    const ty = Math.max(0, Math.min(map.h - 1, Math.floor(y / TILE)));
+    const libre = map.isOpenTile(tx, ty) ? { tx, ty } : map.findFreeTile(tx, ty, 3);
+    if (!libre) return;
+    this.destination = { x: libre.tx * TILE + TILE / 2, y: libre.ty * TILE + TILE / 2 };
+    this.state = STATE.MOVE;
+    this.repathAttempts = 0;
+    this.requestPathTo(this.destination.x, this.destination.y);
+  }
+
+  /** Le cochon change de camp : il cesse d'errer et se mène comme une unité. */
+  capturer(playerIndex) {
+    if (playerIndex < 0 || playerIndex === this.playerIndex) return;
+    this.playerIndex = playerIndex;
+    this.state = STATE.IDLE; this.path = null; this.destination = null;
+    this.world.onAnimalCaptured(this);
   }
 }
 

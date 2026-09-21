@@ -310,7 +310,12 @@ export class UI {
     if (selection.length === 1) {
       const def = first.def;
       const rows = [];
-      if (first.kind === 'unit') {
+      if (first.kind === 'unit' && first.isAnimal) {
+        rows.push(`${ic('food')} ${def.food} de nourriture`);
+        rows.push(first.playerIndex < 0
+          ? (def.capturable ? 'sauvage — approchez un villageois' : 'gibier — envoyez des villageois')
+          : 'capturé — un villageois l’abat');
+      } else if (first.kind === 'unit') {
         rows.push(`${ic('aggressive')} ${def.attack} · ${ic('defensive')} ${first.meleeArmor()}/${first.pierceArmor()}`);
         rows.push(`${ic(first.stanceDef.icon)} ${first.stanceDef.name}`);
         if (first.buildQueue && first.buildQueue.length > 0) {
@@ -343,7 +348,7 @@ export class UI {
             ? `<img src="${PORTRAITS[first.type]}" alt="" class="${mine ? '' : 'adverse'}">`
             : iconeSVG(def.icon, 30)}</div>
         <div class="info">
-          <div class="name">${def.name}${mine ? '' : ' <span class="enemy">(ennemi)</span>'}</div>
+          <div class="name">${def.name}${mine ? '' : first.isAnimal && first.playerIndex < 0 ? ' <span class="enemy">(sauvage)</span>' : ' <span class="enemy">(ennemi)</span>'}</div>
           <div class="hp"><span style="width:${Math.round((first.hp / first.maxHp) * 100)}%"></span></div>
           <div class="stats">${ic('pointsDeVie')} ${Math.ceil(first.hp)}/${first.maxHp} · ${rows.join(' · ')}</div>
         </div>`;
@@ -386,7 +391,12 @@ export class UI {
     if (first.playerIndex !== this.world.humanIndex) { node.innerHTML = ''; return; }
 
     const buttons = [];
-    const units = selection.filter((e) => e.kind === 'unit');
+    // Un cochon capturé se mène au doigt ; il n'a ni attitude ni abri.
+    const betes = selection.filter((e) => e.kind === 'unit' && e.isAnimal);
+    const units = selection.filter((e) => e.kind === 'unit' && !e.isAnimal);
+    if (betes.length > 0 && units.length === 0) {
+      buttons.push({ icon: 'stop', label: 'Stop', action: () => this.game.stopSelection() });
+    }
     const villagers = units.filter((u) => u.isVillager);
     const military = units.filter((u) => !u.isVillager);
 

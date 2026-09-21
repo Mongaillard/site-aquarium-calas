@@ -129,6 +129,21 @@ const ATLAS = {
     src: 'assets/decor.webp',
     pieces: PIECES_DECOR,
   },
+  // Les animaux : trois rangées (sud, est, nord) de quatre foulées ; l'ouest
+  // est l'est en miroir (`miroirs`). Pas de couleur d'équipe : un cochon
+  // capturé se reconnaît à son socle.
+  deer: {
+    src: 'assets/cerf.webp',
+    cellW: 74, cellH: 86, cases: 4, images: 4, cycle: 40,
+    lignes: [0, 1, 2, 1], miroirs: [false, false, false, true],
+    ancreY: 84, hauteurMonde: 43,
+  },
+  pig: {
+    src: 'assets/cochon.webp',
+    cellW: 72, cellH: 67, cases: 4, images: 4, cycle: 26,
+    lignes: [0, 1, 2, 1], miroirs: [false, false, false, true],
+    ancreY: 65, hauteurMonde: 33.5,
+  },
   spearman: {
     src: 'assets/lancier.png',
     cellW: 48, cellH: 48, cases: 8, images: 1,

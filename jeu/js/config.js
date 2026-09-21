@@ -135,6 +135,26 @@ export const UNIT_TYPES = {
     from: 'siege', age: 2,
     desc: 'Démolit les bâtiments. Lent et vulnérable aux lanciers.',
   },
+  // Les animaux vivent sur la carte : ni produits, ni comptés dans la
+  // population, sans camp (voir Animal, entities.js). `food` est ce que rend
+  // leur carcasse ; un animal `sauvage` fuit quand on le frappe, un
+  // `capturable` devient le bien du premier joueur qui l'approche.
+  deer: {
+    id: 'deer', name: 'Cerf', icon: 'food', class: 'animal',
+    cost: {}, trainTime: 0, hp: 15, speed: 1.35,
+    attack: 0, attackType: 'melee', range: 0, attackSpeed: 1,
+    meleeArmor: 0, pierceArmor: 0, los: 1, radius: 8,
+    food: 140, sauvage: true, patureCases: 2.5,
+    desc: 'Gibier : sa carcasse vaut 140 de nourriture. Envoyez des villageois le chasser — il détale quand on le frappe, puis s’arrête.',
+  },
+  pig: {
+    id: 'pig', name: 'Cochon', icon: 'food', class: 'animal',
+    cost: {}, trainTime: 0, hp: 9, speed: 0.6,
+    attack: 0, attackType: 'melee', range: 0, attackSpeed: 1,
+    meleeArmor: 0, pierceArmor: 0, los: 2, radius: 8,
+    food: 100, capturable: true, patureCases: 1.5,
+    desc: 'Approchez un villageois pour le capturer, menez-le au village, puis faites-le abattre par un villageois : 100 de nourriture.',
+  },
 };
 
 // --- Bâtiments --------------------------------------------------------------

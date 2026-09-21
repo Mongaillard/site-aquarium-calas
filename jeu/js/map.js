@@ -179,16 +179,21 @@ export class GameMap {
     this.dirty = true;
   }
 
-  addResource(tx, ty, type, rng) {
-    if (!this.inBounds(tx, ty)) return;
+  /**
+   * @param {object} [options] `amount` (sinon la quantité du type), `gibier`
+   *   (le type d'animal dont c'est la carcasse : elle ne bloque pas le passage).
+   * @returns la case créée, ou null.
+   */
+  addResource(tx, ty, type, rng, options = {}) {
+    if (!this.inBounds(tx, ty)) return null;
     const i = this.idx(tx, ty);
-    if (this.blocked[i] || this.resources.has(i)) return;
-    const max = RESOURCE_TILE_AMOUNT[type];
-    this.resources.set(i, {
-      type, amount: max, max, tx, ty,
-      variant: rng ? rng.int(0, 255) : 0,
-    });
-    this.blocked[i] |= BLOCK.RESOURCE;
+    if (this.blocked[i] || this.resources.has(i)) return null;
+    const max = options.amount ?? RESOURCE_TILE_AMOUNT[type];
+    const res = { type, amount: max, max, tx, ty, variant: rng ? rng.int(0, 255) : 0 };
+    if (options.gibier) { res.gibier = options.gibier; res.passable = true; }
+    this.resources.set(i, res);
+    if (!res.passable) this.blocked[i] |= BLOCK.RESOURCE;
+    return res;
   }
 
   // --- Génération -----------------------------------------------------------

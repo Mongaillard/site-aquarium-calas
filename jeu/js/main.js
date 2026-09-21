@@ -302,6 +302,11 @@ class Game {
     const isMine = entity && entity.playerIndex === this.world.humanIndex;
     const visible = entity && (isMine || this.renderer.isEntityVisible(entity));
 
+    // Un cochon capturé sous le doigt, des villageois en main : on l'abat.
+    if (entity && isMine && entity.isAnimal && !isDouble && ownUnits.some((u) => u.isVillager)) {
+      this.issueOrder(entity.x, entity.y);
+      return;
+    }
     if (entity && isMine) {
       // Des soldats qui touchent un abri allié n'ont qu'une intention possible :
       // s'y réfugier. Pour les villageois on reste sur la sélection, qui sert
@@ -423,8 +428,14 @@ class Game {
         ? `${result.workers} ouvriers envoyés ${verbe}`
         : `Ouvrier envoyé ${verbe}`);
     }
+    if (result && result.kind === 'hunt') {
+      const bete = result.target;
+      this.ui.toast(bete.playerIndex === this.world.humanIndex
+        ? `${bete.def.name} : abattage, ${bete.def.food} de nourriture`
+        : `Chasse au ${bete.def.name.toLowerCase()} : ${bete.def.food} de nourriture`);
+    }
     const colors = {
-      attack: '#ff6b6b', gather: '#ffd166', build: '#8ecae6',
+      attack: '#ff6b6b', hunt: '#ff9b6b', gather: '#ffd166', build: '#8ecae6',
       repair: '#8ecae6', garrison: '#c39bf6', move: '#9bf6a0',
     };
     this.pingOrder(worldX, worldY, colors[result ? result.kind : 'move'] || '#9bf6a0');

@@ -79,7 +79,7 @@ check('au moins un camp atteint l’Âge Féodal', world.players.some((p) => p.a
 check('des villageois travaillent encore', r0.villagers > 0 && r1.villagers > 0);
 check('des combats ont eu lieu', combats > 0, combats + ' entités détruites');
 check('aucune entité fantôme', world.entities.every((e) => !e.dead));
-check('population cohérente', world.players.every((p) => p.pop === world.units.filter((u) => u.playerIndex === p.index).length));
+check('population cohérente', world.players.every((p) => p.pop === world.units.filter((u) => u.playerIndex === p.index && !u.isAnimal).length));
 
 // Partie « économique » : sur une grande carte, les bases sont assez éloignées
 // pour que les deux camps puissent développer leur économie sans être razziés.
@@ -225,6 +225,68 @@ check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches >
   const tout = planterDecor(map);
   check('le décor complet est la somme du rivage et de la campagne', tout.total === decor.total + campagne.total && tout.rivage === decor.total && tout.campagne === campagne.total
     && tout.debout.reduce((n, l) => n + l.length, 0) + tout.cuits.reduce((n, l) => n + l.length, 0) === tout.total, `${tout.total} = ${decor.total} + ${campagne.total}`);
+}
+
+// --- Le troupeau ---------------------------------------------------------------
+// Des hardes sur la carte : quatre cochons près de chaque base, des cerfs loin
+// des bases, ni comptés ni produits. Un cerf se chasse : il détale quand on le
+// frappe puis s'arrête ; abattu, il laisse une carcasse que le chasseur dépèce
+// sans nouvel ordre. Un cochon se capture en l'approchant, se mène au doigt et
+// s'abat au village.
+{
+  const w = new World({ seed: 11, mapSize: 'small', difficulty: 'normal' });
+  w.ais = [];
+  const betes = w.units.filter((u) => u.isAnimal);
+  const cochons = betes.filter((b) => b.type === 'pig'), cerfs = betes.filter((b) => b.type === 'deer');
+  const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  check('des hardes au départ : cochons près des bases, cerfs plus loin', cochons.length >= 6 && cerfs.length >= 6, `${cochons.length} cochons, ${cerfs.length} cerfs`);
+  check('des cochons à moins de dix cases du Centre-Ville', cochons.filter((c) => dist(c.x, c.y, tc.x, tc.y) < TILE * 10).length >= 3);
+  check('les cerfs se tiennent loin des bases', cerfs.every((c) => w.map.startPositions.every((s) => dist(c.x, c.y, s.tx * TILE, s.ty * TILE) > TILE * 11)));
+  check('les animaux ne comptent pas dans la population', w.players[0].pop === 5 && w.players[0].pop === w.units.filter((u) => u.playerIndex === 0 && !u.isAnimal).length, w.players[0].pop + ' de population');
+  check('sur des cases libres, jamais dans l’eau', betes.every((b) => w.map.isOpenTile(Math.floor(b.x / TILE), Math.floor(b.y / TILE))));
+  const avant = betes.map((b) => [b.x, b.y]);
+  advance(w, 30);
+  const bouge = betes.filter((b, i) => dist(b.x, b.y, avant[i][0], avant[i][1]) > 8).length;
+  check('ils pâturent : presque tous ont bougé en trente secondes', bouge >= betes.length * 0.7, `${bouge}/${betes.length}`);
+  check('sans s’éloigner de leur pâture', betes.every((b) => dist(b.x, b.y, b.home.x, b.home.y) < TILE * 5));
+  check('aucun soldat ne les prend pour cible de lui-même', w.units.every((u) => !u.target || !u.target.isAnimal));
+  // La chasse.
+  const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  const cerf = cerfs.filter((c) => !c.dead).sort((a, b) => dist(a.x, a.y, v.x, v.y) - dist(b.x, b.y, v.x, v.y))[0];
+  const ordre = w.commandUnits([v], cerf.x, cerf.y, { tolerance: 10 });
+  check('un villageois envoyé sur un cerf part chasser', !!ordre && ordre.kind === 'hunt' && v.state === STATE.ATTACK && v.target === cerf, ordre && ordre.kind);
+  const pv = cerf.hp;
+  let fuite = false;
+  advance(w, 150, () => { if (cerf.hp < pv && cerf.fleeTimer > 0) fuite = true; return cerf.dead; });
+  check('frappé, le cerf détale ; il finit abattu', fuite && cerf.dead, cerf.dead ? `abattu à ${Math.round(w.time)} s` : `pv ${cerf.hp}/${pv}`);
+  const carcasse = [...w.map.resources.values()].find((r) => r.gibier === 'deer');
+  check('il laisse une carcasse de 140 de nourriture, qui ne bloque pas le passage', !!carcasse && carcasse.max === 140 && carcasse.type === 'food' && !w.map.isBlocked(carcasse.tx, carcasse.ty));
+  check('le chasseur la dépèce sans nouvel ordre', !!carcasse && v.state === STATE.GATHER && !!v.resourceTile && v.resourceTile.tx === carcasse.tx && v.resourceTile.ty === carcasse.ty, v.state);
+  // Le cerf est tombé loin de la base : un seul voyage suffit à prouver la chaîne.
+  const food0 = w.players[0].resources.food;
+  advance(w, 120, () => w.players[0].resources.food >= food0 + 10);
+  check('et la nourriture arrive au village', w.players[0].resources.food >= food0 + 10, `${food0} → ${Math.round(w.players[0].resources.food)}`);
+  // La capture d'un cochon.
+  const cochon = cochons.filter((c) => !c.dead && c.playerIndex < 0).sort((a, b) => dist(a.x, a.y, tc.x, tc.y) - dist(b.x, b.y, tc.x, tc.y))[0];
+  const v2 = w.units.filter((u) => u.playerIndex === 0 && u.isVillager && u !== v)[0];
+  w.commandUnits([v2], cochon.x, cochon.y - TILE, { tolerance: 0 });
+  advance(w, 60, () => cochon.playerIndex === 0);
+  check('un villageois qui approche un cochon le capture', cochon.playerIndex === 0 && !cochon.dead);
+  const p0 = [cochon.x, cochon.y];
+  advance(w, 20);
+  check('capturé, il n’erre plus', dist(cochon.x, cochon.y, p0[0], p0[1]) < TILE, Math.round(dist(cochon.x, cochon.y, p0[0], p0[1])) + ' px');
+  const but = { x: tc.x + TILE * 3, y: tc.y + TILE * 3 };
+  const mene = w.commandUnits([cochon], but.x, but.y, { tolerance: 0 });
+  advance(w, 40, () => cochon.state === STATE.IDLE);
+  check('on le mène au doigt, comme une unité', !!mene && mene.kind === 'move' && dist(cochon.x, cochon.y, but.x, but.y) < TILE * 2.5, `${Math.round((dist(cochon.x, cochon.y, but.x, but.y) / TILE) * 10) / 10} cases du but`);
+  const abat = w.commandUnits([v2], cochon.x, cochon.y, { tolerance: 8 });
+  advance(w, 60, () => cochon.dead);
+  check('ses propres villageois l’abattent : cent de nourriture', !!abat && abat.kind === 'hunt' && cochon.dead && [...w.map.resources.values()].some((r) => r.gibier === 'pig' && r.max === 100), abat && abat.kind);
+  // Un ordre de marche à côté d'un animal reste un ordre de marche.
+  const v3 = w.units.filter((u) => u.playerIndex === 0 && u.isVillager && u !== v && u !== v2)[0];
+  const cerf2 = cerfs.find((c) => !c.dead);
+  const pres = w.commandUnits([v3], cerf2.x + TILE * 0.9, cerf2.y, { tolerance: TILE });
+  check('un ordre à côté d’un animal est un déplacement, pas une chasse', !!pres && pres.kind !== 'hunt' && v3.state !== STATE.ATTACK, pres && pres.kind);
 }
 
 // --- Collé au gisement ---------------------------------------------------------
@@ -1105,7 +1167,8 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     const d = atteignables(w.map, Math.floor(grp[0].x / TILE), Math.floor(grp[0].y / TILE));
     const c = cibleLibre(w, d, 6);
     w.commandUnits(grp, c.x, c.y);
-    advance(w, 40, () => grp.every((u) => u.state === STATE.IDLE));
+    // Le temps de marcher jusque-là : la cible tirée au sort peut être loin.
+    advance(w, (c.cases * TILE) / grp[0].speedPx() * 2 + 8, () => grp.every((u) => u.state === STATE.IDLE));
     check('et ils repartent normalement', grp.every((u) => arrive(u, c.x, c.y, TILE * 3.5)),
       grp.map((u) => `${u.state} à ${Math.round(dist(u.x, u.y, c.x, c.y))}px`).join(' · '));
   }

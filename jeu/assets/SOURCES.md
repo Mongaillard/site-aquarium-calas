@@ -7,6 +7,8 @@
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
+| `cerf.webp` | Le **cerf** : trois rangées (sud, est, nord) de quatre foulées, 74×86 par case, l'ouest en miroir de l'est | Planche générée par l'auteur du dépôt, fond transparent |
+| `cochon.webp` | Le **cochon** : mêmes trois rangées de quatre foulées, 72×67 par case | Planche générée par l'auteur du dépôt, fond transparent |
 | `decor.webp` | Le **décor de la carte** : 97 pièces — amas de rochers, rochers, roseaux, touffes sèches, pampas, touffes d'herbe, buissons fleuris, fougères, couvre-sol, agaves, nénuphars, fleurs en quatre couleurs, galets — de tailles diverses dans un atlas à 2×, table dans `js/decor-pieces.js` | Découpées dans les planches d'eau, la planche d'arbres et la planche d'ornements de l'auteur du dépôt (voir plus bas) |
 | `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 56×86 par case | Planche générée par l'auteur du dépôt, fond dégradé retiré en deux passes (voir plus bas) |
 | `eclaireur.webp` | L'**éclaireur** : cavalier à la lance, huit orientations × quatre foulées, 106×111 par case | Planche générée par l'auteur du dépôt, livrée avec sa transparence |
@@ -172,6 +174,19 @@ vu de face fait **54 px monde** — plus grand qu'un homme à pied (44), comme i
 se doit — atlas à 2× avec le peps : 424×888, **145 Ko**. La cape et le tapis de
 selle sont bleu franc et basculent ; la robe du cheval, brune, ne bouge pas —
 le test le vérifie sur ses pixels.
+
+## Le troupeau
+
+Deux planches à fond transparent, trois rangées de quatre images : de face
+(sud), de profil (est), de dos (nord). Pas de diagonales, et pas besoin : le
+jeu marche sur quatre orientations, la cardinale la plus proche, et l'ouest
+est le profil retourné (`miroirs` dans l'atlas). Le détourage laissait un
+liseré rouge et vert très saturé sur le pourtour (`decoupe-animaux.py`) : les
+pixels de bord de cette teinte-là repassent en transparence, l'alpha est
+renormalisé, puis chaque image est repérée par composantes connexes, réduite
+à l'échelle du jeu — un cerf de profil fait 34 px monde, un cochon 22 — et
+posée au bas de sa case, centrée, avec le peps commun. Une carcasse est le
+profil couché sur le flanc, qui rapetisse à mesure qu'on la dépèce.
 
 ## Les bâtiments
 

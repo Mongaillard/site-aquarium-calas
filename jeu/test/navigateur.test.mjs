@@ -1044,6 +1044,41 @@ const decorRivage = await page.evaluate(async () => {
 check('l’atlas du décor est chargé : près de cent pièces en seize classes', decorRivage.pret && decorRivage.pieces >= 90 && decorRivage.classes === 16, `${decorRivage.pieces} pièces, ${decorRivage.classes} classes`);
 check('la carte est décorée, et ça se voit', decorRivage.total > 0 && decorRivage.diff > 2000, `${decorRivage.total} pièces (${decorRivage.autour} autour du point de vue), ${decorRivage.diff} pixels changés`);
 
+// Le troupeau : cerf et cochon illustrés, trois rangées pour quatre
+// orientations (l'ouest est l'est retourné), des hardes sur la carte, et la
+// chasse au doigt.
+const troupeau = await page.evaluate(async () => {
+  const g = window.__jeu; const w = g.world;
+  const mod = await import('./js/sprites.js');
+  const cerf = mod.spriteDe('deer'), cochon = mod.spriteDe('pig');
+  const betes = w.units.filter((u) => u.isAnimal);
+  const ouest = mod.caseDirection(Math.PI, 4), est = mod.caseDirection(0, 4);
+  const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager && !u.garrisonedIn && !u.dead);
+  const proie = w.units.filter((u) => u.type === 'deer' && !u.dead).sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y))[0];
+  w.fog.explored.fill(1); w.fog.visible.fill(1); w.fog.dirty = true;
+  g.rallyArmed = false; g.attackMoveArmed = false; g.garrisonArmed = false;
+  g.setSelection([v]);
+  g.camera.centerOn(proie.x, proie.y);
+  const s = g.camera.worldToScreen(proie.x, proie.y);
+  const p = g.camera.screenToWorld(s.x, s.y);
+  const diag = { ennemi: (w.enemyAt(p.x, p.y, 0, g.tapTolerance()) || {}).type, visible: g.renderer.isEntityVisible(proie), ecart: Math.round(Math.hypot(p.x - proie.x, p.y - proie.y)) };
+  g.tapAt(s.x, s.y, false);
+  const etat = v.state, cible = v.target === proie;
+  g.setSelection([proie]); g.ui.refreshSelection(true);
+  const panneau = (g.ui.nodes.selection.querySelector('.name') || {}).textContent || '';
+  g.setSelection([]); v.stop();
+  return {
+    cerf: !!cerf, cochon: !!cochon, cases: cerf && cerf.def.cases, images: cerf && cerf.def.images,
+    ouestMiroir: !!cerf && cerf.def.miroirs[ouest] === true && cerf.def.lignes[ouest] === cerf.def.lignes[est] && !cerf.def.miroirs[est],
+    betes: betes.length, cochons: betes.filter((b) => b.type === 'pig').length, etat, cible, panneau, diag,
+  };
+});
+check('le cerf et le cochon portent leur illustration : quatre orientations, quatre foulées', troupeau.cerf && troupeau.cochon && troupeau.cases === 4 && troupeau.images === 4, `${troupeau.cases} orientations × ${troupeau.images}`);
+check('l’ouest est l’est en miroir', troupeau.ouestMiroir === true);
+check('des hardes vivent sur la carte', troupeau.betes >= 12 && troupeau.cochons >= 6, `${troupeau.betes} animaux dont ${troupeau.cochons} cochons`);
+check('touché avec un villageois en main, un cerf déclenche la chasse', troupeau.etat === 'attack' && troupeau.cible, `${troupeau.etat}, cible ${troupeau.cible}, ${JSON.stringify(troupeau.diag)}`);
+check('le panneau nomme le cerf sauvage', /Cerf/.test(troupeau.panneau) && /sauvage/.test(troupeau.panneau), troupeau.panneau.trim());
+
 // L'éclaireur illustré : huit orientations × quatre foulées, planche lue du
 // nord au nord-ouest et remise sur les secteurs du jeu ; la cape bascule, la
 // robe du cheval reste.

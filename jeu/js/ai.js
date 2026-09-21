@@ -66,7 +66,7 @@ export class AIPlayer {
   survey() {
     const world = this.world;
     this.buildings = world.buildings.filter((b) => !b.dead && b.playerIndex === this.index);
-    this.units = world.units.filter((u) => !u.dead && u.playerIndex === this.index);
+    this.units = world.units.filter((u) => !u.dead && !u.isAnimal && u.playerIndex === this.index);
     this.villagers = this.units.filter((u) => u.isVillager);
     this.army = this.units.filter((u) => !u.isVillager);
     this.townCenter = this.buildings.find((b) => b.type === 'towncenter' && b.complete)
@@ -444,7 +444,7 @@ export class AIPlayer {
     const world = this.world;
     let best = null, bestD = Infinity;
     for (const e of world.entities) {
-      if (e.dead || e.playerIndex === this.index) continue;
+      if (e.dead || e.playerIndex === this.index || e.isAnimal) continue;
       if (e.kind === 'building') continue;
       for (const b of this.buildings) {
         const d = dist2(e.x, e.y, b.x, b.y);
@@ -460,7 +460,7 @@ export class AIPlayer {
     const tc = this.townCenter;
     const targets = world.buildings.filter((b) => !b.dead && b.playerIndex === enemyIndex);
     if (targets.length === 0) {
-      const units = world.units.filter((u) => !u.dead && u.playerIndex === enemyIndex);
+      const units = world.units.filter((u) => !u.dead && !u.isAnimal && u.playerIndex === enemyIndex);
       return units[0] || null;
     }
     // Format « le Centre-Ville décide » : inutile de raser une maison.
@@ -506,7 +506,7 @@ export class AIPlayer {
   /** Plus de base : tout le monde au combat. */
   lastStand() {
     const enemyIndex = this.index === 0 ? 1 : 0;
-    const target = this.world.entities.find((e) => !e.dead && e.playerIndex === enemyIndex);
+    const target = this.world.entities.find((e) => !e.dead && !e.isAnimal && e.playerIndex === enemyIndex);
     if (!target) return;
     for (const u of this.units) if (u.state === STATE.IDLE) u.attackEntity(target);
   }
