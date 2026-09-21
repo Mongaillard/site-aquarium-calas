@@ -162,6 +162,24 @@ parcourue ; de profil, la mesure ne distingue pas les pieds et la planche est
 jouée telle quelle. Le chevalier n'a pas d'image nette de chaque côté : rien
 à remonter, il faudra une nouvelle planche.
 
+### Des pas intermédiaires (RIFE)
+
+Six à huit poses par foulée, cadencées sur la distance, font trois à six
+images par seconde en jeu : l'œil voit les sauts. Plutôt que de redessiner,
+`fabrique-villageois-rife.py` intercale **deux images entre chaque paire de
+poses successives** avec RIFE (*Real-Time Intermediate Flow Estimation*,
+Huang et coll. 2020, licence MIT — le binaire `rife-ncnn-vulkan`, modèle
+v4.6, tourne sur processeur via lavapipe). Couleur et transparence sont
+interpolées séparément : la couleur composée sur gris moyen, l'alpha en
+niveaux de gris, puis les deux sont recombinés ; les images sont rembourrées
+à un multiple de 32 px, sans quoi le binaire écrit de travers. Avant cela,
+les miettes détachées du matting sont effacées et la pose fantôme de la
+rangée est (image 1) écartée ; les rangées de profil sont remises dans
+l'ordre le plus lisse (cycle de moindre écart entre images successives,
+départ pieds joints). Résultat : S et N 18 images, O 24, E 21, et la
+marche chargée (« porter ») 12 ; repos, cueillir et construire restent à
+quatre. Atlas 24 colonnes × 8 rangées de 56×86.
+
 ## L'éclaireur
 
 La planche tient huit orientations × quatre foulées d'un cavalier à la lance,

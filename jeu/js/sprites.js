@@ -23,6 +23,9 @@ const batiment = (src, cellW, cellH, largeurMonde) => ({
 
 import { PIECES_DECOR } from './decor-pieces.js';
 
+/** Les images 0..n-1 dans l'ordre : une rangée déjà remontée et interpolée. */
+function suite(n) { return Array.from({ length: n }, (_, i) => i); }
+
 const ATLAS = {
   militia: {
     src: 'assets/milicien-marche.webp',
@@ -91,18 +94,21 @@ const ATLAS = {
   // Renderer.poseDe). Debout, 40 px : un peu moins que le chevalier.
   villager: {
     src: 'assets/villageois.webp',
-    cellW: 56, cellH: 86, cases: 4, images: 8, cycle: 36,
+    cellW: 56, cellH: 86, cases: 4, images: 24, cycle: 36,
     lignes: [0, 3, 1, 2],
     // Les huit foulées de la planche n'alternent pas les pieds (de face :
-    // droit, droit, puis quatre fois le gauche). Mesurées image par image,
-    // on en garde six qui font une vraie marche : neutre, droit, droit,
-    // neutre, gauche, gauche. De profil, on ne distingue pas les pieds.
-    sequences: { 0: [0, 1, 2, 3, 5, 6], 1: [7, 1, 4, 0, 2, 3] },
+    // droit, droit, puis quatre fois le gauche) et l'une d'elles, de profil,
+    // est un fantôme du matting. Mesurées image par image, on retient six à
+    // huit poses par rangée dans l'ordre d'une vraie marche, puis RIFE
+    // intercale deux pas entre chaque paire (voir SOURCES.md, « Des pas
+    // intermédiaires ») : la rangée joue ses images dans l'ordre, la
+    // première étant la foulée neutre où le villageois s'arrête.
+    sequences: { 0: suite(18), 1: suite(18), 2: suite(24), 3: suite(21) },
     poses: {
       repos: { ligne: 4, images: 4, cadence: 2.5 },
       cueillir: { ligne: 5, images: 4, cadence: 5, sens: -1 },
       construire: { ligne: 6, images: 4, cadence: 7, sens: 1 },
-      porter: { ligne: 7, images: 4, sens: 1 },
+      porter: { ligne: 7, images: 12, sens: 1 },
     },
     ancreY: 85, hauteurMonde: 40, natif: 'bleu',
     // L'écharpe est bleu franc ; peau, cuir et chemise sont orangés ou crème.

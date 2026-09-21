@@ -960,7 +960,7 @@ const villageois = await page.evaluate(async () => {
   v.dead = true;
   return { cases: def.cases, images: def.images, lignes: def.lignes, opaques, changes, peau, peauIntacte, bleusRestants, poses };
 });
-check('le villageois porte son illustration : quatre orientations, huit pas', !!villageois && villageois.cases === 4 && villageois.images === 8 && villageois.lignes.length === 4, villageois ? `${villageois.cases} orientations × ${villageois.images}` : 'absent');
+check('le villageois porte son illustration : quatre orientations, 24 pas interpolés', !!villageois && villageois.cases === 4 && villageois.images === 24 && villageois.lignes.length === 4, villageois ? `${villageois.cases} orientations × ${villageois.images}` : 'absent');
 check('le villageois adverse est repeint (l’écharpe)', !!villageois && villageois.changes > villageois.opaques * 0.02, villageois && `${Math.round((villageois.changes / villageois.opaques) * 100)} % des pixels`);
 check('la peau du villageois reste la même', !!villageois && villageois.peau > 500 && villageois.peauIntacte === villageois.peau, villageois && `${villageois.peauIntacte}/${villageois.peau} pixels de peau intacts`);
 check('aucun bleu franc ne subsiste côté adverse (villageois)', !!villageois && villageois.bleusRestants === 0, villageois && villageois.bleusRestants + ' pixels');
@@ -996,7 +996,7 @@ const cadenceVillageois = await page.evaluate(async () => {
   };
   return {
     sud: jouees(0), nord: jouees(1), ouest: jouees(2),
-    attendueSud: def.sequences[0], attendueNord: def.sequences[1],
+    attendueSud: def.sequences[0], attendueNord: def.sequences[1], attendueOuest: def.sequences[2],
     arretSud: mod.imageDeMarche(def, 999, false, 0), arretOuest: mod.imageDeMarche(def, 999, false, 2),
     neutreSud: def.sequences[0][0],
   };
@@ -1007,8 +1007,8 @@ const cadenceVillageois = await page.evaluate(async () => {
   check('de face et de dos, le villageois joue sa séquence de six pas, deux tours par double cycle',
     deuxTours(cadenceVillageois.sud, cadenceVillageois.attendueSud) && deuxTours(cadenceVillageois.nord, cadenceVillageois.attendueNord),
     `sud ${cadenceVillageois.sud.join('')} · nord ${cadenceVillageois.nord.join('')}`);
-  check('de profil, il joue les huit images dans l’ordre de la planche',
-    memes(cadenceVillageois.ouest, [0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7]), cadenceVillageois.ouest.join(''));
+  check('de profil, il joue ses vingt-quatre images interpolées dans l’ordre, deux tours par double cycle',
+    deuxTours(cadenceVillageois.ouest, cadenceVillageois.attendueOuest), cadenceVillageois.ouest.join(','));
   check('à l’arrêt, la foulée neutre de la séquence, ou la première image sans séquence',
     cadenceVillageois.arretSud === cadenceVillageois.neutreSud && cadenceVillageois.arretOuest === 0,
     `sud ${cadenceVillageois.arretSud} · ouest ${cadenceVillageois.arretOuest}`);
