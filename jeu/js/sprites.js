@@ -140,9 +140,16 @@ const ATLAS = {
   },
   pig: {
     src: 'assets/cochon.webp',
-    cellW: 72, cellH: 67, cases: 4, images: 4, cycle: 26,
-    lignes: [0, 1, 2, 1], miroirs: [false, false, false, true],
-    ancreY: 65, hauteurMonde: 33.5,
+    cellW: 74, cellH: 63, cases: 8, images: 4, cycle: 26,
+    // Cinq rangées (sud, sud-est, est, nord-est, nord) ; les trois secteurs de
+    // l'ouest reprennent les rangées de l'est en miroir.
+    lignes: [0, 1, 2, 3, 4, 3, 2, 1], miroirs: [false, false, false, false, false, true, true, true],
+    // La planche ne fait pas alterner les pieds : mesuré au contour, de face et
+    // de dos on lève surtout le même ; en trois quarts, la même jambe avant
+    // reste plantée. Chaque rangée rejoue ses images dans l'ordre d'un
+    // balancier — repos, un pied, repos, l'autre — sans saut.
+    sequences: { 0: [0, 1, 0, 3], 1: [0, 3, 2, 3, 0, 1], 2: [0, 1, 3, 2], 3: [0, 3, 2, 1, 2, 3], 4: [0, 2, 0, 3] },
+    ancreY: 61, hauteurMonde: 31.5,
   },
   spearman: {
     src: 'assets/lancier.png',

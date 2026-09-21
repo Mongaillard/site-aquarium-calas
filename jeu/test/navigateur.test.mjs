@@ -1078,6 +1078,19 @@ const troupeau = await page.evaluate(async () => {
 });
 check('le cerf et le cochon portent leur illustration : quatre orientations, quatre foulées', troupeau.cerf && troupeau.cochon && troupeau.cases === 4 && troupeau.images === 4, `${troupeau.cases} orientations × ${troupeau.images}`);
 check('l’ouest est l’est en miroir', troupeau.ouestMiroir === true);
+// Le cochon en huit orientations : cinq rangées, les trois de l'ouest en
+// miroir ; et ses pas remis en balancier — de face, la boucle lève un pied
+// puis l'autre.
+const cochon8 = await page.evaluate(async () => {
+  const mod = await import('./js/sprites.js');
+  const def = mod.spriteDe('pig').def;
+  const so = mod.caseDirection(3 * Math.PI / 4, 8), se = mod.caseDirection(Math.PI / 4, 8), o = mod.caseDirection(Math.PI, 8), e = mod.caseDirection(0, 8), n = mod.caseDirection(-Math.PI / 2, 8);
+  const suite = [];
+  for (let d = 0; d < def.cycle; d += 0.5) { const i = mod.imageDeMarche(def, d, true, 0); if (suite[suite.length - 1] !== i) suite.push(i); }
+  return { cases: def.cases, lignes: def.lignes.length, soCommeSe: def.lignes[so] === def.lignes[se] && def.miroirs[so] && !def.miroirs[se], oCommeE: def.lignes[o] === def.lignes[e] && def.miroirs[o], nord: def.lignes[n], face: suite, repos: mod.imageDeMarche(def, 999, false, 0) };
+});
+check('le cochon marche en huit orientations, les trois de l’ouest en miroir', cochon8.cases === 8 && cochon8.lignes === 8 && cochon8.soCommeSe && cochon8.oCommeE && cochon8.nord === 4, JSON.stringify(cochon8));
+check('de face, il lève un pied puis l’autre, et se repose sur la foulée neutre', JSON.stringify(cochon8.face) === '[0,1,0,3]' && cochon8.repos === 0, cochon8.face.join(''));
 check('des hardes vivent sur la carte', troupeau.betes >= 12 && troupeau.cochons >= 6, `${troupeau.betes} animaux dont ${troupeau.cochons} cochons`);
 check('touché avec un villageois en main, un cerf déclenche la chasse', troupeau.etat === 'attack' && troupeau.cible, `${troupeau.etat}, cible ${troupeau.cible}, ${JSON.stringify(troupeau.diag)}`);
 check('le panneau nomme le cerf sauvage', /Cerf/.test(troupeau.panneau) && /sauvage/.test(troupeau.panneau), troupeau.panneau.trim());
