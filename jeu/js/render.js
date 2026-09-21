@@ -212,7 +212,6 @@ export class Renderer {
     this.buildTileAtlas();
     this.bruitLisiere = bruitPeriodique(BRUIT_N, [{ cellules: 8, poids: 0.65 }, { cellules: 16, poids: 0.35 }], 3);
     this.bruitEcume = bruitPeriodique(BRUIT_N, [{ cellules: 20, poids: 0.6 }, { cellules: 40, poids: 0.4 }], 5);   // strie l'écume
-    this.imagesMasque = [];
     this.initFogCanvas();
     this.resize();
   }
@@ -392,8 +391,7 @@ export class Renderer {
     // texel suffisent à un fondu de 10), puis posé sur le tronçon.
     const tampon = this.tamponTroncon(canvas.width);
     const g = tampon.getContext('2d');
-    const masque = this.masqueTroncon(cote / RES_MASQUE);
-    const m = masque.getContext('2d');
+    const n = cote / RES_MASQUE;
     const composer = (img, e, peindre) => {
       if (e.u1 < e.u0) return;   // présent dans la couronne, mais n'entre pas
       const x = X0 + e.u0 * RES_MASQUE, y = Y0 + e.v0 * RES_MASQUE;
@@ -401,7 +399,12 @@ export class Renderer {
       g.setTransform(echelle, 0, 0, echelle, -X0 * echelle, -Y0 * echelle);
       g.clearRect(x, y, w, h);
       peindre(x, y, w, h);
-      m.putImageData(img, 0, 0);
+      // Le masque passe par un canvas neuf à chaque fois : petit (136 px de
+      // côté), et jamais réutilisé — un canvas réécrit par putImageData puis
+      // redessiné aussitôt a déjà valu des instantanés périmés sur WebKit.
+      const masque = document.createElement('canvas');
+      masque.width = n; masque.height = n;
+      masque.getContext('2d').putImageData(img, 0, 0);
       g.globalCompositeOperation = 'destination-in';
       g.drawImage(masque, e.u0, e.v0, w / RES_MASQUE, h / RES_MASQUE, x, y, w, h);
       g.globalCompositeOperation = 'source-over';
@@ -461,11 +464,9 @@ export class Renderer {
     for (let p = 0; p < TERRAIN_PAR_PRIORITE.length; p++) if (vus & (1 << p)) presents.push(p);
     const masques = [null], etendues = [null];
     if (presents.length === 1) return { presents, masques, etendues, rivage: null };
-    const image = (cle) => {
-      let img = this.imagesMasque[cle];
-      if (!img || img.width !== n) img = this.imagesMasque[cle] = new ImageData(n, n);
-      return img;
-    };
+    // Un ImageData neuf par masque : WebKit a déjà servi des pixels périmés
+    // quand le même objet était réécrit puis redessiné d'un tronçon à l'autre.
+    const image = () => new ImageData(n, n);
     for (let l = 1; l < presents.length; l++) {
       masques.push(image(l));
       etendues.push({ u0: n, v0: n, u1: -1, v1: -1 });   // rectangle des texels non nuls
@@ -573,14 +574,6 @@ export class Renderer {
       this.tampon.width = px; this.tampon.height = px;
     }
     return this.tampon;
-  }
-
-  masqueTroncon(n) {
-    if (!this.masque || this.masque.width !== n) {
-      this.masque = document.createElement('canvas');
-      this.masque.width = n; this.masque.height = n;
-    }
-    return this.masque;
   }
 
   /** Le rectangle monde (x, y, w, h) couvert par la nappe, période par période. */

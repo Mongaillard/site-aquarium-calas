@@ -662,6 +662,31 @@ for (const [type, nom] of Object.entries(NOMS)) {
   check(`aucun bleu franc ne subsiste côté adverse (${type})`, !!b && b.bleusRestants === 0, b && b.bleusRestants + ' pixels bleus restants');
 }
 
+// Deux tronçons voisins se recouvrent de 8 px monde sur les MÊMES texels :
+// leurs pixels doivent y coïncider, rivages compris — sinon une couture
+// droite traverse le sol au bord du tronçon.
+const coutures = await page.evaluate(() => {
+  const g = window.__jeu; const r = g.renderer; const map = g.world.map; const T = 32;
+  const nappes = r.nappesPour(1);
+  const taille = 8 * T, rec = 8, ech = 2, cote = (taille + 2 * rec) * ech, bande = 2 * rec * ech;
+  const ncx = Math.ceil(map.w / 8), ncy = Math.ceil(map.h / 8);
+  const lire = (c) => c.getContext('2d').getImageData(0, 0, cote, cote).data;
+  // une vingtaine de paires, réparties, en privilégiant celles qui touchent l'eau
+  const paires = [];
+  for (let cy = 0; cy < ncy - 1; cy += 2) for (let cx = 0; cx < ncx - 1; cx += 2) paires.push([cx, cy]);
+  let pire = 0, n = 0;
+  for (const [cx, cy] of paires.slice(0, 24)) {
+    const a = lire(r.rendreTroncon(cx, cy, ech, nappes)), b = lire(r.rendreTroncon(cx + 1, cy, ech, nappes)), c = lire(r.rendreTroncon(cx, cy + 1, ech, nappes));
+    let s = 0, k = 0;
+    for (let y = 0; y < cote; y += 3) for (let x = 0; x < bande; x++) { const ia = (y * cote + cote - bande + x) * 4, ib = (y * cote + x) * 4; s += Math.abs(a[ia] - b[ib]) + Math.abs(a[ia + 1] - b[ib + 1]) + Math.abs(a[ia + 2] - b[ib + 2]); k++; }
+    for (let x = 0; x < cote; x += 3) for (let y = 0; y < bande; y++) { const ia = ((cote - bande + y) * cote + x) * 4, ic = (y * cote + x) * 4; s += Math.abs(a[ia] - c[ic]) + Math.abs(a[ia + 1] - c[ic + 1]) + Math.abs(a[ia + 2] - c[ic + 2]); k++; }
+    pire = Math.max(pire, s / k / 3); n++;
+  }
+  r.troncons.clear();
+  return { paires: n, pire: Math.round(pire * 100) / 100 };
+});
+check('les tronçons voisins coïncident sur leur recouvrement', coutures.pire < 1.5, `écart moyen au pire ${coutures.pire} niveau(x) sur ${coutures.paires} paires`);
+
 // Le palais se touche là où on le voit : un doigt sur les dômes, bien au-dessus
 // de l'emprise, sélectionne le Centre-Ville ; sur les toits d'un palais ennemi,
 // il l'attaque — et l'ordre vise le bâtiment, pas le point touché.
