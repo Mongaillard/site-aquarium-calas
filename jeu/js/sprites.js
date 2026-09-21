@@ -134,9 +134,13 @@ const ATLAS = {
   // capturé se reconnaît à son socle.
   deer: {
     src: 'assets/cerf.webp',
-    cellW: 74, cellH: 86, cases: 4, images: 4, cycle: 40,
-    lignes: [0, 1, 2, 1], miroirs: [false, false, false, true],
-    ancreY: 84, hauteurMonde: 43,
+    cellW: 82, cellH: 78, cases: 8, images: 4, cycle: 40,
+    lignes: [0, 1, 2, 3, 4, 3, 2, 1], miroirs: [false, false, false, false, false, true, true, true],
+    // De face, la planche lève deux fois la même jambe : neutre, gauche,
+    // neutre, droite. De dos, jamais de neutre : gauche, droite, gauche,
+    // droite. Le profil et les trois quarts se jouent tels quels.
+    sequences: { 0: [1, 0, 1, 2], 1: [0, 1, 2, 3, 2, 1], 2: [0, 1, 2, 3], 3: [0, 1, 2, 3], 4: [0, 1, 0, 2] },
+    ancreY: 76, hauteurMonde: 39.0,
   },
   pig: {
     src: 'assets/cochon.webp',

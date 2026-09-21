@@ -7,7 +7,7 @@
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
-| `cerf.webp` | Le **cerf** : trois rangées (sud, est, nord) de quatre foulées, 74×86 par case, l'ouest en miroir de l'est | Planche générée par l'auteur du dépôt, fond transparent |
+| `cerf.webp` | Le **cerf** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en ordre de face et de dos | Planche générée par l'auteur du dépôt, fond noir dé-prémultiplié |
 | `cochon.webp` | Le **cochon** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en balancier | Planche générée par l'auteur du dépôt, fond gris uni |
 | `decor.webp` | Le **décor de la carte** : 97 pièces — amas de rochers, rochers, roseaux, touffes sèches, pampas, touffes d'herbe, buissons fleuris, fougères, couvre-sol, agaves, nénuphars, fleurs en quatre couleurs, galets — de tailles diverses dans un atlas à 2×, table dans `js/decor-pieces.js` | Découpées dans les planches d'eau, la planche d'arbres et la planche d'ornements de l'auteur du dépôt (voir plus bas) |
 | `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 56×86 par case | Planche générée par l'auteur du dépôt, fond dégradé retiré en deux passes (voir plus bas) |
@@ -177,20 +177,24 @@ le test le vérifie sur ses pixels.
 
 ## Le troupeau
 
-Le cerf : une planche à fond transparent, trois rangées de quatre images —
-de face (sud), de profil (est), de dos (nord) —, l'ouest étant le profil
-retourné (`miroirs` dans l'atlas) : quatre orientations, la cardinale la plus
-proche. Le cochon : une seconde planche sur fond gris uni, cinq rangées (sud,
-sud-est, est, nord-est, nord), détourée par distance au fond
-(`decoupe-cochon8.py`) ; les trois secteurs de l'ouest reprennent les rangées
-de l'est en miroir, soit huit orientations. Ses pas ne s'alternaient pas :
+Deux planches de cinq rangées (sud, sud-est, est, nord-est, nord) de
+quatre images ; les trois secteurs de l'ouest reprennent les rangées de
+l'est en miroir (`miroirs` dans l'atlas), soit huit orientations. Le cochon
+est sur fond gris uni, détouré par distance au fond (`decoupe-cochon8.py`) ;
+le cerf sur fond noir sans alpha : le noir est le fond, et les bords
+antialiasés — couleur × alpha sur noir — sont dé-prémultipliés
+(`decoupe-cerf8.py`), ce qui garde les sabots sombres. Ses pas ne s'alternaient pas :
 mesuré au contour bas de chaque silhouette (`pattes.py`, un sabot est un
 point bas local), de face les images lèvent le pied droit une fois et le
 gauche deux fois, de dos l'inverse, et en trois quarts la même jambe avant
 reste plantée sur les quatre images. Chaque rangée rejoue donc ses images
 en balancier (`sequences` : repos, un pied, repos, l'autre ; en trois quarts,
 l'aller-retour de la seule jambe qui bouge), sans saut — l'alternation
-manquante des trois quarts, elle, ne peut venir que de la planche. Le détourage laissait un
+manquante des trois quarts, elle, ne peut venir que de la planche. Le cerf
+s'en tire mieux : de profil et en trois quarts ses quatre images font un
+vrai cycle ; de face il lève deux fois la même jambe (neutre, gauche,
+neutre, droite), de dos il n'a pas de neutre (gauche, droite, gauche,
+droite). Le détourage laissait un
 liseré rouge et vert très saturé sur le pourtour (`decoupe-animaux.py`) : les
 pixels de bord de cette teinte-là repassent en transparence, l'alpha est
 renormalisé, puis chaque image est repérée par composantes connexes, réduite

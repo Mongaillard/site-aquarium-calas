@@ -1055,7 +1055,7 @@ const troupeau = await page.evaluate(async () => {
   const mod = await import('./js/sprites.js');
   const cerf = mod.spriteDe('deer'), cochon = mod.spriteDe('pig');
   const betes = w.units.filter((u) => u.isAnimal);
-  const ouest = mod.caseDirection(Math.PI, 4), est = mod.caseDirection(0, 4);
+  const ouest = mod.caseDirection(Math.PI, 8), est = mod.caseDirection(0, 8);
   const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager && !u.garrisonedIn && !u.dead);
   const proie = w.units.filter((u) => u.type === 'deer' && !u.dead).sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y))[0];
   w.fog.explored.fill(1); w.fog.visible.fill(1); w.fog.dirty = true;
@@ -1076,7 +1076,7 @@ const troupeau = await page.evaluate(async () => {
     betes: betes.length, cochons: betes.filter((b) => b.type === 'pig').length, etat, cible, panneau, diag,
   };
 });
-check('le cerf et le cochon portent leur illustration : quatre orientations, quatre foulées', troupeau.cerf && troupeau.cochon && troupeau.cases === 4 && troupeau.images === 4, `${troupeau.cases} orientations × ${troupeau.images}`);
+check('le cerf et le cochon portent leur illustration : huit orientations, quatre foulées', troupeau.cerf && troupeau.cochon && troupeau.cases === 8 && troupeau.images === 4, `${troupeau.cases} orientations × ${troupeau.images}`);
 check('l’ouest est l’est en miroir', troupeau.ouestMiroir === true);
 // Le cochon en huit orientations : cinq rangées, les trois de l'ouest en
 // miroir ; et ses pas remis en balancier — de face, la boucle lève un pied
@@ -1091,6 +1091,14 @@ const cochon8 = await page.evaluate(async () => {
 });
 check('le cochon marche en huit orientations, les trois de l’ouest en miroir', cochon8.cases === 8 && cochon8.lignes === 8 && cochon8.soCommeSe && cochon8.oCommeE && cochon8.nord === 4, JSON.stringify(cochon8));
 check('de face, il lève un pied puis l’autre, et se repose sur la foulée neutre', JSON.stringify(cochon8.face) === '[0,1,0,3]' && cochon8.repos === 0, cochon8.face.join(''));
+const cerf8 = await page.evaluate(async () => {
+  const mod = await import('./js/sprites.js');
+  const def = mod.spriteDe('deer').def;
+  const suite = [];
+  for (let d = 0; d < def.cycle; d += 0.5) { const i = mod.imageDeMarche(def, d, true, 0); if (suite[suite.length - 1] !== i) suite.push(i); }
+  return { cases: def.cases, face: suite, repos: mod.imageDeMarche(def, 999, false, 0), dos: def.sequences[4] };
+});
+check('le cerf aussi : de face neutre, gauche, neutre, droite ; de dos gauche et droite en alternance', cerf8.cases === 8 && JSON.stringify(cerf8.face) === '[1,0,1,2]' && cerf8.repos === 1 && JSON.stringify(cerf8.dos) === '[0,1,0,2]', JSON.stringify(cerf8));
 check('des hardes vivent sur la carte', troupeau.betes >= 12 && troupeau.cochons >= 6, `${troupeau.betes} animaux dont ${troupeau.cochons} cochons`);
 check('touché avec un villageois en main, un cerf déclenche la chasse', troupeau.etat === 'attack' && troupeau.cible, `${troupeau.etat}, cible ${troupeau.cible}, ${JSON.stringify(troupeau.diag)}`);
 check('le panneau nomme le cerf sauvage', /Cerf/.test(troupeau.panneau) && /sauvage/.test(troupeau.panneau), troupeau.panneau.trim());
