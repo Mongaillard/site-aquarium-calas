@@ -27,10 +27,12 @@ function serializeMap(map) {
   // Quantités laissées en pleine précision : arrondir ferait diverger la partie
   // rechargée de la partie d'origine dès la première récolte.
   const restant = [];
+  const injoignables = [];   // gisements marqués injoignables, jusqu'à la prochaine remise à zéro
   for (const [i, res] of map.resources) {
     if (res.amount < res.max - 1e-9) restant.push([i, res.amount]);
+    if (res.inaccessible) injoignables.push(i);
   }
-  return { disparus: [...map.removed], restant };
+  return { disparus: [...map.removed], restant, injoignables };
 }
 
 function serializeProjectile(pr) {
@@ -64,10 +66,15 @@ function serializeUnit(u) {
     carry: { type: u.carry.type, amount: u.carry.amount },
     resourceTile: u.resourceTile ? { tx: u.resourceTile.tx, ty: u.resourceTile.ty } : null,
     lastResourceTile: u.lastResourceTile ? { tx: u.lastResourceTile.tx, ty: u.lastResourceTile.ty } : null,
+    gatherSpot: u.gatherSpot ? { x: u.gatherSpot.x, y: u.gatherSpot.y, tx: u.gatherSpot.tx, ty: u.gatherSpot.ty, cote: u.gatherSpot.cote } : null,
+    snugTime: u.snugTime,
     target: refId(u.target),
     returnTo: refId(u.returnTo),
     destination: point(u.destination),
     path: u.path ? u.path.map((n) => ({ tx: n.tx, ty: n.ty })) : null,
+    pathPending: !!u.pathPending,
+    pathRequest: u.pathRequest ? { x: u.pathRequest.x, y: u.pathRequest.y, adjacent: !!u.pathRequest.adjacent, seq: u.pathRequest.seq } : null,
+    pathSeq: u.pathSeq || 0,
     pathIndex: u.pathIndex,
     attackCooldown: u.attackCooldown, scanCooldown: u.scanCooldown,
     repathCooldown: u.repathCooldown, repathAttempts: u.repathAttempts,
@@ -87,6 +94,7 @@ function serializeBuilding(b) {
   return {
     id: b.id, player: b.playerIndex, type: b.type, tx: b.tx, ty: b.ty,
     hp: b.hp, complete: b.complete, buildProgress: b.buildProgress,
+    unreachable: !!b.unreachable, gatherUnreachable: !!b.gatherUnreachable,
     queue: b.queue.map((q) => ({
       kind: q.kind, id: q.id, timeLeft: q.timeLeft, total: q.total, cost: { ...q.cost },
     })),
@@ -147,6 +155,9 @@ export function serializeWorld(world, extra = {}) {
     // Le compteur réel, pas le plus grand identifiant vivant : une entité morte
     // a consommé son numéro, et le réattribuer ferait diverger la partie.
     nextId: world.nextId,
+    // La file des demandes de trajet, dans l'ordre : une demande en attente à
+    // la sauvegarde doit être servie au même tick à la reprise.
+    pathQueue: world.pathQueue.filter((u) => !u.dead).map((u) => u.id),
     map: serializeMap(world.map),
     fog: encodeBytes(world.fog.explored),
     players: world.players.map(serializePlayer),
@@ -184,6 +195,10 @@ export function restoreWorld(data) {
     const res = world.map.resources.get(i);
     if (res) res.amount = amount;
   }
+  for (const i of data.map.injoignables || []) {
+    const res = world.map.resources.get(i);
+    if (res) res.inaccessible = true;
+  }
 
   // 2. Les joueurs.
   data.players.forEach((saved, i) => {
@@ -208,6 +223,8 @@ export function restoreWorld(data) {
     const b = world.spawnBuilding(saved.player, saved.type, saved.tx, saved.ty, saved.complete);
     b.hp = saved.hp;
     b.buildProgress = saved.buildProgress;
+    b.unreachable = !!saved.unreachable;
+    b.gatherUnreachable = !!saved.gatherUnreachable;
     b.queue = saved.queue.map((q) => ({ ...q, cost: { ...q.cost } }));
     b.productionTime = saved.productionTime;
     b.rally = saved.rally ? { ...saved.rally } : null;
@@ -228,6 +245,8 @@ export function restoreWorld(data) {
     u.carry = { ...saved.carry };
     u.resourceTile = saved.resourceTile ? { ...saved.resourceTile } : null;
     u.lastResourceTile = saved.lastResourceTile ? { ...saved.lastResourceTile } : null;
+    u.gatherSpot = saved.gatherSpot ? { ...saved.gatherSpot } : null;
+    u.snugTime = saved.snugTime || 0;
     u.destination = saved.destination ? { ...saved.destination } : null;
     u.path = saved.path ? saved.path.map((n) => ({ ...n })) : null;
     u.pathIndex = saved.pathIndex;
@@ -243,7 +262,9 @@ export function restoreWorld(data) {
     u.failedDropoffs = saved.failedDropoffs ? new Set(saved.failedDropoffs) : null;
     u.fleeUntil = saved.fleeUntil;
     u.spawnTime = saved.spawnTime;
-    u.pathPending = false;   // la file de trajets, elle, ne se sauvegarde pas
+    u.pathPending = !!saved.pathPending;
+    u.pathRequest = saved.pathRequest ? { ...saved.pathRequest } : null;
+    u.pathSeq = saved.pathSeq || 0;
     paires.push([saved, u]);
   }
 
@@ -253,6 +274,7 @@ export function restoreWorld(data) {
   world.byId.clear();
   for (const [, entity] of paires) world.byId.set(entity.id, entity);
   world.nextId = Math.max(world.nextId, data.nextId || 1);
+  world.pathQueue = (data.pathQueue || []).map((id) => parId.get(id)).filter((u) => u && u.pathPending);
 
   // 5. Les renvois d'une entité à l'autre, maintenant que toutes existent.
   const cible = (id) => (id === null || id === undefined ? null : parId.get(id) || null);

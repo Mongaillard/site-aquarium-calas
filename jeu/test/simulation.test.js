@@ -163,6 +163,61 @@ check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches >
     villager.state !== 'idle' || villager.carry.amount > 0, villager.state);
 }
 
+// --- Collé au gisement ---------------------------------------------------------
+// Un villageois récolte le corps contre la case, sur un de ses côtés : l'ouest
+// ou l'est de préférence (les poses de travail sont de profil), le nord ou le
+// sud sinon, un angle en dernier recours. Plusieurs récolteurs se répartissent
+// les côtés.
+{
+  const world = new World({ seed: 11, mapSize: 'small', difficulty: 'normal' });
+  const map = world.map;
+  const tc = world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const villagers = world.units.filter((u) => u.playerIndex === 0 && u.isVillager);
+  // Un arbre dégagé sur ses huit côtés, près de la base.
+  const degage = (r) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && !map.isOpenTile(r.tx + dx, r.ty + dy)) return false;
+    return true;
+  };
+  const arbres = [...map.resources.values()].filter((r) => r.type === 'wood' && degage(r))
+    .sort((a, b) => dist(a.tx * TILE, a.ty * TILE, tc.x, tc.y) - dist(b.tx * TILE, b.ty * TILE, tc.x, tc.y));
+  const arbre = arbres[0];
+  const cx = arbre.tx * TILE + TILE / 2, cy = arbre.ty * TILE + TILE / 2;
+  const v = villagers[0];
+  v.x = cx; v.y = cy + 4 * TILE;       // il arrive par le sud
+  v.gatherAt(arbre.tx, arbre.ty);
+  const auTravail = (u) => u.state === STATE.GATHER && u.carry.amount > 0;
+  for (let i = 0; i < 30 * TICKS_PER_SECOND && !auTravail(v); i++) world.update(DT);
+  const d1 = dist(v.x, v.y, cx, cy);
+  check('le bûcheron récolte collé à l’arbre', auTravail(v) && d1 < TILE * 0.75, `${d1.toFixed(1)} px du centre de l’arbre (état ${v.state})`);
+  check('… sur son flanc ouest ou est, pas au nord ni au sud', Math.abs(v.x - cx) > Math.abs(v.y - cy) && (v.gatherSpot.cote === 'O' || v.gatherSpot.cote === 'E'),
+    `côté ${v.gatherSpot && v.gatherSpot.cote}, dx ${(v.x - cx).toFixed(0)} dy ${(v.y - cy).toFixed(0)}`);
+  check('il fait face à l’arbre', Math.abs(Math.atan2(cy - v.y, cx - v.x) - v.facing) < 0.4 || Math.abs(Math.abs(Math.atan2(cy - v.y, cx - v.x) - v.facing) - Math.PI * 2) < 0.4,
+    `orientation ${v.facing.toFixed(2)} pour un arbre à ${Math.atan2(cy - v.y, cx - v.x).toFixed(2)}`);
+
+  // Deux autres sur le même arbre : chacun son côté.
+  const v2 = villagers[1], v3 = villagers[2];
+  v2.x = cx; v2.y = cy + 4 * TILE; v2.gatherAt(arbre.tx, arbre.ty);
+  v3.x = cx; v3.y = cy + 4 * TILE; v3.gatherAt(arbre.tx, arbre.ty);
+  for (let i = 0; i < 30 * TICKS_PER_SECOND && !(auTravail(v2) && auTravail(v3)); i++) world.update(DT);
+  const cotes = [v, v2, v3].map((u) => u.gatherSpot && u.gatherSpot.cote);
+  check('trois bûcherons sur un arbre se répartissent ses côtés', new Set(cotes).size === 3 && auTravail(v2) && auTravail(v3), cotes.join(' '));
+  const ecart = Math.min(dist(v.x, v.y, v2.x, v2.y), dist(v.x, v.y, v3.x, v3.y), dist(v2.x, v2.y, v3.x, v3.y));
+  check('… sans se marcher dessus', ecart > TILE * 0.6, `${ecart.toFixed(1)} px entre les plus proches`);
+
+  // Un arbre dont seul le nord est libre : on récolte quand même, du nord.
+  const bouche = arbres[1];
+  const bx = bouche.tx * TILE + TILE / 2, by = bouche.ty * TILE + TILE / 2;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    if ((dx || dy) && !(dx === 0 && dy === -1)) map.blocked[(bouche.ty + dy) * map.w + bouche.tx + dx] |= 1;
+  }
+  const v4 = villagers[3];
+  v4.x = bx; v4.y = by - 4 * TILE;
+  v4.gatherAt(bouche.tx, bouche.ty);
+  for (let i = 0; i < 30 * TICKS_PER_SECOND && !auTravail(v4); i++) world.update(DT);
+  const d4 = dist(v4.x, v4.y, bx, by);
+  check('un seul côté libre : on y récolte, collé quand même', auTravail(v4) && d4 < TILE * 0.75 && v4.gatherSpot.cote === 'N', `côté ${v4.gatherSpot && v4.gatherSpot.cote}, ${d4.toFixed(1)} px (état ${v4.state})`);
+}
+
 // Changer un villageois de métier ne doit pas jeter son chargement.
 {
   const world = new World({ seed: 8, mapSize: 'small', difficulty: 'normal' });

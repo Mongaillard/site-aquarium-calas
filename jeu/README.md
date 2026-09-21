@@ -330,6 +330,18 @@ sinon un chevalier de dix-huit pixels ne se lirait pas — et posé sur un **soc
 aux couleurs du joueur** : de loin une armure reste une tache sombre, et
 l'appartenance doit se lire d'un coup d'œil.
 
+**Collé au gisement.** Un villageois ne récolte pas à une case de vide : il
+choisit, avant de partir, le point où se tenir — le corps contre la case, sur
+un de ses côtés. L'ouest ou l'est de préférence (les poses de travail sont de
+profil : posté au nord, il regarderait à côté), puis le nord et le sud, puis
+les angles ; à préférence égale, le plus proche, et un côté déjà pris par un
+autre récolteur de la même case est laissé tant qu'il en reste — trois
+bûcherons sur un arbre se répartissent ses flancs. Le chemin vise ce point ;
+s'il est tenu ou impossible (un coin), il se contente d'où il est, et si le
+point n'est pas joignable du tout, n'importe quel côté fait l'affaire avant de
+condamner la case. Le point choisi est sauvegardé avec l'unité : une partie
+reprise le garde.
+
 **Le villageois travaille pour de vrai** (`villageois.webp`, 90 Ko) : quatre
 orientations de marche × huit pas, et quatre poses de quatre images — repos,
 cueillir, construire, porter. La pose suit l'état de la simulation : devant des

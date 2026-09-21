@@ -134,6 +134,8 @@ export class Unit extends Entity {
     this.destination = null;      // {x, y} final
     this.target = null;           // entité visée (combat, construction, ferme)
     this.resourceTile = null;     // {tx, ty} en cours de récolte
+    this.gatherSpot = null;       // {x, y, tx, ty, cote} où se tenir pour la récolter
+    this.snugTime = 0;            // temps passé à essayer de s'y coller
     this.carry = { type: null, amount: 0 };
     this.attackCooldown = 0;
     // Toute l'aléa de simulation passe par le générateur du monde : une même
@@ -294,7 +296,54 @@ export class Unit extends Entity {
     this.resourceTile = { tx, ty };
     this.target = null;
     this.state = STATE.GATHER;
-    this.requestPathToTile(tx, ty, true);
+    this.gatherSpot = this.chooseGatherSpot(tx, ty);
+    this.snugTime = 0;
+    this.requestPathToSpot();
+  }
+
+  /**
+   * Le point où se tenir pour récolter la case (tx, ty), collé à elle : le
+   * corps touche la case, sur un de ses côtés. On préfère l'ouest ou l'est —
+   * les poses de travail sont de profil, un villageois au nord regarderait à
+   * côté —, puis le nord et le sud, puis les angles ; à préférence égale, le
+   * plus proche. Un côté déjà pris par un autre récolteur de la même case est
+   * laissé, tant qu'il en reste. Null si aucun côté n'est tenable.
+   */
+  chooseGatherSpot(tx, ty) {
+    const map = this.world.map;
+    const r = this.radius * BODY;
+    const marge = TILE / 2 + r + 1;
+    const cx = tx * TILE + TILE / 2, cy = ty * TILE + TILE / 2;
+    const cotes = [
+      ['O', -1, 0, 0], ['E', 1, 0, 0], ['N', 0, -1, TILE], ['S', 0, 1, TILE],
+      ['NO', -1, -1, 2 * TILE], ['NE', 1, -1, 2 * TILE], ['SO', -1, 1, 2 * TILE], ['SE', 1, 1, 2 * TILE],
+    ];
+    const pris = new Set();
+    for (const u of this.world.units) {
+      if (u === this || u.dead || !u.gatherSpot || !u.resourceTile) continue;
+      if (u.resourceTile.tx === tx && u.resourceTile.ty === ty) pris.add(u.gatherSpot.cote);
+    }
+    let meilleur = null, meilleurCout = Infinity;
+    for (let passe = 0; passe < 2 && !meilleur; passe++) {   // 2e passe : les côtés pris aussi
+      for (const [cote, ox, oy, penalite] of cotes) {
+        if (passe === 0 && pris.has(cote)) continue;
+        const x = cx + ox * marge, y = cy + oy * marge;
+        if (x < r || y < r || x > map.pixelWidth - r || y > map.pixelHeight - r || !map.canStand(x, y, r)) continue;
+        const stx = Math.floor(x / TILE), sty = Math.floor(y / TILE);
+        // un côté qui débouche sur un espace fermé (poche de forêt) passe après
+        const enclave = map.floodSize(stx, sty, 40) < 40 ? 4 * TILE : 0;
+        const cout = penalite + enclave + dist(this.x, this.y, x, y);
+        if (cout < meilleurCout) { meilleurCout = cout; meilleur = { x, y, tx, ty, cote }; }
+      }
+    }
+    return meilleur;
+  }
+
+  /** Chemin vers le point de récolte s'il y en a un, sinon vers une case voisine. */
+  requestPathToSpot() {
+    const spot = this.gatherSpot, tile = this.resourceTile;
+    if (spot && tile && spot.tx === tile.tx && spot.ty === tile.ty) this.requestPathTo(spot.x, spot.y, false);
+    else if (tile) this.requestPathToTile(tile.tx, tile.ty, true);
   }
 
   gatherFarm(farm) {
@@ -523,12 +572,30 @@ export class Unit extends Entity {
 
     const d = farm ? farm.edgeDistanceTo(this.x, this.y) : dist(this.x, this.y, targetX, targetY);
     const limit = farm ? TILE * 1.1 : reach;
+
+    // Collé au gisement : tant qu'on n'est pas au point choisi, on y va — droit
+    // dessus quand il est tout près. Si on est à portée mais qu'on n'y arrive
+    // pas (un coin, quelqu'un qui l'occupe), on se contente d'où l'on est.
+    const spot = !farm && this.gatherSpot && this.gatherSpot.tx === this.resourceTile.tx && this.gatherSpot.ty === this.resourceTile.ty
+      ? this.gatherSpot : null;
+    if (spot && d <= limit && dist(this.x, this.y, spot.x, spot.y) > 2.5) {
+      const enChemin = this.pathPending || (this.path && this.pathIndex < this.path.length);
+      if (!enChemin) this.snugTime += dt;
+      if (this.snugTime > 1.5) {
+        this.gatherSpot = { ...spot, x: this.x, y: this.y };
+      } else {
+        if (this.approach(spot.x, spot.y, dt)) return;
+        if (!this.followPath(dt)) return;
+        if (this.stuckTime > 0.5) this.snugTime += dt;   // bloqué : le temps compte double
+        return;
+      }
+    }
     if (d > limit) {
       // Approche finale : tout près mais pas encore à portée (arrêt au bord
       // d'une case, poussée par un voisin), on marche droit sur le gisement
       // plutôt que de redemander un chemin — qui reviendrait vide, la case
       // étant déjà adjacente.
-      if (this.approach(targetX, targetY, dt, farm ? farm.radius : 0)) return;
+      if (this.approach(spot ? spot.x : targetX, spot ? spot.y : targetY, dt, farm ? farm.radius : 0)) return;
       if (this.followPath(dt)) {
         // Chemin terminé mais cible toujours hors de portée : elle est
         // probablement enclavée (buisson cerné d'arbres). On insiste un peu,
@@ -541,6 +608,9 @@ export class Unit extends Entity {
             this.findNextResource(resType);
             return;
           }
+          // Le point choisi n'est peut-être pas joignable (une poche, un coin) :
+          // avant de condamner la case, on accepte n'importe quel côté.
+          if (this.gatherSpot) { this.gatherSpot = null; this.requestPathToSpot(); return; }
           // Case injoignable : on la marque, puis on reprend l'ordre du joueur
           // sur le gisement exploitable le plus proche. Ce n'est pas un
           // changement de métier, c'est l'ordre donné qui se poursuit.
@@ -558,7 +628,7 @@ export class Unit extends Entity {
         if (this.repathCooldown <= 0) {
           this.repathCooldown = 1.0;
           if (farm) this.requestPathToEntity(farm);
-          else this.requestPathToTile(this.resourceTile.tx, this.resourceTile.ty, true);
+          else this.requestPathToSpot();
         }
       }
       return;
@@ -651,7 +721,10 @@ export class Unit extends Entity {
       this.requestPathToEntity(this.target);
     } else if (this.resourceTile && this.world.map.resourceAt(this.resourceTile.tx, this.resourceTile.ty)) {
       this.state = STATE.GATHER;
-      this.requestPathToTile(this.resourceTile.tx, this.resourceTile.ty, true);
+      const { tx, ty } = this.resourceTile;
+      if (!this.gatherSpot || this.gatherSpot.tx !== tx || this.gatherSpot.ty !== ty) this.gatherSpot = this.chooseGatherSpot(tx, ty);
+      this.snugTime = 0;
+      this.requestPathToSpot();
     } else {
       this.findNextResource(resType);
     }
