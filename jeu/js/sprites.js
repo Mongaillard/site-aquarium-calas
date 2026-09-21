@@ -10,6 +10,8 @@
 // elle est toujours dans le dos.
 // ---------------------------------------------------------------------------
 
+import { bruitPeriodique } from './utils.js';
+
 /**
  * `natif` dit de quelle couleur d'équipe est l'illustration d'origine ; l'autre
  * camp est recoloré au chargement. `ancreY` est la ligne des pieds dans la
@@ -310,9 +312,46 @@ function chargerTexture(cle) {
   image.src = TEXTURES[cle];
 }
 
+/**
+ * L'eau n'a pas de texture peinte : sa nappe est dessinée ici, périodique
+ * comme les autres — un bleu profond que traversent des reflets clairs. Elle
+ * entre dans le même mécanisme que les nappes chargées, ce qui donne aux
+ * rivages les mêmes lisières fondues qu'aux autres terrains.
+ */
+function nappeEau() {
+  const n = 384;   // texels : même période que les nappes peintes (192 px monde)
+  const c = document.createElement('canvas');
+  c.width = n; c.height = n;
+  const g = c.getContext('2d');
+  const img = g.createImageData(n, n);
+  const houle = bruitPeriodique(n, [{ cellules: 4, poids: 0.6 }, { cellules: 8, poids: 0.4 }], 7);
+  const d = img.data;
+  for (let i = 0; i < n * n; i++) {
+    const k = 1 + houle[i] * 0.12;
+    d[i * 4] = 47 * k; d[i * 4 + 1] = 109 * k; d[i * 4 + 2] = 158 * k; d[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  // Reflets : traits clairs courts, semés à pas fixe, jamais à cheval sur un bord.
+  g.strokeStyle = 'rgba(255,255,255,0.14)';
+  g.lineWidth = 2;
+  g.lineCap = 'round';
+  g.beginPath();
+  for (let i = 0; i < 60; i++) {
+    const a = ((i * 7919) % 331) / 331, b = ((i * 104729) % 337) / 337, l = 10 + ((i * 31) % 12);
+    const x = 24 + a * (n - 48 - l), y = 24 + b * (n - 48);
+    g.moveTo(x, y); g.lineTo(x + l, y + ((i % 3) - 1) * 2);
+  }
+  g.stroke();
+  return [
+    { canvas: nappeRepliee(c, n, MARGE), n, marge: MARGE, texel: TEXEL },
+    { canvas: nappeRepliee(c, n / 2, MARGE / 2), n: n / 2, marge: MARGE / 2, texel: TEXEL * 2 },
+  ];
+}
+
 export function chargerTextures() {
   if (typeof document === 'undefined') return;
   for (const cle of Object.keys(TEXTURES)) chargerTexture(cle);
+  if (!nappes.has('water')) nappes.set('water', { pret: true, niveaux: nappeEau() });
 }
 
 /**

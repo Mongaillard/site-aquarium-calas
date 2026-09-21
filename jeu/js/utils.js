@@ -110,6 +110,40 @@ export class SpatialGrid {
   }
 }
 
+/**
+ * Bruit de valeur périodique : n × n valeurs dans [-1, 1], somme d'octaves
+ * interpolées en douceur sur un réseau qui se referme sur lui-même — le bord
+ * droit continue le bord gauche. Déterministe (graine fixe), donc identique
+ * d'une partie à l'autre ; purement cosmétique, la simulation l'ignore.
+ * @param {number} n côté, en valeurs
+ * @param {{cellules:number, poids:number}[]} octaves cellules du réseau (divise n) et poids
+ * @param {number} graine
+ */
+export function bruitPeriodique(n, octaves, graine = 1) {
+  const out = new Float32Array(n * n);
+  const hash = (i, j, k) => {
+    let h = (i * 374761393 + j * 668265263 + k * 1274126177 + graine * 97) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  };
+  octaves.forEach(({ cellules, poids }, o) => {
+    const pas = n / cellules;
+    for (let y = 0; y < n; y++) {
+      const gy = Math.floor(y / pas), fy = (y - gy * pas) / pas, sy = fy * fy * (3 - 2 * fy);
+      const gy1 = (gy + 1) % cellules;
+      for (let x = 0; x < n; x++) {
+        const gx = Math.floor(x / pas), fx = (x - gx * pas) / pas, sx = fx * fx * (3 - 2 * fx);
+        const gx1 = (gx + 1) % cellules;
+        const v00 = hash(gx, gy, o), v10 = hash(gx1, gy, o), v01 = hash(gx, gy1, o), v11 = hash(gx1, gy1, o);
+        const v = (v00 + (v10 - v00) * sx) * (1 - sy) + (v01 + (v11 - v01) * sx) * sy;
+        out[y * n + x] += (v * 2 - 1) * poids;
+      }
+    }
+  });
+  return out;
+}
+
 /** Formate 123.7 en "123" et 1234 en "1,2k" pour les petits écrans. */
 export function formatNumber(n) {
   n = Math.floor(n);

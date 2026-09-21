@@ -369,20 +369,35 @@ bâtiments gardent leur rendu dessiné au code, comme les cinq unités sans plan
 ### Le sol est une nappe, pas un damier
 
 Quatre textures de sol (`assets/sol-*.webp`, 149 Ko) — herbe, herbe sombre,
-terre, sable. Elles sont dessinées comme des **nappes continues** : chaque case
-montre le morceau de nappe qui correspond à sa position dans le monde, si bien
-que deux cases voisines se prolongent sans couture et que rien ne trahit la
-grille. Aux **lisières**, un terrain déborde en fondu sur son voisin de moindre
-priorité (l'herbe mord sur la terre) : chaque case de lisière est repeinte
-élargie de 8 px à travers un masque qui s'estompe — posée sur une case du même
-terrain, elle y peint les mêmes texels, ce qui rend l'astuce sûre.
+terre, sable — et une nappe d'eau dessinée au chargement. Elles sont traitées
+comme des **nappes continues** : chaque case montre le morceau de nappe qui
+correspond à sa position dans le monde, si bien que deux cases voisines se
+prolongent sans couture et que rien ne trahit la grille.
+
+Les **lisières** ne suivent pas la grille non plus. Une première version
+repeignait chaque case de lisière élargie de 8 px à travers un masque qui
+s'estompe : la frontière restait un escalier de cases, à peine adouci — « ça
+fait bizarre ». Désormais chaque terrain a un **masque de couverture** : le
+champ « ce terrain, ou un plus prioritaire » vaut 1 au centre de ses cases, 0
+au centre des autres, et s'interpole entre les deux — sa ligne de niveau 0,5
+passe par le milieu des bords de case et coupe les angles en diagonale. Un
+bruit périodique l'ondule (jusqu'à 9 px), puis un seuil doux large de 10 px
+donne l'opacité avec laquelle la nappe se pose. Les terrains se posent par
+priorité croissante (terre, sable, herbe, herbe sombre, eau) ; les champs étant
+emboîtés, chaque nappe ne garde sous les couches du dessus que sa part, et à
+une lisière herbe/terre aucun sable ne transparaît. Les masques se calculent à
+2 px monde par texel (moins d'une milliseconde par tronçon) et s'agrandissent
+avec lissage ; chaque couche n'est composée que sur le rectangle où son masque
+n'est pas nul. L'eau, sans texture peinte, entre dans le même mécanisme : le
+rivage se fond comme le reste.
 
 Le sol est **pré-rendu par tronçons** de 8×8 cases dans des canvas hors écran
 mis en cache (le terrain ne change jamais, le brouillard se peint par-dessus) :
-une image affiche une dizaine de tronçons au lieu de trois cents cases et de
-deux cents tampons de lisière — c'était 48 images par seconde en direct, c'est
-60 en cache. Les tronçons se recouvrent de 8 px sur les mêmes texels, sans quoi
-un zoom fractionnaire laissait voir une couture anticrénelée entre deux images
+une image affiche une dizaine de tronçons au lieu de trois cents cases et
+d'autant de compositions — c'était 48 images par seconde en direct, c'est 60 en
+cache, et 57 pendant un défilement continu qui rend dix tronçons frais par
+seconde. Les tronçons se recouvrent de 8 px sur les mêmes texels, sans quoi un
+zoom fractionnaire laissait voir une couture anticrénelée entre deux images
 posées bord à bord. Une version demi-taille sert au zoom arrière, où réduire
 une nappe de trop scintille au défilement.
 

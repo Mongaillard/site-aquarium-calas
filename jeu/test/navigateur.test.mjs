@@ -706,7 +706,7 @@ check('un doigt sur les toits ennemis ordonne l’attaque du palais', tapPalais.
 const sol = await page.evaluate(async () => {
   const g = window.__jeu; const T = 32;
   const mod = await import('./js/sprites.js');
-  const nappes = ['grass', 'grassDark', 'dirt', 'sand'].map((k) => !!mod.textureSol(k));
+  const nappes = ['grass', 'grassDark', 'dirt', 'sand', 'water'].map((k) => !!mod.textureSol(k));
   const map = g.world.map;
   // une case explorée d'herbe près du Centre-Ville
   const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
@@ -729,8 +729,82 @@ const sol = await page.evaluate(async () => {
   const moy = somme / n; const variance = somme2 / n - moy * moy;
   return { nappes, variance: Math.round(variance), moyenne: Math.round(moy) };
 });
-check('les quatre nappes de sol sont chargées', sol.nappes.every(Boolean), sol.nappes.join(' '));
+check('les cinq nappes de sol sont chargées, l’eau dessinée comprise', sol.nappes.every(Boolean), sol.nappes.join(' '));
 check('le sol est texturé, pas une couleur plate', sol.variance > 30, `variance ${sol.variance} sur 36×36 px (une tuile plate : ~0)`);
+
+// Les lisières ne suivent plus la grille : le masque de couverture d'un
+// terrain ondule le long de la frontière et se fond sur une largeur. On peint
+// une frontière verticale terre/herbe sur toute la fenêtre d'un tronçon, on
+// lit le masque de l'herbe, puis on rend le tronçon et on sonde ses pixels.
+const lisieres = await page.evaluate(() => {
+  const g = window.__jeu; const T = 32; const map = g.world.map; const r = g.renderer;
+  const cx = 1, cy = 1, taille = 8 * T, rec = 8;
+  const X0 = cx * taille - rec, Y0 = cy * taille - rec, cote = taille + 2 * rec, n = cote / 2;
+  const tx0 = Math.floor(X0 / T) - 1, ty0 = Math.floor(Y0 / T) - 1, cols = Math.ceil(cote / T) + 3;
+  const frontiere = ((tx0 + 6) * T - X0) / 2;   // en texels de masque
+  const sauve = [];
+  for (let ty = ty0; ty < ty0 + cols; ty++) {
+    for (let tx = tx0; tx < tx0 + cols; tx++) {
+      const i = ty * map.w + tx;
+      sauve.push([i, map.terrain[i]]);
+      map.terrain[i] = tx < tx0 + 6 ? 2 : 0;   // terre à gauche, herbe à droite
+    }
+  }
+  const nappes = r.nappesPour(1);
+  const t0 = performance.now();
+  const { presents, masques } = r.couverturesTroncon(X0, Y0, cote);
+  const canvas = r.rendreTroncon(cx, cy, 2, nappes);
+  const scratch = document.createElement('canvas'); scratch.width = 4; scratch.height = 4;
+  const sc = scratch.getContext('2d'); sc.drawImage(canvas, 0, 0, 4, 4); sc.getImageData(0, 0, 1, 1);   // force le rendu
+  const ms = performance.now() - t0;
+
+  const a = masques[presents.indexOf(2)].data;
+  const alpha = (u, v) => a[(v * n + u) * 4 + 3];
+  const croisements = [], largeurs = [];
+  let horsLisiere = 0;
+  for (let v = 4; v < n - 4; v++) {
+    let c = -1, l = 0;
+    for (let u = 0; u < n; u++) {
+      const al = alpha(u, v);
+      if (c < 0 && al >= 128) c = u;
+      if (al > 25 && al < 230) l++;
+      if ((u < frontiere - 16 && al !== 0) || (u > frontiere + 16 && al !== 255)) horsLisiere++;
+    }
+    croisements.push(c); largeurs.push(l);
+  }
+  const moy = croisements.reduce((s, x) => s + x, 0) / croisements.length;
+  const ecart = Math.sqrt(croisements.reduce((s, x) => s + (x - moy) ** 2, 0) / croisements.length);
+  const etendue = Math.max(...croisements) - Math.min(...croisements);
+  const largeur = largeurs.reduce((s, x) => s + x, 0) / largeurs.length;
+
+  // Les pixels rendus : la couleur suit le masque, sans frange ni ligne. Un
+  // texel de masque couvre 2 px monde, soit 4 px du tronçon rendu à l'échelle 2.
+  const px = canvas.getContext('2d'); const K = 4;
+  const moyenne = (x, y) => {
+    const d = px.getImageData(x - 4, y - 4, 9, 9).data; const m = [0, 0, 0];
+    for (let i = 0; i < d.length; i += 4) { m[0] += d[i]; m[1] += d[i + 1]; m[2] += d[i + 2]; }
+    return m.map((c) => c / 81);
+  };
+  const sondes = [];
+  for (let v = 16; v < n - 16; v += 24) {
+    const c = croisements[v - 4];
+    const terre = moyenne(K * (c - 22), K * v), herbe = moyenne(K * (c + 22), K * v), milieu = moyenne(K * c, K * v);
+    const d = [herbe[0] - terre[0], herbe[1] - terre[1], herbe[2] - terre[2]];
+    const d2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+    const s = ((milieu[0] - terre[0]) * d[0] + (milieu[1] - terre[1]) * d[1] + (milieu[2] - terre[2]) * d[2]) / d2;
+    sondes.push(Math.round(s * 100) / 100);
+  }
+  for (const [i, t] of sauve) map.terrain[i] = t;
+  r.troncons.clear();
+  return { frontiere, moy: Math.round(moy * 10) / 10, ecart: Math.round(ecart * 10) / 10, etendue, largeur: Math.round(largeur * 10) / 10, horsLisiere, sondes, ms: Math.round(ms * 10) / 10 };
+});
+check('la lisière ondule au lieu de suivre la grille', lisieres.ecart >= 1.5 && lisieres.etendue >= 5,
+  `écart-type ${lisieres.ecart} texels, étendue ${lisieres.etendue} (2 px monde par texel)`);
+check('la lisière passe bien entre les centres des cases', Math.abs(lisieres.moy - lisieres.frontiere) < 6, `moyenne ${lisieres.moy} pour une frontière à ${lisieres.frontiere}`);
+check('le fondu a une largeur, ni nette ni floue', lisieres.largeur >= 3 && lisieres.largeur <= 10, `${lisieres.largeur} texels en moyenne`);
+check('aucun îlot loin de la lisière', lisieres.horsLisiere === 0, `${lisieres.horsLisiere} texels intermédiaires à plus de 32 px`);
+check('la couleur rendue suit le masque : mi-terre mi-herbe au croisement', lisieres.sondes.every((s) => s > 0.2 && s < 0.8), lisieres.sondes.join(' '));
+check('un tronçon de deux terrains se rend vite', lisieres.ms < 60, `${lisieres.ms} ms, masques et rastérisation compris`);
 
 // Arbres et buissons illustrés : deux atlas de six cases, plus hauts que leur
 // case — ils entrent dans l'ordre du peintre avec les unités.
