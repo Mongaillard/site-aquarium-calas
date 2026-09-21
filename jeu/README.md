@@ -3,7 +3,7 @@
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
 très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 946 Ko d'illustrations et de textures — dont un cycle de marche
+pictogrammes vectoriels et 962 Ko d'illustrations et de textures — dont un cycle de marche
 complet.
 
 ## Lancer le jeu
@@ -410,8 +410,16 @@ emboîtés, chaque nappe ne garde sous les couches du dessus que sa part, et à
 une lisière herbe/terre aucun sable ne transparaît. Les masques se calculent à
 2 px monde par texel (moins d'une milliseconde par tronçon) et s'agrandissent
 avec lissage ; chaque couche n'est composée que sur le rectangle où son masque
-n'est pas nul. L'eau, sans texture peinte, entre dans le même mécanisme : le
-rivage se fond comme le reste.
+n'est pas nul.
+
+**L'eau a des bords.** Sa nappe (`sol-eau.webp`) est l'« eau pleine » de la
+planche, un losange isométrique redressé en carré vu de dessus puis raccordé
+bord à bord comme les autres. Elle n'est pas posée telle quelle : une
+transformée de distance depuis la ligne de rivage ondulée donne à chaque texel
+sa distance au bord, et le rendu en tire trois bandes — une **frange de sable**
+côté terre, un **haut-fond** turquoise et une **ligne d'écume** blanche côté
+eau, striée par un bruit plus fin pour qu'elle se rompe comme un ressac. Trois
+masques de plus par tronçon riverain, composés comme les couches de terrain.
 
 Le sol est **pré-rendu par tronçons** de 8×8 cases dans des canvas hors écran
 mis en cache (le terrain ne change jamais, le brouillard se peint par-dessus) :

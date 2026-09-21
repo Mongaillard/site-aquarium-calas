@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v20';
+const CACHE = 'age-empires-mobile-v21';
 const ASSETS = [
   './',
   './index.html',
@@ -41,6 +41,7 @@ const ASSETS = [
   './assets/sol-herbe-sombre.webp',
   './assets/sol-terre.webp',
   './assets/sol-sable.webp',
+  './assets/sol-eau.webp',
   './assets/arbres.webp',
   './assets/baies.webp',
   './assets/or.webp',

@@ -740,7 +740,7 @@ const sol = await page.evaluate(async () => {
   const moy = somme / n; const variance = somme2 / n - moy * moy;
   return { nappes, variance: Math.round(variance), moyenne: Math.round(moy) };
 });
-check('les cinq nappes de sol sont chargées, l’eau dessinée comprise', sol.nappes.every(Boolean), sol.nappes.join(' '));
+check('les cinq nappes de sol sont chargées, l’eau redressée comprise', sol.nappes.every(Boolean), sol.nappes.join(' '));
 check('le sol est texturé, pas une couleur plate', sol.variance > 30, `variance ${sol.variance} sur 36×36 px (une tuile plate : ~0)`);
 
 // Les lisières ne suivent plus la grille : le masque de couverture d'un
@@ -816,6 +816,60 @@ check('le fondu a une largeur, ni nette ni floue', lisieres.largeur >= 3 && lisi
 check('aucun îlot loin de la lisière', lisieres.horsLisiere === 0, `${lisieres.horsLisiere} texels intermédiaires à plus de 32 px`);
 check('la couleur rendue suit le masque : mi-terre mi-herbe au croisement', lisieres.sondes.every((s) => s > 0.2 && s < 0.8), lisieres.sondes.join(' '));
 check('un tronçon de deux terrains se rend vite', lisieres.ms < 60, `${lisieres.ms} ms, masques et rastérisation compris`);
+
+// L'eau a des bords : une frange de sable côté terre, une écume côté eau.
+// Même montage, frontière verticale terre | eau ; on lit les masques du
+// rivage, puis les pixels rendus de part et d'autre de la ligne — tout se
+// mesure depuis le rivage RÉEL de chaque ligne (l'eau à demi opaque), qui
+// ondule autour de la frontière des cases.
+const rivage = await page.evaluate(() => {
+  const g = window.__jeu; const T = 32; const map = g.world.map; const r = g.renderer;
+  const cx = 1, cy = 1, taille = 8 * T, rec = 8;
+  const X0 = cx * taille - rec, Y0 = cy * taille - rec, cote = taille + 2 * rec, n = cote / 2;
+  const tx0 = Math.floor(X0 / T) - 1, ty0 = Math.floor(Y0 / T) - 1, cols = Math.ceil(cote / T) + 3;
+  const sauve = [];
+  for (let ty = ty0; ty < ty0 + cols; ty++) for (let tx = tx0; tx < tx0 + cols; tx++) { const i = ty * map.w + tx; sauve.push([i, map.terrain[i]]); map.terrain[i] = tx < tx0 + 6 ? 2 : 4; }
+  const nappes = r.nappesPour(1);
+  const { presents, masques, rivage } = r.couverturesTroncon(X0, Y0, cote);
+  const canvas = r.rendreTroncon(cx, cy, 2, nappes);
+  const out = { present: !!rivage };
+  if (rivage) {
+    const lire = (img) => (u, v) => img.data[(v * n + u) * 4 + 3];
+    const eau = lire(masques[presents.indexOf(4)]);
+    const plage = lire(rivage.plage.img), ecume = lire(rivage.ecume.img), haut = lire(rivage.hautFond.img);
+    const croisement = (v) => { for (let u = 0; u < n; u++) if (eau(u, v) >= 128) return u; return -1; };
+    let plagePres = 0, plageLoin = 0, ecumeSur = 0, ecumeHors = 0, hautPres = 0, hautLoin = 0;
+    for (let v = 8; v < n - 8; v++) {
+      const c = croisement(v);
+      for (let u = 0; u < n; u++) {
+        const d = u - c;   // texels ; > 0 côté eau
+        if (plage(u, v) > 0) { if (d >= -12 && d <= 3) plagePres++; else if (d < -13 || d > 4) plageLoin++; }
+        if (ecume(u, v) > 0) { if (d >= -2 && d <= 8) ecumeSur++; else if (d < -3 || d > 9) ecumeHors++; }
+        if (haut(u, v) > 0) { if (d >= -4 && d <= 11) hautPres++; else if (d < -5 || d > 12) hautLoin++; }
+      }
+    }
+    Object.assign(out, { plagePres, plageLoin, ecumeSur, ecumeHors, hautPres, hautLoin });
+    // pixels : luminance sur chaque ligne sondée, à 4 px de tronçon par texel
+    const px = canvas.getContext('2d'); const K = 4;
+    const lum = (x, y) => { const d = px.getImageData(x - 2, y - 2, 5, 5).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]; return s / 25; };
+    let ecumeMax = 0, eauProfonde = 0, sable = 0, terre = 0, k = 0;
+    for (let v = 20; v < n - 20; v += 12) {
+      const c = croisement(v);
+      let m = 0; for (let u = c - 2; u <= c + 9; u++) m = Math.max(m, lum(K * u, K * v));
+      ecumeMax += m; eauProfonde += lum(K * (c + 40), K * v); sable += lum(K * (c - 5), K * v); terre += lum(K * (c - 40), K * v); k++;
+    }
+    Object.assign(out, { ecumeMax: Math.round(ecumeMax / k), eauProfonde: Math.round(eauProfonde / k), sable: Math.round(sable / k), terre: Math.round(terre / k) });
+  }
+  for (const [i, t] of sauve) map.terrain[i] = t;
+  r.troncons.clear();
+  return out;
+});
+check('au bord de l’eau, les masques du rivage existent', rivage.present);
+check('la plage borde l’eau côté terre, et nulle part ailleurs', rivage.plagePres > 500 && rivage.plageLoin === 0, `${rivage.plagePres} texels de plage le long du rivage, ${rivage.plageLoin} ailleurs`);
+check('l’écume court le long du rivage, côté eau', rivage.ecumeSur > 200 && rivage.ecumeHors === 0, `${rivage.ecumeSur} texels d’écume sur le rivage, ${rivage.ecumeHors} ailleurs`);
+check('le haut-fond éclaircit l’eau près du bord, pas au large', rivage.hautPres > 500 && rivage.hautLoin === 0, `${rivage.hautPres} texels près du bord, ${rivage.hautLoin} au large`);
+check('en pixels : l’écume est plus claire que l’eau profonde, la plage plus claire que la terre',
+  rivage.ecumeMax > rivage.eauProfonde + 40 && rivage.sable > rivage.terre + 12, `écume ${rivage.ecumeMax} · eau ${rivage.eauProfonde} · plage ${rivage.sable} · terre ${rivage.terre}`);
 
 // Arbres et buissons illustrés : deux atlas de six cases, plus hauts que leur
 // case — ils entrent dans l'ordre du peintre avec les unités.

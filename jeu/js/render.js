@@ -23,7 +23,7 @@ const TERRAIN_COLORS = {
   [TERRAIN.GRASS_DARK]: ['#5c6123', '#5e6325', '#5a5f21'],
   [TERRAIN.DIRT]: ['#805a3a', '#835d3d', '#7d5737'],
   [TERRAIN.SAND]: ['#a17954', '#a47c57', '#9e7651'],
-  [TERRAIN.WATER]: ['#2f6d9e', '#32709f', '#2c6a9a'],
+  [TERRAIN.WATER]: ['#0f6584', '#116886', '#0d6282'],
 };
 
 // Nappe de sol par terrain, et priorité : là où deux terrains se rencontrent,
@@ -43,6 +43,17 @@ const FONDU = 10;                  // largeur du fondu, en pixels monde
 const ONDULATION = 0.28;           // amplitude de l'ondulation, en cases
 const RES_MASQUE = 2;              // pixels monde par texel de masque
 const BRUIT_N = 80;                // côté du bruit d'ondulation, en texels (160 px monde)
+// Les bords de l'eau, en cases depuis la ligne de rivage (négatif : côté terre),
+// modelés par la même ondulation que la lisière : une frange de sable côté
+// terre, un haut-fond clair et une ligne d'écume côté eau. Chaque bande monte
+// entre ses deux premières bornes et redescend entre les deux dernières.
+const RIVAGE = {
+  plage: [-0.55, -0.3, 0.05, 0.15],
+  hautFond: [-0.2, 0, 0.1, 0.45],
+  ecume: [0, 0.06, 0.12, 0.2],
+};
+const TEINTE_HAUT_FOND = 'rgba(150, 225, 225, 0.42)';
+const TEINTE_ECUME = 'rgba(240, 252, 255, 0.9)';
 const TRONCON = 8;                 // cases de côté d'un tronçon de sol pré-rendu
 const TRONCONS_MAX = 40;           // tronçons gardés en cache (≈ 1,1 Mo chacun en fin)
 // Recouvrement entre tronçons voisins, en pixels monde : à zoom fractionnaire,
@@ -130,6 +141,56 @@ export class Camera {
   }
 }
 
+/** Rampe douce de 0 (x ≤ a) à 1 (x ≥ b). */
+function lisse(a, b, x) {
+  const t = clamp((x - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * Distance de chaque texel au plus proche texel marqué (chanfrein 3-4, en
+ * texels) : deux balayages, l'un vers le bas et la droite, l'autre en retour.
+ */
+function distances(marque, w, h, out) {
+  for (let i = 0; i < w * h; i++) out[i] = marque[i] ? 0 : 1e9;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      let v = out[i];
+      if (x > 0 && out[i - 1] + 3 < v) v = out[i - 1] + 3;
+      if (y > 0) {
+        if (out[i - w] + 3 < v) v = out[i - w] + 3;
+        if (x > 0 && out[i - w - 1] + 4 < v) v = out[i - w - 1] + 4;
+        if (x < w - 1 && out[i - w + 1] + 4 < v) v = out[i - w + 1] + 4;
+      }
+      out[i] = v;
+    }
+  }
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x;
+      let v = out[i];
+      if (x < w - 1 && out[i + 1] + 3 < v) v = out[i + 1] + 3;
+      if (y < h - 1) {
+        if (out[i + w] + 3 < v) v = out[i + w] + 3;
+        if (x < w - 1 && out[i + w + 1] + 4 < v) v = out[i + w + 1] + 4;
+        if (x > 0 && out[i + w - 1] + 4 < v) v = out[i + w - 1] + 4;
+      }
+      out[i] = v;
+    }
+  }
+  for (let i = 0; i < w * h; i++) out[i] /= 3;
+  return out;
+}
+
+/** Élargit le rectangle e au texel (u, v). */
+function etendre(e, u, v) {
+  if (u < e.u0) e.u0 = u;
+  if (u > e.u1) e.u1 = u;
+  if (v < e.v0) e.v0 = v;
+  if (v > e.v1) e.v1 = v;
+}
+
 export class Renderer {
   constructor(canvas, world, camera) {
     this.canvas = canvas;
@@ -150,6 +211,7 @@ export class Renderer {
     chargerTextures();
     this.buildTileAtlas();
     this.bruitLisiere = bruitPeriodique(BRUIT_N, [{ cellules: 8, poids: 0.65 }, { cellules: 16, poids: 0.35 }], 3);
+    this.bruitEcume = bruitPeriodique(BRUIT_N, [{ cellules: 20, poids: 0.6 }, { cellules: 40, poids: 0.4 }], 5);   // strie l'écume
     this.imagesMasque = [];
     this.initFogCanvas();
     this.resize();
@@ -321,26 +383,25 @@ export class Renderer {
     const ctx = canvas.getContext('2d');
     ctx.setTransform(echelle, 0, 0, echelle, -X0 * echelle, -Y0 * echelle);
 
-    const { presents, masques, etendues } = this.couverturesTroncon(X0, Y0, cote);
+    const { presents, masques, etendues, rivage } = this.couverturesTroncon(X0, Y0, cote);
     this.dessinerNappe(ctx, nappes[TERRAIN_PAR_PRIORITE[presents[0]]], X0, Y0, cote, cote);
     if (presents.length === 1) return canvas;
 
-    // Chaque couche, sur le rectangle où son masque n'est pas nul : sa nappe
-    // sur un tampon, passée par le masque (agrandi avec lissage : 2 px monde
-    // par texel suffisent à un fondu de 10), puis posée sur le tronçon.
+    // Chaque couche, sur le rectangle où son masque n'est pas nul : son contenu
+    // sur un tampon, passé par le masque (agrandi avec lissage : 2 px monde par
+    // texel suffisent à un fondu de 10), puis posé sur le tronçon.
     const tampon = this.tamponTroncon(canvas.width);
     const g = tampon.getContext('2d');
     const masque = this.masqueTroncon(cote / RES_MASQUE);
     const m = masque.getContext('2d');
-    for (let l = 1; l < presents.length; l++) {
-      const e = etendues[l];
-      if (e.u1 < e.u0) continue;   // présent dans la couronne, mais n'entre pas
+    const composer = (img, e, peindre) => {
+      if (e.u1 < e.u0) return;   // présent dans la couronne, mais n'entre pas
       const x = X0 + e.u0 * RES_MASQUE, y = Y0 + e.v0 * RES_MASQUE;
       const w = (e.u1 - e.u0 + 1) * RES_MASQUE, h = (e.v1 - e.v0 + 1) * RES_MASQUE;
       g.setTransform(echelle, 0, 0, echelle, -X0 * echelle, -Y0 * echelle);
       g.clearRect(x, y, w, h);
-      this.dessinerNappe(g, nappes[TERRAIN_PAR_PRIORITE[presents[l]]], x, y, w, h);
-      m.putImageData(masques[l], 0, 0);
+      peindre(x, y, w, h);
+      m.putImageData(img, 0, 0);
       g.globalCompositeOperation = 'destination-in';
       g.drawImage(masque, e.u0, e.v0, w / RES_MASQUE, h / RES_MASQUE, x, y, w, h);
       g.globalCompositeOperation = 'source-over';
@@ -348,6 +409,18 @@ export class Renderer {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(tampon, sx, sy, sw, sh, sx, sy, sw, sh);
       ctx.setTransform(echelle, 0, 0, echelle, -X0 * echelle, -Y0 * echelle);
+    };
+    const nappe = (cle) => (x, y, w, h) => this.dessinerNappe(g, nappes[cle], x, y, w, h);
+    const teinte = (couleur) => (x, y, w, h) => { g.fillStyle = couleur; g.fillRect(x, y, w, h); };
+    for (let l = 1; l < presents.length; l++) {
+      const terrain = TERRAIN_PAR_PRIORITE[presents[l]];
+      // Sous l'eau, sa plage ; sur l'eau, son haut-fond et son écume.
+      if (terrain === TERRAIN.WATER) composer(rivage.plage.img, rivage.plage.e, nappe(TERRAIN.SAND));
+      composer(masques[l], etendues[l], nappe(terrain));
+      if (terrain === TERRAIN.WATER) {
+        composer(rivage.hautFond.img, rivage.hautFond.e, teinte(TEINTE_HAUT_FOND));
+        composer(rivage.ecume.img, rivage.ecume.e, teinte(TEINTE_ECUME));
+      }
     }
     return canvas;
   }
@@ -371,8 +444,8 @@ export class Renderer {
     const n = cote / RES_MASQUE;
     // Les cases dont les centres encadrent le carré, une couronne de plus ; le
     // bord de la carte se prolonge.
-    const tx0 = Math.floor(X0 / TILE) - 1, ty0 = Math.floor(Y0 / TILE) - 1;
-    const cols = Math.ceil(cote / TILE) + 3;
+    const tx0 = Math.floor(X0 / TILE) - 2, ty0 = Math.floor(Y0 / TILE) - 2;
+    const cols = Math.ceil(cote / TILE) + 5;   // deux couronnes : le rivage regarde 32 px au-delà
     const prio = new Uint8Array(cols * cols);
     let vus = 0;
     for (let j = 0; j < cols; j++) {
@@ -387,13 +460,17 @@ export class Renderer {
     const presents = [];
     for (let p = 0; p < TERRAIN_PAR_PRIORITE.length; p++) if (vus & (1 << p)) presents.push(p);
     const masques = [null], etendues = [null];
-    if (presents.length === 1) return { presents, masques, etendues };
+    if (presents.length === 1) return { presents, masques, etendues, rivage: null };
+    const image = (cle) => {
+      let img = this.imagesMasque[cle];
+      if (!img || img.width !== n) img = this.imagesMasque[cle] = new ImageData(n, n);
+      return img;
+    };
     for (let l = 1; l < presents.length; l++) {
-      let img = this.imagesMasque[l];
-      if (!img || img.width !== n) img = this.imagesMasque[l] = new ImageData(n, n);
-      masques.push(img);
+      masques.push(image(l));
       etendues.push({ u0: n, v0: n, u1: -1, v1: -1 });   // rectangle des texels non nuls
     }
+    const eau = presents.indexOf(PRIORITE[TERRAIN.WATER]);
 
     const k = presents.length;
     const M = new Float32Array(k);
@@ -423,18 +500,71 @@ export class Renderer {
         for (let l = k - 1; l >= 1; l--) {
           const a = dessus >= 1 ? 0 : ((M[l] - dessus) / (1 - dessus)) * 255;
           masques[l].data[o] = a;
-          if (a > 0) {
-            const e = etendues[l];
-            if (u < e.u0) e.u0 = u;
-            if (u > e.u1) e.u1 = u;
-            if (v < e.v0) e.v0 = v;
-            if (v > e.v1) e.v1 = v;
-          }
+          if (a > 0) etendre(etendues[l], u, v);
           dessus = M[l];
         }
       }
     }
-    return { presents, masques, etendues };
+    const rivage = eau > 0 ? this.masquesRivage(X0, Y0, n, prio, cols, tx0, ty0, image) : null;
+    return { presents, masques, etendues, rivage };
+  }
+
+  /**
+   * Les bords de l'eau : trois masques sur la DISTANCE au rivage. Le champ
+   * interpolé ne convient pas — il sature à une demi-case du bord, si bien
+   * qu'au large l'ondulation seule ferait des taches. On classe donc les
+   * texels (eau si le champ ondulé passe 0,5, la même ligne que la couche
+   * d'eau), sur une fenêtre élargie de MARGE texels pour voir les rivages
+   * voisins, puis une transformée de distance donne, en cases, la distance
+   * signée au rivage : négative sur la terre. Les bandes en découlent.
+   */
+  masquesRivage(X0, Y0, n, prio, cols, tx0, ty0, image) {
+    const MARGE = 16, ne = n + 2 * MARGE;
+    const bruit = this.bruitLisiere, nb = BRUIT_N;
+    const u0 = X0 / RES_MASQUE - MARGE, v0 = Y0 / RES_MASQUE - MARGE;
+    const pEau = PRIORITE[TERRAIN.WATER];
+    const dansEau = new Uint8Array(ne * ne), horsEau = new Uint8Array(ne * ne);
+    for (let v = 0; v < ne; v++) {
+      const wy = (v0 + v + 0.5) * RES_MASQUE;
+      const fy = wy / TILE - 0.5, jy = Math.floor(fy), sy = fy - jy;
+      const r0 = (jy - ty0) * cols, r1 = r0 + cols;
+      const by = ((((v0 + v) % nb) + nb) % nb) * nb;
+      for (let u = 0; u < ne; u++) {
+        const wx = (u0 + u + 0.5) * RES_MASQUE;
+        const fx = wx / TILE - 0.5, ix = Math.floor(fx), sx = fx - ix;
+        const i0 = ix - tx0;
+        const c = ((prio[r0 + i0] >= pEau) * (1 - sx) + (prio[r0 + i0 + 1] >= pEau) * sx) * (1 - sy)
+          + ((prio[r1 + i0] >= pEau) * (1 - sx) + (prio[r1 + i0 + 1] >= pEau) * sx) * sy;
+        const eau = c + bruit[by + (((u0 + u) % nb) + nb) % nb] * ONDULATION >= 0.5;
+        dansEau[v * ne + u] = eau ? 1 : 0;
+        horsEau[v * ne + u] = eau ? 0 : 1;
+      }
+    }
+    if (!this.distancesRivage || this.distancesRivage[0].length !== ne * ne) this.distancesRivage = [new Float32Array(ne * ne), new Float32Array(ne * ne)];
+    const versEau = distances(dansEau, ne, ne, this.distancesRivage[0]);
+    const versTerre = distances(horsEau, ne, ne, this.distancesRivage[1]);
+    const rivage = {
+      plage: { img: image('plage'), e: { u0: n, v0: n, u1: -1, v1: -1 } },
+      hautFond: { img: image('hautFond'), e: { u0: n, v0: n, u1: -1, v1: -1 } },
+      ecume: { img: image('ecume'), e: { u0: n, v0: n, u1: -1, v1: -1 } },
+    };
+    const bande = ([a, b, c, d], x) => lisse(a, b, x) * (1 - lisse(c, d, x));
+    const enCases = RES_MASQUE / TILE;
+    for (let v = 0; v < n; v++) {
+      const by = ((((v0 + MARGE + v) % nb) + nb) % nb) * nb;
+      for (let u = 0; u < n; u++) {
+        const i = (v + MARGE) * ne + u + MARGE;
+        const d = (dansEau[i] ? versTerre[i] : -versEau[i]) * enCases;
+        const strie = clamp((this.bruitEcume[by + (((u0 + MARGE + u) % nb) + nb) % nb] + 0.25) * 1.6, 0, 1);
+        const o = (v * n + u) * 4 + 3;
+        for (const [cle, valeur] of [['plage', bande(RIVAGE.plage, d)], ['hautFond', bande(RIVAGE.hautFond, d)], ['ecume', bande(RIVAGE.ecume, d) * strie]]) {
+          const a = valeur * 255;
+          rivage[cle].img.data[o] = a;
+          if (a > 0) etendre(rivage[cle].e, u, v);
+        }
+      }
+    }
+    return rivage;
   }
 
   tamponTroncon(px) {
@@ -1397,7 +1527,7 @@ export class Renderer {
     const palette = {
       [TERRAIN.GRASS]: [74, 98, 23], [TERRAIN.GRASS_DARK]: [92, 97, 35],
       [TERRAIN.DIRT]: [128, 90, 58], [TERRAIN.SAND]: [161, 121, 84],
-      [TERRAIN.WATER]: [47, 109, 158],
+      [TERRAIN.WATER]: [15, 101, 132],
     };
     for (let i = 0; i < map.w * map.h; i++) {
       const c = palette[map.terrain[i]] || [90, 130, 70];

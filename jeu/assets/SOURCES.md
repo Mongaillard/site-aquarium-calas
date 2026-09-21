@@ -10,6 +10,7 @@
 | `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 56×86 par case | Planche générée par l'auteur du dépôt, fond dégradé retiré en deux passes (voir plus bas) |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 316×315, dessinée sur 158 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
+| `sol-eau.webp` | La **nappe d'eau**, 384×384, redressée depuis un losange isométrique et raccordée bord à bord | Illustration « eau pleine » générée par l'auteur du dépôt |
 | `sol-herbe.webp`, `sol-herbe-sombre.webp`, `sol-terre.webp`, `sol-sable.webp` | Les quatre **nappes de sol** (herbe, herbe sombre, terre, sable), 384×384, raccordées bord à bord | Planche de six textures générée par l'auteur du dépôt ; deux (herbe sèche, terre sombre) restent en réserve |
 | `arbres.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux), 107×190 par case | Planche générée par l'auteur du dépôt, avec transparence ; ses six buissons fleuris ne sont pas utilisés — ils ne disaient pas « nourriture » |
 | `baies.webp` | Le **buisson à baies** rouges et bleues sur son socle, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
@@ -209,6 +210,30 @@ Réduites à 384 px et encodées en WebP avec pertes (qualité 72) : **149 Ko** 
 les quatre. Les couleurs moyennes des nappes servent à la minimap et à la tuile
 de secours affichée le temps du chargement.
 
+## L'eau, et ses bords
+
+L'« eau pleine » de la planche est un **losange** en perspective isométrique,
+alors que le sol du jeu est vu de dessus. `redresse-eau.py` la redresse : les
+quatre sommets du losange (les extrêmes du masque) sont envoyés sur les coins
+d'un carré par une transformation affine ajustée aux moindres carrés (résidu
+4 px en x, 20 en y : le losange n'est pas tout à fait un parallélogramme), le
+carré est rogné de 3 % — le bord du losange est dentelé —, réduit à 384 texels
+puis traité comme les autres nappes : aplatissement, raccord à quatre images
+(couture 36 → 5, pour un grain de 6). **16 Ko**.
+
+L'eau n'est pas posée telle quelle : chaque rivage a ses **bords**, comme sur
+les planches de plage et de rivage. Le rendu (`render.js`, `RIVAGE`) classe
+les texels eau ou terre selon la même ligne ondulée que la couche d'eau, puis
+une **transformée de distance** (chanfrein 3-4, sur une fenêtre élargie de 32 px
+pour voir les rivages voisins) donne à chaque texel sa distance signée au
+rivage, en cases — le champ interpolé des lisières ne convenait pas, il sature à
+une demi-case du bord et l'ondulation seule aurait fait des taches au large.
+Trois bandes en découlent : une **frange de sable** côté terre (de −0,55 à
+0,15, la nappe de sable sous l'eau), un **haut-fond** turquoise côté eau
+(jusqu'à 0,45) et une **ligne d'écume** blanche (de 0 à 0,2), striée par un
+bruit plus fin pour qu'elle se rompe comme un ressac. Trois masques de plus par
+tronçon riverain, composés comme les couches de terrain.
+
 ## Les arbres, les baies et l'or
 
 La planche est livrée avec sa transparence, mais aucun pixel n'y est tout à
@@ -240,5 +265,5 @@ arbres ont été essayés pour la nourriture : jolis, mais ils ne disaient pas
 
 ## Format
 
-WebP partout où c'est possible : 946 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
+WebP partout où c'est possible : 962 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
 PNG, sans différence visible à l'œil même agrandi trois fois.
