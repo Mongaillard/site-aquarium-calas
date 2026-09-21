@@ -8,6 +8,7 @@
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
 | `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 56×86 par case | Planche générée par l'auteur du dépôt, fond dégradé retiré en deux passes (voir plus bas) |
+| `eclaireur.webp` | L'**éclaireur** : cavalier à la lance, huit orientations × quatre foulées, 106×111 par case | Planche générée par l'auteur du dépôt, livrée avec sa transparence |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 316×315, dessinée sur 158 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
 | `sol-eau.webp` | La **nappe d'eau**, 384×384, redressée depuis un losange isométrique et raccordée bord à bord | Illustration « eau pleine » générée par l'auteur du dépôt |
@@ -144,6 +145,19 @@ bâtiments : 448×688, **90 Ko**. La couleur d'équipe est celle du chevalier �
 l'écharpe bleue bascule, la peau, le cuir et la chemise restent ; le test le
 vérifie sur 14 440 pixels de peau.
 
+## L'éclaireur
+
+La planche tient huit orientations × quatre foulées d'un cavalier à la lance,
+lues du nord au nord-ouest dans le sens horaire ; l'atlas garde cet ordre et
+le jeu remet chaque secteur sur sa ligne (`lignes` de la déclaration). La
+transparence est fournie, renormalisée (99e centile → 255), et le voile
+d'alpha autour des figures retiré sous 48. Chaque image est posée au bas de
+sa case, centrée : le sabot le plus bas fait la ligne des pieds. Un cavalier
+vu de face fait **54 px monde** — plus grand qu'un homme à pied (44), comme il
+se doit — atlas à 2× avec le peps : 424×888, **145 Ko**. La cape et le tapis de
+selle sont bleu franc et basculent ; la robe du cheval, brune, ne bouge pas —
+le test le vérifie sur ses pixels.
+
 ## Les bâtiments
 
 L'illustration est en vue de trois quarts sur une carte vue de dessus — c'est
@@ -265,5 +279,5 @@ arbres ont été essayés pour la nourriture : jolis, mais ils ne disaient pas
 
 ## Format
 
-WebP partout où c'est possible : 962 Ko pour l'ensemble, contre bien plus d'un mégaoctet en
+WebP partout où c'est possible : 1,1 Mo pour l'ensemble, contre bien plus d'un mégaoctet en
 PNG, sans différence visible à l'œil même agrandi trois fois.

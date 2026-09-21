@@ -101,6 +101,19 @@ const ATLAS = {
     // L'écharpe est bleu franc ; peau, cuir et chemise sont orangés ou crème.
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
+  // L'éclaireur : cavalier à la lance, huit orientations × quatre foulées. La
+  // planche va du nord au nord-ouest dans le sens horaire ; `lignes` remet
+  // chaque secteur (sud, sud-est, est…) sur sa ligne. Plus grand qu'un homme
+  // à pied : 54 px de face.
+  scout: {
+    src: 'assets/eclaireur.webp',
+    cellW: 106, cellH: 111, cases: 8, images: 4, cycle: 56,
+    lignes: [4, 3, 2, 1, 0, 7, 6, 5],
+    ancreY: 110, hauteurMonde: 54, natif: 'bleu',
+    // Cape et tapis de selle sont bleu franc ; la robe du cheval, la peau et
+    // la tunique sont brunes ou crème.
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
   spearman: {
     src: 'assets/lancier.png',
     cellW: 48, cellH: 48, cases: 8, images: 1,

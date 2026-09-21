@@ -3,7 +3,7 @@
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
 très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 962 Ko d'illustrations et de textures — dont un cycle de marche
+pictogrammes vectoriels et 1,1 Mo d'illustrations et de textures — dont un cycle de marche
 complet.
 
 ## Lancer le jeu
@@ -339,6 +339,11 @@ Les poses sont dessinées d'un seul côté et retournées en miroir quand la cib
 est de l'autre ; elles se cadencent sur l'horloge, décalées par unité pour que
 dix bûcherons ne frappent pas en chœur, et le port suit la distance comme la
 marche.
+
+**L'éclaireur galope** (`eclaireur.webp`, 145 Ko) : huit orientations × quatre
+foulées d'un cavalier à la lance, la planche lue du nord dans le sens horaire
+et remise sur les secteurs du jeu. Il fait 54 px de face, un homme à pied 44 ;
+la foulée suit la distance, comme toutes les marches.
 
 **Deux partis pris sont jouables**, au choix dans le menu de pause :
 

@@ -949,6 +949,38 @@ const quatre = await page.evaluate(async () => {
 check('le villageois marche sur quatre orientations, la cardinale la plus proche en diagonale',
   quatre.sud === 0 && quatre.nord === 1 && quatre.ouest === 2 && quatre.est === 3 && quatre.sudEst === 3 && quatre.sudEstBis === 0, JSON.stringify(quatre));
 
+// L'éclaireur illustré : huit orientations × quatre foulées, planche lue du
+// nord au nord-ouest et remise sur les secteurs du jeu ; la cape bascule, la
+// robe du cheval reste.
+const eclaireur = await page.evaluate(async () => {
+  const mod = await import('./js/sprites.js');
+  const s = mod.spriteDe('scout');
+  if (!s) return null;
+  const def = s.def;
+  const lire = (src) => { const c = document.createElement('canvas'); c.width = src.width; c.height = src.height; const x = c.getContext('2d'); x.drawImage(src, 0, 0); return x.getImageData(0, 0, c.width, c.height).data; };
+  const hsl = (r, g, b) => { const mx = Math.max(r, g, b) / 255, mn = Math.min(r, g, b) / 255, l = (mx + mn) / 2; if (mx === mn) return [0, 0, l]; const d = mx - mn, sa = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); const R = r / 255, G = g / 255, B = b / 255; let h; if (mx === R) h = ((G - B) / d + (G < B ? 6 : 0)) / 6; else if (mx === G) h = ((B - R) / d + 2) / 6; else h = ((R - G) / d + 4) / 6; return [h * 360, sa, l]; };
+  const bleu = lire(mod.imagePourJoueur(s, 0)), rouge = lire(mod.imagePourJoueur(s, 1));
+  let opaques = 0, changes = 0, robe = 0, robeIntacte = 0, bleusRestants = 0;
+  for (let i = 0; i < bleu.length; i += 4) {
+    if (bleu[i + 3] < 128) continue;
+    opaques++;
+    const memes = bleu[i] === rouge[i] && bleu[i + 1] === rouge[i + 1] && bleu[i + 2] === rouge[i + 2];
+    if (!memes) changes++;
+    const [hb, sb, lb] = hsl(bleu[i], bleu[i + 1], bleu[i + 2]);
+    if (hb >= 15 && hb <= 40 && sb > 0.3 && lb > 0.2 && lb < 0.6) { robe++; if (memes) robeIntacte++; }
+    const [hr, sr] = hsl(rouge[i], rouge[i + 1], rouge[i + 2]);
+    if (hr >= 200 && hr <= 255 && sr > 0.32) bleusRestants++;
+  }
+  const ligne = (facing) => mod.cadreSource(def, mod.caseDirection(facing, def.cases), 0).sy / def.cellH;
+  return { cases: def.cases, images: def.images, opaques, changes, robe, robeIntacte, bleusRestants,
+    lignes: { sud: ligne(Math.PI / 2), est: ligne(0), nord: ligne(-Math.PI / 2), ouest: ligne(Math.PI), sudEst: ligne(Math.PI / 4), nordOuest: ligne(-3 * Math.PI / 4) } };
+});
+check('l’éclaireur porte son illustration : huit orientations, quatre foulées', !!eclaireur && eclaireur.cases === 8 && eclaireur.images === 4, eclaireur ? `${eclaireur.cases} × ${eclaireur.images}` : 'absent');
+check('la planche de l’éclaireur, lue du nord, retombe sur les secteurs du jeu', !!eclaireur && eclaireur.lignes.sud === 4 && eclaireur.lignes.est === 2 && eclaireur.lignes.nord === 0 && eclaireur.lignes.ouest === 6 && eclaireur.lignes.sudEst === 3 && eclaireur.lignes.nordOuest === 7, eclaireur && JSON.stringify(eclaireur.lignes));
+check('l’éclaireur adverse est repeint (cape et tapis de selle)', !!eclaireur && eclaireur.changes > eclaireur.opaques * 0.05, eclaireur && `${Math.round((eclaireur.changes / eclaireur.opaques) * 100)} % des pixels`);
+check('la robe du cheval reste la même', !!eclaireur && eclaireur.robe > 2000 && eclaireur.robeIntacte === eclaireur.robe, eclaireur && `${eclaireur.robeIntacte}/${eclaireur.robe} pixels de robe intacts`);
+check('aucun bleu franc ne subsiste côté adverse (éclaireur)', !!eclaireur && eclaireur.bleusRestants === 0, eclaireur && eclaireur.bleusRestants + ' pixels');
+
 check('les orientations tombent sur les bonnes cases',
   chevalier.sud === 0 && chevalier.est === 2 && chevalier.nord === 4 && chevalier.ouest === 6,
   `sud ${chevalier.sud} · est ${chevalier.est} · nord ${chevalier.nord} · ouest ${chevalier.ouest}`);
