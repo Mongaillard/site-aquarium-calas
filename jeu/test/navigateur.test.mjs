@@ -841,7 +841,10 @@ check('la lisière ondule au lieu de suivre la grille', lisieres.ecart >= 1.5 &&
 check('la lisière passe bien entre les centres des cases', Math.abs(lisieres.moy - lisieres.frontiere) < 6, `moyenne ${lisieres.moy} pour une frontière à ${lisieres.frontiere}`);
 check('le fondu a une largeur, ni nette ni floue', lisieres.largeur >= 3 && lisieres.largeur <= 10, `${lisieres.largeur} texels en moyenne`);
 check('aucun îlot loin de la lisière', lisieres.horsLisiere === 0, `${lisieres.horsLisiere} texels intermédiaires à plus de 32 px`);
-check('la couleur rendue suit le masque : mi-terre mi-herbe au croisement', lisieres.sondes.every((s) => s > 0.2 && s < 0.8), lisieres.sondes.join(' '));
+// Projection du pixel du croisement sur l'axe terre → herbe : ~0 ou ~1 serait
+// une frontière nette. Les deux nappes étant proches en couleur (l'herbe est
+// désormais calme), la mesure est bruitée : on laisse de la marge.
+check('la couleur rendue suit le masque : mi-terre mi-herbe au croisement', lisieres.sondes.every((s) => s > 0.12 && s < 0.88), lisieres.sondes.join(' '));
 check('un tronçon de deux terrains se rend vite', lisieres.ms < 60, `${lisieres.ms} ms, masques et rastérisation compris`);
 
 // L'eau a des bords : une frange de sable côté terre, une écume côté eau.

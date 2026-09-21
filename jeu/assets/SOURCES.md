@@ -254,6 +254,18 @@ Réduites à 384 px et encodées en WebP avec pertes (qualité 72) : **149 Ko** 
 les quatre. Les couleurs moyennes des nappes servent à la minimap et à la tuile
 de secours affichée le temps du chargement.
 
+### Une herbe plus douce
+
+Le gazon à rosettes de la planche, très saturé (0,80) et sombre, faisait un
+tapis répétitif toutes les six cases. L'herbe est désormais la **prairie** de
+la même planche (brins fins, pointes sèches), mêlée au gazon par un bruit
+lisse sur une **période de 512 texels — huit cases** — pour casser la
+répétition, puis calmée (`herbe-douce.py`) : saturation ramenée à 0,50, un
+peu plus claire, moins de contraste, grain adouci d'un demi-pixel, teinte
+tirée d'un rien vers le vert froid. L'herbe sombre est le gazon assombri et
+désaturé. Une vraie texture peinte, dans le style des ornements, reste la
+cible : voir la demande faite à l'auteur.
+
 ## L'eau, et ses bords
 
 L'« eau pleine » de la planche est un **losange** en perspective isométrique,
