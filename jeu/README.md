@@ -438,6 +438,18 @@ côté terre, un **haut-fond** turquoise et une **ligne d'écume** blanche côt�
 eau, striée par un bruit plus fin pour qu'elle se rompe comme un ressac. Trois
 masques de plus par tronçon riverain, composés comme les couches de terrain.
 
+**Les rives sont décorées.** Les planches d'eau ne montraient pas que de l'eau :
+rochers, galets, touffes d'herbe, roseaux, nénuphars et fleurs en bordent les
+rives. Ces pièces sont découpées une à une (`assets/rivage.webp`, 46 pièces) et
+le jeu les pose lui-même le long de chaque rive, quelle qu'en soit la forme
+(`js/decor.js`) : un plan d'eau de 40 cases ou moins est une **mare**, ceinte de
+rochers serrés, de roseaux et de nénuphars ; au-delà, un **lac** prend une plage
+de rochers épars, de galets et de touffes. Tout se déduit de la carte par un
+hachage de la case et de la graine — la simulation n'en sait rien, une unité
+traverse un rocher, et une partie reprise retrouve son décor. Rochers et
+roseaux entrent dans l'ordre du peintre avec les unités ; galets, nénuphars et
+fleurs sont peints sous tout le reste.
+
 Le sol est **pré-rendu par tronçons** de 8×8 cases dans des canvas hors écran
 mis en cache (le terrain ne change jamais, le brouillard se peint par-dessus) :
 une image affiche une dizaine de tronçons au lieu de trois cents cases et

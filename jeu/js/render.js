@@ -10,7 +10,8 @@ import { iconePath, ICON_BOX } from './icones.js';
 import {
   chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche, poseSource,
 } from './sprites.js';
-import { TERRAIN } from './map.js';
+import { TERRAIN, BLOCK } from './map.js';
+import { planterRivage, ECHELLE_RIVAGE } from './decor.js';
 import { STATE, villagerTask } from './entities.js';
 import { clamp, bruitPeriodique } from './utils.js';
 
@@ -193,6 +194,7 @@ function etendre(e, u, v) {
 
 export class Renderer {
   constructor(canvas, world, camera) {
+    this.decorActif = true;      // le décor des rivages (decor.js) ; débrayable pour les mesures
     this.canvas = canvas;
     this.troncons = new Map();
     this.ctx = canvas.getContext('2d', { alpha: false });
@@ -631,6 +633,47 @@ export class Renderer {
       else if (res.type === 'wood' && !arbres) this.drawTree(x, y, res);
       else if (res.type === 'food' && !buissons) this.drawBush(x, y, res);
     }
+    // Le décor plat des rivages (galets, nénuphars, fleurs) : sous tout le reste.
+    const rivage = this.decorActif ? spriteDe('rivage') : null;
+    if (rivage && rivage.pret) {
+      const decor = this.decorRivage(), explored = this.world.fog.explored;
+      for (let ty = Math.max(0, view.y0 - 1); ty <= Math.min(map.h - 1, view.y1 + 1); ty++) {
+        for (const d of decor.plats[ty]) {
+          if (d.tx < view.x0 - 1 || d.tx > view.x1 + 1) continue;
+          const i = d.ty * map.w + d.tx;
+          if (!explored[i] || (map.blocked[i] & BLOCK.BUILDING)) continue;
+          this.dessinerPiece(d, rivage);
+        }
+      }
+    }
+  }
+
+  /**
+   * Le décor des rivages se déduit de la carte (decor.js) ; il est planté une
+   * fois par carte et gardé.
+   */
+  decorRivage() {
+    const map = this.world.map;
+    if (!this.decor || this.decor.carte !== map) {
+      this.decor = planterRivage(map);
+      this.decor.carte = map;
+    }
+    return this.decor;
+  }
+
+  /** Une pièce du décor, posée par son pied ; en miroir une fois sur deux. */
+  dessinerPiece(d, sprite) {
+    const ctx = this.ctx, p = d.piece;
+    const w = p.w * ECHELLE_RIVAGE * d.echelle, h = p.h * ECHELLE_RIVAGE * d.echelle;
+    if (d.miroir) {
+      ctx.save();
+      ctx.translate(d.x * 2, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(sprite.variantes.bleu, p.x, p.y, p.w, p.h, d.x - w / 2, d.y - h, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(sprite.variantes.bleu, p.x, p.y, p.w, p.h, d.x - w / 2, d.y - h, w, h);
+    }
   }
 
   /**
@@ -775,17 +818,35 @@ export class Renderer {
         if (sprite) list.push({ kind: 'vegetation', res, sprite, ty: res.ty });
       }
     }
+    // Le décor debout des rivages (rochers, touffes, roseaux) : classé au pied
+    // de chaque pièce, comme un arbre — une unité qui passe derrière un rocher
+    // passe derrière. Un roseau de deux cases de haut oblige à regarder
+    // quelques lignes sous le bord bas de l'écran.
+    const rivage = this.decorActif ? spriteDe('rivage') : null;
+    if (rivage && rivage.pret) {
+      const map = this.world.map, explored = this.world.fog.explored;
+      const decor = this.decorRivage();
+      for (let ty = Math.max(0, view.y0 - 1); ty <= Math.min(map.h - 1, view.y1 + 3); ty++) {
+        for (const d of decor.debout[ty]) {
+          if (d.tx < view.x0 - 3 || d.tx > view.x1 + 3) continue;
+          const i = d.ty * map.w + d.tx;
+          if (!explored[i] || (map.blocked[i] & BLOCK.BUILDING)) continue;
+          list.push({ kind: 'decor', d, sprite: rivage });
+        }
+      }
+    }
     // Ordre du peintre. Un bâtiment est classé à son bord NORD, pas à son
     // centre : son illustration déborde de l'emprise, et une unité qui longe
     // le mur doit passer devant, jamais dessous. Ce qui est derrière (plus au
     // nord) reste caché par les toits — c'est l'effet voulu.
     // Un arbre se classe au pied de sa case, un peu avant une unité qui s'y
     // tiendrait devant : celle-ci est dessinée par-dessus le tronc.
-    const rang = (e) => (e.kind === 'building' ? e.ty * TILE + 8 : e.kind === 'vegetation' ? (e.ty + 1) * TILE - 6 : e.y);
+    const rang = (e) => (e.kind === 'building' ? e.ty * TILE + 8 : e.kind === 'vegetation' ? (e.ty + 1) * TILE - 6 : e.kind === 'decor' ? e.d.y - 1 : e.y);
     list.sort((a, b) => rang(a) - rang(b));
     for (const e of list) {
       if (e.kind === 'building') this.drawBuilding(e);
       else if (e.kind === 'vegetation') this.dessinerVegetation(e.res, e.sprite);
+      else if (e.kind === 'decor') this.dessinerPiece(e.d, e.sprite);
       else this.drawUnit(e);
     }
   }

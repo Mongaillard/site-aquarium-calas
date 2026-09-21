@@ -8,6 +8,8 @@ import { serializeWorld, restoreWorld } from '../js/save.js';
 import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
 import { formatTime, dist, RNG } from '../js/utils.js';
 import { STATE } from '../js/entities.js';
+import { TERRAIN } from '../js/map.js';
+import { planterRivage, plansDEau, hacher, MARE_MAX } from '../js/decor.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 let failures = 0;
@@ -161,6 +163,44 @@ check('carte connectée (pas de blocage total)', alt.world.pathfinder.searches >
   }
   check('avec l’automatisme, l’ouvrier enchaîne tout seul',
     villager.state !== 'idle' || villager.carry.amount > 0, villager.state);
+}
+
+// --- Le décor des rivages ------------------------------------------------------
+// Rochers, galets, touffes, roseaux et nénuphars se déduisent de la carte, sans
+// toucher à la simulation : chaque pièce debout tient sur une case de terre au
+// bord de l'eau, un nénuphar sur l'eau, rien sur un arbre ; même graine, même
+// décor ; une mare a ses roseaux, un lac n'en a pas.
+{
+  const world = new World({ seed: 11, mapSize: 'small', difficulty: 'normal' });
+  const map = world.map;
+  const decor = planterRivage(map);
+  const eau = (x, y) => map.inBounds(x, y) && map.terrain[y * map.w + x] === TERRAIN.WATER;
+  const bordEau = (tx, ty) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && eau(tx + dx, ty + dy)) return true;
+    return false;
+  };
+  const debout = decor.debout.flat(), plats = decor.plats.flat(), toutes = [...debout, ...plats];
+  check('le rivage est décoré', decor.total > 100 && toutes.length === decor.total, decor.total + ' pièces');
+  check('chaque pièce debout tient sur la terre, au bord de l’eau', debout.length > 0 && debout.every((d) => !eau(d.tx, d.ty) && bordEau(d.tx, d.ty)), debout.length + ' pièces debout');
+  const nenuphars = plats.filter((d) => d.piece.classe === 'nenuphar');
+  check('les nénuphars flottent sur l’eau', nenuphars.length > 0 && nenuphars.every((d) => eau(d.tx, d.ty)), nenuphars.length + ' nénuphars');
+  check('rien sur un arbre ni un buisson', toutes.every((d) => eau(d.tx, d.ty) || !map.resources.has(d.ty * map.w + d.tx)));
+  let bienRange = true;
+  decor.debout.forEach((liste, ty) => { for (const d of liste) if (Math.max(0, Math.min(map.h - 1, Math.floor(d.y / TILE))) !== ty) bienRange = false; });
+  check('chaque pièce debout est rangée sur la ligne de son pied', bienRange);
+  const corps = plansDEau(map);
+  const tailles = new Set();
+  for (let i = 0; i < corps.length; i++) if (corps[i] > 0) tailles.add(corps[i]);
+  const mares = [...tailles].filter((t) => t <= MARE_MAX).length;
+  const roseaux = debout.filter((d) => d.piece.classe === 'roseau').length;
+  check('chaque case d’eau connaît la taille de son plan d’eau', [...corps].every((c, i) => (map.terrain[i] === TERRAIN.WATER) === (c > 0)));
+  check('une mare a ses roseaux, un lac n’en a pas', mares > 0 ? roseaux > 0 : roseaux === 0, `${mares} mare(s), ${roseaux} roseaux`);
+  const cle = (d) => JSON.stringify([...d.debout.flat(), ...d.plats.flat()].map((p) => [p.tx, p.ty, p.piece.nom, Math.round(p.x * 100), Math.round(p.y * 100), p.miroir, Math.round(p.echelle * 1000)]));
+  check('même carte, même décor', cle(planterRivage(map)) === cle(decor));
+  const autre = planterRivage(new World({ seed: 12, mapSize: 'small', difficulty: 'normal' }).map);
+  check('une autre graine, un autre décor', cle(autre) !== cle(decor));
+  const h = hacher(3, 4, 5, 6);
+  check('le hachage est stable et borné', h === hacher(3, 4, 5, 6) && h >= 0 && h < 1 && h !== hacher(3, 4, 5, 7) && h !== hacher(4, 3, 5, 6));
 }
 
 // --- Collé au gisement ---------------------------------------------------------

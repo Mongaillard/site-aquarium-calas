@@ -21,6 +21,8 @@ const batiment = (src, cellW, cellH, largeurMonde) => ({
   recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
 });
 
+import { PIECES_RIVAGE } from './rivage-pieces.js';
+
 const ATLAS = {
   militia: {
     src: 'assets/milicien-marche.webp',
@@ -118,6 +120,13 @@ const ATLAS = {
     // Cape et tapis de selle sont bleu franc ; la robe du cheval, la peau et
     // la tunique sont brunes ou crème.
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  // Le décor des rivages : rochers, galets, touffes, roseaux, nénuphars et
+  // fleurs, pièces de tailles diverses rangées dans un même atlas (voir
+  // rivage-pieces.js et decor.js) ; pas de couleur d'équipe.
+  rivage: {
+    src: 'assets/rivage.webp',
+    pieces: PIECES_RIVAGE,
   },
   spearman: {
     src: 'assets/lancier.png',

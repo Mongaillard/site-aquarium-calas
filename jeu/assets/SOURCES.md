@@ -7,6 +7,7 @@
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
+| `rivage.webp` | Le **décor des rivages** : 46 pièces — amas de rochers, rochers, roseaux, touffes d'herbe, nénuphars, fleurs, galets — de tailles diverses dans un atlas à 2× (768×365), table dans `js/rivage-pieces.js` | Découpées dans les planches d'eau de l'auteur du dépôt (voir plus bas) |
 | `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 56×86 par case | Planche générée par l'auteur du dépôt, fond dégradé retiré en deux passes (voir plus bas) |
 | `eclaireur.webp` | L'**éclaireur** : cavalier à la lance, huit orientations × quatre foulées, 106×111 par case | Planche générée par l'auteur du dépôt, livrée avec sa transparence |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
@@ -261,6 +262,39 @@ Trois bandes en découlent : une **frange de sable** côté terre (de −0,55 à
 (jusqu'à 0,45) et une **ligne d'écume** blanche (de 0 à 0,2), striée par un
 bruit plus fin pour qu'elle se rompe comme un ressac. Trois masques de plus par
 tronçon riverain, composés comme les couches de terrain.
+
+## Le décor des rivages
+
+Les planches « eau-plage », « eau-rivage » et « eau-mare » ne montrent pas que
+de l'eau : des rochers, des galets, des touffes d'herbe, des roseaux à
+massettes, des nénuphars et des fleurs bordent leurs rives. Plutôt que d'en
+faire des tuiles de bordure à tourner — ces pièces sont vues de trois quarts,
+un rocher tourné d'un quart de tour changerait d'éclairage —, elles sont
+**découpées une à une** et le jeu les pose lui-même le long de chaque rive,
+quelle qu'en soit la forme (`js/decor.js`).
+
+La découpe (`decoupe-rivage.py`, `decoupe-rivage2.py`) classe les pixels par
+teinte : gris peu saturé pour la roche, vert-jaune clair pour l'herbe, plus
+les massettes brunes pour les roseaux, bleu franc pour les fleurs. Fermeture
+morphologique, trous bouchés, composantes connexes ; les touffes et les
+roseaux prennent une fermeture large (7 px) pour réunir les brins d'un même
+pied, avec un alpha fin (le masque d'origine dilaté d'un pixel) pour ne pas
+emporter le sable entre les brins. L'écume et l'eau prises dans les creux des
+amas repartent en transparence. Quarante-six pièces retenues à la main, à
+0,21 pixel monde par pixel de planche (atlas à 2×), même peps que le reste.
+
+Le plantage est déterministe : un hachage de la case et de la graine décide
+de tout, la simulation n'en sait rien, et une partie reprise retrouve son
+décor. Chaque case de terre qui touche l'eau reçoit, au plus, un rocher (ou
+un amas, rare) vers l'eau, une touffe côté terre ou des roseaux les pieds
+dans l'eau, un à trois galets, une fleur ; les cases d'eau bordières des
+mares portent des nénuphars. Un **plan d'eau de 40 cases ou moins** est une
+mare, ceinte de rochers serrés, de roseaux et de nénuphars comme la planche
+« eau-mare » ; au-delà, un lac prend la plage de « eau-rivage » : rochers
+épars, galets, touffes. Rochers, amas, touffes et roseaux entrent dans
+l'ordre du peintre avec les unités ; galets, nénuphars et fleurs sont peints
+sous tout le reste. Une pièce sous un bâtiment ou dans le brouillard n'est
+pas dessinée.
 
 ## Les arbres, les baies et l'or
 

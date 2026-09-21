@@ -1007,6 +1007,39 @@ const cadenceVillageois = await page.evaluate(async () => {
     `sud ${cadenceVillageois.arretSud} · ouest ${cadenceVillageois.arretOuest}`);
 }
 
+// Le décor des rivages : l'atlas des pièces est chargé, le décor planté sur la
+// carte, et il se voit — la même vue avec et sans décor diffère sur des
+// milliers de pixels.
+const decorRivage = await page.evaluate(async () => {
+  const g = window.__jeu; const map = g.world.map;
+  const mod = await import('./js/sprites.js');
+  const s = mod.spriteDe('rivage');
+  const r = g.renderer;
+  const decor = r.decorRivage();
+  let meilleur = null, score = -1;
+  for (let ty = 0; ty < map.h; ty++) for (const d of decor.debout[ty]) {
+    let n = 0;
+    for (let y = Math.max(0, ty - 3); y <= Math.min(map.h - 1, ty + 3); y++) for (const e of decor.debout[y]) if (Math.abs(e.tx - d.tx) <= 3) n++;
+    if (n > score) { score = n; meilleur = d; }
+  }
+  const base = { pret: !!(s && s.pret), total: decor.total, mares: decor.mares, lacs: decor.lacs, pieces: s ? s.def.pieces.length : 0, classes: s ? [...new Set(s.def.pieces.map((p) => p.classe))].length : 0, diff: 0 };
+  if (!meilleur || !base.pret) return base;
+  const explored = g.world.fog.explored.slice(), visible = g.world.fog.visible.slice();
+  g.world.fog.explored.fill(1); g.world.fog.visible.fill(1); g.world.fog.dirty = true;
+  const zoom = g.camera.zoom, cx = g.camera.x, cy = g.camera.y;
+  g.camera.zoom = 1.5; g.camera.centerOn(meilleur.x, meilleur.y);
+  const lire = () => { r.render(1 / 60); return r.ctx.getImageData(0, 0, r.canvas.width, r.canvas.height).data; };
+  r.decorActif = false; const sans = lire();
+  r.decorActif = true; const avec = lire();
+  let diff = 0;
+  for (let i = 0; i < sans.length; i += 4) if (Math.abs(sans[i] - avec[i]) + Math.abs(sans[i + 1] - avec[i + 1]) + Math.abs(sans[i + 2] - avec[i + 2]) > 30) diff++;
+  g.world.fog.explored.set(explored); g.world.fog.visible.set(visible); g.world.fog.dirty = true;
+  g.camera.zoom = zoom; g.camera.x = cx; g.camera.y = cy;
+  return { ...base, diff, autour: score };
+});
+check('l’atlas du décor de rivage est chargé : 46 pièces de 7 classes', decorRivage.pret && decorRivage.pieces >= 40 && decorRivage.classes === 7, `${decorRivage.pieces} pièces, ${decorRivage.classes} classes`);
+check('le rivage est décoré, et ça se voit', decorRivage.total > 0 && decorRivage.diff > 2000, `${decorRivage.total} pièces (${decorRivage.autour} autour du point de vue), ${decorRivage.diff} pixels changés`);
+
 // L'éclaireur illustré : huit orientations × quatre foulées, planche lue du
 // nord au nord-ouest et remise sur les secteurs du jeu ; la cape bascule, la
 // robe du cheval reste.
