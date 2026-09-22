@@ -326,7 +326,7 @@ export class UI {
         }
         if (def.range > 1.5) rows.push(`${ic('attaquer')} portée ${def.range}`);
         if (first.isVillager && first.carry.amount > 0.5) {
-          rows.push(`${RESOURCE_ICONS[first.carry.type]} ${Math.floor(first.carry.amount)}/${first.carryCapacity()}`);
+          rows.push(`${ic(RESOURCE_ICONS[first.carry.type])} ${Math.floor(first.carry.amount)}/${first.carryCapacity()}`);
         }
       } else {
         if (def.attack) rows.push(`${ic('aggressive')} ${def.attack} · ${ic('attaquer')} ${def.range}`);

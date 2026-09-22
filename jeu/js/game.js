@@ -336,17 +336,21 @@ export class World {
   // --- Chemins (budget par tick pour éviter les à-coups) ---------------------
 
   requestPath(unit, x, y, adjacent = false) {
+    // Déjà en attente : la demande est mise à jour sur place. Sinon l'unité
+    // occuperait deux places dans la file et son chemin serait calculé deux fois.
+    const dejaEnFile = unit.pathPending;
     unit.pathPending = true;
     unit.pathRequest = { x, y, adjacent, seq: (unit.pathSeq = (unit.pathSeq || 0) + 1) };
-    this.pathQueue.push(unit);
+    if (!dejaEnFile) this.pathQueue.push(unit);
   }
 
   processPathQueue() {
     let processed = 0;
     while (this.pathQueue.length > 0 && processed < PATHS_PER_TICK) {
       const unit = this.pathQueue.shift();
+      // Une unité qui a reçu son chemin entre-temps (ou s'est arrêtée) n'attend plus rien.
+      if (!unit || unit.dead || !unit.pathPending || !unit.pathRequest) continue;
       const req = unit.pathRequest;
-      if (!unit || unit.dead || !req) continue;
       processed++;
       const sx = Math.floor(unit.x / TILE);
       const sy = Math.floor(unit.y / TILE);
@@ -598,7 +602,8 @@ export class World {
         this.effects.push({ kind: 'rubble', x: entity.x, y: entity.y, life: 12, max: 12, size: entity.size });
       }
       // Une ferme épuisée n'est replantée d'office que si l'automatisme est actif.
-      if (silent && entity.type === 'farm') {
+      // Une fondation annulée disparaît aussi en silence : elle n'est pas épuisée.
+      if (silent && entity.type === 'farm' && entity.complete && entity.foodLeft <= 0) {
         if (owner.autoWorkers) this.reseedFarm(entity);
         else if (entity.playerIndex === this.humanIndex) {
           this.pushEvent({ type: 'notice', text: 'Ferme épuisée — reconstruisez-la pour continuer.' });

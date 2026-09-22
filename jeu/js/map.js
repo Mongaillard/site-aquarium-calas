@@ -61,6 +61,10 @@ export class GameMap {
     // pour rejouer l'état d'une carte, celle-ci étant régénérable à l'identique
     // depuis sa graine (voir save.js).
     this.removed = new Set();
+    // Cases dont le terrain a changé en cours de partie (un gisement d'or
+    // épuisé laisse de la terre) : le rendu refait les tronçons de sol qui les
+    // couvrent, puis vide la liste.
+    this.terrainModifie = new Set();
     this.dirty = true; // demande un nouveau rendu du calque terrain
     this.generate();
   }
@@ -174,7 +178,10 @@ export class GameMap {
     if (!res) return;
     this.resources.delete(i);
     this.blocked[i] &= ~BLOCK.RESOURCE;
-    if (res.type === 'gold') this.terrain[i] = TERRAIN.DIRT;
+    if (res.type === 'gold' && this.terrain[i] !== TERRAIN.DIRT) {
+      this.terrain[i] = TERRAIN.DIRT;
+      this.terrainModifie.add(i);
+    }
     this.removed.add(i);
     this.dirty = true;
   }

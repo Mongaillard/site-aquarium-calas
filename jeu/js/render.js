@@ -340,12 +340,14 @@ export class Renderer {
     const atlas = spriteDe('decor');
     const decorPret = !!(atlas && atlas.pret && this.decorActif);
     if (decorPret !== this.decorCuit) { this.decorCuit = decorPret; this.troncons.clear(); }
+    this.oublierTronconsModifies();
     const zoom = this.camera.zoom;
     const nappes = this.nappesPour(zoom);
     if (!nappes) { this.drawTerrainTuiles(view); return; }
 
     // Le sol est pré-rendu par TRONÇONS de TRONCON × TRONCON cases, mis en
-    // cache : le terrain ne change jamais, et le brouillard se peint par-dessus.
+    // cache : le terrain ne change presque jamais (voir oublierTronconsModifies),
+    // et le brouillard se peint par-dessus.
     // Une image affiche une dizaine de tronçons, là où le rendu case par case
     // coûtait des centaines d'opérations. Deux résolutions : fine (2 px par
     // pixel monde) pour le jeu, grossière au zoom arrière — réduire une nappe
@@ -360,6 +362,28 @@ export class Renderer {
         this.ctx.drawImage(this.troncon(cx, cy, niveau, nappes), cx * taille - r, cy * taille - r, taille + 2 * r, taille + 2 * r);
       }
     }
+  }
+
+  /**
+   * Le terrain change rarement — un gisement d'or épuisé laisse de la terre —,
+   * mais un tronçon en cache garderait l'ancien sol. Les tronçons qui couvrent
+   * la case, à deux cases près (fondu et ondulation des lisières, décor voisin),
+   * sont oubliés aux deux niveaux : ils seront refaits à la prochaine demande.
+   */
+  oublierTronconsModifies() {
+    const map = this.world.map;
+    const modifies = map.terrainModifie;
+    if (!modifies || modifies.size === 0) return;
+    for (const i of modifies) {
+      const tx = i % map.w, ty = Math.floor(i / map.w);
+      for (let cy = Math.floor((ty - 2) / TRONCON); cy <= Math.floor((ty + 2) / TRONCON); cy++) {
+        for (let cx = Math.floor((tx - 2) / TRONCON); cx <= Math.floor((tx + 2) / TRONCON); cx++) {
+          this.troncons.delete(`0:${cx}:${cy}`);
+          this.troncons.delete(`1:${cx}:${cy}`);
+        }
+      }
+    }
+    modifies.clear();
   }
 
   /** Le tronçon (cx, cy) au niveau demandé, rendu à la première demande. */
