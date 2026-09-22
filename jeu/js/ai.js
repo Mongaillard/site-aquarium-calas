@@ -8,6 +8,7 @@
 import { TILE, BUILDING_TYPES, UNIT_TYPES, AGES } from './config.js';
 import { dist2, canAfford, RNG } from './utils.js';
 import { STATE, villagerTask } from './entities.js';
+import { BLOCK } from './map.js';
 
 const JOB_RATIOS = [
   { food: 0.45, wood: 0.40, gold: 0.15 }, // Âge Sombre
@@ -112,7 +113,8 @@ export class AIPlayer {
     const idle = [];
     const now = this.world.time;
     for (const v of this.villagers) {
-      if (v.fleeUntil > now) continue;          // en train de se mettre à l'abri
+      // En train de se mettre à l'abri, ou déjà dedans : pas disponible.
+      if (v.fleeUntil > now || v.garrisonedIn) continue;
       const job = this.jobOf(v);
       if (job) jobs[job]++;
       else idle.push(v);
@@ -249,8 +251,12 @@ export class AIPlayer {
   countFarms() { return this.counts.farm || 0; }
 
   pickBuilders(site, count) {
+    // Un villageois à l'abri ne bouge pas : l'affecter ferait croire le
+    // chantier pourvu, et personne d'autre n'y viendrait de toute l'alerte.
+    const now = this.world.time;
     const candidates = this.villagers
-      .filter((v) => v.state !== STATE.BUILD && v.carry.amount < v.carryCapacity() * 0.8)
+      .filter((v) => v.state !== STATE.BUILD && v.carry.amount < v.carryCapacity() * 0.8
+        && !v.garrisonedIn && !(v.fleeUntil > now))
       .sort((a, b) => dist2(a.x, a.y, site.x, site.y) - dist2(b.x, b.y, site.x, site.y));
     return candidates.slice(0, count);
   }
@@ -297,6 +303,7 @@ export class AIPlayer {
         if (this.badSpots.has(c.tx + ',' + c.ty)) continue;
         if (!this.world.canPlace(this.index, type, c.tx, c.ty, true)) continue;
         if (!this.hasRoomAround(c.tx, c.ty, def.size)) continue;
+        if (!this.laisseLesAcces(type, c.tx, c.ty)) continue;
         return c;
       }
     }
@@ -315,6 +322,54 @@ export class AIPlayer {
       }
     }
     return total === 0 || free / total >= 0.55;
+  }
+
+  /**
+   * Le bâtiment posé là laisse-t-il un accès à lui-même et à ses voisins ?
+   * La couronne libre de hasRoomAround ne suffit pas : maison après maison,
+   * l'IA finissait par murer un moulin ou son propre Centre-Ville — plus
+   * aucun villageois ne pouvait y livrer ni s'y abriter. On pose l'emprise
+   * pour de faux, et chaque bâtiment du voisinage doit garder une case de
+   * pourtour « ouverte » (reliée à au moins quarante cases). Il ne doit pas
+   * non plus boucher un passage : une maison posée entre une autre et la
+   * forêt coupait la carte en deux, des villageois se retrouvaient enfermés
+   * du mauvais côté, loin des baies qu'on leur demandait de cueillir.
+   */
+  laisseLesAcces(type, tx, ty) {
+    const def = BUILDING_TYPES[type];
+    if (def.walkable) return true;   // une ferme se traverse : elle ne mure rien
+    const map = this.world.map;
+    const ouvert = (bx, by, size) => {
+      for (let y = by - 1; y <= by + size; y++) {
+        for (let x = bx - 1; x <= bx + size; x++) {
+          if (x >= bx && x < bx + size && y >= by && y < by + size) continue;
+          if (map.inBounds(x, y) && !map.isBlocked(x, y) && map.floodSize(x, y, 40) >= 40) return true;
+        }
+      }
+      return false;
+    };
+    for (let y = ty; y < ty + def.size; y++) for (let x = tx; x < tx + def.size; x++) map.block(x, y, BLOCK.BUILDING);
+    let ok = ouvert(tx, ty, def.size);
+    if (ok) {
+      const pourtour = [];
+      for (let y = ty - 1; y <= ty + def.size; y++) {
+        for (let x = tx - 1; x <= tx + def.size; x++) {
+          if (x >= tx && x < tx + def.size && y >= ty && y < ty + def.size) continue;
+          if (map.inBounds(x, y)) pourtour.push({ tx: x, ty: y });
+        }
+      }
+      ok = map.relies(pourtour);
+    }
+    for (const b of this.world.buildings) {
+      if (!ok) break;
+      if (b.dead || b.def.walkable) continue;
+      // Seuls les voisins proches peuvent avoir été murés par cette emprise.
+      if (b.tx > tx + def.size + 2 || b.tx + b.size < tx - 2 || b.ty > ty + def.size + 2 || b.ty + b.size < ty - 2) continue;
+      ok = ouvert(b.tx, b.ty, b.size);
+    }
+    // Les cases étaient libres (canPlace l'a vérifié) : on les rend telles quelles.
+    for (let y = ty; y < ty + def.size; y++) for (let x = tx; x < tx + def.size; x++) map.unblock(x, y, BLOCK.BUILDING);
+    return ok;
   }
 
   // --- Technologies ---------------------------------------------------------
@@ -501,7 +556,8 @@ export class AIPlayer {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-          if (this.world.canPlace(this.index, type, ax + dx, ay + dy, true)) return { tx: ax + dx, ty: ay + dy };
+          if (this.world.canPlace(this.index, type, ax + dx, ay + dy, true)
+              && this.laisseLesAcces(type, ax + dx, ay + dy)) return { tx: ax + dx, ty: ay + dy };
         }
       }
     }

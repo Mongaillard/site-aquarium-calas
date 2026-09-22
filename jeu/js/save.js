@@ -40,6 +40,9 @@ function serializeMap(map) {
 function serializeProjectile(pr) {
   return {
     x: pr.x, y: pr.y, target: refId(pr.target), source: refId(pr.source), damage: pr.damage,
+    // Tireur tombé pendant le vol : la flèche touche quand même. On garde ce
+    // que l'impact consulte de lui (son camp, sa position).
+    tireur: { x: pr.source.x, y: pr.source.y, player: pr.source.playerIndex },
     lastX: pr.lastX, lastY: pr.lastY, startX: pr.startX, startY: pr.startY,
     travel: pr.travel, totalDist: pr.totalDist,
   };
@@ -75,11 +78,12 @@ function serializeUnit(u) {
     destination: point(u.destination),
     path: u.path ? u.path.map((n) => ({ tx: n.tx, ty: n.ty })) : null,
     pathPending: !!u.pathPending,
-    pathRequest: u.pathRequest ? { x: u.pathRequest.x, y: u.pathRequest.y, adjacent: !!u.pathRequest.adjacent, seq: u.pathRequest.seq } : null,
+    pathRequest: u.pathRequest ? { x: u.pathRequest.x, y: u.pathRequest.y, adjacent: !!u.pathRequest.adjacent, rect: u.pathRequest.rect ? { ...u.pathRequest.rect } : null, seq: u.pathRequest.seq } : null,
     pathSeq: u.pathSeq || 0,
     pathIndex: u.pathIndex,
     attackCooldown: u.attackCooldown, scanCooldown: u.scanCooldown,
-    repathCooldown: u.repathCooldown, repathAttempts: u.repathAttempts,
+    repathCooldown: u.repathCooldown, repathAttempts: u.repathAttempts, approcheSuspendue: u.approcheSuspendue,
+    meilleurReste: Number.isFinite(u.meilleurReste) ? u.meilleurReste : null, sansProgres: u.sansProgres,
     stuckTime: u.stuckTime, blockedTime: u.blockedTime,
     autoTarget: u.autoTarget, groupSpeed: u.groupSpeed,
     rallyAfterFight: point(u.rallyAfterFight),
@@ -284,6 +288,9 @@ export function restoreWorld(data) {
     u.scanCooldown = saved.scanCooldown;
     u.repathCooldown = saved.repathCooldown;
     u.repathAttempts = saved.repathAttempts;
+    u.approcheSuspendue = saved.approcheSuspendue || 0;
+    u.meilleurReste = saved.meilleurReste ?? Infinity;
+    u.sansProgres = saved.sansProgres || 0;
     u.stuckTime = saved.stuckTime;
     u.blockedTime = saved.blockedTime;
     u.autoTarget = saved.autoTarget;
@@ -294,7 +301,7 @@ export function restoreWorld(data) {
     u.fleeUntil = saved.fleeUntil;
     u.spawnTime = saved.spawnTime;
     u.pathPending = !!saved.pathPending;
-    u.pathRequest = saved.pathRequest ? { ...saved.pathRequest } : null;
+    u.pathRequest = saved.pathRequest ? { ...saved.pathRequest, rect: saved.pathRequest.rect ? { ...saved.pathRequest.rect } : null } : null;
     u.pathSeq = saved.pathSeq || 0;
     paires.push([saved, u]);
   }
@@ -339,9 +346,11 @@ export function restoreWorld(data) {
     if (p.ageProgress) p.ageProgress.building = cible(p.ageProgress.building);
   }
   // Les flèches en vol : une salve perdue au rechargement serait des dégâts
-  // évaporés. On les laisse tomber seulement si le tireur ou la cible a disparu.
+  // évaporés. On les laisse tomber seulement si la cible a disparu : celle d'un
+  // tireur mort en route touche encore, comme dans la partie d'origine.
   for (const saved of data.projectiles || []) {
-    const source = cible(saved.source), target = cible(saved.target);
+    const target = cible(saved.target), t = saved.tireur;
+    const source = cible(saved.source) || (t && { x: t.x, y: t.y, playerIndex: t.player, dead: true });
     if (!source || !target) continue;
     const pr = new Projectile(world, source, target, saved.damage);
     Object.assign(pr, {

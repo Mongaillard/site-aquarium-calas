@@ -35,6 +35,13 @@ const UNREACHABLE_AFTER = 7;
 /** Même chose pour un gisement : on réagit plus vite, il y a un plan B. */
 const GATHER_RETRY_AFTER = 3;
 
+/**
+ * Distance au bord d'un bâtiment d'où l'on dépose, bâtit ou entre quand la
+ * foule empêche d'aller plus près (chemin fini ou abandonné pour encombrement).
+ * Seulement la foule : rien de fixe ne doit s'interposer (voir bordEnVue).
+ */
+const PORTEE_GENEE = TILE * 1.6;
+
 // Les identifiants sont distribués par le monde lui-même : un compteur global
 // serait partagé entre deux parties vivant dans le même processus (test de
 // sauvegarde, vérification d'une reprise) et les ferait diverger.
@@ -144,6 +151,9 @@ export class Unit extends Entity {
     this.stuckTime = 0;       // temps sans progresser vers le point de passage
     this.repathAttempts = 0;  // relances de trajet pour atteindre la destination
     this.repathCooldown = 0;
+    this.approcheSuspendue = 0;   // approche directe en échec : on suit un chemin un moment
+    this.meilleurReste = Infinity;  // plus courte longueur restante atteinte sur ce chemin
+    this.sansProgres = 0;           // temps depuis qu'elle n'a plus raccourci
     this.scanCooldown = world.rng.next() * 0.5;
     // Attitude à la manière d'AoE : décide si l'unité engage d'elle-même,
     // jusqu'où elle poursuit, et si elle revient à son poste.
@@ -223,6 +233,7 @@ export class Unit extends Entity {
     this.resourceTile = null;
     this.target = null;
     this.returnTo = drop;
+    this.blockedTime = 0;   // voir garrisonAt
     this.state = STATE.RETURN;
     this.requestPathToEntity(drop);
     return true;
@@ -231,6 +242,7 @@ export class Unit extends Entity {
   moveTo(x, y, aggressive = false) {
     this.target = null;
     this.resourceTile = null;
+    this.pendingJob = null;   // un ordre plus récent que « je livre, puis… »
     this.destination = { x, y };
     this.autoTarget = false;
     this.groupSpeed = 0;   // un ordre individuel rend sa vitesse à l'unité
@@ -302,6 +314,7 @@ export class Unit extends Entity {
     this.pendingJob = null;
     this.resourceTile = { tx, ty };
     this.target = null;
+    this.blockedTime = 0;   // voir garrisonAt
     this.state = STATE.GATHER;
     this.gatherSpot = this.chooseGatherSpot(tx, ty);
     this.snugTime = 0;
@@ -361,6 +374,7 @@ export class Unit extends Entity {
     this.pendingJob = null;
     this.target = farm;
     this.resourceTile = null;
+    this.blockedTime = 0;   // voir garrisonAt
     this.state = STATE.GATHER;
     this.requestPathToEntity(farm);
   }
@@ -378,8 +392,10 @@ export class Unit extends Entity {
       return;
     }
     if (!queue) this.buildQueue.length = 0;
+    this.pendingJob = null;   // un ordre plus récent que « je livre, puis… »
     this.target = building;
     this.resourceTile = null;
+    this.blockedTime = 0;   // voir garrisonAt
     this.state = STATE.BUILD;
     this.requestPathToEntity(building);
   }
@@ -393,22 +409,68 @@ export class Unit extends Entity {
     return false;
   }
 
+  // Un trajet demandé par la logique de l'unité (un ordre, une nouvelle
+  // tentative de son état) rouvre le quota de relances de followPath. Avant,
+  // seul un ordre de déplacement le rouvrait : après dix détours dans sa vie,
+  // un villageois ne recalculait plus jamais seul son chemin quand il se
+  // cognait — il attendait, planté, que son état redemande un trajet.
+  // Les relances de followPath lui-même passent par world.requestPath.
+
   requestPathTo(x, y, adjacent = false) {
+    this.repathAttempts = 0;
     this.world.requestPath(this, x, y, adjacent);
   }
 
   /** Variante « case » : convertit en coordonnées monde avant la requête. */
   requestPathToTile(tx, ty, adjacent = false) {
+    this.repathAttempts = 0;
     this.world.requestPath(this, tx * TILE + TILE / 2, ty * TILE + TILE / 2, adjacent);
   }
 
-  /** Chemin vers une entité : un bâtiment se rejoint par une case de son pourtour. */
+  /**
+   * Chemin vers une entité. Un bâtiment se rejoint par n'importe quelle case
+   * de son pourtour : la plus proche PAR LE CHEMIN. Celle qui l'est à vol
+   * d'oiseau peut être emmurée (arbres, bâtiment voisin) — l'unité y visait
+   * un cul-de-sac et restait plantée devant, sac plein, des minutes durant.
+   */
   requestPathToEntity(entity, adjacent = true) {
     if (entity.kind === 'building') {
-      const tile = entity.accessTile(this.x, this.y);
-      if (tile) { this.requestPathToTile(tile.tx, tile.ty, false); return; }
+      const rect = { x0: entity.tx, y0: entity.ty, x1: entity.tx + entity.size - 1, y1: entity.ty + entity.size - 1 };
+      this.repathAttempts = 0;
+      this.world.requestPath(this, entity.x, entity.y, false, rect);
+      return;
     }
     this.requestPathTo(entity.x, entity.y, adjacent);
+  }
+
+  /**
+   * Assez près du bâtiment pour s'en servir quand la foule empêche d'avancer :
+   * à PORTEE_GENEE de son bord, et rien de fixe entre les deux — un mur de
+   * maisons autour d'un Centre-Ville ne se traverse pas en « tendant le bras ».
+   */
+  aPorteGenee(b) {
+    if (b.edgeDistanceTo(this.x, this.y) > PORTEE_GENEE) return false;
+    const half = (b.size * TILE) / 2;
+    const px = clamp(this.x, b.x - half, b.x + half), py = clamp(this.y, b.y - half, b.y + half);
+    const d = Math.hypot(this.x - px, this.y - py);
+    if (d < 1) return true;
+    // Le point visé s'arrête 2 px avant le bord : la case du bâtiment est bloquée.
+    return this.world.map.segmentClear(this.x, this.y, px + ((this.x - px) / d) * 2, py + ((this.y - py) / d) * 2, 1);
+  }
+
+  /**
+   * Recalcule le trajet demandé en dernier, depuis la position actuelle —
+   * même cible, même pourtour. Viser plutôt la dernière case du chemin en
+   * cours menait droit dans un bâtiment posé dessus entre-temps.
+   */
+  relancerChemin() {
+    const req = this.pathRequest;
+    if (req) { this.world.requestPath(this, req.x, req.y, req.adjacent, req.rect); return; }
+    const last = this.path && this.path[this.path.length - 1];
+    if (last) {
+      this.world.requestPath(this, last.tx * TILE + TILE / 2, last.ty * TILE + TILE / 2,
+        this.state !== STATE.MOVE && this.state !== STATE.ATTACK_MOVE);
+    }
   }
 
   setPath(path) {
@@ -416,6 +478,21 @@ export class Unit extends Entity {
     this.pathIndex = 0;
     this.pathPending = false;
     this.stuckTime = 0;
+    this.meilleurReste = Infinity;
+    this.sansProgres = 0;
+  }
+
+  /** Longueur du chemin courant du nœud j à son bout (calculée une fois par chemin). */
+  resteDepuis(j) {
+    const path = this.path;
+    if (!this.suffixes || this.suffixes.path !== path) {
+      const s = new Array(path.length).fill(0);
+      for (let k = path.length - 2; k >= 0; k--) {
+        s[k] = s[k + 1] + Math.hypot(path[k + 1].tx - path[k].tx, path[k + 1].ty - path[k].ty) * TILE;
+      }
+      this.suffixes = { path, s };
+    }
+    return this.suffixes.s[j];
   }
 
   // --- Mise à jour ---------------------------------------------------------
@@ -424,6 +501,7 @@ export class Unit extends Entity {
     if (this.dead || this.garrisonedIn) return;   // à l'abri : hors du jeu
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     if (this.repathCooldown > 0) this.repathCooldown -= dt;
+    if (this.approcheSuspendue > 0) this.approcheSuspendue -= dt;
     if (this.gatherAnim > 0) this.gatherAnim -= dt;
 
     // Désempilement : les unités à l'arrêt ou au corps à corps se repoussent
@@ -606,7 +684,11 @@ export class Unit extends Entity {
       // plutôt que de redemander un chemin — qui reviendrait vide, la case
       // étant déjà adjacente.
       if (this.approach(spot ? spot.x : targetX, spot ? spot.y : targetY, dt, farm ? farm.radius : 0)) return;
-      if (this.followPath(dt)) {
+      if (!this.followPath(dt)) return;
+      // Ferme encombrée par ceux qui la cultivent déjà : chemin fini ou
+      // abandonné tout près, on s'y met d'où l'on est. Sinon le fermier
+      // recalculait sans fin le même chemin vers la case occupée.
+      if (!farm || !this.aPorteGenee(farm)) {
         // Chemin terminé mais cible toujours hors de portée : elle est
         // probablement enclavée (buisson cerné d'arbres). On insiste un peu,
         // puis on l'abandonne définitivement pour ne pas bloquer l'économie.
@@ -640,8 +722,8 @@ export class Unit extends Entity {
           if (farm) this.requestPathToEntity(farm);
           else this.requestPathToSpot();
         }
+        return;
       }
-      return;
     }
 
     this.blockedTime = 0;
@@ -679,6 +761,7 @@ export class Unit extends Entity {
       return;
     }
     this.returnTo = drop;
+    this.blockedTime = 0;   // voir garrisonAt
     this.state = STATE.RETURN;
     this.requestPathToEntity(drop);
   }
@@ -688,7 +771,8 @@ export class Unit extends Entity {
     if (!drop || drop.dead) { this.startReturn(); return; }
     if (drop.edgeDistanceTo(this.x, this.y) > TILE * 1.1) {
       if (this.approach(drop.x, drop.y, dt, drop.radius)) return;
-      if (this.followPath(dt)) {
+      if (!this.followPath(dt)) return;
+      if (!this.aPorteGenee(drop)) {
         this.blockedTime += dt;
         if (this.blockedTime > UNREACHABLE_AFTER) {
           this.blockedTime = 0;
@@ -703,8 +787,10 @@ export class Unit extends Entity {
           this.repathCooldown = 1.0;
           this.requestPathToEntity(drop);
         }
+        return;
       }
-      return;
+      // Arrêtée aussi près que la foule le permet (des mineurs devant la
+      // porte) : à portée de bras, elle livre — c'est ce que fait AoE.
     }
     this.blockedTime = 0;
     // Dépôt
@@ -746,6 +832,9 @@ export class Unit extends Entity {
    * ouvriers. La réaffectation automatique est une option, activée pour l'IA.
    */
   findNextResource(type) {
+    // Le gisement désigné est « le bosquet », même tombé avant notre premier
+    // coup de hache : l'ancien, lui, peut être à l'autre bout de la carte.
+    if (this.resourceTile) this.lastResourceTile = { tx: this.resourceTile.tx, ty: this.resourceTile.ty };
     if (!type) type = this.carry.type;            // on livre avant de s'arrêter
     if (!type) { this.state = STATE.IDLE; this.world.notifyIdleWorker(this); return; }
     if (this.carry.amount > 0) {
@@ -755,6 +844,7 @@ export class Unit extends Entity {
         this.resourceTile = null;
         this.target = null;
         this.returnTo = drop;
+        this.blockedTime = 0;   // voir garrisonAt
         this.state = STATE.RETURN;
         this.requestPathToEntity(drop);
         return;
@@ -806,7 +896,8 @@ export class Unit extends Entity {
     }
     if (site.edgeDistanceTo(this.x, this.y) > TILE * 1.1) {
       if (this.approach(site.x, site.y, dt, site.radius)) return;
-      if (this.followPath(dt)) {
+      if (!this.followPath(dt)) return;
+      if (!this.aPorteGenee(site)) {
         this.blockedTime += dt;
         if (this.blockedTime > UNREACHABLE_AFTER) {
           this.blockedTime = 0;
@@ -819,8 +910,9 @@ export class Unit extends Entity {
           this.repathCooldown = 1.0;
           this.requestPathToEntity(site);
         }
+        return;
       }
-      return;
+      // Bloquée tout près par d'autres bâtisseurs : elle bâtit d'où elle est.
     }
     this.blockedTime = 0;
     this.path = null;
@@ -840,6 +932,9 @@ export class Unit extends Entity {
     this.target = building;
     this.resourceTile = null;
     this.destination = null;
+    // Le compteur d'un trajet précédent ne vaut rien ici : hérité d'un dépôt
+    // difficile, il faisait abandonner l'abri deux ticks après l'ordre.
+    this.blockedTime = 0;
     this.state = STATE.GARRISON;
     this.requestPathToEntity(building);
     return true;
@@ -853,12 +948,33 @@ export class Unit extends Entity {
       return;
     }
     if (shelter.edgeDistanceTo(this.x, this.y) <= TILE * 1.2) {
+      this.blockedTime = 0;
       shelter.addToGarrison(this);
       return;
     }
-    if (this.followPath(dt) && this.repathCooldown <= 0) {
-      this.repathCooldown = 1.0;
-      this.requestPathToEntity(shelter);
+    if (this.approach(shelter.x, shelter.y, dt, shelter.radius)) return;
+    if (this.followPath(dt)) {
+      // Bloquée tout près par ceux qui entrent avant elle : elle entre aussi.
+      if (this.aPorteGenee(shelter)) {
+        this.blockedTime = 0;
+        shelter.addToGarrison(this);
+        return;
+      }
+      // Chemin fini, abri toujours hors d'atteinte (une poche, un abri cerné) :
+      // on n'attend pas indéfiniment devant. Le villageois que la cloche avait
+      // envoyé garde son poste en mémoire : le second coup l'y renverra.
+      this.blockedTime += dt;
+      if (this.blockedTime > UNREACHABLE_AFTER) {
+        this.blockedTime = 0;
+        this.target = null;
+        this.path = null;
+        this.state = STATE.IDLE;
+        return;
+      }
+      if (this.repathCooldown <= 0) {
+        this.repathCooldown = 1.0;
+        this.requestPathToEntity(shelter);
+      }
     }
   }
 
@@ -941,12 +1057,14 @@ export class Unit extends Entity {
    * sans chemin en cours, on marche droit dessus. L'obstacle — arbre, mur —
    * arrête le pas au bon endroit, et l'état appelant juge ensuite la portée.
    * Renvoie true si on s'en est chargé ce tick. Sans rapprochement pendant
-   * 0,8 s (arbre derrière un angle), on rend la main à la logique de chemin
-   * pour un moment : `stuckTime` et `repathCooldown` servent de compteurs,
-   * ils sont déjà sauvegardés.
+   * 0,8 s (arbre derrière un angle, bâtiment entre soi et le dépôt), on rend
+   * la main à la logique de chemin pour trois secondes, chemin demandé tout
+   * de suite. Avant, l'approche reprenait la main dès la fin d'une courte
+   * pause, avant que l'appelant ait pu demander son chemin : l'unité se
+   * cognait au même mur en boucle.
    */
   approach(targetX, targetY, dt, extra = 0) {
-    if (this.pathPending || this.repathCooldown > 0) return false;
+    if (this.pathPending || this.repathCooldown > 0 || this.approcheSuspendue > 0) return false;
     if (this.path && this.pathIndex < this.path.length) return false;
     const d = dist(this.x, this.y, targetX, targetY);
     if (d > TILE * 2.5 + extra || d < 0.5) return false;
@@ -956,7 +1074,7 @@ export class Unit extends Entity {
     const after = dist(this.x, this.y, targetX, targetY);
     if (after > d - step * 0.3) {
       this.stuckTime += dt;
-      if (this.stuckTime > 0.8) { this.stuckTime = 0; this.repathCooldown = 0.5; return false; }
+      if (this.stuckTime > 0.8) { this.stuckTime = 0; this.approcheSuspendue = 3; this.repathCooldown = 0; return false; }
     } else if (this.stuckTime > 0) {
       this.stuckTime = Math.max(0, this.stuckTime - dt * 2);
     }
@@ -987,7 +1105,7 @@ export class Unit extends Entity {
           && this.repathCooldown <= 0 && this.repathAttempts < MAX_REPATHS) {
         this.repathCooldown = 0.9;
         this.repathAttempts++;
-        this.requestPathTo(this.destination.x, this.destination.y);
+        this.world.requestPath(this, this.destination.x, this.destination.y, false);
         return false;
       }
       return true;
@@ -997,6 +1115,18 @@ export class Unit extends Entity {
     const r = this.radius * BODY;
     const tx = Math.floor(this.x / TILE), ty = Math.floor(this.y / TILE);
     const last = path.length - 1;
+
+    // Un bâtiment posé depuis sur le trajet : on recalcule sans attendre de
+    // s'y cogner. Le chemin ne passe que par des cases libres au moment du
+    // calcul ; seule une construction peut en boucher une ensuite.
+    for (let j = this.pathIndex, fin = Math.min(last, this.pathIndex + LOOKAHEAD); j <= fin; j++) {
+      if (!map.isBlocked(path[j].tx, path[j].ty)) continue;
+      if (this.repathAttempts >= MAX_REPATHS) { this.pathIndex = path.length; return true; }
+      this.repathAttempts++;
+      this.stuckTime = 0;
+      this.relancerChemin();
+      return false;
+    }
 
     // Entrer dans la case d'un nœud intermédiaire le valide — pas le frôler.
     // On prend le plus lointain des nœuds dont on occupe la case : on a pu
@@ -1037,7 +1167,9 @@ export class Unit extends Entity {
     const nodeX = path[target].tx * TILE + TILE / 2;
     const nodeY = path[target].ty * TILE + TILE / 2;
     const dx = nodeX - this.x, dy = nodeY - this.y;
-    const d = Math.hypot(dx, dy);
+    // Pile au centre du nœud visé (déposée là par un recalage) : pas de 0/0,
+    // qui rendait l'orientation NaN.
+    const d = Math.hypot(dx, dy) || 0.001;
     if (aveugle) this.stuckTime += dt;
 
     let vx = dx / d, vy = dy / d;
@@ -1048,21 +1180,28 @@ export class Unit extends Entity {
 
     this.facing = Math.atan2(vy, vx);
     const step = this.speedPx() * dt;
-    this.tryMove(vx * step, vy * step);
+    this.tryMove(vx * step, vy * step, dx, dy);
 
     // Ce qui compte n'est pas de bouger, mais de se RAPPROCHER du point visé :
     // en longeant un obstacle, une unité avance à pleine vitesse tout en
     // s'éloignant de sa cible. Sans progression réelle, on recalcule un chemin
     // depuis la position courante — un nombre borné de fois.
     const after = Math.hypot(nodeX - this.x, nodeY - this.y);
-    if (after > d - step * 0.3) {
+    // Le progrès se juge aussi sur le trajet entier. Poussée par des voisins
+    // contre un angle, une unité peut viser un nœud puis le précédent, un
+    // tick sur deux : chaque pas la rapproche de celui qu'elle vise, jamais
+    // du bout. Le test par pas n'y voyait rien — elle oscillait des minutes.
+    const reste = after + this.resteDepuis(target);
+    if (reste < this.meilleurReste - 1) { this.meilleurReste = reste; this.sansProgres = 0; }
+    else this.sansProgres += dt;
+    if (after > d - step * 0.3 || this.sansProgres > 1.2) {
       this.stuckTime += dt;
       if (this.stuckTime > 0.8 && this.repathCooldown <= 0) {
         this.repathCooldown = 0.8;
         this.stuckTime = 0;
         if (this.repathAttempts >= MAX_REPATHS) { this.pathIndex = path.length; return true; }
         this.repathAttempts++;
-        this.requestPathToTile(path[last].tx, path[last].ty, this.state !== STATE.MOVE && this.state !== STATE.ATTACK_MOVE);
+        this.relancerChemin();
       }
     } else if (this.stuckTime > 0) {
       this.stuckTime = Math.max(0, this.stuckTime - dt * 2);
@@ -1079,7 +1218,7 @@ export class Unit extends Entity {
    * glisse désormais à pleine vitesse le long de l'obstacle, et on s'en écarte
    * perpendiculairement si les deux axes sont bloqués.
    */
-  tryMove(dx, dy) {
+  tryMove(dx, dy, capX = dx, capY = dy) {
     const map = this.world.map;
     const r = this.radius * BODY;
     // Prise dans une case bloquée (bâtiment posé dessus, partie restaurée…) :
@@ -1088,6 +1227,18 @@ export class Unit extends Entity {
     if (map.isBlocked(tx, ty)) {
       const free = map.findOpenTile(tx, ty, 6);
       if (free) { this.x = free.tx * TILE + TILE / 2; this.y = free.ty * TILE + TILE / 2; }
+      return;
+    }
+    // Centre sur du libre mais corps à cheval sur une case bloquée depuis
+    // (bâtiment posé tout contre) : chaque pas exige quatre coins sur du
+    // libre, et aucun pas plus court que le débord ne l'obtient — l'unité
+    // restait figée contre le mur, des minutes. On la décale juste assez.
+    if (!map.canStand(this.x, this.y, r)) {
+      for (let d = 1; d <= Math.ceil(2 * r); d++) {
+        for (const [ox, oy] of [[d, 0], [-d, 0], [0, d], [0, -d], [d, d], [-d, d], [d, -d], [-d, -d]]) {
+          if (map.canStand(this.x + ox, this.y + oy, r)) { this.x += ox; this.y += oy; return; }
+        }
+      }
       return;
     }
     const apply = (ox, oy) => {
@@ -1100,7 +1251,11 @@ export class Unit extends Entity {
     if (apply(dx, dy)) return;
     const len = Math.hypot(dx, dy);
     if (len < 0.0001) return;
-    const ux = dx / len, uy = dy / len;
+    // Les glissements suivent le cap voulu (capX, capY), pas le pas lui-même :
+    // la poussée d'un voisin, ajoutée au pas, envoyait glisser du mauvais
+    // côté d'un angle — vers le bas, puis vers le haut au tick suivant, sans fin.
+    const lc = Math.hypot(capX, capY) || 1;
+    const ux = capX / lc, uy = capY / lc;
 
     // Glissement le long de l'axe dominant, puis de l'autre.
     const slides = Math.abs(ux) >= Math.abs(uy)
@@ -1300,24 +1455,13 @@ export class Building extends Entity {
     return taken;
   }
 
-  /** Case libre la plus proche sur le pourtour : point de rendez-vous des unités. */
-  accessTile(fromX, fromY) {
-    const map = this.world.map;
-    let best = null, bestD = Infinity;
-    for (let y = this.ty - 1; y <= this.ty + this.size; y++) {
-      for (let x = this.tx - 1; x <= this.tx + this.size; x++) {
-        if (!map.inBounds(x, y) || map.isBlocked(x, y)) continue;
-        const d = dist2(fromX, fromY, x * TILE + TILE / 2, y * TILE + TILE / 2);
-        if (d < bestD) { bestD = d; best = { tx: x, ty: y }; }
-      }
-    }
-    return best;
-  }
-
   /** Point d'apparition des unités : juste sous le bâtiment, sur une case libre. */
   spawnPoint() {
     const map = this.world.map;
-    const free = map.findFreeTile(this.tx + Math.floor(this.size / 2), this.ty + this.size, 8)
+    // Une case OUVERTE : la case libre la plus proche peut être une poche murée
+    // par les bâtiments voisins, d'où l'unité formée — ou sortie de l'abri — ne
+    // sortirait jamais.
+    const free = map.findOpenTile(this.tx + Math.floor(this.size / 2), this.ty + this.size, 8)
       || map.findFreeTile(this.tx - 1, this.ty + this.size, 10);
     if (free) return { x: free.tx * TILE + TILE / 2, y: free.ty * TILE + TILE / 2 };
     return { x: this.x, y: this.y + this.radius + TILE };

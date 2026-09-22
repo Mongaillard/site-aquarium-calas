@@ -196,7 +196,18 @@ export class World {
     const map = this.map;
     let tx = Math.floor(animal.x / TILE), ty = Math.floor(animal.y / TILE);
     if (!map.inBounds(tx, ty) || map.resources.has(map.idx(tx, ty)) || (map.blocked[map.idx(tx, ty)] & (BLOCK.BUILDING | BLOCK.TERRAIN))) {
-      const libre = map.findFreeTile(tx, ty, 3);
+      // Pas findFreeTile : une carcasse déjà là ne bloque pas le passage, il
+      // rendrait sa case, qu'addResource refuserait — la nourriture perdue.
+      let libre = null;
+      for (let r = 1; r <= 3 && !libre; r++) {
+        for (let dy = -r; dy <= r && !libre; dy++) {
+          for (let dx = -r; dx <= r && !libre; dx++) {
+            const x = tx + dx, y = ty + dy;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) === r && !map.isBlocked(x, y)
+                && !map.resources.has(map.idx(x, y))) libre = { tx: x, ty: y };
+          }
+        }
+      }
       if (!libre) return null;
       tx = libre.tx; ty = libre.ty;
     }
@@ -230,13 +241,23 @@ export class World {
     return unit;
   }
 
-  /** Sort de l'emprise d'un bâtiment les unités qui s'y trouvent. */
+  /**
+   * Sort de l'emprise d'un bâtiment les unités qui s'y trouvent — et celles
+   * qu'il vient d'enfermer : posé contre des arbres, il peut clore une poche
+   * de quelques cases autour d'un villageois, qui y restait ensuite, sac
+   * plein, sans chemin vers aucun dépôt.
+   */
   evictUnitsFrom(building) {
     const { tx, ty, size } = building;
+    const MARGE = 6;
     for (const u of this.units) {
       if (u.dead || u.garrisonedIn) continue;
       const utx = Math.floor(u.x / TILE), uty = Math.floor(u.y / TILE);
-      if (utx < tx || utx >= tx + size || uty < ty || uty >= ty + size) continue;
+      const dessous = utx >= tx && utx < tx + size && uty >= ty && uty < ty + size;
+      if (!dessous) {
+        if (utx < tx - MARGE || utx >= tx + size + MARGE || uty < ty - MARGE || uty >= ty + size + MARGE) continue;
+        if (this.map.isBlocked(utx, uty) || this.map.floodSize(utx, uty, 40) >= 40) continue;
+      }
       // Une case OUVERTE : la plus proche des cases libres peut être une poche
       // fermée de la forêt voisine, d'où l'unité ne sortirait jamais.
       const free = this.map.findOpenTile(utx, uty, 8);
@@ -335,12 +356,17 @@ export class World {
 
   // --- Chemins (budget par tick pour éviter les à-coups) ---------------------
 
-  requestPath(unit, x, y, adjacent = false) {
+  /**
+   * @param rect emprise d'un bâtiment ({x0,y0,x1,y1}, en cases, bornes
+   *   comprises) : le chemin mène alors à la case de son pourtour la plus
+   *   proche PAR LE CHEMIN — pas à vol d'oiseau, qui peut être emmurée.
+   */
+  requestPath(unit, x, y, adjacent = false, rect = null) {
     // Déjà en attente : la demande est mise à jour sur place. Sinon l'unité
     // occuperait deux places dans la file et son chemin serait calculé deux fois.
     const dejaEnFile = unit.pathPending;
     unit.pathPending = true;
-    unit.pathRequest = { x, y, adjacent, seq: (unit.pathSeq = (unit.pathSeq || 0) + 1) };
+    unit.pathRequest = { x, y, adjacent, rect, seq: (unit.pathSeq = (unit.pathSeq || 0) + 1) };
     if (!dejaEnFile) this.pathQueue.push(unit);
   }
 
@@ -354,6 +380,15 @@ export class World {
       processed++;
       const sx = Math.floor(unit.x / TILE);
       const sy = Math.floor(unit.y / TILE);
+      if (req.rect) {
+        // Pourtour d'un bâtiment : le chemin le plus court vers l'une de ses
+        // cases, ou au plus près si aucune n'est joignable.
+        const r = req.rect;
+        const gxr = clamp(Math.floor(req.x / TILE), r.x0, r.x1);
+        const gyr = clamp(Math.floor(req.y / TILE), r.y0, r.y1);
+        unit.setPath(this.pathfinder.find(sx, sy, gxr, gyr, { rect: r, smooth: false }) || []);
+        continue;
+      }
       let gx = clamp(Math.floor(req.x / TILE), 0, this.map.w - 1);
       let gy = clamp(Math.floor(req.y / TILE), 0, this.map.h - 1);
       let adjacent = req.adjacent;
@@ -596,7 +631,9 @@ export class World {
         }
         entity.garrison.length = 0;
       }
-      entity.releaseTiles();
+      // Une ferme ne bloquait rien : « libérer » ses cases déboucherait celles
+      // d'un voisin qui les occuperait.
+      if (!entity.def.walkable) entity.releaseTiles();
       this.map.dirty = true;
       if (!silent) {
         this.effects.push({ kind: 'rubble', x: entity.x, y: entity.y, life: 12, max: 12, size: entity.size });
@@ -872,6 +909,12 @@ export class World {
         if (!ignoreFog && playerIndex === this.humanIndex && !this.fog.explored[i]) return false;
       }
     }
+    // Une ferme se traverse — elle ne bloque pas ses cases — mais elle occupe
+    // le terrain : on ne bâtit pas dessus, pas même une autre ferme. Avant,
+    // l'IA empilait ses fermes, et une maison posée sur une ferme devenait
+    // traversable quand la ferme s'épuisait.
+    if (this.buildings.some((b) => !b.dead && b.def.walkable
+        && tx < b.tx + b.size && b.tx < tx + def.size && ty < b.ty + b.size && b.ty < ty + def.size)) return false;
     // Sans case libre sur le pourtour, personne ne pourrait venir le bâtir.
     if (!def.walkable && !this.hasAccessAround(tx, ty, def.size)) return false;
     return true;
@@ -1212,11 +1255,12 @@ export class World {
       (b) => !b.dead && b.complete && b.playerIndex === playerIndex && b.def.garrison);
     if (shelters.length === 0) return { sheltered: 0, released: 0 };
 
-    // Ceux que la cloche a envoyés et qui courent encore vers l'abri : le
-    // second coup les concerne aussi.
+    // Ceux que la cloche a envoyés et qui courent encore vers l'abri — ou qui
+    // y ont renoncé, abri injoignable, et attendent sur place : le second
+    // coup les concerne aussi.
     const enRoute = this.units.filter(
       (u) => !u.dead && u.playerIndex === playerIndex && u.isVillager && !u.garrisonedIn
-        && u.state === STATE.GARRISON && u.posteAvantAbri);
+        && (u.state === STATE.GARRISON || u.state === STATE.IDLE) && u.posteAvantAbri);
     const occupied = shelters.reduce((sum, b) => sum + b.garrison.length, 0);
     if (occupied > 0 || enRoute.length > 0) {
       let released = 0;

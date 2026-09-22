@@ -34,8 +34,12 @@ export class PathFinder {
   /**
    * @param {number} sx,sy case de départ
    * @param {number} gx,gy case d'arrivée
-   * @param {{adjacent?:boolean, budget?:number, smooth?:boolean, passable?:(i:number)=>boolean}} opts
+   * @param {{adjacent?:boolean, rect?:{x0:number,y0:number,x1:number,y1:number}, budget?:number, smooth?:boolean, passable?:(i:number)=>boolean}} opts
    *   adjacent : s'arrêter dès qu'on touche la case cible (cible bloquée : arbre, bâtiment…)
+   *   rect : viser n'importe quelle case praticable au contact de ce rectangle
+   *     (l'emprise d'un bâtiment, bornes comprises) — la plus proche PAR LE
+   *     CHEMIN, pas à vol d'oiseau : une case du pourtour emmurée par des arbres
+   *     ou d'autres bâtiments n'est jamais choisie si une autre est joignable
    *   smooth : false pour obtenir la suite complète des cases, sans lissage
    * @returns {{tx:number,ty:number}[] | null}
    */
@@ -44,14 +48,28 @@ export class PathFinder {
     const { w, h } = map;
     if (!map.inBounds(sx, sy) || !map.inBounds(gx, gy)) return null;
     const adjacent = !!opts.adjacent;
+    const rect = opts.rect || null;
     const budget = opts.budget || 6000;
     const passable = opts.passable || ((i) => map.blocked[i] === 0);
     const smooth = opts.smooth !== false;
 
+    // Heuristique et test d'arrivée : vers une case, ou vers le pourtour d'un
+    // rectangle (distance à la case du pourtour la plus proche — admissible).
+    const estime = rect
+      ? (x, y) => this.heuristic(x, y,
+        Math.min(Math.max(x, rect.x0 - 1), rect.x1 + 1),
+        Math.min(Math.max(y, rect.y0 - 1), rect.y1 + 1))
+      : (x, y) => this.heuristic(x, y, gx, gy);
+    const atteint = rect
+      ? (x, y) => x >= rect.x0 - 1 && x <= rect.x1 + 1 && y >= rect.y0 - 1 && y <= rect.y1 + 1
+      : adjacent
+        ? (x, y) => Math.abs(x - gx) <= 1 && Math.abs(y - gy) <= 1
+        : (x, y) => x === gx && y === gy;
+
     const start = sy * w + sx;
     const goal = gy * w + gx;
-    if (start === goal) return [];
-    if (!adjacent && !passable(goal)) return null;
+    if (rect ? atteint(sx, sy) : start === goal) return [];
+    if (!rect && !adjacent && !passable(goal)) return null;
 
     this.generation++;
     const gen = this.generation;
@@ -60,7 +78,7 @@ export class PathFinder {
 
     stamp[start] = gen;
     gScore[start] = 0;
-    fScore[start] = this.heuristic(sx, sy, gx, gy);
+    fScore[start] = estime(sx, sy);
     cameFrom[start] = -1;
     closed[start] = 0;
     heap.push(start, fScore[start]);
@@ -79,11 +97,9 @@ export class PathFinder {
       const cx = current % w;
       const cy = (current / w) | 0;
 
-      const dx = Math.abs(cx - gx), dy = Math.abs(cy - gy);
-      const reached = adjacent ? (dx <= 1 && dy <= 1) : current === goal;
-      if (reached) return this.buildPath(current, start, smooth);
+      if (atteint(cx, cy)) return this.buildPath(current, start, smooth);
 
-      const hCur = this.heuristic(cx, cy, gx, gy);
+      const hCur = estime(cx, cy);
       if (hCur < bestH) { bestH = hCur; best = current; }
 
       for (let oy = -1; oy <= 1; oy++) {
@@ -108,7 +124,7 @@ export class PathFinder {
             closed[ni] = 0;
             gScore[ni] = tentative;
             cameFrom[ni] = current;
-            const f = tentative + this.heuristic(nx, ny, gx, gy);
+            const f = tentative + estime(nx, ny);
             fScore[ni] = f;
             heap.push(ni, f);
           }

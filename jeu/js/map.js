@@ -430,6 +430,39 @@ export class GameMap {
     return vus.size;
   }
 
+  /**
+   * Les cases libres données sont-elles toutes reliées entre elles ? Celles
+   * qui ne donnent que sur un cul-de-sac (moins de 40 cases) ne comptent pas.
+   * Parcours depuis l'une d'elles, arrêté dès qu'il les a toutes vues, ou au
+   * bout de `plafond` cases : un détour plus long vaut une coupure.
+   */
+  relies(cases, plafond = 4000) {
+    const ouvertes = cases.filter(({ tx, ty }) => !this.isBlocked(tx, ty) && this.floodSize(tx, ty, 40) >= 40);
+    if (ouvertes.length < 2) return true;
+    const { w, h } = this;
+    const cibles = new Set(ouvertes.map(({ tx, ty }) => ty * w + tx));
+    const depart = ouvertes[0].ty * w + ouvertes[0].tx;
+    const vus = new Set([depart]);
+    const file = [depart];
+    cibles.delete(depart);
+    for (let tete = 0; tete < file.length && vus.size < plafond; tete++) {
+      const cur = file[tete], cx = cur % w, cy = (cur / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const ni = ny * w + nx;
+          if (vus.has(ni) || this.blocked[ni]) continue;
+          if (dx && dy && (this.blocked[cy * w + nx] || this.blocked[ny * w + cx])) continue;
+          vus.add(ni); file.push(ni);
+          if (cibles.delete(ni) && cibles.size === 0) return true;
+        }
+      }
+    }
+    return cibles.size === 0;
+  }
+
   /** Case libre la plus proche de (tx, ty), en spirale. */
   findFreeTile(tx, ty, maxRadius = 12) {
     tx = clamp(tx, 0, this.w - 1);

@@ -9,7 +9,7 @@ import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
 import { formatTime, dist, RNG } from '../js/utils.js';
 import { STATE, Projectile } from '../js/entities.js';
 import { readFileSync } from 'node:fs';
-import { TERRAIN } from '../js/map.js';
+import { TERRAIN, BLOCK } from '../js/map.js';
 import { planterRivage, planterCampagne, planterDecor, plansDEau, hacher, MARE_MAX, CUITES } from '../js/decor.js';
 
 const DT = 1 / TICKS_PER_SECOND;
@@ -1421,6 +1421,382 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     const manquants = [...modules, 'index.html', 'css/jeu.css', 'manifest.webmanifest', ...images].filter((f) => !cache.has(f));
     check('hors ligne : le cache garde tous les modules, la feuille de style et les images', manquants.length === 0,
       manquants.join(', ') || `${modules.size} modules, ${images.size} images`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Unités figées (septembre, second passage) : villageois plantés devant un
+// dépôt, soldats immobiles, cloche sans effet. Chaque cause a son test, écrit
+// à partir de la partie ou du script qui l'a montrée.
+// ---------------------------------------------------------------------------
+{
+  const petit = (seed) => { const w = new World({ seed, mapSize: 'small', difficulty: 'normal' }); w.ais = []; return w; };
+  const centre = (w, i = 0) => w.buildings.find((b) => b.playerIndex === i && b.type === 'towncenter');
+  const cases = (d) => (d / TILE).toFixed(1);
+  const pas = (w, s, stop) => { for (let i = 0; i < s * TICKS_PER_SECOND; i++) { w.update(1 / TICKS_PER_SECOND); if (stop && stop()) return true; } return false; };
+
+  // Case du pourtour la plus proche emmurée : on livre par une autre.
+  {
+    const w = petit(5);
+    const tc = centre(w);
+    const { tx, ty } = tc;
+    w.spawnBuilding(0, 'house', tx + 3, ty - 1, true);
+    w.spawnBuilding(0, 'house', tx + 4, ty + 1, true);
+    w.spawnBuilding(0, 'house', tx + 3, ty + 3, true);
+    w.spawnBuilding(0, 'mill', tx + 1, ty + 3, true);
+    const poche = w.map.floodSize(tx + 3, ty + 1, 40);
+    const v = w.spawnUnit(0, 'villager', (tx + 8) * TILE + TILE / 2, (ty + 2) * TILE + TILE / 2);
+    v.carry = { type: 'wood', amount: 10 };
+    v.startReturn();
+    const bois = w.players[0].resources.wood;
+    let t = 0;
+    pas(w, 20, () => { t += 1 / TICKS_PER_SECOND; return w.players[0].resources.wood > bois; });
+    check('la case du pourtour la plus proche est murée : le villageois livre par une autre', poche < 40 && w.players[0].resources.wood > bois,
+      `poche de ${poche} cases, ${w.players[0].resources.wood > bois ? `livré en ${t.toFixed(1)} s` : `rien livré, état ${v.state}`}`);
+  }
+
+  // Maison posée en travers d'un chemin : l'unité recalcule et arrive.
+  {
+    const w = petit(11);
+    for (const u of w.units) u.setStance('passive');
+    w.players[0].resources.wood = 5000;
+    w.fog.explored.fill(1);
+    const map = w.map;
+    let depart = null;
+    for (let ty = 8; ty < map.h - 8 && !depart; ty++) {
+      for (let tx = 4; tx < map.w - 18 && !depart; tx++) {
+        let ok = true;
+        for (let y = ty - 3; y <= ty + 3 && ok; y++) for (let x = tx; x <= tx + 14 && ok; x++) if (map.isBlocked(x, y) || map.resourceAt(x, y)) ok = false;
+        if (ok && w.canPlace(0, 'house', tx + 7, ty, true)) depart = { tx, ty };
+      }
+    }
+    const v = w.spawnUnit(0, 'villager', depart.tx * TILE + TILE / 2, depart.ty * TILE + TILE / 2);
+    v.setStance('passive');
+    const but = { x: (depart.tx + 13) * TILE + TILE / 2, y: depart.ty * TILE + TILE / 2 };
+    v.moveTo(but.x, but.y);
+    pas(w, 0.2);
+    const maison = w.placeBuilding(0, 'house', depart.tx + 4, depart.ty, []);
+    pas(w, 20, () => v.state === STATE.IDLE);
+    const reste = dist(v.x, v.y, but.x, but.y);
+    check('une maison posée en travers du chemin : l’unité la contourne et arrive', !!maison && v.state === STATE.IDLE && reste < TILE,
+      `état ${v.state}, à ${cases(reste)} case(s) du but`);
+  }
+
+  // Corps à cheval sur une maison posée tout contre lui : il repart.
+  {
+    const w = petit(920);
+    for (const u of w.units) u.setStance('passive');
+    w.players[0].resources.wood = 5000;
+    const tc = centre(w);
+    let spot = null;
+    for (let r = 3; r <= 10 && !spot; r++) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r && !spot; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === r && w.canPlace(0, 'house', tc.tx + dx, tc.ty + dy, true)
+          && w.map.isOpenTile(tc.tx + dx, tc.ty + dy + 2)) spot = { tx: tc.tx + dx, ty: tc.ty + dy };
+    }
+    const v = w.spawnUnit(0, 'villager', 0, 0);
+    v.setStance('passive');
+    v.x = (spot.tx + 1) * TILE; v.y = (spot.ty + 2) * TILE + 3;   // 3 px sous le bord de la future maison
+    w.update(1 / TICKS_PER_SECOND);
+    w.placeBuilding(0, 'house', spot.tx, spot.ty, []);
+    const depart = { x: v.x, y: v.y };
+    v.moveTo(v.x, v.y + TILE * 6);
+    pas(w, 20);
+    const bouge = dist(v.x, v.y, depart.x, depart.y);
+    check('un corps à cheval sur une maison posée tout contre lui repart', bouge > TILE * 5, `${cases(bouge)} case(s) parcourue(s)`);
+  }
+
+  // Une unité formée n'apparaît pas dans une poche murée.
+  {
+    const w = petit(5);
+    const tc = centre(w);
+    const { tx, ty } = tc;
+    w.spawnBuilding(0, 'house', tx - 1, ty + 3, true);
+    w.spawnBuilding(0, 'house', tx + 2, ty + 3, true);
+    w.spawnBuilding(0, 'house', tx + 1, ty + 5, true);
+    const sp = tc.spawnPoint();
+    const ouvert = w.map.floodSize(Math.floor(sp.x / TILE), Math.floor(sp.y / TILE), 40);
+    check('le point d’apparition d’un bâtiment n’est jamais une poche murée', ouvert >= 40, `${ouvert} case(s) atteignable(s) depuis lui`);
+  }
+
+  // Une maison qui ferme une poche autour d'un villageois l'en fait sortir.
+  {
+    const w = petit(5);
+    w.fog.explored.fill(1);
+    w.players[0].resources.wood = 1000;
+    const tc = centre(w);
+    const { tx, ty } = tc;
+    w.spawnBuilding(0, 'house', tx - 1, ty + 3, true);
+    w.spawnBuilding(0, 'house', tx + 2, ty + 3, true);
+    const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+    for (const u of w.units) u.stop();
+    v.x = (tx + 1) * TILE + TILE / 2; v.y = (ty + 4) * TILE + TILE / 2;
+    w.update(1 / TICKS_PER_SECOND);
+    w.placeBuilding(0, 'house', tx + 1, ty + 5, []);
+    const libre = w.map.floodSize(Math.floor(v.x / TILE), Math.floor(v.y / TILE), 40);
+    check('une maison qui ferme une poche autour d’un villageois l’en fait sortir', libre >= 40, `${libre} case(s) atteignable(s) depuis lui`);
+  }
+
+  // L'ordre de s'abriter n'hérite pas du compteur de blocage d'un trajet
+  // précédent (il faisait renoncer deux ticks après l'ordre).
+  {
+    const w = petit(5);
+    const tc = centre(w);
+    const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+    for (const u of w.units) u.stop();
+    v.x = tc.x + TILE * 5; v.y = tc.y;
+    v.blockedTime = 6.95;
+    v.garrisonAt(tc);
+    pas(w, 12, () => !!v.garrisonedIn);
+    check('l’ordre de s’abriter ne reprend pas le compteur de blocage d’un trajet précédent', v.garrisonedIn === tc, `état ${v.state}`);
+  }
+
+  // Abri injoignable : on n'attend pas indéfiniment devant, et le second coup
+  // de cloche renvoie quand même au travail.
+  {
+    const w = petit(5);
+    const tc = centre(w);
+    // Un mur de deux cases d'épaisseur tout autour du Centre-Ville.
+    for (let y = tc.ty - 2; y <= tc.ty + tc.size + 1; y++) {
+      for (let x = tc.tx - 2; x <= tc.tx + tc.size + 1; x++) {
+        const dedans = x >= tc.tx && x < tc.tx + tc.size && y >= tc.ty && y < tc.ty + tc.size;
+        if (!dedans) w.map.block(x, y, BLOCK.TERRAIN);
+      }
+    }
+    for (const u of w.units) if (u.playerIndex === 0 && u.isVillager && !w.map.canStand(u.x, u.y, u.radius * 0.6)) u.x += TILE * 3;
+    const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+    for (const u of w.units) u.stop();
+    const arbre = w.findNearestResource(v.x, v.y, 'wood', 30 * TILE, 0);
+    v.gatherAt(arbre.tx, arbre.ty);
+    pas(w, 3);
+    w.ringTownBell(0);
+    pas(w, 15);
+    const renonce = v.state === STATE.IDLE && !v.garrisonedIn;
+    w.ringTownBell(0);
+    pas(w, 0.2);
+    check('un abri injoignable : le villageois y renonce au lieu d’attendre sans fin', renonce, `état ${v.state}`);
+    check('et le second coup de cloche le renvoie à son poste', v.state === STATE.GATHER, `état ${v.state}`);
+  }
+
+  // L'IA ne mure ni un de ses bâtiments ni un passage.
+  {
+    const w = new World({ seed: 5, mapSize: 'small', difficulty: 'normal' });
+    const ai = w.ais[0];
+    const map = w.map;
+    // Une zone dégagée loin des bases, entourée d'un mur de terrain (le cadre
+    // du test) à deux cases d'un moulin, avec une brèche de deux cases à l'est.
+    let z = null;
+    for (let ty = 10; ty < map.h - 10 && !z; ty++) {
+      for (let tx = 10; tx < map.w - 14 && !z; tx++) {
+        let ok = true;
+        for (let y = ty - 4; y <= ty + 6 && ok; y++) for (let x = tx - 4; x <= tx + 10 && ok; x++) if (map.isBlocked(x, y) || map.resourceAt(x, y)) ok = false;
+        const loin = w.buildings.every((b) => dist(b.x, b.y, tx * TILE, ty * TILE) > 16 * TILE);
+        if (ok && loin) z = { tx, ty };
+      }
+    }
+    const { tx, ty } = z;
+    w.spawnBuilding(1, 'mill', tx, ty, true);
+    for (let y = ty - 2; y <= ty + 3; y++) {
+      for (let x = tx - 2; x <= tx + 3; x++) {
+        const bord = x === tx - 2 || x === tx + 3 || y === ty - 2 || y === ty + 3;
+        const breche = x === tx + 3 && (y === ty || y === ty + 1);
+        if (bord && !breche) map.block(x, y, BLOCK.TERRAIN);
+      }
+    }
+    const pose = w.canPlace(1, 'house', tx + 3, ty, true);
+    const bouche = ai.laisseLesAcces('house', tx + 3, ty);
+    const ailleurs = ai.laisseLesAcces('house', tx + 6, ty + 4);
+    check('l’IA ne pose pas une maison qui boucherait l’unique accès d’un moulin', pose && !bouche && ailleurs,
+      `pose permise ${pose}, brèche ${bouche ? 'bouchée' : 'refusée'}, ailleurs ${ailleurs ? 'accepté' : 'refusé'}`);
+  }
+  {
+    // Un passage : un mur barre toute la carte, sauf une brèche de deux cases.
+    // Une maison posée dans la brèche la couperait en deux.
+    const w = new World({ seed: 5, mapSize: 'small', difficulty: 'normal' });
+    const map = w.map;
+    const r = map.h >> 1;
+    let g = -1;
+    for (let x = 4; x < map.w - 6 && g < 0; x++) {
+      let ok = true;
+      for (let y = r - 2; y <= r + 1 && ok; y++) for (let xx = x - 1; xx <= x + 2 && ok; xx++) if (map.isBlocked(xx, y) || map.resourceAt(xx, y)) ok = false;
+      if (ok) g = x;
+    }
+    for (let x = 0; x < map.w; x++) if (x !== g && x !== g + 1) map.block(x, r, BLOCK.TERRAIN);
+    const pose = w.canPlace(1, 'house', g, r - 1, true);
+    const coupe = w.ais[0].laisseLesAcces('house', g, r - 1);
+    check('ni une maison qui couperait la carte en deux', pose && !coupe, `pose permise ${pose}, ${coupe ? 'brèche bouchée' : 'refusée'}`);
+  }
+
+  // Parties IA contre IA : aucune unité active ne reste figée (même place,
+  // même charge, même cible) 25 s d'affilée.
+  {
+    const figees = [];
+    for (const seed of [1000, 8919]) {
+      const w = new World({ seed, mode: 'express', mapSize: 'small', difficulty: 'normal' });
+      w.addAI(0); w.players[0].autoWorkers = true;
+      const suivi = new Map(), vus = new Set();
+      for (let i = 0; i < 600 * TICKS_PER_SECOND && !w.gameOver; i++) {
+        w.update(1 / TICKS_PER_SECOND);
+        if (i % 10) continue;
+        for (const u of w.units) {
+          if (u.isAnimal || u.garrisonedIn || u.state === STATE.IDLE) { suivi.delete(u.id); continue; }
+          const c = u.target;
+          const e = [Math.round(u.x / 8), Math.round(u.y / 8), Math.floor(u.carry.amount), u.state, c ? c.id : '',
+            c && c.hp ? Math.floor(c.hp) : '', c && c.buildProgress ? Math.floor(c.buildProgress) : ''].join('|');
+          const s = suivi.get(u.id);
+          if (!s || s.e !== e) { suivi.set(u.id, { e, t: w.time }); continue; }
+          if (w.time - s.t > 25 && !vus.has(u.id)) {
+            vus.add(u.id);
+            figees.push(`graine ${seed} t=${Math.round(w.time)} ${u.type}#${u.id} ${u.state} en ${Math.floor(u.x / TILE)},${Math.floor(u.y / TILE)}`);
+          }
+        }
+      }
+    }
+    check('parties IA contre IA : aucune unité figée 25 s dans son travail ou sa marche', figees.length === 0,
+      figees.slice(0, 3).join(' ; ') || 'aucune');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Second passage sur la simulation (septembre).
+// ---------------------------------------------------------------------------
+{
+  const petit = (seed) => { const w = new World({ seed, mapSize: 'small', difficulty: 'normal' }); w.ais = []; return w; };
+  const centre = (w, i = 0) => w.buildings.find((b) => b.playerIndex === i && b.type === 'towncenter');
+  const pas = (w, s, stop) => { for (let i = 0; i < s * TICKS_PER_SECOND; i++) { w.update(1 / TICKS_PER_SECOND); if (stop && stop()) return true; } return false; };
+
+  // Une ferme occupe le terrain : ni seconde ferme ni maison dessus.
+  {
+    const w = petit(5);
+    w.players[0].resources.wood = 5000;
+    const tc = centre(w);
+    w.spawnBuilding(0, 'mill', tc.tx + 5, tc.ty, true);
+    let spot = null;
+    for (let r = 3; r <= 10 && !spot; r++) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r && !spot; dx++) {
+      if (w.canPlace(0, 'farm', tc.tx + dx, tc.ty + dy, true)) spot = { tx: tc.tx + dx, ty: tc.ty + dy };
+    }
+    const ferme = w.placeBuilding(0, 'farm', spot.tx, spot.ty, []);
+    const ferme2 = w.placeBuilding(0, 'farm', spot.tx, spot.ty, []);
+    const maison = w.placeBuilding(0, 'house', spot.tx + 1, spot.ty + 1, []);
+    check('on ne bâtit pas sur une ferme, pas même une autre ferme', !!ferme && !ferme2 && !maison,
+      `seconde ferme ${!!ferme2}, maison à cheval ${!!maison}`);
+    // Et une ferme qui s'épuise ne débouche pas les cases d'un voisin posé
+    // dessus (anciennes parties : l'empilement était possible).
+    const dessus = w.spawnBuilding(0, 'house', spot.tx, spot.ty, true);
+    ferme.addBuildProgress(1e6);
+    ferme.takeFarmFood(1e6);
+    check('une ferme épuisée ne rend pas traversable la maison posée sur elle', ferme.dead && w.map.isBlocked(dessus.tx, dessus.ty),
+      `ferme ${ferme.dead ? 'épuisée' : 'debout'}, case de la maison ${w.map.isBlocked(dessus.tx, dessus.ty) ? 'bloquée' : 'LIBRE'}`);
+  }
+
+  // Deux bêtes abattues sur la même case : deux carcasses.
+  {
+    const w = petit(11);
+    const tc = centre(w);
+    const cochons = w.units.filter((u) => u.type === 'pig').slice(0, 2);
+    const x = (tc.tx + 5) * TILE + TILE / 2, y = (tc.ty + 5) * TILE + TILE / 2;
+    for (const c of cochons) { c.x = x; c.y = y; }
+    const avant = [...w.map.resources.values()].filter((r) => r.gibier === 'pig').reduce((s, r) => s + r.amount, 0);
+    for (const c of cochons) w.killEntity(c, null);
+    const apres = [...w.map.resources.values()].filter((r) => r.gibier === 'pig').reduce((s, r) => s + r.amount, 0);
+    const attendu = cochons.reduce((s, c) => s + c.def.food, 0);
+    check('deux bêtes tombées sur la même case laissent deux carcasses', apres - avant === attendu, `${apres - avant} nourriture sur ${attendu}`);
+  }
+
+  // Envoyé sur un autre bosquet dont l'arbre tombe avant son premier coup de
+  // hache : il reste dans ce bosquet-là.
+  {
+    const w = petit(23);
+    const map = w.map;
+    const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+    const tc = centre(w);
+    const d = (a, b) => Math.hypot(a.tx - b.tx, a.ty - b.ty);
+    const exploitable = (r) => r.type === 'wood' && map.hasOpenNeighbour(r.tx, r.ty);
+    const voisins = (r) => [...map.resources.values()].filter((o) => o !== r && exploitable(o) && Math.max(Math.abs(o.tx - r.tx), Math.abs(o.ty - r.ty)) <= 2).length;
+    const arbres = [...map.resources.values()].filter((r) => exploitable(r) && voisins(r) >= 2)
+      .sort((a, b) => Math.hypot(a.tx * TILE - tc.x, a.ty * TILE - tc.y) - Math.hypot(b.tx * TILE - tc.x, b.ty * TILE - tc.y));
+    const A = arbres[0];
+    const B = arbres.find((r) => d(r, A) > 12 && Math.hypot(r.tx * TILE - tc.x, r.ty * TILE - tc.y) < 16 * TILE);
+    v.gatherAt(A.tx, A.ty);
+    pas(w, 60, () => v.carry.amount >= 3);
+    v.gatherAt(B.tx, B.ty);
+    pas(w, 2);
+    map.harvest(B.tx, B.ty, 1e9);
+    let apres = null;
+    pas(w, 120, () => { if (v.state === STATE.GATHER && v.resourceTile && w.players[0].stats.gathered.wood > 0) { apres = v.resourceTile; return true; } return false; });
+    check('l’arbre désigné tombé avant le premier coup : on reste dans son bosquet', !!apres && d(apres, B) < d(apres, A),
+      apres ? `reprend à ${d(apres, B).toFixed(1)} case(s) du bosquet désigné, ${d(apres, A).toFixed(1)} de l’ancien` : `état ${v.state}`);
+  }
+
+  // La flèche d'un tireur tombé pendant son vol touche aussi dans la partie reprise.
+  {
+    const w = new World({ seed: 3, mapSize: 'small', difficulty: 'normal' });
+    w.ais = [];
+    for (const u of w.units) u.setStance('passive');
+    const tc = centre(w);
+    const cible = w.spawnUnit(0, 'militia', tc.x + TILE * 6, tc.y + TILE * 6);
+    cible.setStance('passive');
+    const archer = w.spawnUnit(1, 'archer', cible.x + TILE * 4.5, cible.y);
+    archer.attackEntity(cible);
+    pas(w, 10, () => w.projectiles.length > 0);
+    w.killEntity(archer, null, true);
+    const r = restoreWorld(JSON.parse(JSON.stringify(serializeWorld(w))));
+    const cr = r.byId.get(cible.id);
+    for (let i = 0; i < 2 * TICKS_PER_SECOND; i++) { w.update(1 / TICKS_PER_SECOND); r.update(1 / TICKS_PER_SECOND); }
+    check('la flèche d’un tireur mort en vol touche aussi après rechargement', r.projectiles !== undefined && cible.hp === cr.hp,
+      `PV ${cible.hp} dans la partie, ${cr.hp} après reprise`);
+  }
+
+  // L'IA ne donne pas d'ordres aux villageois abrités.
+  {
+    const w = new World({ seed: 808, mapSize: 'small', difficulty: 'normal' });
+    pas(w, 60);
+    const tc = centre(w, 1);
+    const v1 = w.units.filter((u) => u.playerIndex === 1 && u.isVillager)
+      .sort((a, b) => dist(a.x, a.y, tc.x, tc.y) - dist(b.x, b.y, tc.x, tc.y))[0];
+    const raider = w.spawnUnit(0, 'scout', v1.x + TILE, v1.y);
+    raider.setStance('passive');
+    raider.hp = raider.maxHp = 1e9;
+    pas(w, 20, () => {
+      raider.x = v1.garrisonedIn ? tc.x + TILE * 3 : v1.x + TILE; raider.y = v1.garrisonedIn ? tc.y : v1.y;
+      return w.units.some((u) => u.playerIndex === 1 && u.garrisonedIn);
+    });
+    w.players[1].resources.wood += 1000;
+    const ordres = new Set();
+    pas(w, 30, () => {
+      raider.x = tc.x + TILE * 4; raider.y = tc.y;
+      for (const u of w.units) if (u.playerIndex === 1 && u.garrisonedIn && u.state !== STATE.IDLE) ordres.add(`${u.id}:${u.state}`);
+      return false;
+    });
+    const abrites = w.units.filter((u) => u.playerIndex === 1 && u.garrisonedIn).length;
+    check('l’IA ne donne pas d’ordres aux villageois qu’elle a mis à l’abri', abrites > 0 && ordres.size === 0,
+      `${abrites} à l’abri, ordres reçus : ${[...ordres].join(' ') || 'aucun'}`);
+  }
+
+  // Un ordre plus récent efface le « je livre, puis… » : la cloche ne renvoie
+  // pas à un poste abandonné.
+  {
+    const w = new World({ seed: 8, mapSize: 'small', difficulty: 'normal' });
+    w.ais = [];
+    w.players[0].resources.wood = 1000;
+    w.fog.explored.fill(1);
+    const tc = centre(w);
+    const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+    for (const u of w.units) if (u.playerIndex === 0 && u !== v) u.stop();
+    v.carry = { type: 'wood', amount: 8 };
+    const or = w.findNearestResource(v.x, v.y, 'gold', 40 * TILE, 0);
+    v.gatherAt(or.tx, or.ty);
+    let spot = null;
+    for (let r = 3; r <= 10 && !spot; r++) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r && !spot; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === r && w.canPlace(0, 'house', tc.tx + dx, tc.ty + dy)) spot = { tx: tc.tx + dx, ty: tc.ty + dy };
+    }
+    const maison = w.placeBuilding(0, 'house', spot.tx, spot.ty, [v]);
+    pas(w, 6);
+    w.ringTownBell(0);
+    pas(w, 20, () => !!v.garrisonedIn);
+    w.ringTownBell(0);
+    w.update(1 / TICKS_PER_SECOND);
+    check('après la cloche, le villageois reprend l’ordre le plus récent (le chantier, pas l’or)', v.target === maison && v.state === STATE.BUILD,
+      `état ${v.state}, cible ${v.target ? v.target.type : v.resourceTile ? 'une case' : '-'}`);
   }
 }
 
