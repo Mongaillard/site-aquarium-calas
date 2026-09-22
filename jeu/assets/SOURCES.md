@@ -129,7 +129,7 @@ bleu franc côté adverse.
 La planche tient quatre orientations de marche (sud, nord, ouest, est — huit
 pas chacune) et quatre poses de travail de quatre images : au repos, cueillir,
 construire, porter une ressource. Les poses sont dessinées **d'un seul côté**
-(la cueillette tournée vers l'ouest, le marteau et le rondin vers l'est) : le
+(la cueillette et le marteau tournés vers l'ouest, le rondin vers l'est) : le
 jeu les retourne en miroir quand la cible est de l'autre côté. Une marche à
 quatre orientations seulement : en diagonale, l'unité prend la cardinale la
 plus proche.

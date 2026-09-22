@@ -57,6 +57,9 @@ export class UI {
     for (const node of document.querySelectorAll('[data-icone]')) {
       node.innerHTML = iconeSVG(node.dataset.icone, node.classList.contains('icon-btn') ? 19 : 17);
     }
+    // Le moteur audio sert toute la session : coupé dans la partie précédente,
+    // il l'est encore — le bouton doit le dire.
+    if (!this.game.audio.enabled) el('btn-sound').innerHTML = iconeSVG('sonCoupe', 19);
 
     // Ces éléments survivent à la partie : leurs écouteurs partent avec elle
     // (voir Game.destroy), sinon la partie suivante hériterait des deux.
@@ -131,6 +134,7 @@ export class UI {
     this.refreshSelection();
     this.refreshDisabledStates();
     if (!this.nodes.workerMenu.classList.contains('hidden')) this.renderWorkerRows();
+    if (!this.nodes.buildMenu.classList.contains('hidden')) this.refreshBuildMenu();
   }
 
   // --- Ouvriers -------------------------------------------------------------
@@ -203,18 +207,20 @@ export class UI {
       this.workerMoving = this.nodes.workerList.querySelector('[data-moving]');
 
       // Les écouteurs ne sont posés qu'une fois, sur des boutons qui ne
-      // sont plus jamais remplacés.
+      // sont plus jamais remplacés. Ces boutons survivent à la partie : sans
+      // le signal, ils retiendraient toute l'ancienne partie en mémoire.
+      const opts = this.ecoute();
       this.nodes.workerList.querySelectorAll('[data-give]').forEach((btn) => {
-        btn.addEventListener('click', () => { this.game.assignWorker(btn.dataset.give); this.renderWorkerRows(); });
+        btn.addEventListener('click', () => { this.game.assignWorker(btn.dataset.give); this.renderWorkerRows(); }, opts);
       });
       this.nodes.workerList.querySelectorAll('[data-take]').forEach((btn) => {
-        btn.addEventListener('click', () => { this.game.unassignWorker(btn.dataset.take); this.renderWorkerRows(); });
+        btn.addEventListener('click', () => { this.game.unassignWorker(btn.dataset.take); this.renderWorkerRows(); }, opts);
       });
       this.nodes.workerList.querySelectorAll('[data-select]').forEach((btn) => {
         btn.addEventListener('click', () => {
           this.game.selectWorkerGroup(btn.dataset.select);
           this.closeWorkerMenu();
-        });
+        }, opts);
       });
     }
 
@@ -261,7 +267,11 @@ export class UI {
       + '#' + (first.buildQueue ? first.buildQueue.length : '')
       + '#' + (first.kind === 'building' && !first.complete ? this.world.buildersOn(first) : '')
       + '#' + (first.complete === false ? Math.round(first.progressRatio * 20) : '')
-      + '#' + this.world.players[this.world.humanIndex].age;
+      + '#' + this.world.players[this.world.humanIndex].age
+      // Ce que le panneau affiche et qui bouge sans toucher aux PV : la charge
+      // d'un villageois, la réserve d'une ferme.
+      + '#' + (selection.length === 1 && first.carry ? Math.floor(first.carry.amount) : '')
+      + '#' + (first.type === 'farm' ? Math.round(first.foodLeft) : '');
   }
 
   /**
@@ -363,7 +373,7 @@ export class UI {
           btn.addEventListener('click', () => {
             this.world.cancelProduction(first, Number(btn.dataset.cancel));
             this.refreshSelection(true);
-          });
+          }, this.ecoute());
         });
       }
       return;
@@ -378,7 +388,7 @@ export class UI {
     node.innerHTML = `<div class="multi"><div class="multi-title">${selection.length} unités sélectionnées</div>
       <div class="chips">${chips}</div></div>`;
     node.querySelectorAll('[data-filter]').forEach((btn) => {
-      btn.addEventListener('click', () => this.game.filterSelection(btn.dataset.filter));
+      btn.addEventListener('click', () => this.game.filterSelection(btn.dataset.filter), this.ecoute());
     });
   }
 
@@ -544,7 +554,7 @@ export class UI {
         this.game.audio.play('click');
         command.action();
         this.refreshSelection(true);
-      });
+      }, this.ecoute());
     });
   }
 
@@ -563,31 +573,44 @@ export class UI {
 
   // --- Menu de construction -------------------------------------------------
 
+  /** Pourquoi ce bâtiment ne peut pas être posé maintenant ('' s'il le peut). */
+  raisonConstruction(def) {
+    const player = this.world.players[this.world.humanIndex];
+    if (def.requires && !this.world.buildings.some(
+      (b) => b.playerIndex === player.index && b.type === def.requires && b.complete && !b.dead)) {
+      return `Nécessite : ${BUILDING_TYPES[def.requires].name}`;
+    }
+    if (def.limit && this.world.buildings.filter(
+      (b) => b.playerIndex === player.index && b.type === def.id && !b.dead).length >= def.limit) {
+      return 'Nombre maximum atteint';
+    }
+    return canAfford(player.resources, def.cost) ? '' : 'Ressources insuffisantes';
+  }
+
+  /** La partie continue menu ouvert : les cartes suivent les ressources, sans être recréées. */
+  refreshBuildMenu() {
+    for (const btn of el('build-list').querySelectorAll('[data-type]')) {
+      const reason = this.raisonConstruction(BUILDING_TYPES[btn.dataset.type]);
+      btn.classList.toggle('disabled', reason !== '');
+      btn.dataset.reason = reason;
+    }
+  }
+
   openBuildMenu() {
     const player = this.world.players[this.world.humanIndex];
     const list = el('build-list');
     const available = Object.values(BUILDING_TYPES).filter((def) => (def.age || 0) <= player.age);
-    list.innerHTML = available.map((def) => {
-      const affordable = canAfford(player.resources, def.cost);
-      const requires = def.requires && !this.world.buildings.some(
-        (b) => b.playerIndex === player.index && b.type === def.requires && b.complete && !b.dead);
-      const limited = def.limit && this.world.buildings.filter(
-        (b) => b.playerIndex === player.index && b.type === def.id && !b.dead).length >= def.limit;
-      const disabled = !affordable || requires || limited;
-      let reason = '';
-      if (requires) reason = `Nécessite : ${BUILDING_TYPES[def.requires].name}`;
-      else if (limited) reason = 'Nombre maximum atteint';
-      else if (!affordable) reason = 'Ressources insuffisantes';
-      return `<button class="build-card ${disabled ? 'disabled' : ''}" data-type="${def.id}" data-reason="${reason}">
+    list.innerHTML = available.map((def) => `<button class="build-card" data-type="${def.id}">
         <span class="bc-icon">${iconeSVG(def.icon, 26)}</span>
         <span class="bc-body">
           <span class="bc-name">${def.name}</span>
           <span class="bc-desc">${def.desc}</span>
         </span>
         <span class="bc-cost">${costLabel(def.cost)}</span>
-      </button>`;
-    }).join('');
+      </button>`).join('');
     poserIconesDeCout(list);
+    this.refreshBuildMenu();
+    // Les cartes restent dans le DOM après la partie : l'écouteur part avec elle.
     list.querySelectorAll('[data-type]').forEach((btn) => {
       btn.addEventListener('click', () => {
         if (btn.classList.contains('disabled')) {
@@ -596,7 +619,7 @@ export class UI {
           return;
         }
         this.game.startBuildMode(btn.dataset.type);
-      });
+      }, this.ecoute());
     });
     this.nodes.buildMenu.classList.remove('hidden');
   }
@@ -634,6 +657,14 @@ export class UI {
 
   // --- Fenêtres modales -----------------------------------------------------
 
+  /**
+   * Options d'un écouteur posé par l'interface : il part avec la partie (voir
+   * Game.destroy). Un bouton détaché reste parfois tenu par le navigateur — le
+   * dernier élément touché, par exemple « Rejouer » —, et son écouteur, avec
+   * lui toute l'ancienne partie.
+   */
+  ecoute() { return { signal: this.game.ecouteurs?.signal }; }
+
   showModal(html, options = {}) {
     this.nodes.modal.innerHTML = `<div class="modal-card ${options.wide ? 'wide' : ''}">${html}</div>`;
     this.nodes.modal.classList.remove('hidden');
@@ -670,18 +701,18 @@ export class UI {
       btn.addEventListener('click', () => {
         this.game.setSpeed(btn.dataset.speed);
         modal.querySelectorAll('[data-speed]').forEach((b) => b.classList.toggle('active', b === btn));
-      });
+      }, this.ecoute());
     });
     modal.querySelectorAll('[data-style]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.game.setStyleUnites(btn.dataset.style);
         modal.querySelectorAll('[data-style]').forEach((b) => b.classList.toggle('active', b === btn));
-      });
+      }, this.ecoute());
     });
-    modal.querySelector('[data-act="resume"]').addEventListener('click', () => this.game.togglePause());
-    modal.querySelector('[data-act="help"]').addEventListener('click', () => this.showHelp());
-    modal.querySelector('[data-act="credits"]').addEventListener('click', () => this.showCredits());
-    modal.querySelector('[data-act="resign"]').addEventListener('click', () => this.game.resign());
+    modal.querySelector('[data-act="resume"]').addEventListener('click', () => this.game.togglePause(), this.ecoute());
+    modal.querySelector('[data-act="help"]').addEventListener('click', () => this.showHelp(), this.ecoute());
+    modal.querySelector('[data-act="credits"]').addEventListener('click', () => this.showCredits(), this.ecoute());
+    modal.querySelector('[data-act="resign"]').addEventListener('click', () => this.game.resign(), this.ecoute());
   }
 
   showHelp() {
@@ -706,7 +737,7 @@ export class UI {
       <div class="modal-actions"><button class="btn primary" data-act="close">J'ai compris</button></div>`, { wide: true });
     modal.querySelector('[data-act="close"]').addEventListener('click', () => {
       if (this.game.paused) this.showPause(); else this.hideModal();
-    });
+    }, this.ecoute());
   }
 
   /**
@@ -732,7 +763,7 @@ export class UI {
       { wide: true });
     modal.querySelector('[data-act="close"]').addEventListener('click', () => {
       if (this.game.paused) this.showPause(); else this.hideModal();
-    });
+    }, this.ecoute());
   }
 
   showGameOver(result) {
@@ -767,8 +798,8 @@ export class UI {
         <button class="btn primary" data-act="again">Nouvelle partie</button>
         <button class="btn" data-act="menu">Menu principal</button>
       </div>`, { wide: true });
-    modal.querySelector('[data-act="again"]').addEventListener('click', () => this.game.restart());
-    modal.querySelector('[data-act="menu"]').addEventListener('click', () => this.game.quitToMenu());
+    modal.querySelector('[data-act="again"]').addEventListener('click', () => this.game.restart(), this.ecoute());
+    modal.querySelector('[data-act="menu"]').addEventListener('click', () => this.game.quitToMenu(), this.ecoute());
   }
 
   total(player) {

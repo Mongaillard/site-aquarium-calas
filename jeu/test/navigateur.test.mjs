@@ -973,7 +973,11 @@ const villageois = await page.evaluate(async () => {
   g.world.players[0].resources.wood = 1000;
   let site = null;
   for (let rr = 3; rr <= 12 && !site; rr++) for (let dy = -rr; dy <= rr && !site; dy++) for (let dx = -rr; dx <= rr && !site; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== rr) continue; if (g.world.canPlace(0, 'house', tc.tx + dx, tc.ty + dy)) site = g.world.placeBuilding(0, 'house', tc.tx + dx, tc.ty + dy, []); }
-  if (site) { v.buildAt(site); v.x = site.x + 60; v.y = site.y; poses.chantierOuest = nom(r.poseDe(v, def, immobile)); g.world.cancelConstruction(site); }
+  if (site) {
+    v.buildAt(site); v.x = site.x + 60; v.y = site.y; poses.chantierOuest = nom(r.poseDe(v, def, immobile));
+    v.x = site.x - 60; poses.chantierEst = nom(r.poseDe(v, def, immobile));
+    g.world.cancelConstruction(site);
+  }
   v.dead = true;
   return { cases: def.cases, images: def.images, lignes: def.lignes, opaques, changes, peau, peauIntacte, bleusRestants, poses };
 });
@@ -989,7 +993,9 @@ check('devant un arbre il abat à la hache, devant l’or il pioche, tournés ve
 check('sur une carcasse, il travaille au maillet, tourné vers elle des deux côtés', P.carcasseEst === 'viande' && P.carcasseOuest === 'viande·miroir',
   `carcasse à l’est : ${P.carcasseEst} · à l’ouest : ${P.carcasseOuest}`);
 check('chargé, il porte ; à l’arrêt, il se repose ; sinon il marche', P.porteEst === 'porter' && P.porteOuest === 'porter·miroir' && P.repos === 'repos' && P.marche === 'marche', JSON.stringify(P));
-check('sur un chantier, il construit, tourné vers lui', P.chantierOuest === 'construire·miroir', String(P.chantierOuest));
+// La planche dessine le maillet frappant vers l'ouest : c'est l'est qui se retourne.
+check('sur un chantier, il construit, tourné vers lui des deux côtés', P.chantierOuest === 'construire' && P.chantierEst === 'construire·miroir',
+  `chantier à l’ouest : ${P.chantierOuest} · à l’est : ${P.chantierEst}`);
 
 // Quatre orientations : la marche du villageois prend la cardinale la plus
 // proche, et chaque secteur tombe sur la bonne ligne de l'atlas.
@@ -1406,6 +1412,165 @@ check('un gisement d’or épuisé refait le sol en cache', relecture.sol.avant 
 check('une carcasse se dessine avec le profil de l’animal', relecture.carcasse.rangee === relecture.carcasse.profil,
   `rangée ${relecture.carcasse.rangee}, profil ${relecture.carcasse.profil}`);
 
+// ---------------------------------------------------------------------------
+// Second passage sur le rendu et l'interface (septembre) : chaque défaut
+// corrigé garde sa vérification, écrite d'après le script qui l'a montré.
+// ---------------------------------------------------------------------------
+const cdp = await context.newCDPSession(page);
+const toucher = (type, points) => cdp.send('Input.dispatchTouchEvent', {
+  type, touchPoints: points.map(([x, y, id]) => ({ x, y, id, radiusX: 4, radiusY: 4, force: 1 })),
+});
+await page.evaluate(() => {
+  const g = window.__jeu;
+  g.speed = 0;
+  window.__appuis = [];
+  const orig = g.tapAt.bind(g);
+  g.tapAt = (x, y, d) => { window.__appuis.push([Math.round(x), Math.round(y)]); return orig(x, y, d); };
+  for (const u of g.world.units) if (u.playerIndex === 0) u.stop();
+  g.focusTownCenter();
+  g.setSelection(g.world.units.filter((u) => u.playerIndex === 0 && u.isVillager));
+});
+// Pincement : le doigt A reste immobile et se lève en dernier.
+async function pincer(A) {
+  const B = [A[0] + 60, A[1] + 30];
+  await toucher('touchStart', [[...A, 0]]);
+  await toucher('touchStart', [[...A, 0], [...B, 1]]);
+  await toucher('touchMove', [[...A, 0], [B[0] + 45, B[1] + 20, 1]]);
+  await toucher('touchMove', [[...A, 0], [B[0] + 90, B[1] + 40, 1]]);
+  await toucher('touchEnd', [[B[0] + 90, B[1] + 40, 1]]);
+  await toucher('touchEnd', []);
+  await page.waitForTimeout(150);
+}
+await pincer([150, 300]);
+const apresPincement = await page.evaluate(() => window.__appuis.splice(0));
+check('le doigt resté posé après un pincement ne donne aucun ordre', apresPincement.length === 0, JSON.stringify(apresPincement));
+const chantiers0 = await page.evaluate(() => { window.__jeu.startBuildMode('house'); return window.__jeu.world.buildings.filter((b) => b.playerIndex === 0 && !b.complete).length; });
+await pincer([120, 470]);
+const construction = await page.evaluate(() => ({
+  appuis: window.__appuis.splice(0), mode: !!window.__jeu.buildMode,
+  chantiers: window.__jeu.world.buildings.filter((b) => b.playerIndex === 0 && !b.complete).length,
+}));
+await page.evaluate(() => window.__jeu.cancelBuild());
+check('ni ne pose de bâtiment en mode construction', construction.appuis.length === 0 && construction.mode && construction.chantiers === chantiers0,
+  JSON.stringify({ ...construction, avant: chantiers0 }));
+await toucher('touchStart', [[200, 250, 0]]);
+await page.waitForTimeout(60);
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+await page.waitForTimeout(150);
+const annule = await page.evaluate(() => window.__appuis.splice(0));
+check('un toucher annulé par le système (appel, geste de bord) ne donne aucun ordre', annule.length === 0, JSON.stringify(annule));
+
+const interfaceRelue = await page.evaluate(async () => {
+  const g = window.__jeu, w = g.world, R = g.renderer, map = w.map, T = 32;
+  const attendre = (ms) => new Promise((res) => setTimeout(res, ms));
+  const r = {};
+  const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  // Menu de construction ouvert pendant que le bois arrive : la carte suit.
+  w.players[0].resources.wood = 20;
+  g.openBuildMenu();
+  await attendre(150);
+  const carte = () => document.querySelector('#build-list [data-type="house"]');
+  const grisee = carte().classList.contains('disabled');
+  w.players[0].resources.wood = 200;
+  await attendre(400);
+  r.menu = { a20: grisee, a200: carte().classList.contains('disabled') };
+  g.ui.closeBuildMenu();
+  // Panneau d'un seul villageois : sa charge suit.
+  const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager && !u.dead);
+  v.carry = { type: 'wood', amount: 2 };
+  g.setSelection([v]);
+  await attendre(250);
+  const texte = () => (document.querySelector('#selection-panel .stats')?.textContent || '').replace(/\s+/g, ' ');
+  const avant = texte();
+  v.carry.amount = 5;
+  await attendre(400);
+  r.charge = { avant, apres: texte() };
+  v.carry = { type: null, amount: 0 };
+  g.setSelection([]);
+  // Un combat hors de vue ne laisse ni éclats ni tache sous le brouillard.
+  const moi = w.entities.filter((e) => e.playerIndex === 0);
+  let loin = null;
+  for (let ty = 5; ty < map.h - 5 && !loin; ty += 3) for (let tx = 5; tx < map.w - 5 && !loin; tx += 3) {
+    if (moi.every((e) => Math.hypot(e.x / T - tx, e.y / T - ty) > 14)) loin = { tx, ty };
+  }
+  const i = loin.ty * map.w + loin.tx;
+  w.fog.explored[i] = 1; w.fog.visible[i] = 0; w.fog.dirty = true;
+  const p0 = R.particles.length;
+  w.effects.push({ kind: 'death', x: loin.tx * T + 16, y: loin.ty * T + 16, life: 1.2, max: 1.2, color: '#c33' },
+    { kind: 'hit', x: loin.tx * T + 16, y: loin.ty * T + 16, life: 0.3, max: 0.3 });
+  R.render(1 / 60);
+  const cache = R.particles.length - p0;
+  const p1 = R.particles.length;
+  w.effects.push({ kind: 'death', x: tc.x, y: tc.y + 60, life: 1.2, max: 1.2, color: '#c33' });
+  R.render(1 / 60);
+  r.brouillard = { cache, vu: R.particles.length - p1 };
+  w.effects.length = 0;
+  // Au bord de la carte, dans un coin inexploré : rien du sol ne déborde.
+  const coinX = tc.x < map.pixelWidth / 2 ? map.pixelWidth : 0, coinY = tc.y < map.pixelHeight / 2 ? map.pixelHeight : 0;
+  g.camera.zoom = 1.5;
+  g.camera.centerOn(coinX, coinY);
+  R.render(1 / 60);
+  const px = (wx, wy) => { const s = g.camera.worldToScreen(wx, wy); return Array.from(R.ctx.getImageData(Math.round(s.x * R.dpr), Math.round(s.y * R.dpr), 1, 1).data.slice(0, 3)); };
+  const pas = coinX === 0 ? 1 : -1, wy = coinY + (coinY === 0 ? 1 : -1) * 120;
+  r.bord = { bande: px(coinX - pas * 4, wy), dehors: px(coinX - pas * 20, wy) };
+  // Zoom minimal : la vue tient plus de 40 tronçons de sol, le cache aussi.
+  let cuissons = 0;
+  const cuire = R.rendreTroncon;
+  R.rendreTroncon = function (...a) { cuissons++; return cuire.apply(this, a); };
+  g.camera.zoom = g.camera.minZoom;
+  g.camera.centerOn(map.pixelWidth / 2, map.pixelHeight / 2);
+  for (let k = 0; k < 3; k++) R.render(1 / 60);
+  const v2 = R.visibleTileRange(), taille = 8 * T;
+  const vus = (Math.floor(Math.min(map.pixelWidth - 1, v2.right) / taille) - Math.floor(Math.max(0, v2.left) / taille) + 1)
+    * (Math.floor(Math.min(map.pixelHeight - 1, v2.bottom) / taille) - Math.floor(Math.max(0, v2.top) / taille) + 1);
+  cuissons = 0;
+  for (let k = 0; k < 5; k++) R.render(1 / 60);
+  R.rendreTroncon = cuire;
+  r.cacheSol = { vus, cuissons };
+  // Une ferme posée sur du décor debout : aucun rocher ni buisson dessus.
+  const S = (await import('./js/config.js')).BUILDING_TYPES.farm.size;
+  const decor = R.decorCarte();
+  const parCase = new Map();
+  for (const ligne of decor.debout) for (const d of ligne) parCase.set(d.ty * map.w + d.tx, (parCase.get(d.ty * map.w + d.tx) || 0) + 1);
+  let place = null;
+  for (let ty = 2; ty < map.h - 5; ty++) for (let tx = 2; tx < map.w - 5; tx++) {
+    let n = 0, libre = true;
+    for (let y = ty; y < ty + S; y++) for (let x = tx; x < tx + S; x++) { n += parCase.get(y * map.w + x) || 0; if (map.blocked[y * map.w + x] !== 0) libre = false; }
+    if (libre && n > (place ? place.n : 1)) place = { tx, ty, n };
+  }
+  const ferme = w.spawnBuilding(0, 'farm', place.tx, place.ty, true);
+  for (let y = ferme.ty - 3; y < ferme.ty + 6; y++) for (let x = ferme.tx - 3; x < ferme.tx + 6; x++) { w.fog.explored[y * map.w + x] = 1; w.fog.visible[y * map.w + x] = 1; }
+  w.fog.dirty = true;
+  g.camera.zoom = 1.6;
+  g.camera.centerOn(ferme.x, ferme.y);
+  let peintes = 0;
+  const peindre = R.dessinerPiece;
+  R.dessinerPiece = function (d, ...a) {
+    if (a.length === 1 && d.tx >= ferme.tx && d.tx < ferme.tx + S && d.ty >= ferme.ty && d.ty < ferme.ty + S) peintes++;
+    return peindre.call(this, d, ...a);
+  };
+  R.render(1 / 60);
+  R.dessinerPiece = peindre;
+  r.ferme = { dessous: place.n, peintes };
+  w.killEntity(ferme, null, true);
+  g.camera.zoom = 0.54;
+  g.focusTownCenter();
+  g.speed = 1;
+  return r;
+});
+check('menu de construction ouvert : la carte de la maison se dégrise quand le bois arrive', interfaceRelue.menu.a20 && !interfaceRelue.menu.a200,
+  JSON.stringify(interfaceRelue.menu));
+check('le panneau d’un villageois suit la charge qu’il porte', /\b2\/\d+/.test(interfaceRelue.charge.avant) && /\b5\/\d+/.test(interfaceRelue.charge.apres),
+  `${interfaceRelue.charge.avant} → ${interfaceRelue.charge.apres}`);
+check('un combat hors de vue ne laisse aucun éclat sous le brouillard (un combat en vue, si)', interfaceRelue.brouillard.cache === 0 && interfaceRelue.brouillard.vu > 0,
+  JSON.stringify(interfaceRelue.brouillard));
+const ecartBord = interfaceRelue.bord.bande.reduce((s, c, k) => s + Math.abs(c - interfaceRelue.bord.dehors[k]), 0);
+check('au bord de la carte, aucune bande de sol inexploré ne déborde', ecartBord <= 6, JSON.stringify(interfaceRelue.bord));
+check('zoom minimal : le sol n’est pas recuit à chaque image', interfaceRelue.cacheSol.vus > 40 && interfaceRelue.cacheSol.cuissons === 0,
+  `${interfaceRelue.cacheSol.vus} tronçons en vue, ${interfaceRelue.cacheSol.cuissons} recuits en 5 images`);
+check('une ferme écarte le décor debout de son emprise', interfaceRelue.ferme.dessous > 0 && interfaceRelue.ferme.peintes === 0,
+  `${interfaceRelue.ferme.dessous} pièce(s) sous la ferme, ${interfaceRelue.ferme.peintes} peinte(s) dessus`);
+
 // Menu pause
 await page.evaluate(() => window.__jeu.togglePause());
 await page.waitForTimeout(150);
@@ -1418,6 +1583,16 @@ await page.click('[data-act="close"]');
 await page.waitForTimeout(120);
 await page.evaluate(() => window.__jeu.togglePause());
 
+// Avant d'abandonner : les deux menus ouverts une fois (leurs boutons gardent
+// des écouteurs), et le son coupé.
+await page.evaluate(async () => {
+  const g = window.__jeu;
+  g.openBuildMenu(); g.ui.closeBuildMenu();
+  g.ui.openWorkerMenu(); g.ui.closeWorkerMenu();
+  if (g.audio.enabled) document.getElementById('btn-sound').click();
+});
+const iconeSonCoupe = await page.evaluate(() => document.getElementById('btn-sound').innerHTML);
+
 // Écran de fin (on abandonne volontairement)
 await page.evaluate(() => window.__jeu.resign());
 await page.waitForTimeout(300);
@@ -1428,6 +1603,7 @@ check('écran de fin affiché', endText.includes('Défaite') && endText.includes
 // du son répondait deux fois, donc ne changeait rien.
 await page.click('[data-act="again"]');
 await page.waitForTimeout(1500);
+const iconeNouvellePartie = await page.evaluate(() => document.getElementById('btn-sound').innerHTML);
 const nouvelle = await page.evaluate(() => {
   const g = window.__jeu;
   const avant = g.audio.enabled;
@@ -1437,6 +1613,87 @@ const nouvelle = await page.evaluate(() => {
   return { avant, apres };
 });
 check('nouvelle partie : un appui sur le son le bascule une seule fois', nouvelle.avant !== nouvelle.apres, JSON.stringify(nouvelle));
+check('son coupé dans la partie précédente : le bouton le montre encore', !nouvelle.avant && iconeNouvellePartie === iconeSonCoupe,
+  `son ${nouvelle.avant ? 'actif' : 'coupé'}, icône ${iconeNouvellePartie === iconeSonCoupe ? '« coupé »' : '« actif »'}`);
+
+// L'ancienne partie ne reste pas en mémoire : les boutons de ses menus,
+// restés dans la page, retenaient toute la partie par leurs écouteurs.
+async function instances(expression) {
+  await cdp.send('HeapProfiler.collectGarbage');
+  const { result: proto } = await cdp.send('Runtime.evaluate', { expression, objectGroup: 'fuite' });
+  const { objects } = await cdp.send('Runtime.queryObjects', { prototypeObjectId: proto.objectId, objectGroup: 'fuite' });
+  const { result } = await cdp.send('Runtime.callFunctionOn', {
+    objectId: objects.objectId, returnByValue: true, objectGroup: 'fuite', functionDeclaration: 'function () { return this.length; }',
+  });
+  await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'fuite' });
+  return result.value;
+}
+const rendus = await instances('Object.getPrototypeOf(window.__jeu.renderer)');
+const mondes = await instances('Object.getPrototypeOf(window.__jeu.world)');
+check('nouvelle partie : l’ancienne ne reste pas en mémoire', rendus === 1 && mondes === 1, `${rendus} rendu(s), ${mondes} monde(s)`);
+
+// Petits écrans : téléphone en paysage, puis petit téléphone en portrait.
+async function ouvrirPartie(viewport) {
+  const ctx = await browser.newContext({ viewport, screen: viewport, hasTouch: true, isMobile: true, deviceScaleFactor: 2, serviceWorkers: 'block' });
+  const p = await ctx.newPage();
+  p.on('pageerror', (err) => errors.push('pageerror: ' + err.message));
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  await p.click('#btn-play');
+  await p.waitForFunction(() => !!(window.__jeu && window.__jeu.world));
+  await p.waitForTimeout(1200);
+  return { ctx, p };
+}
+{
+  const { ctx, p } = await ouvrirPartie({ width: 740, height: 360 });
+  // Le panneau des ouvriers défile : sa bascule reste atteignable.
+  await p.click('#btn-workers');
+  await p.waitForTimeout(300);
+  const avant = await p.evaluate(() => window.__jeu.autoWorkers());
+  let touche = true;
+  try { await p.tap('#auto-workers', { timeout: 2000 }); } catch { touche = false; }
+  const apres = await p.evaluate(() => window.__jeu.autoWorkers());
+  check('paysage 740×360 : la bascule du panneau des ouvriers s’atteint et répond', touche && avant !== apres, `${avant} → ${apres}`);
+  await p.click('#btn-close-workers');
+  // La partie vide de la barre des ouvriers laisse passer les appuis vers la carte.
+  await p.evaluate(() => { const g = window.__jeu; g.setSelection(g.world.units.filter((u) => u.playerIndex === 0 && u.isVillager)); });
+  await p.waitForTimeout(200);
+  const sous = await p.evaluate(() => {
+    const bar = document.getElementById('worker-bar').getBoundingClientRect();
+    const fin = Math.max(...[...document.querySelectorAll('#worker-bar > *')].map((n) => n.getBoundingClientRect().right));
+    const n = document.elementFromPoint(Math.round((fin + innerWidth - 8) / 2), Math.round(bar.top + bar.height / 2));
+    return n ? (n.id || n.tagName) : '-';
+  });
+  check('paysage 740×360 : la partie vide de la barre des ouvriers laisse toucher la carte', sous === 'game' || sous === 'CANVAS', sous);
+  await ctx.close();
+}
+{
+  const { ctx, p } = await ouvrirPartie({ width: 360, height: 640 });
+  await p.evaluate(() => {
+    const g = window.__jeu; g.speed = 0;
+    g.focusTownCenter();
+    g.setSelection(g.world.units.filter((u) => u.playerIndex === 0 && u.isVillager));
+    g.startBuildMode('house');
+    document.getElementById('alerts').innerHTML = '';
+  });
+  const tc = await p.evaluate(() => { const g = window.__jeu; const b = g.world.buildings.find((x) => x.type === 'towncenter' && x.playerIndex === 0); return g.camera.worldToScreen(b.x, b.y); });
+  await p.touchscreen.tap(tc.x, tc.y);
+  await p.waitForTimeout(250);
+  const m = await p.evaluate(() => {
+    const rec = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    const bulle = document.getElementById('build-hint');
+    const hint = bulle.getBoundingClientRect();
+    const t = [...document.querySelectorAll('#alerts .toast')].find((n) => n.dataset.message.startsWith('Emplacement impossible'));
+    return {
+      notification: t ? rec(t.getBoundingClientRect(), hint) : -1,
+      minimap: rec(document.getElementById('minimap-wrap').getBoundingClientRect(), hint),
+      lignes: Math.round(hint.height / parseFloat(getComputedStyle(bulle).lineHeight || 16)),
+      traversable: getComputedStyle(bulle).pointerEvents === 'none',
+    };
+  });
+  check('360×640 : la bulle de construction ne cache ni la notification ni la minimap, et laisse passer le doigt',
+    m.notification === 0 && m.minimap === 0 && m.traversable, JSON.stringify(m));
+  await ctx.close();
+}
 
 check('aucune erreur console', errors.length === 0, errors.slice(0, 3).join(' | '));
 

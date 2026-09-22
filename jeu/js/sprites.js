@@ -114,7 +114,8 @@ const ATLAS = {
     poses: {
       repos: { ligne: 4, images: 4, cadence: 2.5 },
       cueillir: { ligne: 5, images: 4, cadence: 5, sens: -1 },
-      construire: { ligne: 6, images: 4, cadence: 7, sens: 1 },
+      // Le maillet frappe vers l'ouest sur la planche (image 3 : tête en bas à gauche).
+      construire: { ligne: 6, images: 4, cadence: 7, sens: -1 },
       porter: { ligne: 7, images: 12, sens: 1 },
       bois: { ligne: 8, images: 8, cadence: 11, sens: 1 },
       or: { ligne: 9, images: 12, cadence: 14, sens: -1 },

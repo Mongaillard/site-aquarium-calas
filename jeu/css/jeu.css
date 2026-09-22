@@ -311,8 +311,12 @@ ul.help a { color: var(--gold); }
 #build-hint {
   position: absolute;
   left: 50%;
-  top: calc(74px + var(--safe-top));
+  /* Au-dessus de la barre des ouvriers : en haut, la bulle recouvrait les
+     notifications (« Emplacement impossible ici ») et la minimap. */
+  bottom: calc(var(--bottom-height, 126px) + 44px + var(--safe-bottom));
   transform: translateX(-50%);
+  width: max-content;   /* sinon `left: 50%` la bride à une demi-largeur d'écran */
+  pointer-events: none;   /* simple consigne : le doigt doit atteindre la carte dessous */
   padding: 8px 14px;
   border-radius: 999px;
   background: rgba(232, 182, 76, .92);
@@ -328,7 +332,9 @@ ul.help a { color: var(--gold); }
 #worker-bar {
   position: absolute;
   left: calc(8px + var(--safe-left));
-  right: calc(8px + var(--safe-right));
+  /* Aussi large que ses pastilles, pas plus : étendue de bord à bord, sa
+     partie vide, transparente, avalait les appuis destinés à la carte. */
+  max-width: calc(100% - 16px - var(--safe-left) - var(--safe-right));
   bottom: calc(var(--bottom-height, 126px) + var(--safe-bottom));
   display: flex;
   gap: 5px;
@@ -535,6 +541,9 @@ ul.help a { color: var(--gold); }
   border-top: 1px solid var(--border);
   border-radius: 18px 18px 0 0;
   padding: 10px 12px calc(12px + var(--safe-bottom));
+  /* Le panneau des ouvriers n'a pas de liste défilante : en paysage, ses
+     dernières lignes et la bascule sortaient de l'écran, inatteignables. */
+  overflow-y: auto;
 }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .sheet-head h2 { margin: 0; font-size: 17px; }

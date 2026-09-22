@@ -358,11 +358,23 @@ export class Renderer {
     const cx0 = Math.floor(Math.max(0, view.left) / taille), cx1 = Math.floor(Math.min(this.world.map.pixelWidth - 1, view.right) / taille);
     const cy0 = Math.floor(Math.max(0, view.top) / taille), cy1 = Math.floor(Math.min(this.world.map.pixelHeight - 1, view.bottom) / taille);
     const r = RECOUVREMENT;
+    // Le cache doit tenir au moins la vue entière : au zoom minimal d'un
+    // téléphone en portrait, elle dépasse 40 tronçons, et un LRU parcouru en
+    // boucle sur plus qu'il n'en tient rate chaque accès — tout était recuit
+    // à chaque image.
+    this.tronconsMax = Math.max(TRONCONS_MAX, (cx1 - cx0 + 1) * (cy1 - cy0 + 1) + 4);
+    // Le recouvrement s'arrête au bord de la carte : au-delà, aucun brouillard
+    // ne le couvre, et une bande du terrain inexploré restait visible.
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.rect(0, 0, this.world.map.pixelWidth, this.world.map.pixelHeight);
+    this.ctx.clip();
     for (let cy = cy0; cy <= cy1; cy++) {
       for (let cx = cx0; cx <= cx1; cx++) {
         this.ctx.drawImage(this.troncon(cx, cy, niveau, nappes), cx * taille - r, cy * taille - r, taille + 2 * r, taille + 2 * r);
       }
     }
+    this.ctx.restore();
   }
 
   /**
@@ -394,7 +406,7 @@ export class Renderer {
     const cache = this.troncons;
     let c = cache.get(cle);
     if (c) { cache.delete(cle); cache.set(cle, c); return c; }   // le plus récent en dernier
-    if (cache.size >= TRONCONS_MAX) cache.delete(cache.keys().next().value);
+    if (cache.size >= (this.tronconsMax || TRONCONS_MAX)) cache.delete(cache.keys().next().value);
     c = this.rendreTroncon(cx, cy, niveau === 0 ? 2 : 1, nappes);
     cache.set(cle, c);
     return c;
@@ -896,11 +908,15 @@ export class Renderer {
     if (atlas && atlas.pret) {
       const map = this.world.map, explored = this.world.fog.explored;
       const decor = this.decorCarte();
+      // Une ferme ne bloque pas ses cases (on y marche) : son emprise écarte
+      // quand même le décor debout, sinon rochers et buissons poussent sur elle.
+      const fermes = this.world.buildings.filter((b) => !b.dead && b.def.walkable);
+      const sousUneFerme = (tx, ty) => fermes.some((b) => tx >= b.tx && tx < b.tx + b.size && ty >= b.ty && ty < b.ty + b.size);
       for (let ty = Math.max(0, view.y0 - 1); ty <= Math.min(map.h - 1, view.y1 + 3); ty++) {
         for (const d of decor.debout[ty]) {
           if (d.tx < view.x0 - 3 || d.tx > view.x1 + 3) continue;
           const i = d.ty * map.w + d.tx;
-          if (!explored[i] || (map.blocked[i] & BLOCK.BUILDING)) continue;
+          if (!explored[i] || (map.blocked[i] & BLOCK.BUILDING) || sousUneFerme(d.tx, d.ty)) continue;
           list.push({ kind: 'decor', d, sprite: atlas });
         }
       }
@@ -1546,6 +1562,8 @@ export class Renderer {
     for (const fx of this.world.effects) {
       if (this.effetsVus.has(fx)) continue;
       this.effetsVus.add(fx);
+      // Hors de vue, pas d'éclats : sous le brouillard ils trahiraient un combat.
+      if (fx.kind !== 'ping' && !this.world.isVisible(fx.x, fx.y)) continue;
       if (fx.kind === 'death') {
         this.semerParticules(fx.x, fx.y - 4, 7, { color: fx.color || '#777', speed: 46, life: 0.75, size: 2 });
       } else if (fx.kind === 'hit') {
@@ -1557,6 +1575,8 @@ export class Renderer {
   drawEffects() {
     const ctx = this.ctx;
     for (const fx of this.world.effects) {
+      // Comme les projectiles et les sons : un combat hors de vue ne se montre pas.
+      if ((fx.kind === 'hit' || fx.kind === 'death') && !this.world.isVisible(fx.x, fx.y)) continue;
       const t = 1 - fx.life / fx.max;
       if (fx.kind === 'hit') {
         ctx.strokeStyle = `rgba(255,220,120,${1 - t})`;

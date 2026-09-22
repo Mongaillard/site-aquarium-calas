@@ -40,7 +40,7 @@ export class InputController {
     c.addEventListener('pointerdown', (e) => this.onPointerDown(e), opts);
     c.addEventListener('pointermove', (e) => this.onPointerMove(e), opts);
     c.addEventListener('pointerup', (e) => this.onPointerUp(e), opts);
-    c.addEventListener('pointercancel', (e) => this.onPointerUp(e), opts);
+    c.addEventListener('pointercancel', (e) => this.onPointerCancel(e), opts);
     c.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
     c.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -158,6 +158,9 @@ export class InputController {
       if (this.pointers.size < 2) this.mode = this.pointers.size === 1 ? 'pan' : 'idle';
       return;
     }
+    // Le doigt resté posé après un pincement : la vue a bougé, ce n'est pas
+    // un appui (sinon ordre, ou pose de bâtiment, sous ce doigt immobile).
+    if (this.mode === 'pan') { this.mode = 'idle'; return; }
 
     if (this.mode === 'box') {
       const box = { x0: this.boxStart.x, y0: this.boxStart.y, x1: pointer.x, y1: pointer.y };
@@ -188,6 +191,17 @@ export class InputController {
     this.lastTap = { time: now, x: pointer.x, y: pointer.y };
     this.game.tapAt(pointer.x, pointer.y, isDouble);
     this.mode = 'idle';
+  }
+
+  /**
+   * Geste interrompu par le système (appel entrant, geste de bord, paume) :
+   * on oublie le doigt sans rien exécuter — ni appui, ni rectangle.
+   */
+  onPointerCancel(e) {
+    this.pointers.delete(e.pointerId);
+    this.cancelLongPress();
+    this.game.setSelectionBox(null);
+    if (this.pointers.size < 2) this.mode = this.pointers.size === 1 ? 'pan' : 'idle';
   }
 
   cancelLongPress() {
