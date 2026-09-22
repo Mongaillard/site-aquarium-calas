@@ -922,8 +922,8 @@ check('les arbres portent leur illustration (six essences, deux chevaliers de ha
 check('le buisson à baies porte son illustration (et son miroir)', vegetation.buissons);
 check('le gisement d’or porte son illustration (et son miroir)', vegetation.or);
 
-// Le villageois illustré : quatre orientations de marche et quatre poses de
-// travail dessinées d'un seul côté, retournées quand la cible est de l'autre.
+// Le villageois illustré : quatre orientations de marche et sept poses,
+// dessinées d'un seul côté et retournées quand la cible est de l'autre.
 const villageois = await page.evaluate(async () => {
   const g = window.__jeu; const T = 32; const map = g.world.map;
   const mod = await import('./js/sprites.js');
@@ -955,8 +955,17 @@ const villageois = await page.evaluate(async () => {
   const baies = trouve('food'), arbre = trouve('wood'), or = trouve('gold');
   const nom = (c) => c ? Object.keys(def.poses).find((k) => def.poses[k] === c.pose) + (c.miroir ? '·miroir' : '') : 'marche';
   if (baies) { v.gatherAt(baies.tx, baies.ty); v.x = baies.tx * T + T / 2 - 40; v.y = baies.ty * T + T / 2; poses.baiesEst = nom(r.poseDe(v, def, immobile)); v.x = baies.tx * T + T / 2 + 40; poses.baiesOuest = nom(r.poseDe(v, def, immobile)); }
-  if (arbre) { v.gatherAt(arbre.tx, arbre.ty); v.x = arbre.tx * T + T / 2 - 40; v.y = arbre.ty * T + T / 2; poses.arbreEst = nom(r.poseDe(v, def, immobile)); }
-  if (or) { v.gatherAt(or.tx, or.ty); v.x = or.tx * T + T / 2 + 40; v.y = or.ty * T + T / 2; poses.orOuest = nom(r.poseDe(v, def, immobile)); }
+  if (arbre) { v.gatherAt(arbre.tx, arbre.ty); v.x = arbre.tx * T + T / 2 - 40; v.y = arbre.ty * T + T / 2; poses.arbreEst = nom(r.poseDe(v, def, immobile)); v.x = arbre.tx * T + T / 2 + 40; poses.arbreOuest = nom(r.poseDe(v, def, immobile)); }
+  if (or) { v.gatherAt(or.tx, or.ty); v.x = or.tx * T + T / 2 + 40; v.y = or.ty * T + T / 2; poses.orOuest = nom(r.poseDe(v, def, immobile)); v.x = or.tx * T + T / 2 - 40; poses.orEst = nom(r.poseDe(v, def, immobile)); }
+  // Une carcasse posée à côté : le maillet, tourné vers elle des deux côtés.
+  const libre = map.findOpenTile(Math.floor(v.x / T) + 3, Math.floor(v.y / T), 6);
+  const carcasse = libre && map.addResource(libre.tx, libre.ty, 'food', null, { amount: 140, gibier: 'deer' });
+  if (carcasse) {
+    v.gatherAt(carcasse.tx, carcasse.ty);
+    v.x = carcasse.tx * T + T / 2 - 40; v.y = carcasse.ty * T + T / 2; poses.carcasseEst = nom(r.poseDe(v, def, immobile));
+    v.x = carcasse.tx * T + T / 2 + 40; poses.carcasseOuest = nom(r.poseDe(v, def, immobile));
+    map.clearResource(carcasse.ty * map.w + carcasse.tx);
+  }
   v.stop(); poses.repos = nom(r.poseDe(v, def, immobile));
   poses.marche = nom(r.poseDe(v, def, marche));
   v.carry = { type: 'wood', amount: 8 }; v.facing = 0; poses.porteEst = nom(r.poseDe(v, def, marche)); v.facing = Math.PI; poses.porteOuest = nom(r.poseDe(v, def, marche));
@@ -974,7 +983,11 @@ check('la peau du villageois reste la même', !!villageois && villageois.peau > 
 check('aucun bleu franc ne subsiste côté adverse (villageois)', !!villageois && villageois.bleusRestants === 0, villageois && villageois.bleusRestants + ' pixels');
 const P = villageois ? villageois.poses : {};
 check('devant des baies, le villageois cueille, tourné vers elles', P.baiesEst === 'cueillir·miroir' && P.baiesOuest === 'cueillir', `à l’est : ${P.baiesEst} · à l’ouest : ${P.baiesOuest}`);
-check('devant un arbre il abat à la hache, devant l’or il pioche, tournés vers eux', P.arbreEst === 'bois' && P.orOuest === 'or', `arbre à l’est : ${P.arbreEst} · or à l’ouest : ${P.orOuest}`);
+check('devant un arbre il abat à la hache, devant l’or il pioche, tournés vers eux des deux côtés',
+  P.arbreEst === 'bois' && P.arbreOuest === 'bois·miroir' && P.orOuest === 'or' && P.orEst === 'or·miroir',
+  `arbre : ${P.arbreEst} / ${P.arbreOuest} · or : ${P.orOuest} / ${P.orEst}`);
+check('sur une carcasse, il travaille au maillet, tourné vers elle des deux côtés', P.carcasseEst === 'viande' && P.carcasseOuest === 'viande·miroir',
+  `carcasse à l’est : ${P.carcasseEst} · à l’ouest : ${P.carcasseOuest}`);
 check('chargé, il porte ; à l’arrêt, il se repose ; sinon il marche', P.porteEst === 'porter' && P.porteOuest === 'porter·miroir' && P.repos === 'repos' && P.marche === 'marche', JSON.stringify(P));
 check('sur un chantier, il construit, tourné vers lui', P.chantierOuest === 'construire·miroir', String(P.chantierOuest));
 
@@ -1013,7 +1026,7 @@ const cadenceVillageois = await page.evaluate(async () => {
 {
   const memes = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const deuxTours = (jouee, seq) => memes(jouee, [...seq, ...seq]);
-  check('de face et de dos, le villageois joue sa séquence de six pas, deux tours par double cycle',
+  check('de face et de dos, le villageois joue ses dix-huit images dans l’ordre, deux tours par double cycle',
     deuxTours(cadenceVillageois.sud, cadenceVillageois.attendueSud) && deuxTours(cadenceVillageois.nord, cadenceVillageois.attendueNord),
     `sud ${cadenceVillageois.sud.join('')} · nord ${cadenceVillageois.nord.join('')}`);
   check('de profil, il joue ses vingt-quatre images interpolées dans l’ordre, deux tours par double cycle',
@@ -1056,9 +1069,9 @@ const decorRivage = await page.evaluate(async () => {
 check('l’atlas du décor est chargé : près de cent pièces en seize classes', decorRivage.pret && decorRivage.pieces >= 90 && decorRivage.classes === 16, `${decorRivage.pieces} pièces, ${decorRivage.classes} classes`);
 check('la carte est décorée, et ça se voit', decorRivage.total > 0 && decorRivage.diff > 2000, `${decorRivage.total} pièces (${decorRivage.autour} autour du point de vue), ${decorRivage.diff} pixels changés`);
 
-// Le troupeau : cerf et cochon illustrés, trois rangées pour quatre
-// orientations (l'ouest est l'est retourné), des hardes sur la carte, et la
-// chasse au doigt.
+// Le troupeau : cerf et cochon illustrés, cinq rangées pour huit orientations
+// (les trois de l'ouest sont celles de l'est retournées), des hardes sur la
+// carte, et la chasse au doigt.
 const troupeau = await page.evaluate(async () => {
   const g = window.__jeu; const w = g.world;
   const mod = await import('./js/sprites.js');
@@ -1367,6 +1380,18 @@ const relecture = await page.evaluate(async () => {
   await attendre(300);
   const apres = g.renderer.troncons.get(cle);
   r.sol = { avant: !!avant, refait: !!apres && apres !== avant, terrain: `${terrain0} → ${w.map.terrain[i]}` };
+  // Une carcasse se dessine avec le profil de l'animal (la rangée « est » de
+  // son atlas) : un numéro de rangée fixe désignait la vue de trois quarts.
+  const mod = await import('./js/sprites.js');
+  const cerf = w.units.find((u) => u.type === 'deer' && !u.dead);
+  w.killEntity(cerf, null);
+  const carcasse = [...w.map.resources.values()].find((res) => res.gibier === 'deer');
+  const def = mod.spriteDe('deer').def;
+  const ctx = g.renderer.ctx, dessiner = ctx.drawImage;
+  let rangee = null;
+  ctx.drawImage = function (image, sx, sy, ...reste) { if (rangee === null) rangee = sy / def.cellH; return dessiner.call(this, image, sx, sy, ...reste); };
+  try { if (carcasse) g.renderer.dessinerCarcasse(carcasse); } finally { ctx.drawImage = dessiner; }
+  r.carcasse = { rangee, profil: def.lignes[mod.caseDirection(0, def.cases)] };
   g.setSelection([]);
   return r;
 });
@@ -1378,6 +1403,8 @@ check('la charge d’un villageois s’affiche avec l’icône de la ressource',
 check('le coin transparent de l’illustration du palais ne le sélectionne pas, ses dômes si', relecture.coin !== 'towncenter' && relecture.dome === 'towncenter',
   `coin : ${relecture.coin} · dômes : ${relecture.dome}`);
 check('un gisement d’or épuisé refait le sol en cache', relecture.sol.avant && relecture.sol.refait, JSON.stringify(relecture.sol));
+check('une carcasse se dessine avec le profil de l’animal', relecture.carcasse.rangee === relecture.carcasse.profil,
+  `rangée ${relecture.carcasse.rangee}, profil ${relecture.carcasse.profil}`);
 
 // Menu pause
 await page.evaluate(() => window.__jeu.togglePause());

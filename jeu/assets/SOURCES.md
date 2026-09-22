@@ -7,7 +7,7 @@
 | `defaite.webp` | Le chevalier à terre (dernière image de l'animation de mort) | idem |
 | `chevalier.webp` | Atlas des **huit orientations** du chevalier, style « peint » du milicien | idem |
 | `milicien-marche.webp` | Cycle de marche du chevalier, **huit orientations × huit images** (64 cases de 51×76), style « animé » du milicien | Planche de cycle de marche fournie par l'auteur du dépôt |
-| `cerf.webp` | Le **cerf** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en ordre de face et de dos | Planche générée par l'auteur du dépôt, fond noir dé-prémultiplié |
+| `cerf.webp` | Le **cerf** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en ordre de face, de dos et en trois quarts avant | Planche générée par l'auteur du dépôt, fond noir dé-prémultiplié |
 | `cochon.webp` | Le **cochon** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en balancier | Planche générée par l'auteur du dépôt, fond gris uni |
 | `decor.webp` | Le **décor de la carte** : 97 pièces — amas de rochers, rochers, roseaux, touffes sèches, pampas, touffes d'herbe, buissons fleuris, fougères, couvre-sol, agaves, nénuphars, fleurs en quatre couleurs, galets — de tailles diverses dans un atlas à 2×, table dans `js/decor-pieces.js` | Découpées dans les planches d'eau, la planche d'arbres et la planche d'ornements de l'auteur du dépôt (voir plus bas) |
 | `villageois.webp` | Le **villageois** : marche en quatre orientations dessinées (sud, nord, ouest, est ; en diagonale, la cardinale la plus proche), repos, cueillir, construire, porter, bûcheron, mineur, boucher ; 99×87 par case, pas intermédiaires interpolés | Marche et poses de la planche de l'auteur du dépôt (ChatGPT), outils d'une planche Gemini ; fond retiré par rembg (voir plus bas) |
@@ -15,8 +15,8 @@
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 316×315, dessinée sur 158 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
 | `sol-eau.webp` | La **nappe d'eau**, 384×384, redressée depuis un losange isométrique et raccordée bord à bord | Illustration « eau pleine » générée par l'auteur du dépôt |
-| `sol-herbe.webp`, `sol-herbe-sombre.webp`, `sol-terre.webp`, `sol-sable.webp` | Les quatre **nappes de sol** (herbe, herbe sombre, terre, sable), 384×384, raccordées bord à bord | Planche de six textures générée par l'auteur du dépôt ; deux (herbe sèche, terre sombre) restent en réserve |
-| `arbres.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux), 107×190 par case | Planche générée par l'auteur du dépôt, avec transparence ; ses six buissons fleuris ne sont pas utilisés — ils ne disaient pas « nourriture » |
+| `sol-herbe.webp`, `sol-herbe-sombre.webp`, `sol-terre.webp`, `sol-sable.webp` | Les quatre **nappes de sol** (herbe, herbe sombre, terre, sable) : l'herbe en 512×512, les trois autres en 384×384, raccordées bord à bord | Planche de six textures générée par l'auteur du dépôt ; deux (herbe sèche, terre sombre) restent en réserve |
+| `arbres.webp` | Six **arbres** (cyprès, sapin, chêne, arbre à frondaison turquoise, saule, arbre noueux), 107×190 par case | Planche générée par l'auteur du dépôt, avec transparence ; ses six buissons fleuris ne servent pas de nourriture — ils ne disaient pas « nourriture » — mais de buissons de décor (`decor.webp`) |
 | `baies.webp` | Le **buisson à baies** rouges et bleues sur son socle, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
 | `or.webp` | Le **gisement d'or** : rochers veinés d'or sur leur socle, 101×74 par case, l'originale et son miroir | Illustration générée par l'auteur du dépôt, avec transparence |
 | `maison.webp` | La **maison** : un dôme de cristal, un toit bleu, une échoppe, 216×186, dessinée sur 108 px pour une emprise de 64 | Illustration générée par l'auteur du dépôt, livrée avec sa transparence |
@@ -24,10 +24,18 @@
 | `moulin.webp`, `camp-bucherons.webp`, `camp-mineurs.webp`, `ferme.webp`, `tour-guet.webp` | Les cinq autres bâtiments **2×2** : ailes à voiles, billes et haches, galerie et wagonnet, potager et charrette de foin, tour au belvédère — 216 px de large, dessinés sur 108 | idem |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 
-Ces images viennent d'une planche de référence fournie par l'auteur du dépôt, qui
-en est l'auteur. Aucune image tierce n'est utilisée ici.
+Ces images viennent de planches générées par l'auteur du dépôt (dont ChatGPT et
+Gemini pour le villageois), qui en est l'auteur ; chacune est détaillée
+ci-dessous. Aucune image tierce n'est utilisée ici.
 
-Le fond en dégradé de la planche a été retiré en ajustant un plan sur l'anneau de
+Les scripts de fabrication cités plus bas (`peps.py`, `decoupe-batiment.py`,
+`textures-sol.py`, `fabrique-villageois-rife.py`, `decoupe-planche.py`…) ne sont
+pas versionnés dans ce dépôt : seuls leurs produits le sont — `assets/*.webp`
+et `js/decor-pieces.js`, générée par `fabrique-rivage.py`. Leurs noms restent
+cités pour suivre la chaîne de fabrication.
+
+Le fond en dégradé de la planche du chevalier (`heros`, `portrait-milicien`,
+`defaite`, `chevalier`) a été retiré en ajustant un plan sur l'anneau de
 bord de chaque découpe, puis en n'effaçant que les pixels *reliés au bord* : le
 contour sombre des personnages arrête la propagation, ce qui préserve l'armure
 grise — un simple seuil de couleur la mangeait.
@@ -153,12 +161,13 @@ matte est doux (anticrénelage conservé) et sans trou ; l'ombre portée peinte
 sous les pieds, qui appartenait au halo, n'est plus reprise — le socle aux
 couleurs du joueur tient ce rôle.
 
-Chaque image est posée au bas de sa case, centrée ; un villageois debout fait
-**40 px monde** (le chevalier : 44), atlas à 2× avec le même peps que les
+Chaque image est posée au bas de sa case, centrée ; chaque case est dessinée
+sur **40,5 px monde** de haut (le chevalier : 44) — un villageois debout y
+mesure 35 à 38 px —, atlas à un peu plus de 2× avec le même peps que les
 bâtiments : 440×688 avant interpolation (cases de 55×86), **99 Ko** ; 1320×688 et
 **226 Ko** avec les pas intermédiaires ; 2376×1044 et **324 Ko** avec le nord-est et les outils ; 2376×957 et **291 Ko** aujourd'hui, le nord-est retiré et les outils corrigés (voir plus bas). La couleur d'équipe est celle du chevalier —
 l'écharpe bleue bascule, la peau, le cuir et la chemise restent ; le test le
-vérifie sur 14 440 pixels de peau.
+vérifie sur 27 849 pixels de peau (14 440 sur le premier atlas).
 
 ### La cadence des pas
 
@@ -168,10 +177,12 @@ gauche et à droite), le villageois vu de face pose deux fois le pied droit
 puis **quatre fois le gauche** ; de dos, c'est à peine mieux. Plutôt que de
 redessiner, `cadence-pas.py` retient six des huit images et les remet dans
 l'ordre d'une vraie marche — neutre, droit, droit, neutre, gauche, gauche —
-en écartant les doublons. Le moteur joue ces `sequences` par rangée
-(`sprites.js`, `imageDeMarche`), toujours cadencées sur la distance
-parcourue ; de profil, la mesure ne distingue pas les pieds et la planche est
-jouée telle quelle. Le chevalier n'a pas d'image nette de chaque côté : rien
+en écartant les doublons. Cet ordre est désormais inscrit dans l'atlas avant
+l'interpolation : les `sequences` du villageois (`sprites.js`,
+`imageDeMarche`) jouent chaque rangée dans l'ordre — 18 images de face et de
+dos, 24 de profil —, toujours cadencées sur la distance parcourue. De profil,
+la mesure ne distingue pas les pieds : les huit images sont remises dans
+l'ordre le plus lisse (voir « Des pas intermédiaires »). Le chevalier n'a pas d'image nette de chaque côté : rien
 à remonter, il faudra une nouvelle planche.
 
 ### Les outils (planche Gemini n° 1), et le nord-est retiré
@@ -251,7 +262,8 @@ les miettes détachées sont effacées et les rangées de profil sont remises
 dans l'ordre le plus lisse (cycle de moindre écart entre images successives,
 départ pieds joints). Résultat : S et N 18 images, O et E 24, et la marche
 chargée (« porter ») 12 ; repos, cueillir et construire restent à quatre.
-Atlas 24 colonnes × 8 rangées de 55×86.
+Atlas, à cette étape, de 24 colonnes × 8 rangées de 55×86 ; avec les trois
+outils, 24 colonnes × 11 rangées de 99×87 (2376×957).
 
 ## L'éclaireur
 
@@ -274,16 +286,18 @@ l'est en miroir (`miroirs` dans l'atlas), soit huit orientations. Le cochon
 est sur fond gris uni, détouré par distance au fond (`decoupe-cochon8.py`) ;
 le cerf sur fond noir sans alpha : le noir est le fond, et les bords
 antialiasés — couleur × alpha sur noir — sont dé-prémultipliés
-(`decoupe-cerf8.py`), ce qui garde les sabots sombres. Ses pas ne s'alternaient pas :
+(`decoupe-cerf8.py`), ce qui garde les sabots sombres. Les pas du cochon ne s'alternaient pas :
 mesuré au contour bas de chaque silhouette (`pattes.py`, un sabot est un
 point bas local), de face les images lèvent le pied droit une fois et le
 gauche deux fois, de dos l'inverse, et en trois quarts la même jambe avant
 reste plantée sur les quatre images. Chaque rangée rejoue donc ses images
 en balancier (`sequences` : repos, un pied, repos, l'autre ; en trois quarts,
-l'aller-retour de la seule jambe qui bouge), sans saut — l'alternation
+l'aller-retour de la seule jambe qui bouge ; de profil, ses quatre images
+sont seulement remises dans l'ordre 0, 1, 3, 2), sans saut — l'alternation
 manquante des trois quarts, elle, ne peut venir que de la planche. Le cerf
-s'en tire mieux : de profil et en trois quarts ses quatre images font un
-vrai cycle ; de face il lève deux fois la même jambe (neutre, gauche,
+s'en tire mieux : de profil et en trois quarts arrière (nord-est), ses quatre
+images font un vrai cycle ; en trois quarts avant (sud-est), elles se jouent
+en aller-retour (0, 1, 2, 3, 2, 1) ; de face il lève deux fois la même jambe (neutre, gauche,
 neutre, droite), de dos il n'a pas de neutre (gauche, droite, gauche,
 droite). Le détourage laissait un
 liseré rouge et vert très saturé sur le pourtour (`decoupe-animaux.py`) : les
@@ -317,7 +331,7 @@ transparence fournie (renormalisée, le détourage automatique laissant un voile
 d'alpha).
 
 Le **peps** (`peps.py`), appliqué à tous les atlas — bâtiments, arbres, baies,
-or — après leur réduction : la réduction de 1254 à 150 px moyenne les pixels et
+or, puis villageois, éclaireur, animaux et décor — après leur réduction : la réduction de 1254 à 150 px moyenne les pixels et
 lisse les contrastes, et la première chaîne quantifiait à 64 couleurs, ce qui
 aplatissait les dégradés. Trois corrections légères, dans cet ordre : un
 masque flou (rayon 1,4, 55 %), +16 % de saturation, +10 % de contraste ; puis
@@ -325,7 +339,7 @@ un WebP avec pertes (qualité 86) dont l'alpha reste sans pertes. Avant de
 filtrer, la couleur des pixels opaques est étendue sous les pixels
 transparents voisins, sinon le masque flou aspire le fond retiré dans les
 bords. Le palais pèse 71 Ko, un 3×3 une cinquantaine, un 2×2 entre 23 et 33 :
-**490 Ko** pour les douze bâtiments.
+**491 Ko** pour les douze bâtiments.
 
 La couleur d'équipe suit la règle du chevalier animé — seule la fenêtre du bleu
 franc (200°–255°) bascule : dômes, toits, bannières et auvents passent au
@@ -337,7 +351,8 @@ pas. Un test le vérifie pixel à pixel pour chacun des douze.
 Les textures sont des **nappes continues**, pas des tuiles : une case d'herbe
 montre le morceau de nappe qui correspond à sa position dans le monde, et deux
 cases voisines montrent deux morceaux contigus — rien ne trahit la grille. La
-nappe se répète toutes les six cases (384 texels à 0,5 px monde par texel).
+nappe se répète toutes les six cases (384 texels à 0,5 px monde par texel) ;
+l'herbe, en 512 texels, toutes les huit (voir « Une herbe plus douce »).
 
 Générées, elles ne se raccordaient pas : écart de 70 à 120 niveaux entre le bord
 droit et le bord gauche, pour un grain de 14 à 19. Trois traitements, dans
@@ -355,8 +370,8 @@ l'ordre (`textures-sol.py`) :
    mi-période, mesurée à 15 niveaux au-dessus du bruit. À quatre images : 3.
 3. Un second aplatissement, le fondu réintroduisant un léger biais de bord.
 
-Réduites à 384 px et encodées en WebP avec pertes (qualité 72) : **149 Ko** pour
-les quatre. Les couleurs moyennes des nappes servent à la minimap et à la tuile
+Réduites à 384 px — 512 pour l'herbe, voir plus bas — et encodées en WebP avec
+pertes (qualité 72) : **138 Ko** pour les quatre, 155 Ko avec l'eau. Les couleurs moyennes des nappes servent à la minimap et à la tuile
 de secours affichée le temps du chargement.
 
 ### Une herbe plus douce
@@ -369,7 +384,7 @@ répétition, puis calmée (`herbe-douce.py`) : saturation ramenée à 0,50, un
 peu plus claire, moins de contraste, grain adouci d'un demi-pixel, teinte
 tirée d'un rien vers le vert froid. L'herbe sombre est le gazon assombri et
 désaturé. Une vraie texture peinte, dans le style des ornements, reste la
-cible : voir la demande faite à l'auteur.
+cible.
 
 ## L'eau, et ses bords
 
@@ -380,7 +395,7 @@ d'un carré par une transformation affine ajustée aux moindres carrés (résidu
 4 px en x, 20 en y : le losange n'est pas tout à fait un parallélogramme), le
 carré est rogné de 3 % — le bord du losange est dentelé —, réduit à 384 texels
 puis traité comme les autres nappes : aplatissement, raccord à quatre images
-(couture 36 → 5, pour un grain de 6). **16 Ko**.
+(couture 36 → 5, pour un grain de 6). **17 Ko**.
 
 L'eau n'est pas posée telle quelle : chaque rivage a ses **bords**, comme sur
 les planches de plage et de rivage. Le rendu (`render.js`, `RIVAGE`) classe
@@ -437,8 +452,9 @@ Le plantage est déterministe : un hachage de la case et de la graine décide
 de tout, la simulation n'en sait rien, et une partie reprise retrouve son
 décor. Chaque case de terre qui touche l'eau reçoit, au plus, un rocher (ou
 un amas, rare) vers l'eau, une touffe côté terre ou des roseaux les pieds
-dans l'eau, un à trois galets, une fleur ; les cases d'eau bordières des
-mares portent des nénuphars. Un **plan d'eau de 40 cases ou moins** est une
+dans l'eau, un à trois galets et — autour des mares seulement — une fleur ;
+une fougère s'ajoute parfois au bord d'une mare, une pampa sur une plage de
+lac ; les cases d'eau bordières des mares portent des nénuphars. Un **plan d'eau de 40 cases ou moins** est une
 mare, ceinte de rochers serrés, de roseaux et de nénuphars comme la planche
 « eau-mare » ; au-delà, un lac prend la plage de « eau-rivage » : rochers
 épars, galets, touffes. Partout ailleurs, la
@@ -465,11 +481,11 @@ la simple projection par colonnes agglomérait les arbres, dont les socles de
 rochers et les branches se touchent presque.
 
 Une seule échelle pour toute la planche, qui garde ses proportions : l'arbre
-le plus haut (le cyprès) fait **95 px monde**, soit trois cases, deux chevaliers ; les
-buissons tombent autour de 36 px, la taille d'une case. Chaque case d'atlas a
-son sprite posé au bas et centré : l'ancre est le bas de la case, le socle de
-rochers vient s'asseoir sur la case de la carte. Atlas à deux fois la taille
-dessinée, WebP avec pertes et transparence : **17 + 29 Ko**.
+le plus haut (le cyprès) fait **95 px monde**, soit trois cases, deux chevaliers.
+Chaque case d'atlas a son sprite posé au bas et centré : l'ancre est le bas de
+la case, le socle de rochers vient s'asseoir sur la case de la carte. Atlas à
+deux fois la taille dessinée, WebP avec pertes et transparence : **54 Ko** pour
+les six arbres (11 pour les baies, 10 pour l'or).
 
 En jeu, arbres et buissons sont plus hauts que leur case : ils sont classés
 dans l'**ordre du peintre** avec les unités et les bâtiments, au pied de leur
@@ -486,5 +502,6 @@ arbres ont été essayés pour la nourriture : jolis, mais ils ne disaient pas
 
 ## Format
 
-WebP partout où c'est possible : 1,1 Mo pour l'ensemble, contre bien plus d'un mégaoctet en
-PNG, sans différence visible à l'œil même agrandi trois fois.
+WebP partout où c'est possible — seul le lancier reste un PNG indexé de 4 Ko :
+1,6 Mo pour les 31 images, sans différence visible à l'œil même agrandi trois
+fois.

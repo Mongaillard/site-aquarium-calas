@@ -444,7 +444,7 @@ export class AIPlayer {
     }
   }
 
-  /** Ennemi présent dans la base ? (réaction plus ou moins rapide selon la difficulté) */
+  /** Ennemi présent dans la base (à moins de treize cases d'un de ses bâtiments) ? */
   findThreat() {
     const world = this.world;
     let best = null, bestD = Infinity;

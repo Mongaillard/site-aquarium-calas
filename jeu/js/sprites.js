@@ -64,7 +64,8 @@ const ATLAS = {
   miningcamp: batiment('assets/camp-mineurs.webp', 216, 187, 108),
   farm: batiment('assets/ferme.webp', 216, 176, 108),
   tower: batiment('assets/tour-guet.webp', 216, 313, 108),
-  // Végétation : six arbres et six buissons, sans couleur d'équipe. Chaque
+  // Végétation : six arbres, sans couleur d'équipe (les six buissons fleuris
+  // de la même planche sont devenus du décor, voir decor.webp). Chaque
   // case a son sprite posé au bas, centré : l'ancre est le bas de la case, et
   // la planche dicte les proportions — l'arbre le plus haut fait 95 px monde,
   // trois cases : un arbre doit dépasser une maison.
@@ -144,16 +145,18 @@ const ATLAS = {
     src: 'assets/decor.webp',
     pieces: PIECES_DECOR,
   },
-  // Les animaux : trois rangées (sud, est, nord) de quatre foulées ; l'ouest
-  // est l'est en miroir (`miroirs`). Pas de couleur d'équipe : un cochon
-  // capturé se reconnaît à son socle.
+  // Les animaux : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre
+  // foulées ; les trois secteurs de l'ouest reprennent celles de l'est en
+  // miroir (`miroirs`). Pas de couleur d'équipe : un cochon capturé se
+  // reconnaît à son socle.
   deer: {
     src: 'assets/cerf.webp',
     cellW: 82, cellH: 78, cases: 8, images: 4, cycle: 40,
     lignes: [0, 1, 2, 3, 4, 3, 2, 1], miroirs: [false, false, false, false, false, true, true, true],
     // De face, la planche lève deux fois la même jambe : neutre, gauche,
     // neutre, droite. De dos, jamais de neutre : gauche, droite, gauche,
-    // droite. Le profil et les trois quarts se jouent tels quels.
+    // droite. En trois quarts avant, un aller-retour ; le profil et les trois
+    // quarts arrière se jouent tels quels.
     sequences: { 0: [1, 0, 1, 2], 1: [0, 1, 2, 3, 2, 1], 2: [0, 1, 2, 3], 3: [0, 1, 2, 3], 4: [0, 1, 0, 2] },
     ancreY: 76, hauteurMonde: 39.0,
   },
@@ -437,7 +440,7 @@ export function cadreSource(def, direction, image) {
     : { sx: direction * def.cellW, sy: 0 };
 }
 
-/** Position d'une image d'une pose (repos, cueillir, construire, porter). */
+/** Position d'une image d'une pose (repos, cueillir, construire, porter, bois, or, viande). */
 export function poseSource(def, pose, image) {
   return { sx: image * def.cellW, sy: pose.ligne * def.cellH };
 }

@@ -324,19 +324,19 @@ export const DIFFICULTIES = {
   easy: {
     id: 'easy', name: 'Facile',
     gatherBonus: 0.8, maxVillagers: 14, armyTrigger: 5, armyStep: 3,
-    attackDelay: 260, reactionTime: 1.4,
+    attackDelay: 260,
     desc: 'L’IA se développe lentement et attaque tard.',
   },
   normal: {
     id: 'normal', name: 'Normal',
     gatherBonus: 1.0, maxVillagers: 20, armyTrigger: 6, armyStep: 4,
-    attackDelay: 150, reactionTime: 0.9,
+    attackDelay: 150,
     desc: 'Une partie équilibrée, comme une escarmouche classique.',
   },
   hard: {
     id: 'hard', name: 'Difficile',
     gatherBonus: 1.25, maxVillagers: 26, armyTrigger: 6, armyStep: 5,
-    attackDelay: 100, reactionTime: 0.5,
+    attackDelay: 100,
     desc: 'L’IA récolte plus vite et harcèle sans relâche.',
   },
 };

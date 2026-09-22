@@ -1,10 +1,10 @@
 # 🏰 Âge des Empires Mobile
 
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
-dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque,
-très peu d'images : ~7 800 lignes de JavaScript, du Canvas 2D, des
-pictogrammes vectoriels et 1,1 Mo d'illustrations et de textures — dont un cycle de marche
-complet.
+dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque :
+~9 800 lignes de JavaScript, du Canvas 2D, des pictogrammes vectoriels et 1,6 Mo
+d'illustrations et de textures — dont les cycles de marche du milicien, du
+villageois, de l'éclaireur, du cerf et du cochon.
 
 ## Lancer le jeu
 
@@ -23,7 +23,8 @@ Sur un téléphone : ouvrez l'URL, puis « Ajouter à l'écran d'accueil ». Le
 
 ## Formats de partie, vitesse et sauvegarde
 
-Trois réglages se choisissent sur l'écran d'accueil, avant de lancer la partie.
+Quatre réglages se choisissent sur l'écran d'accueil, avant de lancer la partie :
+le format, la difficulté, la taille de la carte et la vitesse de jeu.
 
 | Format | Durée | Ce qui change |
 | --- | --- | --- |
@@ -34,10 +35,10 @@ Le score d'une partie Express : *ressources récoltées + 10 par unité vivante 
 25 par bâtiment debout*. Il s'affiche sur l'écran de fin, et le compte à rebours
 remplace le chronomètre en haut de l'écran (il rougit dans la dernière minute).
 
-Mesuré sur huit parties IA contre IA : **toutes se terminent dans les dix
-minutes**, durée moyenne 9 min 21 s, dont deux par destruction du Centre-Ville
-(7 min 23 s et 7 min 29 s). Un joueur qui masse ses troupes finit plus vite
-encore.
+Mesuré sur huit parties IA contre IA (difficulté Normal) : **toutes se terminent
+dans les dix minutes**, durée moyenne 9 min 45 s, dont deux par destruction du
+Centre-Ville (8 min 40 s et 9 min 26 s). Un joueur qui masse ses troupes finit
+plus vite encore.
 
 La **vitesse de jeu** — Tranquille ×0,75, Normal, Rapide ×1,5, Blitz ×2 —
 multiplie le nombre de pas de simulation par seconde réelle. Elle se change
@@ -60,12 +61,12 @@ retour, l'écran d'accueil propose **Reprendre la partie** avec son format, son
 | Double tap sur une unité | Sélectionner toutes celles du même type à l'écran |
 | Appui long puis glisser | Sélection rectangulaire |
 | Toucher le sol / un arbre / un ennemi (avec une sélection) | Ordre contextuel : se déplacer, récolter, construire, attaquer |
-| Bouton 🏗️ puis toucher la carte | Poser un bâtiment |
-| Barre 👷 en bas | Voir qui fait quoi · toucher un métier pour sélectionner le groupe |
-| Pastilles ⚔️ 🛡️ 🧱 🕊️ | Attitude de combat de la sélection (voir plus bas) |
-| Bouton 🚪 puis un abri | Mettre la sélection à l'abri · 🔔 met tous les villageois à couvert |
+| Bouton **Construire** (marteau et clous) puis toucher la carte | Poser un bâtiment |
+| Barre des **ouvriers** en bas | Voir qui fait quoi · toucher un métier pour sélectionner le groupe |
+| Pastilles **Agressif · Défensif · Tenir · Passif** | Attitude de combat de la sélection (voir plus bas) |
+| Bouton **Abriter** (une porte) puis un abri | Mettre la sélection à l'abri · la **Cloche** met tous les villageois à couvert |
 | Toucher un chantier (villageois sélectionné) | L'y affecter — même geste que pour le bois ou la nourriture |
-| Bouton 👷 | Panneau d'affectation : − / + pour déplacer un ouvrier d'un poste à l'autre, **chantiers compris** |
+| Bouton **Ouvriers** (trois silhouettes) | Panneau d'affectation : − / + pour déplacer un ouvrier d'un poste à l'autre, **chantiers compris** |
 
 Le pointage est **tolérant** : inutile de viser au pixel près. Un appui à moins
 d'une case d'un ennemi, d'un arbre ou d'un filon vise la bonne cible. Et quand
@@ -85,10 +86,10 @@ sélection :
 
 | Attitude | Comportement |
 | --- | --- |
-| ⚔️ **Agressif** | Engage tout ennemi en vue et le poursuit jusqu'à 9 cases de son poste |
-| 🛡️ **Défensif** | Engage ce qui approche, ne s'éloigne pas de plus de 4 cases, puis revient |
-| 🧱 **Position tenue** | Ne bouge jamais : ne frappe que ce qui entre à portée d'arme |
-| 🕊️ **Sans attaque** | N'attaque jamais de sa propre initiative |
+| **Agressif** | Engage tout ennemi en vue et le poursuit jusqu'à 9 cases de son poste |
+| **Défensif** | Engage ce qui approche, ne s'éloigne pas de plus de 4 cases, puis revient |
+| **Position tenue** | Ne bouge jamais : ne frappe que ce qui entre à portée d'arme |
+| **Sans attaque** | N'attaque jamais de sa propre initiative |
 
 Les soldats démarrent en *agressif*, les villageois en *sans attaque* — mais un
 villageois rend les coups à un autre villageois, comme dans AoE.
@@ -102,11 +103,12 @@ lui, est suivi sans limite.
 villageois, fantassins et archers. À l'intérieur, les unités sont hors d'atteinte
 et se soignent, et **chaque occupant ajoute une flèche** à la salve du bâtiment :
 un Centre-Ville vide ne tire pas, un Centre-Ville plein est une forteresse. Si le
-bâtiment tombe, la garnison périt avec lui. Le bouton **🔔 cloche du village**
+bâtiment tombe, la garnison périt avec lui. Le bouton **Cloche**
 envoie tous les villageois s'abriter d'un coup ; un second coup renvoie chacun à
 son poste — le gisement, la ferme ou le chantier qu'il avait quitté —, y compris
-ceux qui couraient encore vers l'abri. Pour abriter une sélection précise, le bouton **🚪 Abriter** puis un
-appui sur le refuge (des soldats se réfugient d'un simple appui sur l'abri).
+ceux qui couraient encore vers l'abri. Pour abriter une sélection précise, le
+bouton **Abriter** puis un appui sur le refuge (des soldats se réfugient d'un
+simple appui sur l'abri).
 
 **Déplacement en groupe.** Une armée avance au rythme de son unité la plus
 lente : un bélier ne se fait plus distancer par les éclaireurs. Un ordre donné à
@@ -168,10 +170,11 @@ chantier et dans le panneau de sélection.
 le villageois, puis le chantier. Trois chemins mènent au même résultat :
 
 - **au doigt** : sélection (un villageois ou dix), puis appui sur le chantier ;
-- **par la barre 👷** : la ligne *🏗️ Chantiers* a ses **− / +** comme le bois ou
-  la nourriture. Le **+** prend un inactif en priorité, sinon quelqu'un du métier
-  le plus fourni, et l'envoie sur le chantier **qui manque le plus de bras** ;
-- **par le chantier** : sélectionnez-le, puis **👷 +1 ouvrier**.
+- **par la barre des ouvriers** : la ligne *Chantiers* a ses **− / +** comme le
+  bois ou la nourriture. Le **+** prend un inactif en priorité, sinon un
+  villageois en chemin, sinon quelqu'un du métier le plus fourni, et l'envoie
+  sur le chantier **qui manque le plus de bras** ;
+- **par le chantier** : sélectionnez-le, puis **+1 ouvrier**.
 
 Un double tap sur un chantier le sélectionne sans y envoyer personne (pour
 suivre l'avancement ou annuler). Et le **−** de la ligne *Chantiers* retire un
@@ -194,23 +197,25 @@ libres.
 
 Le jeu ne réaffecte **jamais** vos villageois à votre place. Quand un arbre, un
 buisson ou un filon s'épuise, le villageois rapporte son chargement à l'entrepôt
-puis attend vos ordres : le compteur 💤 de la barre 👷 s'allume et une
+puis attend vos ordres : le compteur des inactifs de la barre des ouvriers s'allume et une
 notification vous prévient. De même, une ferme épuisée n'est pas replantée
 d'office, et changer un ouvrier de métier ne jette jamais ce qu'il porte — il
 passe d'abord livrer.
 
 Si vous préférez le confort à la maîtrise, l'option **Réaffectation
-automatique** (panneau 👷) rend la main au jeu : le villageois repart seul sur
+automatique** (panneau des ouvriers) rend la main au jeu : le villageois repart seul sur
 le gisement suivant. Le réglage est conservé d'une partie à l'autre. L'IA
 adverse, elle, joue toujours avec l'automatisme.
 
 Souris : clic gauche pour sélectionner ou tracer un rectangle, clic droit pour
-donner un ordre, molette pour zoomer, `WASD`/flèches pour la vue, `Échap` pour
-annuler, `.` pour trouver un villageois inactif, `H` pour revenir au Centre-Ville.
+donner un ordre, molette pour zoomer, `WASD`, `ZQSD` ou les flèches pour la vue,
+`Échap` pour annuler, `Suppr` pour supprimer la sélection (un chantier est
+annulé et remboursé), `Espace` pour la pause, `.` pour trouver un villageois
+inactif, `H` pour revenir au Centre-Ville.
 
 ## Le jeu
 
-- **3 ressources** : 🍖 nourriture (buissons, fermes), 🪵 bois (forêts), 🪙 or (filons).
+- **3 ressources** : nourriture (buissons à baies, fermes, chasse au cerf, cochons), bois (forêts), or (filons).
 - **3 âges** : Âge Sombre → Âge Féodal → Âge des Châteaux, chacun débloquant
   bâtiments, unités et technologies.
 - **7 unités** : villageois, milicien, lancier, archer, éclaireur, cavalier, bélier.
@@ -232,12 +237,14 @@ annuler, `.` pour trouver un villageois inactif, `H` pour revenir au Centre-Vill
 
 ### L'IA adverse
 
-Trois difficultés, qui ne trichent pas sur les ressources (seule la vitesse de
-récolte et l'agressivité changent). L'IA suit un ordre de construction, répartit
+Trois difficultés, qui ne trichent pas sur les ressources : seuls changent la
+vitesse de récolte de l'IA (×0,8, ×1, ×1,25), le nombre de ses villageois (14,
+20 ou 26) et son agressivité. L'IA suit un ordre de construction, répartit
 ses villageois selon des quotas par ressource, met de côté le coût du prochain
 âge, remplace ses fermes épuisées, défend sa base quand elle est attaquée et
 lance des vagues d'assaut de plus en plus grosses. Première offensive typique :
-7 à 11 minutes.
+9 à 13 minutes en Normal, parfois bien plus tard ; en Express, dès la deuxième
+minute.
 
 ## Architecture
 
@@ -246,25 +253,34 @@ jeu/
 ├── index.html            page unique
 ├── css/jeu.css           interface (DOM), pensée « pouce d'abord »
 ├── js/
-│   ├── config.js         toutes les données de jeu et l'équilibrage
-│   ├── utils.js          maths, RNG déterministe, tas binaire, grille spatiale
+│   ├── config.js         données de jeu et équilibrage
+│   ├── utils.js          maths, RNG déterministe, tas binaire, grille spatiale, bruit
 │   ├── map.js            génération procédurale, terrain, ressources, blocage
-│   ├── pathfinding.js    A* 8 directions, lissage, budget de nœuds
-│   ├── entities.js       unités (machine à états), bâtiments, projectiles
-│   ├── game.js           le monde : ordres, économie, combat, brouillard, victoire
+│   ├── pathfinding.js    A* 8 directions, budget de nœuds (le lissage se fait en marchant)
+│   ├── entities.js       unités (machine à états), animaux, bâtiments, projectiles
+│   ├── game.js           le monde : ordres, économie, combat, troupeau, brouillard, victoire
 │   ├── ai.js             l'adversaire
-│   ├── render.js         Canvas 2D : terrain, entités, brouillard, minimap
+│   ├── save.js           sauvegarde et reprise
+│   ├── render.js         Canvas 2D : sol en tronçons, entités, brouillard, minimap
+│   ├── sprites.js        atlas d'illustrations, couleur d'équipe, textures de sol
+│   ├── decor.js          plantation du décor (rivages, campagne)
+│   ├── decor-pieces.js   table des pièces de decor.webp (générée)
+│   ├── icones.js         pictogrammes vectoriels (game-icons.net)
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons générés à la volée (Web Audio)
 │   └── main.js           écrans et boucle de jeu
+├── assets/               illustrations et textures (voir assets/SOURCES.md)
+├── icons/                icônes de l'application
 ├── test/                 tests (voir plus bas)
+├── package.json          scripts, Playwright en dépendance de développement
 ├── manifest.webmanifest  installation sur l'écran d'accueil
 └── sw.js                 cache hors ligne
 ```
 
 Choix structurant : **la simulation ne dépend pas du navigateur**. `config`,
-`utils`, `map`, `pathfinding`, `entities`, `game` et `ai` tournent tels quels
+`utils`, `map`, `pathfinding`, `entities`, `game`, `ai` et `save` — ainsi que
+`decor` et `decor-pieces`, que le test headless vérifie — tournent tels quels
 sous Node, ce qui permet de tester des parties entières sans rendu.
 
 La boucle est à **pas fixe** (20 ticks/s) avec rattrapage plafonné ; le rendu
@@ -275,19 +291,28 @@ chemin sont mises en file avec un budget par tick pour éviter les à-coups.
 
 ```bash
 cd jeu
-npm test              # simulation headless : deux IA jouent 16 minutes, sauvegarde comprise
-npm run test:navigateur   # Chromium (Playwright) : chargement, gestes, rendu, FPS
+npm test                  # simulation headless : 188 vérifications — deux IA jouent 16 minutes, sauvegarde comprise
+npm run test:navigateur   # Chromium (Playwright) : 181 vérifications — chargement, gestes, rendu, images/s
 ```
 
 Le test headless vérifie que l'économie tourne, que les âges sont atteints, que
-des combats ont lieu et que l'état reste cohérent. Le test navigateur vérifie
-qu'il n'y a aucune erreur console, que le rendu tient 30+ images/s, et que les
-gestes (sélection, ordre, pose de bâtiment, zoom) répondent.
+des combats ont lieu et que l'état reste cohérent, puis chaque attitude, la
+garnison et la cloche, la répartition des groupes, la file et l'affectation des
+chantiers, la sauvegarde et la reprise à l'identique, le mode Express, le
+déplacement, la récolte collée au gisement, le décor et le troupeau. Le test
+navigateur vérifie qu'il n'y a aucune erreur console, que le rendu tient 30+
+images/s, que les gestes (sélection, ordre, pose de bâtiment, zoom, appui long)
+répondent, et contrôle les illustrations, la recoloration d'équipe, le sol, le
+rivage et le décor.
+
+Chaque bug corrigé garde son test : ceux de la relecture de septembre ont chacun
+une vérification écrite à partir du script qui l'a reproduit, qui échoue sur le
+code d'avant et passe après.
 
 ## Le troupeau
 
-Des **hardes** vivent sur la carte : quatre **cochons** à sept ou huit cases de
-chaque Centre-Ville, et des hardes de **cerfs** loin des bases. Ils pâturent
+Des **hardes** vivent sur la carte : trois ou quatre **cochons** à six à neuf
+cases de chaque Centre-Ville, et des hardes de **cerfs** loin des bases. Ils pâturent
 autour de leur point d'attache, ne comptent pas dans la population et ne sont
 la cible de personne d'eux-mêmes — les soldats les ignorent.
 
@@ -296,12 +321,12 @@ la cible de personne d'eux-mêmes — les soldats les ignorent.
   Abattu, il laisse une **carcasse** de 140 de nourriture, qui ne bloque pas le
   passage ; le chasseur la dépèce sans nouvel ordre et rapporte la viande au
   dépôt le plus proche.
-- **Le cochon se capture** : un villageois qui passe à moins de deux cases le
-  fait sien. Il cesse alors d'errer, se sélectionne et se mène au doigt comme
+- **Le cochon se capture** : une unité — villageois ou soldat — qui passe à
+  moins de 1,6 case le fait sien. Il cesse alors d'errer, se sélectionne et se mène au doigt comme
   une unité ; menez-le au village, puis touchez-le avec un villageois pour
   l'abattre — 100 de nourriture. Les unités adverses peuvent capturer les
-  vôtres de la même façon, tant qu'aucune de vos unités ne se tient à côté pour
-  le garder.
+  vôtres de la même façon, si aucune des vôtres ne se tient à moins de 1,6 case
+  pour le garder.
 
 Un ordre donné *à côté* d'un animal reste un ordre de déplacement : seul un
 doigt posé sur la bête déclenche la chasse.
@@ -320,11 +345,14 @@ n'avait pas la même tête sur un Samsung et sur un iPhone.
 couleur vient du texte qui les porte. Les auteurs sont cités dans l'écran
 **Crédits**, accessible depuis le menu de pause — c'est ce que la licence exige.
 
-Les **illustrations** (`assets/`, 205 Ko, plus 149 Ko de textures de sol) viennent de planches de personnage
-fournies par l'auteur du dépôt : le chevalier de l'écran d'accueil,
-le portrait du milicien dans le panneau de sélection, et le chevalier à terre
-de l'écran de défaite. Le portrait de l'adversaire est le même fichier, passé
-en rouge par rotation de teinte — plutôt qu'une seconde image à télécharger.
+Les **illustrations** (`assets/`, 26 fichiers, 1 445 Ko, plus 155 Ko de textures
+de sol et d'eau) viennent de planches générées par l'auteur du dépôt —
+personnages, bâtiments, arbres, eau, ornements, animaux —, détaillées dans
+`assets/SOURCES.md`. L'interface en reprend trois : le chevalier de l'écran
+d'accueil, le portrait du milicien dans le panneau de sélection, et le chevalier
+à terre de l'écran de défaite. Le portrait de l'adversaire est le même fichier,
+passé en rouge par rotation de teinte — plutôt qu'une seconde image à
+télécharger.
 
 Le choix des icônes a été fait sur mesure : une icône doit tenir **à 24 px en
 une seule couleur**, et deux concepts voisins ne doivent pas se ressembler.
@@ -366,14 +394,18 @@ condamner la case. Le point choisi est sauvegardé avec l'unité : une partie
 reprise le garde.
 
 **Le villageois travaille pour de vrai** (`villageois.webp`, 291 Ko) : quatre
-orientations de marche dessinées (en diagonale, la cardinale la plus proche), et sept poses — repos,
-cueillir, construire, porter. La pose suit l'état de la simulation : devant des
-baies ou une ferme il cueille, devant un arbre, un gisement, un chantier ou un
-ennemi il frappe, en chemin avec sa charge il la porte, à l'arrêt il souffle.
-Les poses sont dessinées d'un seul côté et retournées en miroir quand la cible
-est de l'autre ; elles se cadencent sur l'horloge, décalées par unité pour que
-dix bûcherons ne frappent pas en chœur, et le port suit la distance comme la
-marche.
+orientations de marche dessinées (en diagonale, la cardinale la plus proche) et
+sept poses — repos, cueillir, construire, porter, bûcheron, mineur, boucher. La
+pose suit l'état de la simulation et l'outil suit le gisement : devant des baies
+ou une ferme il cueille, devant un arbre il abat à la hache, devant l'or il
+pioche, sur une carcasse il travaille au maillet, devant un chantier ou un
+ennemi il frappe au marteau, en chemin avec sa charge il la porte, à l'arrêt il
+souffle. Les poses sont dessinées d'un seul côté et retournées en miroir quand
+la cible est de l'autre ; elles se cadencent sur l'horloge, décalées par unité
+pour que dix bûcherons ne frappent pas en chœur, et le port suit la distance
+comme la marche. Une rangée de marche nord-est, tirée d'une planche Gemini, a
+été essayée puis retirée : ses dessins mêlaient vue de face et vue de dos (voir
+`assets/SOURCES.md`).
 
 **L'éclaireur galope** (`eclaireur.webp`, 145 Ko) : huit orientations × quatre
 foulées d'un cavalier à la lance, la planche lue du nord dans le sens horaire
@@ -387,8 +419,10 @@ la foulée suit la distance, comme toutes les marches.
 | **Animé** (par défaut) | `milicien-marche.webp`, 8 images par direction | Le mouvement se lit : on voit qui avance, qui est bloqué |
 | **Peint** | `chevalier.webp`, une pose par direction | Le détail de l'armure, au prix d'une silhouette figée |
 
-Le choix est retenu d'un lancement à l'autre, et l'atlas de l'autre style n'est
-téléchargé que si on le demande — inutile de payer les deux. Le verdict à
+Le choix est retenu d'un lancement à l'autre. Sans service worker, l'atlas
+peint n'est téléchargé que si on choisit ce style — l'animé, style par défaut,
+l'est toujours ; une fois le jeu installé, le service worker garde les deux pour
+le hors-ligne (107 Ko à eux deux). Le verdict à
 l'écran est net : **la marche dessinée l'emporte**. À la taille d'une unité, ce
 qui se lit n'est pas le détail d'un personnage mais son mouvement ; la peinture
 réduite devient une tache sombre. Elle garde sa place là où elle est vue en
@@ -396,7 +430,7 @@ grand — accueil, portrait, écran de fin.
 
 ### Douze bâtiments illustrés, un palais en tête
 
-Tous les bâtiments portent une illustration (`assets/*.webp`, 490 Ko pour les
+Tous les bâtiments portent une illustration (`assets/*.webp`, 491 Ko pour les
 douze) : un palais à dômes bleus pour le Centre-Ville, une forteresse pour la
 caserne, puis archerie, écurie, atelier de siège, forge, maison, moulin, camp de
 bûcherons, camp minier, ferme et tour de guet — même cité, même vue de trois
@@ -430,8 +464,8 @@ arbre dépasse une maison. La chaîne est décrite dans `assets/SOURCES.md`.
 
 ### Le sol est une nappe, pas un damier
 
-Quatre textures de sol (`assets/sol-*.webp`, 149 Ko) — herbe, herbe sombre,
-terre, sable — et une nappe d'eau dessinée au chargement. Elles sont traitées
+Cinq textures de sol (`assets/sol-*.webp`, 155 Ko) — herbe, herbe sombre,
+terre, sable et eau. Elles sont traitées
 comme des **nappes continues** : chaque case montre le morceau de nappe qui
 correspond à sa position dans le monde, si bien que deux cases voisines se
 prolongent sans couture et que rien ne trahit la grille.
@@ -474,13 +508,16 @@ fleurs, buissons et couvre-sol sur les prés ; cailloux, agaves, pampas et touff
 sèches sur la terre et le sable ; fougères et un peu plus de tout au pied des
 forêts. Tout se déduit de la carte par un
 hachage de la case et de la graine — la simulation n'en sait rien, une unité
-traverse un rocher, et une partie reprise retrouve son décor. Rochers, roseaux,
-buissons, fougères et agaves entrent dans l'ordre du peintre avec les unités ; le
-reste est cuit dans les tronçons de sol mis en cache, et ne coûte rien à chaque
+traverse un rocher, et une partie reprise retrouve son décor. Rochers, amas,
+roseaux, buissons, fougères, agaves et pampas entrent dans l'ordre du peintre
+avec les unités ; le reste — galets, nénuphars, fleurs, touffes, couvre-sol —
+est cuit dans les tronçons de sol mis en cache, et ne coûte rien à chaque
 image.
 
 Le sol est **pré-rendu par tronçons** de 8×8 cases dans des canvas hors écran
-mis en cache (le terrain ne change jamais, le brouillard se peint par-dessus) :
+mis en cache (le terrain ne change presque jamais — un gisement d'or épuisé
+laisse de la terre, et les tronçons qui couvrent la case sont refaits —, le
+brouillard se peint par-dessus) :
 une image affiche une dizaine de tronçons au lieu de trois cents cases et
 d'autant de compositions — c'était 48 images par seconde en direct, c'est 60 en
 cache, et 57 pendant un défilement continu qui rend dix tronçons frais par
@@ -498,10 +535,10 @@ en jeu, mesurée puis éliminée.
 Six essences d'arbres, un buisson à baies et un gisement d'or
 (`assets/arbres.webp`, `baies.webp`, `or.webp`), à une seule échelle qui garde
 les proportions des planches : le cyprès fait deux chevaliers, un buisson
-ou un rocher tient dans sa case. Plus hauts que leur case, ils entrent dans l'**ordre du peintre** avec les
+ou un rocher d'or déborde à peine de sa case. Plus hauts que leur case, ils entrent dans l'**ordre du peintre** avec les
 unités et les bâtiments : une unité passe derrière un arbre quand elle est
 derrière, devant quand elle est devant. Un gisement qui s'épuise rapetisse un
-peu — de loin, on voit ce qu'il reste. Le gisement d'or (`or.webp`, 9 Ko) suit
+peu — de loin, on voit ce qu'il reste. Le gisement d'or (`or.webp`, 10 Ko) suit
 la même voie : une illustration et son miroir, avec une pointe de variation de
 taille par case pour qu'un filon ne soit pas une frise.
 
@@ -540,15 +577,20 @@ jamais dans la simulation — une partie rejouée à la même graine reste ident
 
 Presque tout l'équilibrage est dans `js/config.js` : coûts, temps, points de vie,
 armures, bonus de dégâts, taux de récolte, coûts des âges, paramètres de
-difficulté, tailles de carte, **formats de partie** (`GAME_MODES`) et **vitesses**
-(`GAME_SPEEDS`). Changer une valeur suffit, rien n'est codé en dur ailleurs.
+difficulté, tailles de carte, animaux, **formats de partie** (`GAME_MODES`) et
+**vitesses** (`GAME_SPEEDS`). Restent codés ailleurs : l'effet des technologies
+(`game.js`, `applyTech`), la taille et la distance des hardes (`game.js`,
+`spawnHerds`), le rayon de capture d'un cochon (`entities.js`), le barème du
+score (`game.js`, `score`) et le rythme des vagues de l'IA (`ai.js`).
 
 ## La sauvegarde, en deux mots
 
 `js/save.js` ne stocke **pas la carte** : il stocke sa *graine*. La génération
 étant déterministe, il suffit de rejouer ce qui a changé depuis — les gisements
-épuisés et ce qu'il reste dans les autres. Le reste (joueurs, unités, bâtiments,
-flèches en vol, IA, brouillard exploré, état du générateur aléatoire, minuteries
+épuisés, ce qu'il reste dans les autres, ceux marqués injoignables et les
+carcasses nées en cours de partie. Le reste (joueurs, unités et animaux avec
+leur pâture, bâtiments et ralliements, flèches en vol, IA, brouillard exploré,
+file des demandes de trajet, état des générateurs aléatoires, minuteries
 internes) est repris champ par champ.
 
 C'est exigeant, et c'est vérifié comme tel : le test compare une partie qui
@@ -557,6 +599,7 @@ restent **rigoureusement identiques** 60 secondes plus tard — positions au
 centième de pixel, points de vie, contenu des gisements, décisions de l'IA. Un
 seul champ oublié fait diverger les deux parties et échouer le test.
 
-Une sauvegarde fait une centaine de kilo-octets et vit dans `localStorage`, sous
-la clé `aem.partie`. Un numéro de version accompagne le format : une sauvegarde
+Une sauvegarde fait quelques dizaines de kilo-octets en début de partie, 150 Ko
+environ après un quart d'heure, et vit dans `localStorage`, sous la clé
+`aem.partie`. Un numéro de version accompagne le format : une sauvegarde
 plus ancienne est refusée plutôt que relue de travers.

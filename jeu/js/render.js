@@ -1,8 +1,9 @@
 // ---------------------------------------------------------------------------
 // Rendu Canvas 2D : terrain, ressources, entités, brouillard, minimap.
-// Terrain, bâtiments et unités sont dessinés au code (atlas de tuiles généré au
-// démarrage) ; les pictogrammes sont des tracés vectoriels (voir icones.js).
-// Aucune image bitmap n'entre ici, ce qui garde le rendu net à tout zoom.
+// Le sol, les bâtiments, les unités, la végétation et le décor viennent des
+// atlas d'illustrations (voir sprites.js) ; une unité sans illustration, ou
+// dont l'atlas n'est pas encore là, garde un dessin au code. Les pictogrammes
+// sont des tracés vectoriels (voir icones.js).
 // ---------------------------------------------------------------------------
 
 import { TILE, BUILDING_TYPES } from './config.js';
@@ -647,10 +648,10 @@ export class Renderer {
   }
 
   /**
-   * Les ressources. L'or, plat, se dessine ici, sous tout le reste. Arbres et
-   * buissons illustrés sont plus hauts que leur case : ils entrent dans l'ordre
-   * du peintre avec les unités et les bâtiments (voir drawEntities), et ne
-   * passent par ici que si leur atlas manque.
+   * Les ressources posées à plat : les carcasses, et le dessin au code des
+   * arbres, buissons et gisements dont l'atlas manque. Illustrés, ils sont plus
+   * hauts que leur case et entrent dans l'ordre du peintre avec les unités et
+   * les bâtiments (voir drawEntities).
    */
   drawResources(view) {
     const map = this.world.map;
@@ -737,7 +738,11 @@ export class Renderer {
     ctx.translate(cx, cy);
     ctx.rotate(res.variant % 2 ? Math.PI / 2 : -Math.PI / 2);
     ctx.globalAlpha = 0.92;
-    ctx.drawImage(sprite.variantes.bleu, 0, cellH, cellW, cellH, -w / 2, -h / 2, w, h);
+    // Le profil, lu dans la table des rangées de l'atlas (secteur est) : un
+    // numéro de rangée fixe désignait la vue de trois quarts depuis que les
+    // planches des animaux ont cinq rangées.
+    const ligne = sprite.def.lignes ? sprite.def.lignes[caseDirection(0, sprite.def.cases)] : 1;
+    ctx.drawImage(sprite.variantes.bleu, 0, ligne * cellH, cellW, cellH, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
 

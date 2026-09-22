@@ -696,7 +696,7 @@ export class UI {
         <li><b>Affecter quelqu'un à un chantier</b> : touchez un villageois, puis touchez le chantier — le même geste que pour l'envoyer au bois ou à la nourriture. La ligne <b>${ic('chantier')} Chantiers</b> de la barre <b>${ic('ouvriers')} Ouvriers</b> fait pareil avec ses <b>+ / −</b>, et un chantier sélectionné a son bouton <b>${ic('ouvriers')} +1 ouvrier</b>. (Double tap sur un chantier pour le sélectionner sans y envoyer personne.)</li>
         <li>Les villageois récoltent ${ic('food')} nourriture, ${ic('wood')} bois et ${ic('gold')} or ; il faut des <b>maisons</b> pour agrandir la population</li>
         <li><b>Attitudes</b> (unité sélectionnée) : ${ic('aggressive')} agressif poursuit loin, ${ic('defensive')} défensif revient à son poste, ${ic('standGround')} position tenue ne bouge pas, ${ic('passive')} sans attaque ignore l'ennemi</li>
-        <li><b>Garnison</b> : touchez votre Centre-Ville ou une tour avec des unités sélectionnées pour les abriter — elles s'y soignent et chaque occupant ajoute une flèche. La <b>${ic('cloche')} cloche</b> y envoie tous les villageois d'un coup</li>
+        <li><b>Garnison</b> : des soldats sélectionnés s'abritent d'un appui sur votre Centre-Ville ou une tour ; des villageois, par le bouton <b>${ic('garrison')} Abriter</b> puis l'abri. Les occupants s'y soignent et chacun ajoute une flèche. La <b>${ic('cloche')} cloche</b> y envoie tous les villageois d'un coup ; un second coup renvoie chacun à son poste</li>
         <li><b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le villageois rapporte son chargement puis attend vos ordres. La barre <b>${ic('ouvriers')} Ouvriers</b> montre qui fait quoi et permet de réaffecter d'un doigt</li>
         <li>Passez les <b>âges</b> depuis le Centre-Ville pour débloquer de nouvelles unités</li>
         <li><b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil</li>
@@ -721,10 +721,9 @@ export class UI {
         <li><b>Icônes</b> — <a href="${l.url}" target="_blank" rel="noopener">${l.source}</a>,
           sous licence <a href="${l.licenceUrl}" target="_blank" rel="noopener">${l.licence}</a>.
           <small class="credits-auteurs">${l.auteurs.join(' · ')}</small></li>
-        <li><b>Illustrations</b> (chevalier de l'accueil, portrait, écran de fin) — générées
-          par l'auteur du jeu, découpées et détourées pour l'interface.</li>
-        <li><b>Terrain, bâtiments, unités, sons</b> — dessinés et synthétisés au code,
-          sans aucune image ni fichier audio.</li>
+        <li><b>Illustrations</b> (personnages, bâtiments, arbres, décor, textures de sol et
+          d'eau) — générées par l'auteur du jeu, puis découpées et détourées pour le jeu.</li>
+        <li><b>Sons</b> — synthétisés au code, sans fichier audio.</li>
         <li><b>Jeu</b> — inspiré des principes d'Age of Empires, sans en reprendre
           aucun contenu : marques, ressources graphiques et sonores appartiennent
           à leurs propriétaires respectifs.</li>

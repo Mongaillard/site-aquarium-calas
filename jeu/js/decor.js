@@ -25,8 +25,8 @@ export const STYLE = { LAC: 0, MARE: 1 };
  * Les classes CUITES dans le sol : peintes une fois dans les tronçons de sol
  * mis en cache, sous tout le reste — galets, nénuphars, fleurs, touffes
  * d'herbe et couvre-sol, assez bas pour ne pas réclamer l'ordre du peintre.
- * Les autres (rochers, amas, roseaux, buissons, fougères, agaves) sont
- * DEBOUT : classées avec les unités à chaque image.
+ * Les autres (rochers, amas, roseaux, buissons, fougères, agaves, pampas)
+ * sont DEBOUT : classées avec les unités à chaque image.
  */
 export const CUITES = new Set(['galet', 'nenuphar', 'fleurBleu', 'fleurJaune', 'fleurRose', 'fleurBlanc', 'herbe', 'touffe', 'couvre']);
 const FLEURS = ['fleurBleu', 'fleurJaune', 'fleurRose', 'fleurBlanc'];
