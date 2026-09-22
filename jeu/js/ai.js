@@ -5,7 +5,7 @@
 //   3. militaire  : composition d'armée, défense de la base, vagues d'attaque
 // ---------------------------------------------------------------------------
 
-import { TILE, BUILDING_TYPES, UNIT_TYPES, POP_MAX, AGES } from './config.js';
+import { TILE, BUILDING_TYPES, UNIT_TYPES, AGES } from './config.js';
 import { dist2, canAfford, RNG } from './utils.js';
 import { STATE, villagerTask } from './entities.js';
 
@@ -212,7 +212,9 @@ export class AIPlayer {
   nextBuilding() {
     const player = this.player;
     const popRoom = player.popCap - player.pop;
-    if (popRoom <= 3 && player.popCap < POP_MAX) return 'house';
+    // Le plafond du format de partie (40 en Express), pas celui du Classique.
+    const popMax = this.world.popMax;
+    if (popRoom <= 3 && player.popCap < popMax) return 'house';
     if (!this.has('lumbercamp') && this.villagers.length >= 4) return 'lumbercamp';
     if (!this.has('mill') && this.villagers.length >= 6) return 'mill';
     if (!this.has('barracks') && this.villagers.length >= 8) return 'barracks';
@@ -240,7 +242,7 @@ export class AIPlayer {
     if (this.wantFarm && this.has('mill') && this.countFarms() < 10) { this.wantFarm = false; return 'farm'; }
     // Maison d'avance seulement quand la marge de population se réduit :
     // sinon l'IA couvre la carte de maisons inutiles.
-    if (popRoom <= 7 && player.resources.wood > 250 && player.popCap < POP_MAX) return 'house';
+    if (popRoom <= 7 && player.resources.wood > 250 && player.popCap < popMax) return 'house';
     return null;
   }
 
@@ -425,12 +427,15 @@ export class AIPlayer {
         }
       }
     } else if (this.army.length > 0) {
-      // Regroupement défensif autour du Centre-Ville.
+      // Regroupement défensif autour du Centre-Ville. Seules les troupes au
+      // repos passent en défensif : changer d'attitude recale le poste de garde
+      // sur la position courante, et une vague en marche, ramenée ainsi à son
+      // point de départ, tournerait les talons au premier ennemi croisé.
       const tc = this.townCenter;
       if (!tc) return;
-      this.world.setStance(this.army, 'defensive');     // au camp, on tient son poste
-      for (const u of this.army) {
-        if (u.state !== STATE.IDLE) continue;
+      const auCamp = this.army.filter((u) => u.state === STATE.IDLE);
+      this.world.setStance(auCamp, 'defensive');     // au camp, on tient son poste
+      for (const u of auCamp) {
         if (dist2(u.x, u.y, tc.x, tc.y) > (TILE * 11) ** 2) {
           u.moveTo(tc.x + (this.rng.next() - 0.5) * TILE * 6,
             tc.y + TILE * 4 + (this.rng.next() - 0.5) * TILE * 4, true);

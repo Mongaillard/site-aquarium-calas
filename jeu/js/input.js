@@ -33,20 +33,23 @@ export class InputController {
 
   attach() {
     const c = this.canvas;
-    const opts = { passive: false };
+    // Le canvas et la fenêtre servent à toutes les parties : les écouteurs
+    // s'en vont avec la partie (voir Game.destroy).
+    const signal = this.game.ecouteurs?.signal;
+    const opts = { passive: false, signal };
     c.addEventListener('pointerdown', (e) => this.onPointerDown(e), opts);
     c.addEventListener('pointermove', (e) => this.onPointerMove(e), opts);
     c.addEventListener('pointerup', (e) => this.onPointerUp(e), opts);
     c.addEventListener('pointercancel', (e) => this.onPointerUp(e), opts);
-    c.addEventListener('contextmenu', (e) => e.preventDefault());
+    c.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
     c.addEventListener('wheel', (e) => {
       e.preventDefault();
       const rect = c.getBoundingClientRect();
       this.camera.zoomBy(e.deltaY < 0 ? 1.12 : 0.89, e.clientX - rect.left, e.clientY - rect.top);
     }, opts);
-    window.addEventListener('keydown', (e) => this.onKeyDown(e));
-    window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('keydown', (e) => this.onKeyDown(e), { signal });
+    window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()), { signal });
+    window.addEventListener('blur', () => this.keys.clear(), { signal });
   }
 
   localPoint(e) {

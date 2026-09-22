@@ -160,6 +160,8 @@ export class Unit extends Entity {
     this.lastResourceTile = null; // dernière case réellement exploitée
     this.blockedTime = 0;   // temps passé sans pouvoir atteindre sa cible
     this.fleeUntil = 0;     // mise à l'abri en cours (piloté par l'IA)
+    this.rallyAfterFight = null;  // destination d'un déplacement interrompu par un combat
+    this.posteAvantAbri = null;   // poste quitté au son de la cloche, repris en sortant
     this.spawnTime = world.time;
   }
 
@@ -246,6 +248,11 @@ export class Unit extends Entity {
    */
   attackEntity(target, auto = false) {
     if (!target || target.dead) return;
+    // Un nouvel engagement oublie le ralliement d'un combat précédent : seul un
+    // déplacement interrompu en pose un (updateMove, juste après cet appel).
+    // Sinon, une cible abattue bien plus tard renverrait l'unité vers une
+    // destination abandonnée depuis longtemps.
+    this.rallyAfterFight = null;
     this.target = target;
     this.resourceTile = null;
     this.destination = null;
@@ -554,6 +561,9 @@ export class Unit extends Entity {
     // Récolte sur une ferme (bâtiment) ou sur une case de ressource.
     const farm = this.target && this.target.type === 'farm' ? this.target : null;
     if (farm && farm.dead) { this.findNextResource('food'); return; }
+    // Une ferme encore en chantier se bâtit avant de se cultiver : sinon on
+    // récolterait ses 260 de nourriture sans l'avoir jamais construite.
+    if (farm && !farm.complete) { this.buildAt(farm); return; }
 
     let targetX, targetY, resType, reach;
     if (farm) {
@@ -868,6 +878,46 @@ export class Unit extends Entity {
     this.y = spawn.y;
     this.state = STATE.IDLE;
     this.guardPoint = { x: this.x, y: this.y };
+    // Abrité par la cloche : il retourne à son poste, pas n'importe où.
+    this.reprendrePoste();
+  }
+
+  /**
+   * Le poste qu'occupe un villageois, pour le lui rendre après l'alerte : une
+   * case de gisement, une ferme, un chantier — ou rien. Les références
+   * d'entités restent telles quelles ; save.js les convertit en numéros.
+   */
+  posteCourant() {
+    if (!this.isVillager) return { kind: 'aucun' };
+    const job = this.pendingJob;
+    if (job) {
+      return job.kind === 'farm' ? { kind: 'farm', farm: job.farm }
+        : { kind: 'tile', tx: job.tx, ty: job.ty, resType: job.resType };
+    }
+    if (this.state === STATE.BUILD && this.target) return { kind: 'build', site: this.target };
+    if (this.resourceTile) {
+      const res = this.world.map.resourceAt(this.resourceTile.tx, this.resourceTile.ty);
+      return { kind: 'tile', tx: this.resourceTile.tx, ty: this.resourceTile.ty, resType: res ? res.type : this.carry.type };
+    }
+    if (this.target && this.target.type === 'farm') return { kind: 'farm', farm: this.target };
+    return { kind: 'aucun' };
+  }
+
+  /** Reprend le poste noté à l'alerte, s'il existe encore (ou son voisin immédiat). */
+  reprendrePoste() {
+    const poste = this.posteAvantAbri;
+    this.posteAvantAbri = null;
+    if (!poste) return;
+    if (poste.kind === 'tile') {
+      const res = this.world.map.resourceAt(poste.tx, poste.ty)
+        || (poste.resType && this.world.findReachableResource(poste.tx, poste.ty, poste.resType, 2));
+      if (res) this.gatherAt(res.tx, res.ty);
+    } else if (poste.kind === 'farm' && poste.farm && !poste.farm.dead) {
+      this.gatherFarm(poste.farm);
+    } else if (poste.kind === 'build' && poste.site && !poste.site.dead
+        && (!poste.site.complete || poste.site.hp < poste.site.maxHp)) {
+      this.buildAt(poste.site);
+    }
   }
 
   // --- Déplacement ---------------------------------------------------------
@@ -1113,12 +1163,18 @@ export class Animal extends Unit {
       // Un animal ne connaît que l'arrêt et la marche.
       this.state = STATE.IDLE; this.target = null; this.path = null;
     }
-    if (!this.sauvage) return;     // capturé : il attend les ordres de son maître
     if (this.def.capturable && this.captureCooldown <= 0) {
       this.captureCooldown = 0.5;
+      // Une unité d'un autre camp tout près, et personne du sien pour le
+      // garder : le cochon change de main — sauvage comme déjà capturé.
       const maitre = this.world.unitePres(this, TILE * 1.6);
-      if (maitre) { this.capturer(maitre.playerIndex); return; }
+      if (maitre && maitre.playerIndex !== this.playerIndex
+          && (this.sauvage || !this.world.unitePres(this, TILE * 1.6, this.playerIndex))) {
+        this.capturer(maitre.playerIndex);
+        return;
+      }
     }
+    if (!this.sauvage) return;     // capturé : il attend les ordres de son maître
     this.wanderTimer -= dt;
     if (this.wanderTimer <= 0 && this.state === STATE.IDLE) {
       this.wanderTimer = 4 + this.world.rng.next() * 7;
@@ -1377,8 +1433,11 @@ export class Projectile {
   }
 
   update(dt) {
-    const tx = this.target && !this.target.dead ? this.target.x : this.lastX;
-    const ty = this.target && !this.target.dead ? this.target.y : this.lastY;
+    // Une cible entrée dans un abri a quitté la carte : la flèche finit sa
+    // course là où elle l'a vue en dernier, sans la toucher.
+    const enJeu = this.target && !this.target.dead && !this.target.garrisonedIn;
+    const tx = enJeu ? this.target.x : this.lastX;
+    const ty = enJeu ? this.target.y : this.lastY;
     this.lastX = tx; this.lastY = ty;
     const dx = tx - this.x, dy = ty - this.y;
     const d = Math.hypot(dx, dy);
@@ -1387,7 +1446,7 @@ export class Projectile {
     if (d <= step) {
       this.x = tx; this.y = ty;
       this.dead = true;
-      if (this.target && !this.target.dead) this.target.takeDamage(this.damage, this.source);
+      if (enJeu) this.target.takeDamage(this.damage, this.source);
       return;
     }
     this.x += (dx / d) * step;

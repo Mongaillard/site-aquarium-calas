@@ -82,7 +82,12 @@ function serializeUnit(u) {
     repathCooldown: u.repathCooldown, repathAttempts: u.repathAttempts,
     stuckTime: u.stuckTime, blockedTime: u.blockedTime,
     autoTarget: u.autoTarget, groupSpeed: u.groupSpeed,
+    rallyAfterFight: point(u.rallyAfterFight),
     garrisonedIn: refId(u.garrisonedIn),
+    // Poste quitté au son de la cloche : une ferme ou un chantier, par numéro.
+    posteAvantAbri: u.posteAvantAbri
+      ? { ...u.posteAvantAbri, farm: refId(u.posteAvantAbri.farm), site: refId(u.posteAvantAbri.site) }
+      : null,
     // Un poste différé peut désigner une ferme : on ne garde que son numéro,
     // sinon la sauvegarde embarquerait tout le monde par référence.
     pendingJob: u.pendingJob ? { ...u.pendingJob, farm: refId(u.pendingJob.farm) } : null,
@@ -104,6 +109,12 @@ function serializeBuilding(b) {
     })),
     productionTime: b.productionTime,
     rally: point(b.rally),
+    // Ce que vise le ralliement (ferme, chantier, gisement) : sans eux, les
+    // villageois formés après la reprise se contentent d'y marcher.
+    rallyEntity: refId(b.rallyEntity),
+    rallyResource: b.rallyResource ? { tx: b.rallyResource.tx, ty: b.rallyResource.ty } : null,
+    // Relevés des bâtisseurs : le rendement du prochain tick en dépend.
+    builderCount: b.builderCount, activeBuilders: b.activeBuilders, assignedBuilders: b.assignedBuilders,
     foodLeft: b.foodLeft,
     garrison: b.garrison.map(refId).filter((id) => id !== null),
     target: refId(b.target),
@@ -117,7 +128,7 @@ function serializeAI(ai) {
     index: ai.index, rng: ai.rng.s, timer: ai.timer, attackTimer: ai.attackTimer,
     armyTarget: ai.armyTarget, waveCount: ai.waveCount, defendUntil: ai.defendUntil,
     lastHouseAt: ai.lastHouseAt, compositionIndex: ai.compositionIndex,
-    badSpots: [...ai.badSpots],
+    badSpots: [...ai.badSpots], wantFarm: !!ai.wantFarm,
   };
 }
 
@@ -235,6 +246,10 @@ export function restoreWorld(data) {
     b.queue = saved.queue.map((q) => ({ ...q, cost: { ...q.cost } }));
     b.productionTime = saved.productionTime;
     b.rally = saved.rally ? { ...saved.rally } : null;
+    b.rallyResource = saved.rallyResource ? { ...saved.rallyResource } : null;
+    b.builderCount = saved.builderCount || 0;
+    b.activeBuilders = saved.activeBuilders || 0;
+    b.assignedBuilders = saved.assignedBuilders || 0;
     b.foodLeft = saved.foodLeft;
     b.attackCooldown = saved.attackCooldown;
     b.scanCooldown = saved.scanCooldown;
@@ -273,6 +288,7 @@ export function restoreWorld(data) {
     u.blockedTime = saved.blockedTime;
     u.autoTarget = saved.autoTarget;
     u.groupSpeed = saved.groupSpeed;
+    u.rallyAfterFight = saved.rallyAfterFight ? { ...saved.rallyAfterFight } : null;
     u.pendingJob = null;   // rattaché plus bas : il peut désigner une ferme
     u.failedDropoffs = saved.failedDropoffs ? new Set(saved.failedDropoffs) : null;
     u.fleeUntil = saved.fleeUntil;
@@ -309,8 +325,14 @@ export function restoreWorld(data) {
         entity.pendingJob = job.farm === null && saved.pendingJob.farm ? null : job;
       }
       entity.garrisonedIn = cible(saved.garrisonedIn);
+      if (saved.posteAvantAbri) {
+        entity.posteAvantAbri = {
+          ...saved.posteAvantAbri, farm: cible(saved.posteAvantAbri.farm), site: cible(saved.posteAvantAbri.site),
+        };
+      }
     } else {
       entity.garrison = (saved.garrison || []).map(cible).filter(Boolean);
+      entity.rallyEntity = cible(saved.rallyEntity);
     }
   }
   for (const p of world.players) {
@@ -342,6 +364,7 @@ export function restoreWorld(data) {
     ai.lastHouseAt = saved.lastHouseAt;
     ai.compositionIndex = saved.compositionIndex;
     ai.badSpots = new Set(saved.badSpots);
+    ai.wantFarm = !!saved.wantFarm;
   }
 
   // 6. Terrain découvert, population, état dérivé.

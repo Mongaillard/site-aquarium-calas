@@ -172,11 +172,15 @@ export class World {
     }
   }
 
-  /** L'unité (pas un animal) la plus proche dans le rayon, tous camps confondus. */
-  unitePres(entity, radius) {
+  /**
+   * L'unité (pas un animal) la plus proche dans le rayon : tous camps
+   * confondus, ou seulement celles du joueur `playerIndex`.
+   */
+  unitePres(entity, radius, playerIndex = null) {
     let best = null, bestD = Infinity;
     this.grid.forEachNear(entity.x, entity.y, radius, (other) => {
       if (other.dead || other.kind !== 'unit' || other.isAnimal || other.garrisonedIn) return;
+      if (playerIndex !== null && other.playerIndex !== playerIndex) return;
       const d = dist(entity.x, entity.y, other.x, other.y);
       if (d <= radius && d < bestD) { bestD = d; best = other; }
     });
@@ -563,6 +567,14 @@ export class World {
     if (entity.kind === 'unit') {
       const i = this.units.indexOf(entity);
       if (i >= 0) this.units.splice(i, 1);
+      // Mort à l'abri (supprimé par le joueur, par exemple) : sa place se libère,
+      // sinon il compterait encore comme occupant et comme archer.
+      if (entity.garrisonedIn) {
+        const g = entity.garrisonedIn.garrison;
+        const k = g.indexOf(entity);
+        if (k >= 0) g.splice(k, 1);
+        entity.garrisonedIn = null;
+      }
       if (!entity.isAnimal) {
         owner.stats.lost++;
         if (source && this.players[source.playerIndex]) this.players[source.playerIndex].stats.killed++;
@@ -727,7 +739,12 @@ export class World {
     const player = this.players[building.playerIndex];
     if (!tech || !building.complete) return { ok: false, reason: 'Indisponible' };
     if (player.techs.has(techId)) return { ok: false, reason: 'Déjà recherché' };
-    if (building.queue.some((q) => q.id === techId)) return { ok: false, reason: 'Déjà en cours' };
+    // En cours dans N'IMPORTE LEQUEL de ses bâtiments : deux forges (ou deux
+    // Centres-Villes) la paieraient et l'appliqueraient deux fois.
+    if (this.buildings.some((b) => !b.dead && b.playerIndex === building.playerIndex
+        && b.queue.some((q) => q.kind === 'tech' && q.id === techId))) {
+      return { ok: false, reason: 'Déjà en cours' };
+    }
     if (tech.age > player.age) return { ok: false, reason: 'Âge requis : ' + AGES[tech.age].name };
     if (!canAfford(player.resources, tech.cost)) return { ok: false, reason: 'Ressources insuffisantes' };
     return { ok: true };
@@ -752,14 +769,19 @@ export class World {
       this.players[building.playerIndex].stats.trained++;
       if (building.rally) {
         const rallyEntity = building.rallyEntity && !building.rallyEntity.dead ? building.rallyEntity : null;
-        if (rallyEntity && rallyEntity.playerIndex === building.playerIndex && unit.isVillager) {
+        const r = building.rallyResource;
+        if (unit.isVillager && rallyEntity && rallyEntity.kind === 'building'
+            && rallyEntity.playerIndex === building.playerIndex
+            && (!rallyEntity.complete || rallyEntity.type === 'farm')) {
+          // Ralliement sur un chantier ou une ferme : le villageois s'y met
+          // direct — une ferme encore en chantier se bâtit d'abord.
+          if (rallyEntity.complete) unit.gatherFarm(rallyEntity);
+          else unit.buildAt(rallyEntity);
+        } else if (unit.isVillager && r && this.map.resourceAt(r.tx, r.ty)) {
           // Point de ralliement sur une ressource : le villageois s'y met direct.
-          if (rallyEntity.type === 'farm') unit.gatherFarm(rallyEntity);
-        } else if (building.rallyResource && unit.isVillager) {
-          const r = building.rallyResource;
-          if (this.map.resourceAt(r.tx, r.ty)) unit.gatherAt(r.tx, r.ty);
-          else unit.moveTo(building.rally.x, building.rally.y);
+          unit.gatherAt(r.tx, r.ty);
         } else {
+          // Tout autre point (un camp, une maison, le sol) : on s'y rend.
           unit.moveTo(building.rally.x, building.rally.y, !unit.isVillager);
         }
       }
@@ -779,6 +801,7 @@ export class World {
   }
 
   applyTech(player, techId) {
+    if (player.techs.has(techId)) return;   // une technologie ne s'applique qu'une fois
     player.techs.add(techId);
     const mods = player.mods;
     switch (techId) {
@@ -1184,10 +1207,21 @@ export class World {
       (b) => !b.dead && b.complete && b.playerIndex === playerIndex && b.def.garrison);
     if (shelters.length === 0) return { sheltered: 0, released: 0 };
 
+    // Ceux que la cloche a envoyés et qui courent encore vers l'abri : le
+    // second coup les concerne aussi.
+    const enRoute = this.units.filter(
+      (u) => !u.dead && u.playerIndex === playerIndex && u.isVillager && !u.garrisonedIn
+        && u.state === STATE.GARRISON && u.posteAvantAbri);
     const occupied = shelters.reduce((sum, b) => sum + b.garrison.length, 0);
-    if (occupied > 0) {
+    if (occupied > 0 || enRoute.length > 0) {
       let released = 0;
+      // En sortant, chacun reprend le poste qu'il a quitté (voir leaveGarrison).
       for (const b of shelters) released += this.releaseGarrison(b).length;
+      for (const u of enRoute) {
+        u.target = null; u.path = null; u.state = STATE.IDLE;
+        u.reprendrePoste();
+        released++;
+      }
       return { sheltered: 0, released };
     }
 
@@ -1202,7 +1236,8 @@ export class World {
         if (d < bestD) { bestD = d; best = b; }
       }
       if (!best) break;
-      if (v.garrisonAt(best)) sheltered++;
+      const poste = v.posteCourant();
+      if (v.garrisonAt(best)) { v.posteAvantAbri = poste; sheltered++; }
     }
     return { sheltered, released: 0 };
   }
@@ -1266,8 +1301,10 @@ export class World {
     for (const p of this.players) {
       if (p.defeated) continue;
       if (parCentreVille) {
+        // Un Centre-Ville debout, pas des fondations : sans quoi un chantier
+        // posé à la hâte sauverait la partie du camp qui vient de tomber.
         const hasTC = this.buildings.some(
-          (b) => !b.dead && b.playerIndex === p.index && b.type === 'towncenter');
+          (b) => !b.dead && b.complete && b.playerIndex === p.index && b.type === 'towncenter');
         if (!hasTC) p.defeated = true;
         continue;
       }

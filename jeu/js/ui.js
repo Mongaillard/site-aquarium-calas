@@ -58,24 +58,27 @@ export class UI {
       node.innerHTML = iconeSVG(node.dataset.icone, node.classList.contains('icon-btn') ? 19 : 17);
     }
 
-    el('btn-menu').addEventListener('click', () => this.game.togglePause());
-    el('btn-sound').addEventListener('click', () => this.game.toggleSound());
-    el('btn-close-build').addEventListener('click', () => this.game.cancelBuild());
+    // Ces éléments survivent à la partie : leurs écouteurs partent avec elle
+    // (voir Game.destroy), sinon la partie suivante hériterait des deux.
+    const opts = { signal: this.game.ecouteurs?.signal };
+    el('btn-menu').addEventListener('click', () => this.game.togglePause(), opts);
+    el('btn-sound').addEventListener('click', () => this.game.toggleSound(), opts);
+    el('btn-close-build').addEventListener('click', () => this.game.cancelBuild(), opts);
 
     // Barre des ouvriers : un appui sélectionne le groupe, le bouton ouvre le panneau.
-    el('btn-workers').addEventListener('click', () => this.openWorkerMenu());
-    el('btn-close-workers').addEventListener('click', () => this.closeWorkerMenu());
+    el('btn-workers').addEventListener('click', () => this.openWorkerMenu(), opts);
+    el('btn-close-workers').addEventListener('click', () => this.closeWorkerMenu(), opts);
     this.nodes.workerBar.querySelectorAll('[data-task]').forEach((chip) => {
       chip.addEventListener('click', () => {
         const task = chip.dataset.task;
         if (task === 'idle') this.game.focusIdleVillager();
         else this.game.selectWorkerGroup(task);
-      });
+      }, opts);
     });
     this.nodes.autoWorkers.addEventListener('change', (e) => {
       this.game.setAutoWorkers(e.target.checked);
       this.renderWorkerRows();
-    });
+    }, opts);
 
     const minimap = this.nodes.minimap;
     const handleMinimap = (e) => {
@@ -88,10 +91,10 @@ export class UI {
       minimap.setPointerCapture?.(e.pointerId);
       this.minimapDragging = true;
       handleMinimap(e);
-    });
-    minimap.addEventListener('pointermove', (e) => { if (this.minimapDragging) handleMinimap(e); });
-    minimap.addEventListener('pointerup', () => { this.minimapDragging = false; });
-    minimap.addEventListener('pointercancel', () => { this.minimapDragging = false; });
+    }, opts);
+    minimap.addEventListener('pointermove', (e) => { if (this.minimapDragging) handleMinimap(e); }, opts);
+    minimap.addEventListener('pointerup', () => { this.minimapDragging = false; }, opts);
+    minimap.addEventListener('pointercancel', () => { this.minimapDragging = false; }, opts);
   }
 
   // --- Rafraîchissement périodique -----------------------------------------
@@ -354,6 +357,14 @@ export class UI {
         </div>`;
       if (first.kind === 'building' && first.queue.length > 0) {
         node.insertAdjacentHTML('beforeend', this.renderQueue(first));
+        // Les boutons de la file sont recréés à chaque rendu du panneau (le
+        // temps restant y figure) : leurs écouteurs se posent ici, avec eux.
+        node.querySelectorAll('[data-cancel]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            this.world.cancelProduction(first, Number(btn.dataset.cancel));
+            this.refreshSelection(true);
+          });
+        });
       }
       return;
     }
@@ -535,14 +546,6 @@ export class UI {
         this.refreshSelection(true);
       });
     });
-
-    const queue = this.nodes.selection.querySelectorAll('[data-cancel]');
-    queue.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.world.cancelProduction(first, Number(btn.dataset.cancel));
-        this.refreshSelection(true);
-      });
-    });
   }
 
 /** Grise en direct ce qui n'est plus payable — sans reconstruire le panneau,
@@ -569,7 +572,7 @@ export class UI {
       const requires = def.requires && !this.world.buildings.some(
         (b) => b.playerIndex === player.index && b.type === def.requires && b.complete && !b.dead);
       const limited = def.limit && this.world.buildings.filter(
-        (b) => b.playerIndex === player.index && b.type === def.type && !b.dead).length >= def.limit;
+        (b) => b.playerIndex === player.index && b.type === def.id && !b.dead).length >= def.limit;
       const disabled = !affordable || requires || limited;
       let reason = '';
       if (requires) reason = `Nécessite : ${BUILDING_TYPES[def.requires].name}`;

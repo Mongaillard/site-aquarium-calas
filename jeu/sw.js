@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v37';
+const CACHE = 'age-empires-mobile-v38';
 const ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,10 @@ const ASSETS = [
   './js/entities.js',
   './js/ai.js',
   './js/render.js',
+  // Importés par render.js et sprites.js : sans eux, le graphe de modules
+  // échoue hors ligne et le jeu ne démarre pas.
+  './js/decor.js',
+  './js/decor-pieces.js',
   './js/input.js',
   './js/ui.js',
   './js/audio.js',

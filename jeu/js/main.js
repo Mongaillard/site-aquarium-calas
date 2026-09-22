@@ -67,11 +67,22 @@ export function speedDef(id) {
   return GAME_SPEEDS.find((s) => s.id === id) || GAME_SPEEDS.find((s) => s.id === DEFAULT_SPEED);
 }
 
-/** Le pixel (u, v) de l'atlas est-il opaque ? Une image sans canvas l'est. */
+/**
+ * Le pixel (u, v) de l'atlas est-il opaque ? L'illustration d'origine est une
+ * <img>, illisible pixel à pixel ; sa variante recolorée est un canvas au même
+ * alpha : c'est elle qu'on interroge. Sans canvas du tout, on dit oui.
+ */
 function pixelOpaque(sprite, u, v) {
-  const image = sprite.variantes.bleu;
-  if (!image.getContext) return true;
-  return image.getContext('2d').getImageData(u | 0, v | 0, 1, 1).data[3] > 40;
+  const { bleu, rouge } = sprite.variantes;
+  const image = bleu && bleu.getContext ? bleu : rouge;
+  if (!image || !image.getContext) return true;
+  // Un canvas verrouillé (image d'une autre origine) refuse la lecture : on
+  // retombe alors sur le rectangle entier, comme avant.
+  try {
+    return image.getContext('2d').getImageData(u | 0, v | 0, 1, 1).data[3] > 40;
+  } catch {
+    return true;
+  }
 }
 
 class Game {
@@ -80,6 +91,10 @@ class Game {
     // Reprise d'une partie interrompue : le monde vient de la sauvegarde.
     this.world = (options.restore && restoreWorld(options.restore)) || new World(options);
     this.canvas = document.getElementById('game');
+    // Tous les écouteurs posés sur le DOM partagé (canvas, boutons du HUD,
+    // clavier, fenêtre) : une partie terminée les retire d'un coup, sinon elle
+    // continue de réagir aux gestes de la suivante.
+    this.ecouteurs = new AbortController();
     this.camera = new Camera(this.world);
     this.renderer = new Renderer(this.canvas, this.world, this.camera);
     this.renderer.initMinimap(document.getElementById('minimap'));
@@ -108,7 +123,7 @@ class Game {
     if (home) this.camera.centerOn(home.x, home.y);
     this.camera.zoom = clamp(this.camera.viewWidth / (24 * TILE), this.camera.minZoom, 1.1);
 
-    window.addEventListener('resize', () => this.renderer.resize());
+    window.addEventListener('resize', () => this.renderer.resize(), { signal: this.ecouteurs.signal });
     // Le téléphone peut couper l'onglet sans prévenir : on écrit avant de partir,
     // et on met la partie en pause plutôt que de la laisser tourner sans être vue.
     this.onHide = () => {
@@ -909,6 +924,7 @@ class Game {
     this.saveNow();
     document.removeEventListener('visibilitychange', this.onHide);
     window.removeEventListener('pagehide', this.onLeave);
+    this.ecouteurs.abort();
     this.running = false;
     this.ui.hideModal();
     this.ui.closeBuildMenu();
