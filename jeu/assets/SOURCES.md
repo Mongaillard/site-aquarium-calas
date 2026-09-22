@@ -156,7 +156,7 @@ couleurs du joueur tient ce rôle.
 Chaque image est posée au bas de sa case, centrée ; un villageois debout fait
 **40 px monde** (le chevalier : 44), atlas à 2× avec le même peps que les
 bâtiments : 440×688 avant interpolation (cases de 55×86), **99 Ko** ; 1320×688 et
-**226 Ko** avec les pas intermédiaires ; 2376×1044 et **324 Ko** avec le nord-est et les outils, **260 Ko** une fois les quatre marches cardinales reprises de la troisième planche. La couleur d'équipe est celle du chevalier —
+**226 Ko** avec les pas intermédiaires ; 2376×1044 et **324 Ko** avec le nord-est et les outils, **278 Ko** une fois les quatre marches cardinales reprises de la troisième planche et les rangées Gemini passées au peps. La couleur d'équipe est celle du chevalier —
 l'écharpe bleue bascule, la peau, le cuir et la chemise restent ; le test le
 vérifie sur 14 440 pixels de peau.
 
@@ -208,6 +208,15 @@ les pieds patineraient. Chaque rangée est ramenée à la stature de l'ancienne
 marche sud (80 px dans l'atlas), la planche dessinant le dos un peu plus grand
 que la face ; l'écharpe est ravivée comme pour la planche précédente. Le repos,
 les poses et le nord-est ne bougent pas (`fabrique-villageois-v5.py`).
+
+Les images Gemini sont **moins nettes** que celles de la première planche :
+mesurée par la variance du laplacien sur les images clés, la netteté des
+rangées Gemini valait la moitié de celle des rangées d'origine (2 300 à 3 000
+contre 4 700 à 6 800), qui avaient reçu le « peps » des autres illustrations
+(masque flou, saturation, contraste — voir plus bas) alors que les rangées
+Gemini ne l'avaient pas eu. Le même traitement, appliqué case par case aux
+rangées Gemini (les quatre marches cardinales, le nord-est et les trois outils),
+les ramène au niveau des autres (5 700 à 7 400) ; l'atlas pèse 278 Ko.
 
 Le découpage ne dépend plus de la mise en page de la planche
 (`decoupe-planche.py`) : les cartouches de légende se reconnaissent à leurs
