@@ -2,7 +2,7 @@
 
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque :
-~9 800 lignes de JavaScript, du Canvas 2D, des pictogrammes vectoriels et 1,6 Mo
+~10 300 lignes de JavaScript, du Canvas 2D, des pictogrammes vectoriels et 1,6 Mo
 d'illustrations et de textures — dont les cycles de marche du milicien, du
 villageois, de l'éclaireur, du cerf et du cochon.
 
@@ -35,10 +35,12 @@ Le score d'une partie Express : *ressources récoltées + 10 par unité vivante 
 25 par bâtiment debout*. Il s'affiche sur l'écran de fin, et le compte à rebours
 remplace le chronomètre en haut de l'écran (il rougit dans la dernière minute).
 
-Mesuré sur huit parties IA contre IA (difficulté Normal) : **toutes se terminent
-dans les dix minutes**, durée moyenne 9 min 45 s, dont deux par destruction du
-Centre-Ville (8 min 40 s et 9 min 26 s). Un joueur qui masse ses troupes finit
-plus vite encore.
+Mesuré sur huit parties IA contre IA (difficulté Normal) : **toutes vont au
+bout des dix minutes et se jouent aux points** — aucune IA ne rase le
+Centre-Ville adverse, maintenant que plus aucun villageois ne reste figé
+devant un dépôt (avant cette correction, deux parties sur huit finissaient
+par la chute d'un Centre-Ville). Un joueur qui masse ses troupes peut, lui,
+finir bien plus tôt.
 
 La **vitesse de jeu** — Tranquille ×0,75, Normal, Rapide ×1,5, Blitz ×2 —
 multiplie le nombre de pas de simulation par seconde réelle. Elle se change
@@ -67,6 +69,7 @@ retour, l'écran d'accueil propose **Reprendre la partie** avec son format, son
 | Bouton **Abriter** (une porte) puis un abri | Mettre la sélection à l'abri · la **Cloche** met tous les villageois à couvert |
 | Toucher un chantier (villageois sélectionné) | L'y affecter — même geste que pour le bois ou la nourriture |
 | Bouton **Ouvriers** (trois silhouettes) | Panneau d'affectation : − / + pour déplacer un ouvrier d'un poste à l'autre, **chantiers compris** |
+| Bouton **Détruire** puis **Confirmer** (dans les trois secondes) | Raser un de ses bâtiments — deux appuis, pour qu'un doigt qui visait « Ralliement » ne rase pas le Centre-Ville |
 
 Le pointage est **tolérant** : inutile de viser au pixel près. Un appui à moins
 d'une case d'un ennemi, d'un arbre ou d'un filon vise la bonne cible. Et quand
@@ -151,6 +154,42 @@ atteignables, sur trois tailles de carte, seul et en groupe — est passé de
 **11 échecs sur 32** ordres en carte moyenne à **zéro**, avec au plus trois
 recalculs par ordre. Et sur une même partie de 16 minutes entre deux IA, le
 joueur récolte **50 % de plus** : les villageois coincés bridaient l'économie.
+
+### Plus aucune unité figée
+
+Une partie jouée de bout en bout, dans un vrai navigateur, a pourtant montré
+des villageois plantés des minutes devant un dépôt, sac plein, et une cloche
+qui laissait quatre villageois dehors pour de bon. Chaque cause a été
+reproduite, corrigée, et garde son test :
+
+- **La case d'accès.** Un bâtiment se rejoignait par la case libre de son
+  pourtour la plus proche *à vol d'oiseau* — parfois une poche murée par des
+  arbres ou une maison. Le chemin vise désormais tout le pourtour : la case
+  la plus proche *par le chemin*.
+- **L'approche finale** en ligne droite reprenait la main avant que l'unité
+  ait pu demander son chemin de contournement : elle se cognait au même mur
+  en boucle.
+- **Le quota de recalculs** (dix par ordre) ne se rouvrait qu'aux ordres de
+  marche : après dix détours dans sa vie, un villageois ne recalculait plus.
+- **L'hésitation entre deux nœuds.** Poussée par un voisin contre un angle,
+  une unité visait un nœud, puis le précédent, un tick sur deux : chaque pas
+  la rapprochait de sa cible du moment, jamais du bout. Le progrès se juge
+  maintenant sur le trajet entier, et les glissements le long d'un obstacle
+  suivent le cap voulu, pas la poussée des voisins.
+- **Un bâtiment posé** en travers d'un chemin (recalcul immédiat), tout
+  contre une unité (corps à cheval sur le mur : on la décale d'un pixel ou
+  deux), ou qui ferme une poche autour d'elle (elle en sort) ; et le point
+  d'apparition d'une unité formée n'est plus jamais une poche.
+- **L'IA murait ses propres dépôts**, jusqu'à son Centre-Ville, ou coupait
+  un passage entre deux bosquets : elle vérifie désormais chaque emplacement.
+- **La foule devant la porte** : bloqué à portée de bras par d'autres
+  villageois, on livre, on bâtit ou on entre d'où l'on est — pas à travers un
+  mur, cependant.
+
+Sur sept parties IA contre IA, les épisodes « en marche sans bouger dix
+secondes ou plus » sont passés de **82** (6 900 secondes cumulées) à
+**zéro** ; sur douze autres parties de quatorze minutes, les unités figées
+vingt-cinq secondes d'affilée, de **123** à **zéro**.
 
 ### Chantiers : file d'attente et renforts
 
@@ -243,8 +282,9 @@ vitesse de récolte de l'IA (×0,8, ×1, ×1,25), le nombre de ses villageois (1
 ses villageois selon des quotas par ressource, met de côté le coût du prochain
 âge, remplace ses fermes épuisées, défend sa base quand elle est attaquée et
 lance des vagues d'assaut de plus en plus grosses. Première offensive typique :
-9 à 13 minutes en Normal, parfois bien plus tard ; en Express, dès la deuxième
-minute.
+9 à 11 minutes en Normal (7 min 30 s à 13 min en Facile, 8 min 45 s à
+10 min 30 s en Difficile) ; en Express, dès la deuxième minute. L'IA ne pose
+jamais un bâtiment qui murerait un des siens ni qui couperait un passage.
 
 ## Architecture
 
@@ -291,8 +331,8 @@ chemin sont mises en file avec un budget par tick pour éviter les à-coups.
 
 ```bash
 cd jeu
-npm test                  # simulation headless : 188 vérifications — deux IA jouent 16 minutes, sauvegarde comprise
-npm run test:navigateur   # Chromium (Playwright) : 181 vérifications — chargement, gestes, rendu, images/s
+npm test                  # simulation headless : 206 vérifications — deux IA jouent 16 minutes, sauvegarde comprise
+npm run test:navigateur   # Chromium (Playwright) : 207 vérifications — chargement, gestes, rendu, images/s
 ```
 
 Le test headless vérifie que l'économie tourne, que les âges sont atteints, que
@@ -399,7 +439,9 @@ sept poses — repos, cueillir, construire, porter, bûcheron, mineur, boucher. 
 pose suit l'état de la simulation et l'outil suit le gisement : devant des baies
 ou une ferme il cueille, devant un arbre il abat à la hache, devant l'or il
 pioche, sur une carcasse il travaille au maillet, devant un chantier ou un
-ennemi il frappe au marteau, en chemin avec sa charge il la porte, à l'arrêt il
+ennemi il frappe au marteau, chargé de bois il porte son rondin à l'épaule (de
+profil : vers l'est ou l'ouest ; l'or, les vivres et la marche vers le nord ou
+le sud gardent la marche ordinaire, la pastille dit la charge), à l'arrêt il
 souffle. Les poses sont dessinées d'un seul côté et retournées en miroir quand
 la cible est de l'autre ; elles se cadencent sur l'horloge, décalées par unité
 pour que dix bûcherons ne frappent pas en chœur, et le port suit la distance
@@ -599,7 +641,7 @@ restent **rigoureusement identiques** 60 secondes plus tard — positions au
 centième de pixel, points de vie, contenu des gisements, décisions de l'IA. Un
 seul champ oublié fait diverger les deux parties et échouer le test.
 
-Une sauvegarde fait quelques dizaines de kilo-octets en début de partie, 150 Ko
-environ après un quart d'heure, et vit dans `localStorage`, sous la clé
+Une sauvegarde fait quelques dizaines de kilo-octets en début de partie, de 120
+à 160 Ko après un quart d'heure ou une demi-heure, et vit dans `localStorage`, sous la clé
 `aem.partie`. Un numéro de version accompagne le format : une sauvegarde
 plus ancienne est refusée plutôt que relue de travers.

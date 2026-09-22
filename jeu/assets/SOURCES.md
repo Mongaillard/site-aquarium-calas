@@ -261,7 +261,9 @@ niveaux de gris, puis les deux sont recombinés ; les images sont rembourrées
 les miettes détachées sont effacées et les rangées de profil sont remises
 dans l'ordre le plus lisse (cycle de moindre écart entre images successives,
 départ pieds joints). Résultat : S et N 18 images, O et E 24, et la marche
-chargée (« porter ») 12 ; repos, cueillir et construire restent à quatre.
+chargée (« porter ») 12 — dont trois intercalaires ratés, à demi transparents
+(images 2 à 4), que le jeu ne joue pas ; repos, cueillir et construire restent
+à quatre.
 Atlas, à cette étape, de 24 colonnes × 8 rangées de 55×86 ; avec les trois
 outils, 24 colonnes × 11 rangées de 99×87 (2376×957).
 
