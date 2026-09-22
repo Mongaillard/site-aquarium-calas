@@ -7,7 +7,8 @@ import { AIPlayer } from '../js/ai.js';
 import { serializeWorld, restoreWorld } from '../js/save.js';
 import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
 import { formatTime, dist, RNG } from '../js/utils.js';
-import { STATE } from '../js/entities.js';
+import { STATE, Projectile } from '../js/entities.js';
+import { readFileSync } from 'node:fs';
 import { TERRAIN } from '../js/map.js';
 import { planterRivage, planterCampagne, planterDecor, plansDEau, hacher, MARE_MAX, CUITES } from '../js/decor.js';
 
@@ -1185,6 +1186,241 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     advance(w, 1);
     check('une unité prise dans une case bloquée en ressort', !w.map.isBlocked(Math.floor(u.x / TILE), Math.floor(u.y / TILE)),
       `case ${Math.floor(u.x / TILE)},${Math.floor(u.y / TILE)}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Relecture complète (septembre) : chaque bug corrigé garde son test, écrit à
+// partir du script qui l'a reproduit.
+// ---------------------------------------------------------------------------
+{
+  const moyen = (seed) => { const w = new World({ seed, mapSize: 'medium', difficulty: 'normal' }); w.ais = []; return w; };
+  const centre = (w, i = 0) => w.buildings.find((b) => b.playerIndex === i && b.type === 'towncenter');
+  const cases = (d) => (d / TILE).toFixed(1);
+
+  // Une technologie ne se paie et ne s'applique qu'une fois, même lancée dans deux forges.
+  {
+    const w = moyen(5);
+    const p = w.players[0];
+    p.age = 1; p.resources = { food: 5000, wood: 5000, gold: 5000 };
+    const tc = centre(w);
+    const a = w.spawnBuilding(0, 'blacksmith', tc.tx + 6, tc.ty, true);
+    const b = w.spawnBuilding(0, 'blacksmith', tc.tx + 6, tc.ty + 5, true);
+    const r1 = w.researchTech(a, 'forging'), r2 = w.researchTech(b, 'forging');
+    advance(w, 40);
+    check('une technologie en cours dans une forge ne se relance pas dans l’autre', !!r1 && !r2 && p.mods.attackMelee === 1,
+      `lancée ${!!r1} puis ${!!r2}, bonus d’attaque ${p.mods.attackMelee}`);
+  }
+
+  // Une flèche déjà en vol épargne l'unité entrée à l'abri ; un mort à l'abri libère sa place.
+  {
+    const w = moyen(7);
+    const tc = centre(w);
+    const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+    v.hp = 2;
+    const archer = w.spawnUnit(1, 'archer', tc.x + TILE * 5, tc.y);
+    w.projectiles.push(new Projectile(w, archer, v, 10));
+    tc.addToGarrison(v);
+    advance(w, 1);
+    check('une flèche en vol épargne l’unité qui vient d’entrer à l’abri', !v.dead && tc.garrison.includes(v),
+      `${v.dead ? 'tuée' : 'vivante'}, ${tc.garrison.length} à l’abri`);
+    w.killEntity(v, archer);
+    check('un occupant tué à l’abri libère sa place', !tc.garrison.includes(v), `${tc.garrison.length} occupant(s)`);
+  }
+
+  // Ralliement sur un de ses bâtiments : le villageois formé s'y rend.
+  {
+    const w = moyen(9);
+    const p = w.players[0]; p.resources = { food: 5000, wood: 5000, gold: 5000 };
+    const tc = centre(w);
+    const camp = w.spawnBuilding(0, 'lumbercamp', tc.tx + 8, tc.ty, true);
+    w.setRally(tc, camp.x, camp.y);
+    const avant = new Set(w.units.map((u) => u.id));
+    w.trainUnit(tc, 'villager');
+    advance(w, 25);
+    const nouveau = w.units.find((u) => !avant.has(u.id) && u.isVillager && u.playerIndex === 0);
+    check('ralliement sur un camp : le villageois formé s’y rend', !!nouveau && dist(nouveau.x, nouveau.y, camp.x, camp.y) < TILE * 4,
+      nouveau ? `${nouveau.state}, à ${cases(dist(nouveau.x, nouveau.y, camp.x, camp.y))} cases` : 'aucun villageois formé');
+  }
+
+  // Ralliement sur une ferme en chantier : on la bâtit avant d'y récolter.
+  {
+    const w = sandbox(13);
+    const p = w.players[0]; p.resources = { food: 5000, wood: 5000, gold: 5000 };
+    const tc = centre(w);
+    const [spot] = freeSpots(w, 'house', 1);   // une ferme demande un moulin ; même emprise qu'une maison
+    const ferme = w.spawnBuilding(0, 'farm', spot.tx, spot.ty, false);
+    const reserve = ferme.foodLeft;
+    w.setRally(tc, ferme.x, ferme.y);
+    w.trainUnit(tc, 'villager');
+    let entameeAvantFin = false;
+    advance(w, 90, () => { if (!ferme.complete && ferme.foodLeft < reserve) entameeAvantFin = true; return ferme.complete; });
+    check('ralliement sur une ferme en chantier : le villageois formé la bâtit d’abord', ferme.complete && !entameeAvantFin,
+      `${ferme.complete ? 'bâtie' : 'pas bâtie'}${entameeAvantFin ? ', récoltée avant la fin' : ''}`);
+  }
+
+  // Le retour après combat ne survit pas à l'ordre suivant.
+  {
+    const w = moyen(11);
+    const a = w.map.findOpenTile(40, 48, 10);
+    const s = w.spawnUnit(0, 'militia', a.tx * TILE + 16, a.ty * TILE + 16);
+    const e = w.spawnUnit(1, 'villager', s.x + TILE * 3, s.y);
+    e.stance = 'passive';
+    const B = { x: s.x + TILE * 12, y: s.y };
+    s.moveTo(B.x, B.y);
+    advance(w, 1);
+    const engage = !!s.rallyAfterFight;
+    const spot = w.map.findOpenTile(a.tx - 6, a.ty + 6, 10);
+    const maison = w.spawnBuilding(1, 'house', spot.tx, spot.ty, true);
+    maison.hp = 3;
+    s.attackEntity(maison);
+    advance(w, 30, () => maison.dead);
+    advance(w, 0.2);
+    const versB = s.destination && dist(s.destination.x, s.destination.y, B.x, B.y) < TILE;
+    check('après un nouvel ordre, une cible abattue ne renvoie plus vers l’ancienne destination', engage && maison.dead && !versB,
+      `${s.state}, destination ${JSON.stringify(s.destination)}`);
+  }
+
+  // Deux coups de cloche : les villageois reprennent leur poste.
+  {
+    const w = sandbox(81);
+    const vs = w.units.filter((u) => u.playerIndex === 0 && u.isVillager);
+    let arbre = null;
+    for (const r of w.map.resources.values()) if (r.type === 'wood' && w.map.hasOpenNeighbour(r.tx, r.ty)) { arbre = r; break; }
+    w.spreadGatherOrder(vs, arbre.tx, arbre.ty, 'wood');
+    advance(w, 20);
+    const r1 = w.ringTownBell(0);
+    advance(w, 15);
+    const r2 = w.ringTownBell(0);
+    advance(w, 5);
+    check('au second coup de cloche, les villageois reprennent leur poste', r1.sheltered === vs.length && r2.released === vs.length
+      && vs.every((v) => v.state === STATE.GATHER && !v.garrisonedIn), vs.map((v) => v.state).join(','));
+  }
+
+  // Express : une fondation de Centre-Ville ne sauve pas la partie.
+  {
+    const w = new World({ seed: 91, mode: 'express', difficulty: 'normal' });
+    w.ais = [];
+    const tc = centre(w, 1);
+    let spot = null;
+    for (let r = 5; r < 20 && !spot; r++) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r && !spot; dx++) {
+      if (w.canPlace(1, 'towncenter', tc.tx + dx, tc.ty + dy, true)) spot = { tx: tc.tx + dx, ty: tc.ty + dy };
+    }
+    w.players[1].resources.wood = 1000;
+    const site = w.placeBuilding(1, 'towncenter', spot.tx, spot.ty, []);
+    w.killEntity(tc, null, false);
+    advance(w, 1);
+    check('Express : son Centre-Ville tombé, une fondation ne sauve pas l’adversaire', !!site && !site.complete && !!w.gameOver && w.gameOver.winner === 0,
+      JSON.stringify(w.gameOver));
+  }
+
+  // Un cochon capturé se vole, sauf si son maître le garde.
+  {
+    const w = sandbox(11);
+    const tc0 = centre(w);
+    const cochon = w.units.filter((u) => u.type === 'pig' && !u.dead)
+      .sort((a, b) => dist(b.x, b.y, tc0.x, tc0.y) - dist(a.x, a.y, tc0.x, tc0.y))[0];
+    cochon.capturer(0);
+    const loin = w.units.every((u) => u.playerIndex !== 0 || u.isAnimal || dist(u.x, u.y, cochon.x, cochon.y) > TILE * 3);
+    const voleur = w.spawnUnit(1, 'villager', cochon.x + TILE * 0.8, cochon.y);
+    voleur.setStance('passive');
+    advance(w, 1.5);
+    const vole = cochon.playerIndex === 1;
+    const gardien = w.spawnUnit(1, 'villager', cochon.x - TILE * 0.8, cochon.y);
+    gardien.setStance('passive');
+    const rival = w.spawnUnit(0, 'villager', cochon.x, cochon.y + TILE * 0.8);
+    rival.setStance('passive');
+    advance(w, 1.5);
+    check('un cochon capturé change de main quand l’ennemi l’approche sans gardien', loin && vole, `propriétaire ${cochon.playerIndex}`);
+    check('gardé par son maître, il ne change plus de main', cochon.playerIndex === 1, `propriétaire ${cochon.playerIndex}`);
+  }
+
+  // Express : l'IA vise le plafond de population de la partie (40), pas celui du Classique.
+  {
+    const w = new World({ seed: 21, mode: 'express', difficulty: 'normal' });
+    const ai = w.ais.find((a) => a.index === 1);
+    ai.survey();
+    const p = w.players[1];
+    p.pop = w.popMax - 2; p.popCap = w.popMax;
+    const choix = ai.nextBuilding();
+    check('Express : au plafond de 40, l’IA ne bâtit plus de maisons', w.popMax === 40 && choix !== 'house', `plafond ${w.popMax}, choix ${choix}`);
+  }
+
+  // La sauvegarde garde ce que vise un point de ralliement.
+  {
+    const w = sandbox(33);
+    const tc = centre(w);
+    const baie = w.findNearestResource(tc.x, tc.y, 'food', 20 * TILE, 0);
+    w.setRally(tc, baie.tx * TILE + TILE / 2, baie.ty * TILE + TILE / 2);
+    const repris = restoreWorld(JSON.parse(JSON.stringify(serializeWorld(w))));
+    const r = centre(repris).rallyResource;
+    check('la sauvegarde garde la ressource visée par le ralliement', !!r && r.tx === baie.tx && r.ty === baie.ty, JSON.stringify(r));
+  }
+
+  // Annuler une fondation de ferme n'annonce pas une ferme épuisée.
+  {
+    const w = sandbox(7);
+    const [spot] = freeSpots(w, 'house', 1);   // une ferme demande un moulin ; même emprise qu'une maison
+    const site = w.spawnBuilding(0, 'farm', spot.tx, spot.ty, false);
+    const n0 = w.events.length;
+    w.cancelConstruction(site);
+    const avis = w.events.slice(n0).filter((e) => e.type === 'notice').map((e) => e.text);
+    check('annuler une fondation de ferme n’annonce pas « Ferme épuisée »', avis.length === 0, avis.join(' | ') || 'aucun avis');
+  }
+
+  // La file des chemins : une place par unité.
+  {
+    const w = sandbox(7);
+    const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+    w.requestPath(v, v.x + TILE * 5, v.y);
+    w.requestPath(v, v.x + TILE * 6, v.y);
+    const places = w.pathQueue.filter((u) => u === v).length;
+    for (let i = 0; i < 5; i++) w.processPathQueue();
+    check('une unité n’occupe qu’une place dans la file des chemins', places === 1 && !v.pathPending && !!v.path && v.path.length > 0, `${places} place(s)`);
+  }
+
+  // Une vague de l'IA reste à l'attaque et atteint la base adverse.
+  {
+    const w = new World({ seed: 5, mapSize: 'small', difficulty: 'normal' });
+    const ai = w.ais.find((a) => a.index === 1);
+    const tc1 = centre(w, 1), tc0 = centre(w, 0);
+    const armee = [];
+    for (let i = 0; i < 8; i++) {
+      armee.push(w.spawnUnit(1, 'militia', tc1.x + ((i % 4) - 1.5) * TILE, tc1.y + TILE * 3 + Math.floor(i / 4) * TILE));
+    }
+    ai.attackTimer = 0; ai.armyTarget = 3; ai.timer = 0;
+    for (const u of w.units) if (u.playerIndex === 0 && !u.isAnimal) u.stop();
+    const vagues0 = ai.waveCount;
+    advance(w, 20, () => ai.waveCount > vagues0);
+    advance(w, 5);
+    const enMarche = armee.filter((u) => !u.dead && u.state !== STATE.IDLE);
+    const agressifs = enMarche.every((u) => u.stance === 'aggressive');
+    let auPlusPres = Infinity;
+    advance(w, 85, () => { for (const u of armee) if (!u.dead) auPlusPres = Math.min(auPlusPres, dist(u.x, u.y, tc0.x, tc0.y)); return false; });
+    check('une vague lancée reste à l’attaque au tour suivant de l’IA', ai.waveCount > vagues0 && enMarche.length >= 4 && agressifs,
+      `${enMarche.length} en marche, ${agressifs ? 'agressifs' : 'repassés en défensif'}`);
+    check('et elle atteint le Centre-Ville adverse', auPlusPres < TILE * 4, `au plus près : ${cases(auPlusPres)} cases`);
+  }
+
+  // Hors ligne : le cache du service worker garde tout ce que le jeu charge.
+  {
+    const lire = (chemin) => readFileSync(new URL(`../${chemin}`, import.meta.url), 'utf8');
+    const cache = new Set([...lire('sw.js').matchAll(/'\.\/([^']*)'/g)].map((m) => m[1]));
+    const modules = new Set();
+    const pile = ['js/main.js'];
+    while (pile.length) {
+      const m = pile.pop();
+      if (modules.has(m)) continue;
+      modules.add(m);
+      for (const [, cible] of lire(m).matchAll(/(?:from|import)\s*\(?\s*'\.\/([\w-]+\.js)'/g)) pile.push(`js/${cible}`);
+    }
+    const images = new Set();
+    for (const f of ['index.html', 'css/jeu.css', 'manifest.webmanifest', ...modules]) {
+      for (const [, img] of lire(f).matchAll(/((?:assets|icons)\/[\w-]+\.(?:webp|png|jpg|svg))/g)) images.add(img);
+    }
+    const manquants = [...modules, 'index.html', 'css/jeu.css', 'manifest.webmanifest', ...images].filter((f) => !cache.has(f));
+    check('hors ligne : le cache garde tous les modules, la feuille de style et les images', manquants.length === 0,
+      manquants.join(', ') || `${modules.size} modules, ${images.size} images`);
   }
 }
 
