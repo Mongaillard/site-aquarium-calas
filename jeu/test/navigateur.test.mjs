@@ -960,13 +960,13 @@ const villageois = await page.evaluate(async () => {
   v.dead = true;
   return { cases: def.cases, images: def.images, lignes: def.lignes, opaques, changes, peau, peauIntacte, bleusRestants, poses };
 });
-check('le villageois porte son illustration : quatre orientations, 24 pas interpolés', !!villageois && villageois.cases === 4 && villageois.images === 24 && villageois.lignes.length === 4, villageois ? `${villageois.cases} orientations × ${villageois.images}` : 'absent');
+check('le villageois porte son illustration : huit secteurs sur six marches dessinées, 24 pas interpolés', !!villageois && villageois.cases === 8 && villageois.images === 24 && villageois.lignes.length === 8, villageois ? `${villageois.cases} secteurs × ${villageois.images}` : 'absent');
 check('le villageois adverse est repeint (l’écharpe)', !!villageois && villageois.changes > villageois.opaques * 0.02, villageois && `${Math.round((villageois.changes / villageois.opaques) * 100)} % des pixels`);
 check('la peau du villageois reste la même', !!villageois && villageois.peau > 500 && villageois.peauIntacte === villageois.peau, villageois && `${villageois.peauIntacte}/${villageois.peau} pixels de peau intacts`);
 check('aucun bleu franc ne subsiste côté adverse (villageois)', !!villageois && villageois.bleusRestants === 0, villageois && villageois.bleusRestants + ' pixels');
 const P = villageois ? villageois.poses : {};
 check('devant des baies, le villageois cueille, tourné vers elles', P.baiesEst === 'cueillir·miroir' && P.baiesOuest === 'cueillir', `à l’est : ${P.baiesEst} · à l’ouest : ${P.baiesOuest}`);
-check('devant un arbre ou un gisement, il frappe, tourné vers eux', P.arbreEst === 'construire' && P.orOuest === 'construire·miroir', `arbre à l’est : ${P.arbreEst} · or à l’ouest : ${P.orOuest}`);
+check('devant un arbre il abat à la hache, devant l’or il pioche, tournés vers eux', P.arbreEst === 'bois' && P.orOuest === 'or', `arbre à l’est : ${P.arbreEst} · or à l’ouest : ${P.orOuest}`);
 check('chargé, il porte ; à l’arrêt, il se repose ; sinon il marche', P.porteEst === 'porter' && P.porteOuest === 'porter·miroir' && P.repos === 'repos' && P.marche === 'marche', JSON.stringify(P));
 check('sur un chantier, il construit, tourné vers lui', P.chantierOuest === 'construire·miroir', String(P.chantierOuest));
 
@@ -975,11 +975,17 @@ check('sur un chantier, il construit, tourné vers lui', P.chantierOuest === 'co
 const quatre = await page.evaluate(async () => {
   const mod = await import('./js/sprites.js');
   const def = mod.spriteDe('villager').def;
-  const ligne = (facing) => mod.cadreSource(def, mod.caseDirection(facing, 4), 0).sy / def.cellH;
-  return { sud: ligne(Math.PI / 2), est: ligne(0), nord: ligne(-Math.PI / 2), ouest: ligne(Math.PI), sudEst: ligne(Math.PI / 4 - 0.05), sudEstBis: ligne(Math.PI / 4 + 0.05) };
+  const k = (facing) => mod.caseDirection(facing, def.cases);
+  const ligne = (facing) => mod.cadreSource(def, k(facing), 0).sy / def.cellH;
+  const miroir = (facing) => !!(def.miroirs && def.miroirs[k(facing)]);
+  return { sud: ligne(Math.PI / 2), est: ligne(0), nord: ligne(-Math.PI / 2), ouest: ligne(Math.PI),
+    nordEst: ligne(-Math.PI / 4), nordOuest: ligne(-3 * Math.PI / 4), sudEst: ligne(Math.PI / 4), sudOuest: ligne(3 * Math.PI / 4),
+    miroirNordOuest: miroir(-3 * Math.PI / 4), miroirNordEst: miroir(-Math.PI / 4), lignes: def.lignes, cases: def.cases };
 });
-check('le villageois marche sur quatre orientations, la cardinale la plus proche en diagonale',
-  quatre.sud === 0 && quatre.nord === 1 && quatre.ouest === 2 && quatre.est === 3 && quatre.sudEst === 3 && quatre.sudEstBis === 0, JSON.stringify(quatre));
+check('le villageois marche sur huit secteurs : quatre cardinales et le nord-est dessinés, le nord-ouest en miroir, les diagonales sud sur le profil',
+  quatre.cases === 8 && quatre.sud === 0 && quatre.nord === 1 && quatre.ouest === 2 && quatre.est === 3
+  && quatre.nordEst === 8 && quatre.nordOuest === 8 && quatre.miroirNordOuest && !quatre.miroirNordEst
+  && quatre.sudEst === 3 && quatre.sudOuest === 2, JSON.stringify(quatre));
 
 // La planche de face n'alterne pas les pieds : une séquence par rangée remonte
 // une vraie marche avec six des huit images, et l'arrêt tombe sur la neutre.

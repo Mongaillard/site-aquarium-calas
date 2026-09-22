@@ -1338,7 +1338,14 @@ export class Renderer {
     if (u.resourceTile) cible = { x: u.resourceTile.tx * TILE + TILE / 2, y: u.resourceTile.ty * TILE + TILE / 2 };
     const dx = cible ? cible.x - u.x : Math.cos(u.facing);
     if (u.state === STATE.GATHER && cible) {
-      const pose = villagerTask(u) === 'food' ? P.cueillir : P.construire;
+      // L'outil suit le gisement : hache au bois, pioche à l'or, maillet sur
+      // une carcasse, et la cueillette pour les baies et les fermes.
+      const tache = villagerTask(u);
+      const res = u.resourceTile ? this.world.map.resourceAt(u.resourceTile.tx, u.resourceTile.ty) : null;
+      const pose = tache === 'wood' ? (P.bois || P.construire)
+        : tache === 'gold' ? (P.or || P.construire)
+        : tache === 'food' ? (res && res.gibier && P.viande ? P.viande : P.cueillir)
+        : P.construire;
       return { pose, miroir: cote(dx) !== pose.sens };
     }
     if ((u.state === STATE.BUILD || u.state === STATE.ATTACK) && cible) return { pose: P.construire, miroir: cote(dx) !== P.construire.sens };

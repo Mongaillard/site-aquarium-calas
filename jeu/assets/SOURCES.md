@@ -10,7 +10,7 @@
 | `cerf.webp` | Le **cerf** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en ordre de face et de dos | Planche générée par l'auteur du dépôt, fond noir dé-prémultiplié |
 | `cochon.webp` | Le **cochon** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en balancier | Planche générée par l'auteur du dépôt, fond gris uni |
 | `decor.webp` | Le **décor de la carte** : 97 pièces — amas de rochers, rochers, roseaux, touffes sèches, pampas, touffes d'herbe, buissons fleuris, fougères, couvre-sol, agaves, nénuphars, fleurs en quatre couleurs, galets — de tailles diverses dans un atlas à 2×, table dans `js/decor-pieces.js` | Découpées dans les planches d'eau, la planche d'arbres et la planche d'ornements de l'auteur du dépôt (voir plus bas) |
-| `villageois.webp` | Le **villageois** : marche en quatre orientations × huit pas, puis repos, cueillir, construire, porter (quatre images chacune), 55×86 par case, pas intermédiaires interpolés | Planche générée par l'auteur du dépôt, fond dégradé retiré par rembg (voir plus bas) |
+| `villageois.webp` | Le **villageois** : marche en cinq orientations dessinées (sud, nord, ouest, est, nord-est), repos, cueillir, construire, porter, bûcheron, mineur, boucher ; 99×87 par case, pas intermédiaires interpolés | Deux planches générées par l'auteur du dépôt (ChatGPT puis Gemini), fond retiré par rembg (voir plus bas) |
 | `eclaireur.webp` | L'**éclaireur** : cavalier à la lance, huit orientations × quatre foulées, 106×111 par case | Planche générée par l'auteur du dépôt, livrée avec sa transparence |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 316×315, dessinée sur 158 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
@@ -156,7 +156,7 @@ couleurs du joueur tient ce rôle.
 Chaque image est posée au bas de sa case, centrée ; un villageois debout fait
 **40 px monde** (le chevalier : 44), atlas à 2× avec le même peps que les
 bâtiments : 440×688 avant interpolation (cases de 55×86), **99 Ko** ; 1320×688 et
-**226 Ko** avec les pas intermédiaires. La couleur d'équipe est celle du chevalier —
+**226 Ko** avec les pas intermédiaires ; 2376×1044 et **324 Ko** avec le nord-est et les outils. La couleur d'équipe est celle du chevalier —
 l'écharpe bleue bascule, la peau, le cuir et la chemise restent ; le test le
 vérifie sur 14 440 pixels de peau.
 
@@ -173,6 +173,25 @@ en écartant les doublons. Le moteur joue ces `sequences` par rangée
 parcourue ; de profil, la mesure ne distingue pas les pieds et la planche est
 jouée telle quelle. Le chevalier n'a pas d'image nette de chaque côté : rien
 à remonter, il faudra une nouvelle planche.
+
+### Le nord-est et les outils (planche Gemini)
+
+Une seconde planche, obtenue avec Gemini à partir de la première, ajoute les
+diagonales et des poses de travail. Seule la marche **nord-est** est retenue
+(les autres diagonales y sont dessinées de dos ou de profil) ; le nord-ouest
+est ce nord-est retourné (`miroirs` de l'atlas), et en sud-est et sud-ouest
+l'unité prend le profil le plus proche, comme avant. Ses huit images posent la
+même jambe cinq fois : elles sont remises dans l'ordre le plus lisse puis
+interpolées ×3, comme les profils. Les poses **bûcheron** (hache, vers l'est),
+**mineur** (pioche, vers l'ouest) et **boucher** (maillet sur une carcasse,
+vers l'ouest) sont interpolées ×2 et retournées quand la cible est de l'autre
+côté ; le repos de cette planche n'apporte rien et n'est pas repris. Les 48
+sprites sont repérés sur le fond blanc (cartouches masqués par position) et
+détourés par rembg ; l'échelle est calée sur la stature de la marche existante
+(128 → 80 px). La hache levée déborde de l'ancienne case : la cellule passe à
+**99×87**, toutes les rangées reposées sur la même ligne des pieds, et
+`hauteurMonde` suit (40,5) pour garder la même taille à l'écran
+(`fabrique-villageois-v4.py`).
 
 ### Des pas intermédiaires (RIFE)
 
