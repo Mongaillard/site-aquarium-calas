@@ -364,7 +364,7 @@ condamner la case. Le point choisi est sauvegardé avec l'unité : une partie
 reprise le garde.
 
 **Le villageois travaille pour de vrai** (`villageois.webp`, 291 Ko) : quatre
-orientations de marche dessinées (les diagonales prennent le profil), et sept poses — repos,
+orientations de marche dessinées (en diagonale, la cardinale la plus proche), et sept poses — repos,
 cueillir, construire, porter. La pose suit l'état de la simulation : devant des
 baies ou une ferme il cueille, devant un arbre, un gisement, un chantier ou un
 ennemi il frappe, en chemin avec sa charge il la porte, à l'arrêt il souffle.

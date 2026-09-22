@@ -10,7 +10,7 @@
 | `cerf.webp` | Le **cerf** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en ordre de face et de dos | Planche générée par l'auteur du dépôt, fond noir dé-prémultiplié |
 | `cochon.webp` | Le **cochon** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en balancier | Planche générée par l'auteur du dépôt, fond gris uni |
 | `decor.webp` | Le **décor de la carte** : 97 pièces — amas de rochers, rochers, roseaux, touffes sèches, pampas, touffes d'herbe, buissons fleuris, fougères, couvre-sol, agaves, nénuphars, fleurs en quatre couleurs, galets — de tailles diverses dans un atlas à 2×, table dans `js/decor-pieces.js` | Découpées dans les planches d'eau, la planche d'arbres et la planche d'ornements de l'auteur du dépôt (voir plus bas) |
-| `villageois.webp` | Le **villageois** : marche en quatre orientations dessinées (sud, nord, ouest, est ; les diagonales prennent le profil), repos, cueillir, construire, porter, bûcheron, mineur, boucher ; 99×87 par case, pas intermédiaires interpolés | Marche et poses de la planche de l'auteur du dépôt (ChatGPT), outils d'une planche Gemini ; fond retiré par rembg (voir plus bas) |
+| `villageois.webp` | Le **villageois** : marche en quatre orientations dessinées (sud, nord, ouest, est ; en diagonale, la cardinale la plus proche), repos, cueillir, construire, porter, bûcheron, mineur, boucher ; 99×87 par case, pas intermédiaires interpolés | Marche et poses de la planche de l'auteur du dépôt (ChatGPT), outils d'une planche Gemini ; fond retiré par rembg (voir plus bas) |
 | `eclaireur.webp` | L'**éclaireur** : cavalier à la lance, huit orientations × quatre foulées, 106×111 par case | Planche générée par l'auteur du dépôt, livrée avec sa transparence |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 316×315, dessinée sur 158 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
@@ -203,7 +203,8 @@ rangées reposées sur la même ligne des pieds (`fabrique-outils-v6.py`,
 La marche **nord-est** de cette planche a été jouée quelque temps pour les deux
 diagonales nord (le nord-ouest en miroir), puis retirée : ses huit dessins
 mêlent vue de face et vue de dos, et la tête se retournait à chaque cycle. En
-diagonale, l'unité prend le profil de son côté (`lignes` de l'atlas).
+diagonale, l'unité reprend la cardinale la plus proche, comme avant (quatre
+secteurs).
 
 ### Une troisième planche essayée, puis retirée (Gemini n° 2)
 

@@ -88,18 +88,18 @@ const ATLAS = {
     ancreY: 74, hauteurMonde: 37,
   },
   // Le villageois : quatre orientations de marche (sud, nord, ouest, est —
-  // `lignes` donne la ligne de l'atlas pour chaque secteur, les diagonales
-  // prenant le profil le plus proche) et sept poses, dessinées d'un seul côté
-  // (`sens` : 1 vers l'est, -1 vers l'ouest) — un miroir les retourne quand la
-  // cible est de l'autre (voir Renderer.poseDe). Debout, 40 px : un peu moins
-  // que le chevalier.
+  // `lignes` donne la ligne de l'atlas pour chaque secteur, une diagonale
+  // prenant la cardinale la plus proche) et sept poses, dessinées d'un seul
+  // côté (`sens` : 1 vers l'est, -1 vers l'ouest) — un miroir les retourne
+  // quand la cible est de l'autre (voir Renderer.poseDe). Debout, 40 px : un
+  // peu moins que le chevalier.
   villager: {
     src: 'assets/villageois.webp',
-    cellW: 99, cellH: 87, cases: 8, images: 24, cycle: 36,
-    // Quatre marches dessinées ; en diagonale, l'unité prend le profil de son
-    // côté. Une rangée nord-est demandée à Gemini a été essayée puis retirée :
-    // ses huit dessins mêlaient vue de face et vue de dos.
-    lignes: [0, 3, 3, 3, 1, 2, 2, 2],
+    cellW: 99, cellH: 87, cases: 4, images: 24, cycle: 36,
+    // Quatre marches dessinées, quatre secteurs. Une rangée nord-est demandée
+    // à Gemini a été essayée puis retirée : ses huit dessins mêlaient vue de
+    // face et vue de dos.
+    lignes: [0, 3, 1, 2],
     // Les huit foulées de la planche n'alternent pas les pieds (de face :
     // droit, droit, puis quatre fois le gauche). Mesurées image par image,
     // on retient six poses de face et de dos dans l'ordre d'une vraie marche,
