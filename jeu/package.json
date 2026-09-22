@@ -1,0 +1,16 @@
+{
+  "name": "age-des-empires-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Jeu de stratégie temps réel façon Age of Empires, jouable au doigt dans le navigateur.",
+  "scripts": {
+    "start": "npx --yes http-server . -p 8080 -c-1 -o /index.html",
+    "test": "node test/simulation.test.js",
+    "test:navigateur": "node test/navigateur.test.mjs",
+    "test:tout": "npm test && npm run test:navigateur"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}
