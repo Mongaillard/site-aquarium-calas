@@ -363,7 +363,7 @@ point n'est pas joignable du tout, n'importe quel côté fait l'affaire avant de
 condamner la case. Le point choisi est sauvegardé avec l'unité : une partie
 reprise le garde.
 
-**Le villageois travaille pour de vrai** (`villageois.webp`, 324 Ko) : cinq
+**Le villageois travaille pour de vrai** (`villageois.webp`, 260 Ko) : cinq
 orientations de marche dessinées (le nord-ouest est le nord-est en miroir), et sept poses — repos,
 cueillir, construire, porter. La pose suit l'état de la simulation : devant des
 baies ou une ferme il cueille, devant un arbre, un gisement, un chantier ou un

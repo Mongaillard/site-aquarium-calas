@@ -100,14 +100,17 @@ const ATLAS = {
     // sud-est et sud-ouest, l'unité prend le profil le plus proche.
     lignes: [0, 3, 3, 8, 1, 8, 2, 2],
     miroirs: [false, false, false, false, false, true, false, false],
-    // Les huit foulées des planches n'alternent pas les pieds (de face :
-    // droit, droit, puis quatre fois le gauche). Mesurées image par image,
-    // on retient six poses de face et de dos dans l'ordre d'une vraie marche,
-    // les huit de profil et de dos trois quarts dans l'ordre le plus lisse,
-    // puis RIFE intercale deux pas entre chaque paire (voir SOURCES.md, « Des
-    // pas intermédiaires ») : la rangée joue ses images dans l'ordre, la
-    // première étant la foulée neutre où le villageois s'arrête.
-    sequences: { 0: suite(18), 1: suite(18), 2: suite(24), 3: suite(24), 8: suite(24) },
+    // Les planches ne cadencent pas les pieds toutes seules. Pour les quatre
+    // marches cardinales, on ne garde que quatre foulées par direction — un
+    // pied devant, puis l'autre —, et RIFE intercale deux pas entre chaque
+    // paire (voir SOURCES.md, « Des pas intermédiaires ») ; le nord-est joue
+    // ses huit dessins dans l'ordre le plus lisse. Chaque rangée joue ses
+    // images dans l'ordre, la première étant celle où le villageois s'arrête.
+    sequences: { 0: suite(12), 1: suite(12), 2: suite(12), 3: suite(12), 8: suite(24) },
+    // De face et de dos, les quatre foulées retenues font deux cycles
+    // complets (droit, gauche, droit, gauche) : la rangée couvre le double de
+    // distance, sans quoi les pieds patineraient.
+    cycles: { 0: 72, 1: 72 },
     // Les poses de travail sont dessinées d'un seul côté (`sens` : 1 vers
     // l'est, -1 vers l'ouest) et retournées quand la cible est de l'autre.
     poses: {
@@ -454,7 +457,8 @@ export function imageDeMarche(def, distance, enMouvement, ligne = 0) {
   const seq = def.sequences && def.sequences[ligne];
   const n = seq ? seq.length : (def.images || 1);
   if (n <= 1 || !enMouvement) return seq ? seq[0] : 0;
-  const cycle = def.cycle || 40;
+  // Une rangée qui dessine plus d'un cycle de marche annonce sa propre distance.
+  const cycle = (def.cycles && def.cycles[ligne]) || def.cycle || 40;
   const i = Math.floor((distance / cycle) * n) % n;
   return seq ? seq[i] : i;
 }

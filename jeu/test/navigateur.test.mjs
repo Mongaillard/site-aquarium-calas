@@ -987,14 +987,16 @@ check('le villageois marche sur huit secteurs : quatre cardinales et le nord-est
   && quatre.nordEst === 8 && quatre.nordOuest === 8 && quatre.miroirNordOuest && !quatre.miroirNordEst
   && quatre.sudEst === 3 && quatre.sudOuest === 2, JSON.stringify(quatre));
 
-// La planche de face n'alterne pas les pieds : une séquence par rangée remonte
-// une vraie marche avec six des huit images, et l'arrêt tombe sur la neutre.
+// Les planches n'alternent pas les pieds d'elles-mêmes : une séquence par rangée
+// remonte une vraie marche (un pied devant, puis l'autre), et l'arrêt tombe sur
+// la première image. De face et de dos, la rangée couvre deux cycles.
 const cadenceVillageois = await page.evaluate(async () => {
   const mod = await import('./js/sprites.js');
   const def = mod.spriteDe('villager').def;
   const jouees = (ligne) => {
     const suite = [];
-    for (let d = 0; d < def.cycle * 2; d += 0.5) {
+    const cycle = (def.cycles && def.cycles[ligne]) || def.cycle;
+    for (let d = 0; d < cycle * 2; d += 0.5) {
       const i = mod.imageDeMarche(def, d, true, ligne);
       if (suite[suite.length - 1] !== i) suite.push(i);
     }
@@ -1010,7 +1012,7 @@ const cadenceVillageois = await page.evaluate(async () => {
 {
   const memes = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const deuxTours = (jouee, seq) => memes(jouee, [...seq, ...seq]);
-  check('de face et de dos, le villageois joue sa séquence de six pas, deux tours par double cycle',
+  check('de face et de dos, le villageois joue sa séquence de pas, deux tours par double cycle',
     deuxTours(cadenceVillageois.sud, cadenceVillageois.attendueSud) && deuxTours(cadenceVillageois.nord, cadenceVillageois.attendueNord),
     `sud ${cadenceVillageois.sud.join('')} · nord ${cadenceVillageois.nord.join('')}`);
   check('de profil, il joue ses vingt-quatre images interpolées dans l’ordre, deux tours par double cycle',
