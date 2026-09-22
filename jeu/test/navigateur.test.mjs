@@ -40,6 +40,14 @@ await page.goto(BASE, { waitUntil: 'networkidle' });
 check('page chargée', await page.title() === 'Âge des Empires Mobile', await page.title());
 await page.screenshot({ path: `${SHOTS}/jeu-accueil.png` });
 
+// L'icône de l'onglet ne doit rien laisser traîner : un reste de balisage
+// fermait l'en-tête, la feuille de style tombait dans le corps de la page.
+const entete = await page.evaluate(() => ({
+  feuille: !!document.head.querySelector('link[rel="stylesheet"]'),
+  textes: [...document.body.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim()).length,
+}));
+check('l’en-tête garde sa feuille de style, le corps aucun texte parasite', entete.feuille && entete.textes === 0, JSON.stringify(entete));
+
 // Aucune clé d'icône ne doit s'afficher en toutes lettres : « express Express »
 // au lieu du pictogramme, c'est le défaut que ce contrôle attrape.
 const ecranAccueil = await page.evaluate(() => {
@@ -1303,6 +1311,74 @@ const soldierShelter = await page.evaluate(() => {
 });
 check('appui direct : les soldats se réfugient', soldierShelter === 'garrison', soldierShelter);
 
+// Relecture complète (septembre) : chaque défaut d'interface corrigé garde son test.
+const relecture = await page.evaluate(async () => {
+  const g = window.__jeu, w = g.world, T = 32;
+  const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+  const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const r = {};
+  // La file de production s'annule encore après que le panneau s'est redessiné.
+  w.players[0].resources.food = 5000;
+  g.setSelection([tc]);
+  const bouton = [...document.querySelectorAll('#command-panel [data-cmd]')].find((b) => b.textContent.includes('Villageois'));
+  bouton.click();
+  const food0 = w.players[0].resources.food, file0 = tc.queue.length;
+  await attendre(2500);
+  document.querySelector('#selection-panel [data-cancel]')?.click();
+  await attendre(200);
+  r.file = { avant: file0, apres: tc.queue.length, rembourse: w.players[0].resources.food - food0 };
+  // Au plafond (deux Centres-Villes), la carte du menu de construction est grisée.
+  w.players[0].resources.wood = 5000;
+  let spot = null;
+  for (let d = 4; d < 20 && !spot; d++) for (let dy = -d; dy <= d && !spot; dy++) for (let dx = -d; dx <= d && !spot; dx++) {
+    if (w.canPlace(0, 'towncenter', tc.tx + dx, tc.ty + dy, true)) spot = { tx: tc.tx + dx, ty: tc.ty + dy };
+  }
+  const second = w.spawnBuilding(0, 'towncenter', spot.tx, spot.ty, true);
+  g.ui.openBuildMenu();
+  const carte = document.querySelector('#build-list [data-type="towncenter"]');
+  r.limite = { grisee: !!carte && carte.classList.contains('disabled'), raison: carte && carte.dataset.reason };
+  g.ui.closeBuildMenu();
+  w.killEntity(second, null, true);
+  // La charge d'un villageois : l'icône de la ressource, pas son nom.
+  const v = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  v.carry = { type: 'wood', amount: 7 };
+  g.setSelection([v]);
+  const stats = document.querySelector('#selection-panel .stats');
+  r.charge = { texte: stats.innerText.replace(/\s+/g, ' '), iconeAvant: /<\/svg>\s*7\//.test(stats.innerHTML) };
+  v.carry = { type: null, amount: 0 };
+  // Toucher le coin transparent de l'illustration du palais : ce n'est pas le palais.
+  const coin = { x: tc.x - 80, y: (tc.ty + tc.size) * T - 150 };
+  r.coin = g.batimentIllustreSous(coin.x, coin.y);
+  r.coin = r.coin ? r.coin.type : null;
+  r.dome = (g.batimentIllustreSous(tc.x, tc.y - T * 2) || {}).type || null;
+  // Un gisement d'or épuisé : le tronçon de sol en cache est refait.
+  w.fog.explored.fill(1); w.fog.visible.fill(1); w.fog.dirty = true;
+  // Un gisement posé sur l'herbe : sur de la terre, il n'y aurait rien à refaire.
+  let or = null;
+  for (const res of w.map.resources.values()) {
+    if (res.type === 'gold' && w.map.terrain[res.ty * w.map.w + res.tx] !== 2) { or = res; break; }
+  }
+  g.camera.centerOn(or.tx * T + T / 2, or.ty * T + T / 2);
+  await attendre(300);
+  const cle = `${g.camera.zoom < 0.75 ? 1 : 0}:${Math.floor(or.tx / 8)}:${Math.floor(or.ty / 8)}`;
+  const avant = g.renderer.troncons.get(cle);
+  const i = or.ty * w.map.w + or.tx, terrain0 = w.map.terrain[i];
+  w.map.clearResource(i);
+  await attendre(300);
+  const apres = g.renderer.troncons.get(cle);
+  r.sol = { avant: !!avant, refait: !!apres && apres !== avant, terrain: `${terrain0} → ${w.map.terrain[i]}` };
+  g.setSelection([]);
+  return r;
+});
+check('la file de production s’annule encore après un nouveau rendu du panneau', relecture.file.avant === 1 && relecture.file.apres === 0 && relecture.file.rembourse >= 50,
+  JSON.stringify(relecture.file));
+check('deux Centres-Villes : leur carte est grisée dans le menu de construction', relecture.limite.grisee, JSON.stringify(relecture.limite));
+check('la charge d’un villageois s’affiche avec l’icône de la ressource', !/\bwood\b/.test(relecture.charge.texte) && relecture.charge.iconeAvant,
+  relecture.charge.texte);
+check('le coin transparent de l’illustration du palais ne le sélectionne pas, ses dômes si', relecture.coin !== 'towncenter' && relecture.dome === 'towncenter',
+  `coin : ${relecture.coin} · dômes : ${relecture.dome}`);
+check('un gisement d’or épuisé refait le sol en cache', relecture.sol.avant && relecture.sol.refait, JSON.stringify(relecture.sol));
+
 // Menu pause
 await page.evaluate(() => window.__jeu.togglePause());
 await page.waitForTimeout(150);
@@ -1320,6 +1396,20 @@ await page.evaluate(() => window.__jeu.resign());
 await page.waitForTimeout(300);
 const endText = await page.textContent('.modal-card');
 check('écran de fin affiché', endText.includes('Défaite') && endText.includes('Ressources récoltées'));
+
+// Une nouvelle partie n'hérite pas des écouteurs de la précédente : le bouton
+// du son répondait deux fois, donc ne changeait rien.
+await page.click('[data-act="again"]');
+await page.waitForTimeout(1500);
+const nouvelle = await page.evaluate(() => {
+  const g = window.__jeu;
+  const avant = g.audio.enabled;
+  document.getElementById('btn-sound').click();
+  const apres = g.audio.enabled;
+  document.getElementById('btn-sound').click();
+  return { avant, apres };
+});
+check('nouvelle partie : un appui sur le son le bascule une seule fois', nouvelle.avant !== nouvelle.apres, JSON.stringify(nouvelle));
 
 check('aucune erreur console', errors.length === 0, errors.slice(0, 3).join(' | '));
 

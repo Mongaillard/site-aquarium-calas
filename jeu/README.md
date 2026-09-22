@@ -103,8 +103,9 @@ villageois, fantassins et archers. À l'intérieur, les unités sont hors d'atte
 et se soignent, et **chaque occupant ajoute une flèche** à la salve du bâtiment :
 un Centre-Ville vide ne tire pas, un Centre-Ville plein est une forteresse. Si le
 bâtiment tombe, la garnison périt avec lui. Le bouton **🔔 cloche du village**
-envoie tous les villageois s'abriter d'un coup ; un second coup les renvoie au
-travail. Pour abriter une sélection précise, le bouton **🚪 Abriter** puis un
+envoie tous les villageois s'abriter d'un coup ; un second coup renvoie chacun à
+son poste — le gisement, la ferme ou le chantier qu'il avait quitté —, y compris
+ceux qui couraient encore vers l'abri. Pour abriter une sélection précise, le bouton **🚪 Abriter** puis un
 appui sur le refuge (des soldats se réfugient d'un simple appui sur l'abri).
 
 **Déplacement en groupe.** Une armée avance au rythme de son unité la plus
@@ -299,7 +300,8 @@ la cible de personne d'eux-mêmes — les soldats les ignorent.
   fait sien. Il cesse alors d'errer, se sélectionne et se mène au doigt comme
   une unité ; menez-le au village, puis touchez-le avec un villageois pour
   l'abattre — 100 de nourriture. Les unités adverses peuvent capturer les
-  vôtres de la même façon.
+  vôtres de la même façon, tant qu'aucune de vos unités ne se tient à côté pour
+  le garder.
 
 Un ordre donné *à côté* d'un animal reste un ordre de déplacement : seul un
 doigt posé sur la bête déclenche la chasse.
