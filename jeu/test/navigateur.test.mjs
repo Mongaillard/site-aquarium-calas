@@ -960,7 +960,7 @@ const villageois = await page.evaluate(async () => {
   v.dead = true;
   return { cases: def.cases, images: def.images, lignes: def.lignes, opaques, changes, peau, peauIntacte, bleusRestants, poses };
 });
-check('le villageois porte son illustration : huit secteurs sur six marches dessinées, 24 pas interpolés', !!villageois && villageois.cases === 8 && villageois.images === 24 && villageois.lignes.length === 8, villageois ? `${villageois.cases} secteurs × ${villageois.images}` : 'absent');
+check('le villageois porte son illustration : huit secteurs sur quatre marches dessinées, 24 pas interpolés', !!villageois && villageois.cases === 8 && villageois.images === 24 && villageois.lignes.length === 8, villageois ? `${villageois.cases} secteurs × ${villageois.images}` : 'absent');
 check('le villageois adverse est repeint (l’écharpe)', !!villageois && villageois.changes > villageois.opaques * 0.02, villageois && `${Math.round((villageois.changes / villageois.opaques) * 100)} % des pixels`);
 check('la peau du villageois reste la même', !!villageois && villageois.peau > 500 && villageois.peauIntacte === villageois.peau, villageois && `${villageois.peauIntacte}/${villageois.peau} pixels de peau intacts`);
 check('aucun bleu franc ne subsiste côté adverse (villageois)', !!villageois && villageois.bleusRestants === 0, villageois && villageois.bleusRestants + ' pixels');
@@ -982,14 +982,13 @@ const quatre = await page.evaluate(async () => {
     nordEst: ligne(-Math.PI / 4), nordOuest: ligne(-3 * Math.PI / 4), sudEst: ligne(Math.PI / 4), sudOuest: ligne(3 * Math.PI / 4),
     miroirNordOuest: miroir(-3 * Math.PI / 4), miroirNordEst: miroir(-Math.PI / 4), lignes: def.lignes, cases: def.cases };
 });
-check('le villageois marche sur huit secteurs : quatre cardinales et le nord-est dessinés, le nord-ouest en miroir, les diagonales sud sur le profil',
+check('le villageois marche sur huit secteurs : quatre cardinales dessinées, chaque diagonale sur le profil de son côté, sans miroir',
   quatre.cases === 8 && quatre.sud === 0 && quatre.nord === 1 && quatre.ouest === 2 && quatre.est === 3
-  && quatre.nordEst === 8 && quatre.nordOuest === 8 && quatre.miroirNordOuest && !quatre.miroirNordEst
-  && quatre.sudEst === 3 && quatre.sudOuest === 2, JSON.stringify(quatre));
+  && quatre.nordEst === 3 && quatre.sudEst === 3 && quatre.nordOuest === 2 && quatre.sudOuest === 2
+  && !quatre.miroirNordOuest && !quatre.miroirNordEst, JSON.stringify(quatre));
 
-// Les planches n'alternent pas les pieds d'elles-mêmes : une séquence par rangée
-// remonte une vraie marche (un pied devant, puis l'autre), et l'arrêt tombe sur
-// la première image. De face et de dos, la rangée couvre deux cycles.
+// La planche de face n'alterne pas les pieds : une séquence par rangée remonte
+// une vraie marche avec six des huit images, et l'arrêt tombe sur la neutre.
 const cadenceVillageois = await page.evaluate(async () => {
   const mod = await import('./js/sprites.js');
   const def = mod.spriteDe('villager').def;
@@ -1012,7 +1011,7 @@ const cadenceVillageois = await page.evaluate(async () => {
 {
   const memes = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const deuxTours = (jouee, seq) => memes(jouee, [...seq, ...seq]);
-  check('de face et de dos, le villageois joue sa séquence de pas, deux tours par double cycle',
+  check('de face et de dos, le villageois joue sa séquence de six pas, deux tours par double cycle',
     deuxTours(cadenceVillageois.sud, cadenceVillageois.attendueSud) && deuxTours(cadenceVillageois.nord, cadenceVillageois.attendueNord),
     `sud ${cadenceVillageois.sud.join('')} · nord ${cadenceVillageois.nord.join('')}`);
   check('de profil, il joue ses vingt-quatre images interpolées dans l’ordre, deux tours par double cycle',

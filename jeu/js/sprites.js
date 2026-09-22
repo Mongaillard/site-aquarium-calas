@@ -88,29 +88,26 @@ const ATLAS = {
     ancreY: 74, hauteurMonde: 37,
   },
   // Le villageois : quatre orientations de marche (sud, nord, ouest, est —
-  // `lignes` donne la ligne de l'atlas pour chaque secteur) et quatre poses
-  // de travail, dessinées d'un seul côté (`sens` : 1 vers l'est, -1 vers
-  // l'ouest) — un miroir les retourne quand la cible est de l'autre (voir
-  // Renderer.poseDe). Debout, 40 px : un peu moins que le chevalier.
+  // `lignes` donne la ligne de l'atlas pour chaque secteur, les diagonales
+  // prenant le profil le plus proche) et sept poses, dessinées d'un seul côté
+  // (`sens` : 1 vers l'est, -1 vers l'ouest) — un miroir les retourne quand la
+  // cible est de l'autre (voir Renderer.poseDe). Debout, 40 px : un peu moins
+  // que le chevalier.
   villager: {
     src: 'assets/villageois.webp',
     cellW: 99, cellH: 87, cases: 8, images: 24, cycle: 36,
-    // Six marches dessinées — sud, nord, ouest, est, et le nord-est de la
-    // planche Gemini —, le nord-ouest étant le nord-est retourné ; en
-    // sud-est et sud-ouest, l'unité prend le profil le plus proche.
-    lignes: [0, 3, 3, 8, 1, 8, 2, 2],
-    miroirs: [false, false, false, false, false, true, false, false],
-    // Les planches ne cadencent pas les pieds toutes seules. Pour les quatre
-    // marches cardinales, on ne garde que quatre foulées par direction — un
-    // pied devant, puis l'autre —, et RIFE intercale deux pas entre chaque
-    // paire (voir SOURCES.md, « Des pas intermédiaires ») ; le nord-est joue
-    // ses huit dessins dans l'ordre le plus lisse. Chaque rangée joue ses
-    // images dans l'ordre, la première étant celle où le villageois s'arrête.
-    sequences: { 0: suite(12), 1: suite(12), 2: suite(12), 3: suite(12), 8: suite(24) },
-    // De face et de dos, les quatre foulées retenues font deux cycles
-    // complets (droit, gauche, droit, gauche) : la rangée couvre le double de
-    // distance, sans quoi les pieds patineraient.
-    cycles: { 0: 72, 1: 72 },
+    // Quatre marches dessinées ; en diagonale, l'unité prend le profil de son
+    // côté. Une rangée nord-est demandée à Gemini a été essayée puis retirée :
+    // ses huit dessins mêlaient vue de face et vue de dos.
+    lignes: [0, 3, 3, 3, 1, 2, 2, 2],
+    // Les huit foulées de la planche n'alternent pas les pieds (de face :
+    // droit, droit, puis quatre fois le gauche). Mesurées image par image,
+    // on retient six poses de face et de dos dans l'ordre d'une vraie marche,
+    // les huit de profil dans l'ordre le plus lisse, puis RIFE intercale deux
+    // pas entre chaque paire (voir SOURCES.md, « Des pas intermédiaires ») :
+    // la rangée joue ses images dans l'ordre, la première étant la foulée
+    // neutre où le villageois s'arrête.
+    sequences: { 0: suite(18), 1: suite(18), 2: suite(24), 3: suite(24) },
     // Les poses de travail sont dessinées d'un seul côté (`sens` : 1 vers
     // l'est, -1 vers l'ouest) et retournées quand la cible est de l'autre.
     poses: {
@@ -118,9 +115,9 @@ const ATLAS = {
       cueillir: { ligne: 5, images: 4, cadence: 5, sens: -1 },
       construire: { ligne: 6, images: 4, cadence: 7, sens: 1 },
       porter: { ligne: 7, images: 12, sens: 1 },
-      bois: { ligne: 9, images: 8, cadence: 11, sens: 1 },
-      or: { ligne: 10, images: 8, cadence: 11, sens: -1 },
-      viande: { ligne: 11, images: 8, cadence: 9, sens: -1 },
+      bois: { ligne: 8, images: 8, cadence: 11, sens: 1 },
+      or: { ligne: 9, images: 12, cadence: 14, sens: -1 },
+      viande: { ligne: 10, images: 9, cadence: 9, sens: 1 },
     },
     ancreY: 86, hauteurMonde: 40.5, natif: 'bleu',
     // L'écharpe est bleu franc ; peau, cuir et chemise sont orangés ou crème.

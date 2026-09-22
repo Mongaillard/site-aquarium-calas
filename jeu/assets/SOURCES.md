@@ -10,7 +10,7 @@
 | `cerf.webp` | Le **cerf** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en ordre de face et de dos | Planche générée par l'auteur du dépôt, fond noir dé-prémultiplié |
 | `cochon.webp` | Le **cochon** : cinq rangées (sud, sud-est, est, nord-est, nord) de quatre foulées, les trois de l'ouest en miroir, pas remis en balancier | Planche générée par l'auteur du dépôt, fond gris uni |
 | `decor.webp` | Le **décor de la carte** : 97 pièces — amas de rochers, rochers, roseaux, touffes sèches, pampas, touffes d'herbe, buissons fleuris, fougères, couvre-sol, agaves, nénuphars, fleurs en quatre couleurs, galets — de tailles diverses dans un atlas à 2×, table dans `js/decor-pieces.js` | Découpées dans les planches d'eau, la planche d'arbres et la planche d'ornements de l'auteur du dépôt (voir plus bas) |
-| `villageois.webp` | Le **villageois** : marche en cinq orientations dessinées (sud, nord, ouest, est, nord-est), repos, cueillir, construire, porter, bûcheron, mineur, boucher ; 99×87 par case, pas intermédiaires interpolés | Trois planches générées par l'auteur du dépôt (ChatGPT puis Gemini), fond retiré par rembg (voir plus bas) |
+| `villageois.webp` | Le **villageois** : marche en quatre orientations dessinées (sud, nord, ouest, est ; les diagonales prennent le profil), repos, cueillir, construire, porter, bûcheron, mineur, boucher ; 99×87 par case, pas intermédiaires interpolés | Marche et poses de la planche de l'auteur du dépôt (ChatGPT), outils d'une planche Gemini ; fond retiré par rembg (voir plus bas) |
 | `eclaireur.webp` | L'**éclaireur** : cavalier à la lance, huit orientations × quatre foulées, 106×111 par case | Planche générée par l'auteur du dépôt, livrée avec sa transparence |
 | `centre-ville.webp` | Le **Centre-Ville** : palais à dômes bleus sur son parvis, 344×343, dessiné sur 172 px pour une emprise de 96 | Illustration générée par l'auteur du dépôt, fond plat retiré |
 | `caserne.webp` | La **caserne** : enceinte crénelée, cour d'entraînement, deux tours à dôme, 316×315, dessinée sur 158 px | Illustration générée par l'auteur du dépôt, même chaîne que le Centre-Ville |
@@ -156,7 +156,7 @@ couleurs du joueur tient ce rôle.
 Chaque image est posée au bas de sa case, centrée ; un villageois debout fait
 **40 px monde** (le chevalier : 44), atlas à 2× avec le même peps que les
 bâtiments : 440×688 avant interpolation (cases de 55×86), **99 Ko** ; 1320×688 et
-**226 Ko** avec les pas intermédiaires ; 2376×1044 et **324 Ko** avec le nord-est et les outils, **278 Ko** une fois les quatre marches cardinales reprises de la troisième planche et les rangées Gemini passées au peps. La couleur d'équipe est celle du chevalier —
+**226 Ko** avec les pas intermédiaires ; 2376×1044 et **324 Ko** avec le nord-est et les outils ; 2376×957 et **291 Ko** aujourd'hui, le nord-est retiré et les outils corrigés (voir plus bas). La couleur d'équipe est celle du chevalier —
 l'écharpe bleue bascule, la peau, le cuir et la chemise restent ; le test le
 vérifie sur 14 440 pixels de peau.
 
@@ -174,57 +174,66 @@ parcourue ; de profil, la mesure ne distingue pas les pieds et la planche est
 jouée telle quelle. Le chevalier n'a pas d'image nette de chaque côté : rien
 à remonter, il faudra une nouvelle planche.
 
-### Le nord-est et les outils (planche Gemini)
+### Les outils (planche Gemini n° 1), et le nord-est retiré
 
-Une seconde planche, obtenue avec Gemini à partir de la première, ajoute les
-diagonales et des poses de travail. Seule la marche **nord-est** est retenue
-(les autres diagonales y sont dessinées de dos ou de profil) ; le nord-ouest
-est ce nord-est retourné (`miroirs` de l'atlas), et en sud-est et sud-ouest
-l'unité prend le profil le plus proche, comme avant. Ses huit images posent la
-même jambe cinq fois : elles sont remises dans l'ordre le plus lisse puis
-interpolées ×3, comme les profils. Les poses **bûcheron** (hache, vers l'est),
-**mineur** (pioche, vers l'ouest) et **boucher** (maillet sur une carcasse,
-vers l'ouest) sont interpolées ×2 et retournées quand la cible est de l'autre
-côté ; le repos de cette planche n'apporte rien et n'est pas repris. Les 48
-sprites sont repérés sur le fond blanc (cartouches masqués par position) et
-détourés par rembg ; l'échelle est calée sur la stature de la marche existante
-(128 → 80 px). La hache levée déborde de l'ancienne case : la cellule passe à
-**99×87**, toutes les rangées reposées sur la même ligne des pieds, et
-`hauteurMonde` suit (40,5) pour garder la même taille à l'écran
-(`fabrique-villageois-v4.py`).
+Une seconde planche, obtenue avec Gemini à partir de la première, ajoute des
+diagonales et des poses de travail. Les poses **bûcheron** (hache), **mineur**
+(pioche) et **boucher** (maillet sur une carcasse) sont retenues — quatre
+dessins chacune. Mais Gemini a dessiné **une image sur quatre retournée** : la
+pioche frappait derrière le mineur, la hache et le maillet changeaient de côté
+d'une image à l'autre. Vérifié image par image, l'image fautive est retournée
+en miroir avant montage pour que l'outil travaille toujours du même côté (la
+pioche vers l'ouest, la hache et le maillet vers l'est) ; la pioche est jouée en
+aller-retour — lever derrière, passer au-dessus, frapper, relever — sur six
+dessins, le maillet sur trois. RIFE intercale une image entre chaque paire (deux
+pour le maillet), l'échelle est calée sur la stature de la marche (128 → 80 px),
+l'écharpe bleu-gris est ravivée pour que la couleur d'équipe la reconnaisse, et
+chaque case reçoit le « peps » des autres illustrations (voir plus bas).
+L'écharpe des rangées d'origine ne valait guère mieux — saturation médiane
+0,21 à 0,26, sous la fenêtre de recoloration (0,32) : le villageois adverse
+gardait une écharpe presque bleue, et le test de repeinte l'a attrapé quand les
+rangées Gemini très saturées ont cessé de masquer la mesure. Toutes les rangées
+sont ravivées de la même façon (teinte 216°, saturation portée à 0,72, clarté
+conservée) : l'écharpe est franchement bleue chez nous, franchement rouge en
+face. La hache
+levée déborde de l'ancienne case : la cellule passe à **99×87**, toutes les
+rangées reposées sur la même ligne des pieds (`fabrique-outils-v6.py`,
+`fabrique-villageois-v6.py`).
 
-### Les quatre marches cardinales (planche Gemini n° 2)
+La marche **nord-est** de cette planche a été jouée quelque temps pour les deux
+diagonales nord (le nord-ouest en miroir), puis retirée : ses huit dessins
+mêlent vue de face et vue de dos, et la tête se retournait à chaque cycle. En
+diagonale, l'unité prend le profil de son côté (`lignes` de l'atlas).
+
+### Une troisième planche essayée, puis retirée (Gemini n° 2)
 
 Une troisième planche, demandée à Gemini pour les seules directions sud, nord,
-ouest et est (huit images chacune), remplace les marches de la première : ses
-foulées alternent enfin les pieds. On n'en garde que **quatre par direction**,
-un pied devant puis l'autre — de face les images 1, 2, 4, 3 de la planche, de
-dos 1, 3, 5, 8 ; de profil, deux foulées (images 1 et 4) séparées par la pose
-jambes jointes (image 3), jouée deux fois — et RIFE intercale deux pas entre
-chaque paire : douze images par rangée. De face et de dos, ces quatre foulées
-font deux cycles complets (droit, gauche, droit, gauche) : la rangée annonce sa
-propre distance (`cycles` dans l'atlas, 72 px monde au lieu de 36), sans quoi
-les pieds patineraient. Chaque rangée est ramenée à la stature de l'ancienne
-marche sud (80 px dans l'atlas), la planche dessinant le dos un peu plus grand
-que la face ; l'écharpe est ravivée comme pour la planche précédente. Le repos,
-les poses et le nord-est ne bougent pas (`fabrique-villageois-v5.py`).
+ouest et est, a remplacé quelque temps les marches de la première : quatre
+foulées retenues par direction, un pied devant puis l'autre, RIFE entre
+chaque paire, la rangée de face et de dos couvrant deux cycles (l'atlas peut
+annoncer une distance par rangée, `cycles`, lue par `imageDeMarche`). Comparées
+image par image, ces marches sont **moins vivantes** que celles de la première
+planche : jambes droites sur presque toutes les images, genoux jamais levés,
+bras immobiles — l'interpolation en fait un glissement plutôt qu'une marche,
+là où la première planche lève le pied et balance les bras. Les marches de la
+première planche sont donc de retour ; l'essai est documenté ici pour ne pas le
+refaire, et la mécanique de distance par rangée reste dans le moteur.
 
-Les images Gemini sont **moins nettes** que celles de la première planche :
-mesurée par la variance du laplacien sur les images clés, la netteté des
-rangées Gemini valait la moitié de celle des rangées d'origine (2 300 à 3 000
-contre 4 700 à 6 800), qui avaient reçu le « peps » des autres illustrations
-(masque flou, saturation, contraste — voir plus bas) alors que les rangées
-Gemini ne l'avaient pas eu. Le même traitement, appliqué case par case aux
-rangées Gemini (les quatre marches cardinales, le nord-est et les trois outils),
-les ramène au niveau des autres (5 700 à 7 400) ; l'atlas pèse 278 Ko.
-
-Le découpage ne dépend plus de la mise en page de la planche
+Le découpage des planches ne dépend plus de leur mise en page
 (`decoupe-planche.py`) : les cartouches de légende se reconnaissent à leurs
 longues lignes de pixels sombres d'un seul tenant, les traits de séparation à
 leur longueur, et les numéros sous les pieds sont écartés parce qu'ils sont
 entièrement sous la boîte du personnage ; les blocs de colonnes et les rangées
-se déduisent des trous entre les boîtes. Vérifié sur la planche précédente : ses
+se déduisent des trous entre les boîtes. Vérifié sur la planche des outils : ses
 48 sprites ressortent tels quels.
+
+Les images Gemini sont **moins nettes** que celles de la première planche :
+mesurée par la variance du laplacien sur les images clés, leur netteté valait la
+moitié de celle des rangées d'origine (2 300 à 3 000 contre 4 700 à 6 800), qui
+avaient reçu le « peps » des autres illustrations (masque flou, saturation,
+contraste — voir plus bas) alors que les rangées Gemini ne l'avaient pas eu. Le
+même traitement, case par case, les ramène au niveau des autres (5 700 à
+7 400).
 
 ### Des pas intermédiaires (RIFE)
 
