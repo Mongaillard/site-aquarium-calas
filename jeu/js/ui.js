@@ -287,7 +287,9 @@ export class UI {
       + '#' + (first.kind === 'building' ? (first.complete ? 'fini' : 'chantier') : '')
       + '#' + (first.garrison ? first.garrison.length : '')
       + '#' + player.age + '#' + player.techs.size
-      + '#' + [this.game.attackMoveArmed, this.game.garrisonArmed, this.game.rallyArmed].join('');
+      + '#' + [this.game.attackMoveArmed, this.game.garrisonArmed, this.game.rallyArmed].join('')
+      // Le bouton « Détruire » armé se désarme seul au bout de trois secondes.
+      + '#' + (first.kind === 'building' && this.game.demolitionEnAttente(first) ? 'armee' : '');
   }
 
   refreshSelection(force = false) {
@@ -521,7 +523,9 @@ export class UI {
             action: () => this.game.toggleRally(),
           });
         }
-        buttons.push({ icon: 'detruire', label: 'Détruire', action: () => this.game.demolish(b) });
+        // Deux appuis pour détruire : le premier arme le bouton (voir Game.demolish).
+        const armee = this.game.demolitionEnAttente(b);
+        buttons.push({ icon: 'detruire', label: armee ? 'Confirmer' : 'Détruire', danger: armee, action: () => this.game.demolish(b) });
       }
     }
 
@@ -532,6 +536,7 @@ export class UI {
       if (b.toggled) classes.push('toggled');
       if (b.highlight) classes.push('highlight');
       if (b.compact) classes.push('compact');
+      if (b.danger) classes.push('danger');
       const title = b.title ? ` title="${b.title}"` : '';
       return `<button class="${classes.join(' ')}" data-cmd="${i}"${title} ${state.ok ? '' : `data-reason="${state.reason}"`}>
         <span class="cmd-icon">${iconeSVG(b.icon, 22)}</span>
@@ -771,18 +776,21 @@ export class UI {
     const enemy = this.world.players[1 - this.world.humanIndex];
     const egalite = result.winner === -1;
     const title = egalite ? 'Égalité' : (result.victory ? 'Victoire !' : 'Défaite');
+    // Chiffres exacts : arrondis (« 4,0k » contre « 4,0k »), un score serré
+    // départagé au temps écoulé ne se lisait plus.
+    const exact = (n) => Math.floor(n).toLocaleString('fr-FR');
     const summary = `
       <table class="scores">
         <tr><th></th><th>Vous</th><th>Adversaire</th></tr>
         <tr><td>Ressources récoltées</td>
-            <td>${formatNumber(this.total(player))}</td><td>${formatNumber(this.total(enemy))}</td></tr>
+            <td>${exact(this.total(player))}</td><td>${exact(this.total(enemy))}</td></tr>
         <tr><td>Unités formées</td><td>${player.stats.trained}</td><td>${enemy.stats.trained}</td></tr>
         <tr><td>Unités perdues</td><td>${player.stats.lost}</td><td>${enemy.stats.lost}</td></tr>
         <tr><td>Bâtiments construits</td><td>${player.stats.built}</td><td>${enemy.stats.built}</td></tr>
         <tr><td>Âge atteint</td><td>${AGES[player.age].name}</td><td>${AGES[enemy.age].name}</td></tr>
         ${result.scores ? `<tr class="total"><td><b>Score final</b></td>
-          <td><b>${formatNumber(result.scores[player.index])}</b></td>
-          <td><b>${formatNumber(result.scores[enemy.index])}</b></td></tr>` : ''}
+          <td><b>${exact(result.scores[player.index])}</b></td>
+          <td><b>${exact(result.scores[enemy.index])}</b></td></tr>` : ''}
       </table>`;
     const illustration = egalite ? ''
       : `<img class="fin-illustration${result.victory ? '' : ' tombe'}"

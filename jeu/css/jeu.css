@@ -132,8 +132,13 @@ html, body {
 }
 
 .options { display: grid; gap: 8px; }
-.options.row { grid-template-columns: repeat(3, 1fr); }
-.options.row:has(> :nth-child(4)) { grid-template-columns: repeat(4, 1fr); }
+.options.row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.options.row:has(> :nth-child(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Quatre choix sur un écran de 360 px : « Tranquille » imposait sa largeur,
+   et « Blitz ×2 » sortait de l'écran. Deux par ligne. */
+@media (max-width: 380px) {
+  .options.row:has(> :nth-child(4)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 /* Partie interrompue : la reprise passe avant tout le reste de l'écran. */
 .resume-box {
@@ -288,7 +293,9 @@ ul.help a { color: var(--gold); }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-width: min(60vw, 320px);
+  /* Place laissée à la minimap, à droite : sur 360 px, les notifications
+     mordaient sur elle. */
+  max-width: min(60vw, 320px, calc(100vw - 150px - var(--safe-left) - var(--safe-right)));
   pointer-events: none;
 }
 .toast {
@@ -514,6 +521,8 @@ ul.help a { color: var(--gold); }
 .cmd.disabled { opacity: .42; }
 .cmd.toggled { border-color: var(--gold); background: rgba(232, 182, 76, .2); }
 .cmd.highlight { border-color: var(--gold); background: linear-gradient(180deg, rgba(232,182,76,.28), rgba(232,182,76,.12)); }
+/* « Détruire » armé : un second appui rase le bâtiment. */
+.cmd.danger { border-color: #e0604c; background: rgba(224, 96, 76, .28); color: #ffd9d2; }
 .cmd.compact { min-width: 54px; padding: 6px 4px; }
 .cmd.compact .cmd-label { font-size: 9.5px; }
 .cmd-icon { font-size: 19px; line-height: 1; display: flex; }
@@ -603,10 +612,12 @@ ul.help a { color: var(--gold); }
 /* Téléphone en paysage : on comprime la barre basse pour garder la carte visible. */
 @media (max-width: 360px) {
   .res { padding: 3px 6px; font-size: 11.5px; }
-  #alerts { max-width: 70vw; }
+  #alerts { max-width: min(70vw, calc(100vw - 150px - var(--safe-left) - var(--safe-right))); }
 }
 
 @media (orientation: landscape) and (max-height: 480px) {
+  /* Trois notifications au plus : la quatrième passait sous la barre des ouvriers. */
+  #alerts .toast:nth-last-child(n+4) { display: none; }
   .worker-chip, .worker-open { min-height: 30px; padding: 4px 8px; font-size: 12px; }
   #selection-panel { min-height: 38px; }
   .portrait { width: 38px; height: 38px; font-size: 20px; }

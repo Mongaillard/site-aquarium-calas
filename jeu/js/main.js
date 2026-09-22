@@ -89,7 +89,8 @@ class Game {
   constructor(options) {
     this.options = options;
     // Reprise d'une partie interrompue : le monde vient de la sauvegarde.
-    this.world = (options.restore && restoreWorld(options.restore)) || new World(options);
+    const repris = options.restore ? restoreWorld(options.restore) : null;
+    this.world = repris || new World(options);
     this.canvas = document.getElementById('game');
     // Tous les écouteurs posés sur le DOM partagé (canvas, boutons du HUD,
     // clavier, fenêtre) : une partie terminée les retire d'un coup, sinon elle
@@ -105,6 +106,7 @@ class Game {
     this.buildMode = null;
     this.attackMoveArmed = false;
     this.rallyArmed = false;
+    this.demolitionArmee = null;   // « Détruire » touché une fois : { id, jusqua } (voir demolish)
     this.garrisonArmed = false;
     this.paused = false;
     this.speedId = options.speed || (options.restore && options.restore.speed) || loadSpeed();
@@ -134,7 +136,9 @@ class Game {
     this.onLeave = () => this.saveNow();
     document.addEventListener('visibilitychange', this.onHide);
     window.addEventListener('pagehide', this.onLeave);
-    this.ui.toast('Affectez vos villageois : touchez-les, puis touchez un arbre, un buisson ou un filon.');
+    // Le conseil de départ, pour une partie neuve seulement : à la reprise,
+    // les villageois travaillent déjà.
+    if (!repris) this.ui.toast('Affectez vos villageois : touchez-les, puis touchez un arbre, un buisson ou un filon.');
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
   }
@@ -254,6 +258,7 @@ class Game {
     if (this.rallyArmed && this.selection.length === 1 && this.selection[0].kind === 'building') {
       this.world.setRally(this.selection[0], p.x, p.y);
       this.rallyArmed = false;
+      this.ui.setBuildHint('');   // la consigne restait affichée, par-dessus les notifications
       this.audio.play('order');
       this.ui.toast('Point de ralliement défini');
       this.ui.refreshSelection(true);
@@ -265,6 +270,7 @@ class Game {
 
     if (this.attackMoveArmed && ownUnits.length > 0) {
       this.attackMoveArmed = false;
+      this.ui.setBuildHint('');
       this.world.formationMove(ownUnits, p.x, p.y, true);
       this.pingOrder(p.x, p.y, '#ff9b6b');
       this.audio.play('order');
@@ -636,7 +642,31 @@ class Game {
     }
   }
 
+  /** Destruction demandée une première fois, en attente de confirmation (sinon null). */
+  demolitionEnAttente(building) {
+    const d = this.demolitionArmee;
+    return !!d && d.id === building.id && performance.now() < d.jusqua;
+  }
+
+  /**
+   * Détruire un de ses bâtiments : deux appuis, trois secondes au plus
+   * d'écart. Un seul appui rasait le Centre-Ville — en Express, la défaite
+   * sur-le-champ, pour un doigt qui visait « Ralliement » juste à côté.
+   */
   demolish(building) {
+    if (!this.demolitionEnAttente(building)) {
+      this.demolitionArmee = { id: building.id, jusqua: performance.now() + 3000 };
+      const w = this.world;
+      const dernier = building.type === 'towncenter' && w.mode.victory === 'towncenter'
+        && !w.buildings.some((b) => b !== building && !b.dead && b.complete
+          && b.type === 'towncenter' && b.playerIndex === building.playerIndex);
+      this.ui.toast(dernier
+        ? 'Votre dernier Centre-Ville : le détruire, c’est perdre la partie. Touchez « Confirmer » pour le raser.'
+        : `Touchez « Confirmer » pour raser : ${building.def.name}.`, dernier ? 'error' : 'info');
+      this.ui.refreshSelection(true);
+      return;
+    }
+    this.demolitionArmee = null;
     this.world.killEntity(building, null, false);
     this.ui.toast(`${building.def.name} détruit`);
     this.setSelection([]);

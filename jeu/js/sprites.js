@@ -116,7 +116,9 @@ const ATLAS = {
       cueillir: { ligne: 5, images: 4, cadence: 5, sens: -1 },
       // Le maillet frappe vers l'ouest sur la planche (image 3 : tête en bas à gauche).
       construire: { ligne: 6, images: 4, cadence: 7, sens: -1 },
-      porter: { ligne: 7, images: 12, sens: 1 },
+      // Images 2 à 4 : des intercalaires ratés, à demi transparents — le rondin
+      // clignotait. On ne joue que les neuf autres.
+      porter: { ligne: 7, images: 12, sens: 1, suite: [0, 1, 5, 6, 7, 8, 9, 10, 11] },
       bois: { ligne: 8, images: 8, cadence: 11, sens: 1 },
       or: { ligne: 9, images: 12, cadence: 14, sens: -1 },
       viande: { ligne: 10, images: 9, cadence: 9, sens: 1 },

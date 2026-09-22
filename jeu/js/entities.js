@@ -56,6 +56,10 @@ export function villagerTask(unit) {
   // ancien gisement, et le compter comme actif le rendrait invisible.
   if (unit.state === STATE.IDLE) return 'idle';
   if (unit.state === STATE.BUILD) return 'build';
+  // Poste demandé pendant qu'il livre encore l'ancien : il compte déjà pour le
+  // nouveau. Sinon « + Or » ne changeait rien aux compteurs pendant la
+  // livraison, et un second appui détournait un autre villageois.
+  if (unit.pendingJob && unit.pendingJob.resType) return unit.pendingJob.resType;
   if (unit.resourceTile) {
     const res = unit.world.map.resourceAt(unit.resourceTile.tx, unit.resourceTile.ty);
     if (res) return res.type;

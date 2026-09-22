@@ -969,6 +969,9 @@ const villageois = await page.evaluate(async () => {
   v.stop(); poses.repos = nom(r.poseDe(v, def, immobile));
   poses.marche = nom(r.poseDe(v, def, marche));
   v.carry = { type: 'wood', amount: 8 }; v.facing = 0; poses.porteEst = nom(r.poseDe(v, def, marche)); v.facing = Math.PI; poses.porteOuest = nom(r.poseDe(v, def, marche));
+  v.facing = Math.PI / 2; poses.porteSud = nom(r.poseDe(v, def, marche));
+  v.carry = { type: 'gold', amount: 8 }; v.facing = 0; poses.porteOrEst = nom(r.poseDe(v, def, marche));
+  poses.suitePorter = def.poses.porter.suite || null;
   v.carry = { type: null, amount: 0 };
   g.world.players[0].resources.wood = 1000;
   let site = null;
@@ -993,6 +996,11 @@ check('devant un arbre il abat à la hache, devant l’or il pioche, tournés ve
 check('sur une carcasse, il travaille au maillet, tourné vers elle des deux côtés', P.carcasseEst === 'viande' && P.carcasseOuest === 'viande·miroir',
   `carcasse à l’est : ${P.carcasseEst} · à l’ouest : ${P.carcasseOuest}`);
 check('chargé, il porte ; à l’arrêt, il se repose ; sinon il marche', P.porteEst === 'porter' && P.porteOuest === 'porter·miroir' && P.repos === 'repos' && P.marche === 'marche', JSON.stringify(P));
+// Le rondin ne vaut que pour du bois, de profil ; et trois intercalaires ratés
+// (à demi transparents : le rondin clignotait) ne sont jamais joués.
+check('le rondin seulement pour du bois vu de profil : or porté, ou marche vers le sud, en marche ordinaire',
+  P.porteSud === 'marche' && P.porteOrEst === 'marche', `bois vers le sud : ${P.porteSud} · or vers l’est : ${P.porteOrEst}`);
+check('le port saute ses images ratées', Array.isArray(P.suitePorter) && !P.suitePorter.some((i) => i >= 2 && i <= 4), JSON.stringify(P.suitePorter));
 // La planche dessine le maillet frappant vers l'ouest : c'est l'est qui se retourne.
 check('sur un chantier, il construit, tourné vers lui des deux côtés', P.chantierOuest === 'construire' && P.chantierEst === 'construire·miroir',
   `chantier à l’ouest : ${P.chantierOuest} · à l’est : ${P.chantierEst}`);
@@ -1180,6 +1188,7 @@ const avantRechargement = await page.evaluate(() => {
     unites: g.world.units.filter((u) => !u.dead).length,
     batiments: g.world.buildings.filter((b) => !b.dead).length,
     sauvegarde: !!localStorage.getItem('aem.partie'),
+    prochainId: g.world.nextId,
   };
 });
 check('la partie s’écrit dans le navigateur', avantRechargement.sauvegarde);
@@ -1190,18 +1199,20 @@ const resumeTexte = await page.textContent('.resume-info');
 await page.click('#btn-resume');
 // On fige la partie tout de suite : elle reprend à la milliseconde où on la
 // relance, et quelques secondes de jeu suffiraient à fausser la comparaison.
-await page.waitForTimeout(120);
-const apresReprise = await page.evaluate(() => {
+// Ce qui naît dans les premières images (une maison que l'IA pose) ne compte
+// pas : on ne recompte que les entités qui existaient à la sauvegarde.
+await page.waitForFunction(() => { const g = window.__jeu; if (!g || !g.world) return false; g.paused = true; return true; }, null, { polling: 'raf' });
+const apresReprise = await page.evaluate((prochainId) => {
   const g = window.__jeu;
   g.paused = true;
   const p = g.world.players[0];
   return {
     time: Math.round(g.world.time),
     food: Math.round(p.resources.food),
-    unites: g.world.units.filter((u) => !u.dead).length,
-    batiments: g.world.buildings.filter((b) => !b.dead).length,
+    unites: g.world.units.filter((u) => !u.dead && u.id < prochainId).length,
+    batiments: g.world.buildings.filter((b) => !b.dead && b.id < prochainId).length,
   };
-});
+}, avantRechargement.prochainId);
 check('la partie reprend au même instant',
   Math.abs(apresReprise.time - avantRechargement.time) <= 1,
   `${avantRechargement.time} s → ${apresReprise.time} s`);
@@ -1444,8 +1455,20 @@ async function pincer(A) {
 await pincer([150, 300]);
 const apresPincement = await page.evaluate(() => window.__appuis.splice(0));
 check('le doigt resté posé après un pincement ne donne aucun ordre', apresPincement.length === 0, JSON.stringify(apresPincement));
+// En mode construction, le doigt immobile au-dessus d'un emplacement libre :
+// avant, son relâchement y posait la maison.
+const constructible = await page.evaluate(() => {
+  const g = window.__jeu, w = g.world, T = 32;
+  const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  for (let r = 3; r <= 9; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !w.canPlace(0, 'house', tc.tx + dx, tc.ty + dy)) continue;
+    const e = g.camera.worldToScreen((tc.tx + dx + 1) * T, (tc.ty + dy + 1) * T);
+    if (e.x > 40 && e.x < innerWidth - 160 && e.y > 180 && e.y < innerHeight - 260) return [Math.round(e.x), Math.round(e.y)];
+  }
+  return [120, 470];
+});
 const chantiers0 = await page.evaluate(() => { window.__jeu.startBuildMode('house'); return window.__jeu.world.buildings.filter((b) => b.playerIndex === 0 && !b.complete).length; });
-await pincer([120, 470]);
+await pincer(constructible);
 const construction = await page.evaluate(() => ({
   appuis: window.__appuis.splice(0), mode: !!window.__jeu.buildMode,
   chantiers: window.__jeu.world.buildings.filter((b) => b.playerIndex === 0 && !b.complete).length,
@@ -1571,6 +1594,63 @@ check('zoom minimal : le sol n’est pas recuit à chaque image', interfaceRelue
 check('une ferme écarte le décor debout de son emprise', interfaceRelue.ferme.dessous > 0 && interfaceRelue.ferme.peintes === 0,
   `${interfaceRelue.ferme.dessous} pièce(s) sous la ferme, ${interfaceRelue.ferme.peintes} peinte(s) dessus`);
 
+// Retours de la partie jouée de bout en bout (septembre).
+const finsDePartie = await page.evaluate(async () => {
+  const g = window.__jeu, w = g.world, T = 32;
+  const attendre = (ms) => new Promise((res) => setTimeout(res, ms));
+  const r = {};
+  const commande = (texte) => [...document.querySelectorAll('#command-panel .cmd')].find((b) => b.querySelector('.cmd-label')?.textContent.trim() === texte);
+  const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const villageois = w.units.filter((u) => u.playerIndex === 0 && u.isVillager && !u.dead);
+  // « + Or » sur un villageois chargé d'autre chose : il livre d'abord, mais
+  // compte tout de suite à l'or.
+  for (const v of villageois) v.stop();
+  const baie = w.findNearestResource(tc.x, tc.y, 'food', 40 * T, 0);
+  for (const v of villageois) { v.gatherAt(baie.tx, baie.ty); v.carry = { type: 'food', amount: 8 }; }
+  const or0 = g.workerStats().gold;
+  g.assignWorker('gold');
+  r.plusOr = { avant: or0, apres: g.workerStats().gold };
+  for (const v of villageois) v.stop();
+  // « Détruire » : un premier appui arme le bouton, rien n'est rasé.
+  g.setSelection([tc]);
+  await attendre(150);
+  commande('Détruire')?.click();
+  await attendre(150);
+  r.cv = { debout: !tc.dead, confirmer: !!commande('Confirmer') };
+  g.setSelection([]);
+  // Une maison : deux appuis la rasent.
+  const maison = w.spawnBuilding(0, 'house', tc.tx + 6, tc.ty + 6, true);
+  g.setSelection([maison]);
+  await attendre(150);
+  commande('Détruire')?.click();
+  await attendre(120);
+  commande('Confirmer')?.click();
+  await attendre(120);
+  r.maison = maison.dead;
+  // Consignes de ralliement et d'attaque : effacées une fois l'ordre donné.
+  const bulle = () => !document.getElementById('build-hint').classList.contains('hidden');
+  g.setSelection([tc]);
+  g.toggleRally();
+  const ralliementAffiche = bulle();
+  const ecran = g.camera.worldToScreen(tc.x + T * 4, tc.y + T * 4);
+  g.tapAt(ecran.x, ecran.y, false);
+  r.ralliement = { avant: ralliementAffiche, apres: bulle() };
+  g.setSelection(villageois.slice(0, 2));
+  g.toggleAttackMove();
+  const attaqueAffiche = bulle();
+  g.tapAt(ecran.x, ecran.y, false);
+  r.attaque = { avant: attaqueAffiche, apres: bulle() };
+  g.setSelection([]);
+  return r;
+});
+check('« Détruire » sur le Centre-Ville : un seul appui ne rase rien, le bouton demande confirmation', finsDePartie.cv.debout && finsDePartie.cv.confirmer,
+  JSON.stringify(finsDePartie.cv));
+check('et « Confirmer » rase le bâtiment', finsDePartie.maison === true, `maison ${finsDePartie.maison ? 'rasée' : 'debout'}`);
+check('la consigne du ralliement s’efface une fois le point posé', finsDePartie.ralliement.avant && !finsDePartie.ralliement.apres, JSON.stringify(finsDePartie.ralliement));
+check('celle de l’attaque aussi, l’ordre donné', finsDePartie.attaque.avant && !finsDePartie.attaque.apres, JSON.stringify(finsDePartie.attaque));
+check('« + Or » : le villageois qui livre d’abord compte déjà à l’or', finsDePartie.plusOr.apres === finsDePartie.plusOr.avant + 1,
+  `or ${finsDePartie.plusOr.avant} → ${finsDePartie.plusOr.apres}`);
+
 // Menu pause
 await page.evaluate(() => window.__jeu.togglePause());
 await page.waitForTimeout(150);
@@ -1692,6 +1772,58 @@ async function ouvrirPartie(viewport) {
   });
   check('360×640 : la bulle de construction ne cache ni la notification ni la minimap, et laisse passer le doigt',
     m.notification === 0 && m.minimap === 0 && m.traversable, JSON.stringify(m));
+  await ctx.close();
+}
+
+{
+  // Écran d'accueil sur 360 px : les quatre vitesses tiennent dans l'écran.
+  const ctx = await browser.newContext({ viewport: { width: 360, height: 640 }, screen: { width: 360, height: 640 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, serviceWorkers: 'block' });
+  const p = await ctx.newPage();
+  p.on('pageerror', (err) => errors.push('pageerror: ' + err.message));
+  await p.goto(BASE, { waitUntil: 'networkidle' });
+  const vitesses = await p.evaluate(() => [...document.querySelectorAll('#speed-options > *')].map((n) => Math.round(n.getBoundingClientRect().right)));
+  check('360 px : les quatre vitesses de jeu tiennent dans l’écran', vitesses.length === 4 && Math.max(...vitesses) <= 360, JSON.stringify(vitesses));
+  // Une partie, sauvegardée puis reprise : pas de conseil de départ.
+  await p.click('#btn-play');
+  await p.waitForFunction(() => !!(window.__jeu && window.__jeu.world));
+  await p.waitForTimeout(800);
+  const conseilNeuve = await p.evaluate(() => [...document.querySelectorAll('#alerts .toast')].some((t) => t.textContent.startsWith('Affectez')));
+  // Notifications : jamais sur la minimap.
+  const minimap = await p.evaluate(async () => {
+    for (let i = 0; i < 4; i++) window.__jeu.ui.toast(`Essai de notification numéro ${i} assez longue pour s’étendre`);
+    await new Promise((res) => setTimeout(res, 100));
+    const m = document.getElementById('minimap-wrap').getBoundingClientRect();
+    return [...document.querySelectorAll('#alerts .toast')].map((t) => t.getBoundingClientRect())
+      .filter((t) => t.right > m.left && t.left < m.right && t.bottom > m.top && t.top < m.bottom).length;
+  });
+  check('360 px : les notifications laissent la minimap dégagée', minimap === 0, `${minimap} notification(s) dessus`);
+  // Fin de partie serrée, au temps : les scores exacts, pas « 4,0k » contre « 4,0k ».
+  const fin = await p.evaluate(() => {
+    window.__jeu.ui.showGameOver({ winner: 0, victory: true, timeUp: true, time: 600, scores: [3990, 3960] });
+    return document.querySelector('.modal-card').textContent;
+  });
+  check('fin serrée : les deux scores se lisent en entier', /3\s?990/.test(fin) && /3\s?960/.test(fin) && !/4,0k/.test(fin), (fin.match(/Score final.*$/m) || [''])[0].slice(0, 60));
+  await p.evaluate(() => { window.__jeu.ui.hideModal(); window.__jeu.saveNow(); });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.click('#btn-resume');
+  await p.waitForFunction(() => !!(window.__jeu && window.__jeu.world));
+  await p.waitForTimeout(600);
+  const conseilReprise = await p.evaluate(() => [...document.querySelectorAll('#alerts .toast')].some((t) => t.textContent.startsWith('Affectez')));
+  check('le conseil de départ s’affiche en partie neuve, pas à la reprise', conseilNeuve && !conseilReprise,
+    `neuve : ${conseilNeuve ? 'affiché' : 'absent'} · reprise : ${conseilReprise ? 'affiché' : 'absent'}`);
+  await ctx.close();
+}
+{
+  // Paysage : les notifications ne passent pas sous la barre des ouvriers.
+  const { ctx, p } = await ouvrirPartie({ width: 740, height: 360 });
+  const dessous = await p.evaluate(async () => {
+    for (let i = 0; i < 5; i++) window.__jeu.ui.toast(`Essai ${i}`);
+    await new Promise((res) => setTimeout(res, 100));
+    const barre = document.getElementById('worker-bar').getBoundingClientRect();
+    return [...document.querySelectorAll('#alerts .toast')].filter((t) => getComputedStyle(t).display !== 'none')
+      .map((t) => t.getBoundingClientRect()).filter((t) => t.bottom > barre.top && t.left < barre.right).length;
+  });
+  check('paysage : aucune notification sous la barre des ouvriers', dessous === 0, `${dessous} dessous`);
   await ctx.close();
 }
 

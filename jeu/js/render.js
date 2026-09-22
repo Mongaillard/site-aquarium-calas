@@ -1310,9 +1310,12 @@ export class Renderer {
       const { pose } = choix;
       // Une pose de travail se cadence sur l'horloge, décalée par unité pour
       // que dix bûcherons ne frappent pas en chœur ; le port suit la distance.
-      const image = choix.parDistance
-        ? Math.floor(((anim.distance || 0) / (sprite.def.cycle || 40)) * pose.images) % pose.images
-        : Math.floor(this.horloge * pose.cadence + (u.id % 7) * 0.53) % pose.images;
+      // `suite` : les images jouées, quand certaines de la rangée sont à écarter.
+      const n = pose.suite ? pose.suite.length : pose.images;
+      const k = choix.parDistance
+        ? Math.floor(((anim.distance || 0) / (sprite.def.cycle || 40)) * n) % n
+        : Math.floor(this.horloge * pose.cadence + (u.id % 7) * 0.53) % n;
+      const image = pose.suite ? pose.suite[k] : k;
       ({ sx, sy } = poseSource(sprite.def, pose, image));
       miroir = choix.miroir;
     } else {
@@ -1377,7 +1380,13 @@ export class Renderer {
     const P = def.poses;
     const charge = u.carry.amount > 0.5;
     const cote = (dx) => (dx >= 0 ? 1 : -1);
-    const porter = () => ({ pose: P.porter, parDistance: true, miroir: cote(Math.cos(u.facing)) !== P.porter.sens });
+    // Le port montre un rondin, de profil : seulement pour du bois, et en
+    // allant vers l'est ou l'ouest (le même secteur que la marche à quatre
+    // orientations). De l'or ou des vivres, ou une marche vers le nord ou le
+    // sud : la marche ordinaire, et la pastille de la charge.
+    const porter = () => (u.carry.type === 'wood' && Math.abs(Math.cos(u.facing)) >= Math.SQRT1_2
+      ? { pose: P.porter, parDistance: true, miroir: cote(Math.cos(u.facing)) !== P.porter.sens }
+      : null);
     if (anim.avance) return charge ? porter() : null;
     let cible = u.target;
     if (u.resourceTile) cible = { x: u.resourceTile.tx * TILE + TILE / 2, y: u.resourceTile.ty * TILE + TILE / 2 };
@@ -1394,8 +1403,7 @@ export class Renderer {
       return { pose, miroir: cote(dx) !== pose.sens };
     }
     if ((u.state === STATE.BUILD || u.state === STATE.ATTACK) && cible) return { pose: P.construire, miroir: cote(dx) !== P.construire.sens };
-    if (charge) return porter();
-    return { pose: P.repos, miroir: false };
+    return (charge && porter()) || { pose: P.repos, miroir: false };
   }
 
   /** Pastille de la ressource portée par un villageois. */
