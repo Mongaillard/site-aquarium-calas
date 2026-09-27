@@ -4,25 +4,27 @@ Donnez une photo d'objet à l'Atelier 3D : il crée un **modèle 3D complet et t
 
 - **Gratuit et 100 % local** : tout est calculé sur votre ordinateur. Pas d'abonnement, pas de clé API, aucune photo envoyée sur Internet.
 - **Sans carte graphique** : fonctionne sur un ordinateur ordinaire. Une carte graphique NVIDIA est utilisée automatiquement si elle est présente.
-- **Fichiers standards** : GLB (sites web, PowerPoint…) et OBJ + texture (Blender, SketchUp…).
+- **Fichiers standards** : GLB (sites web, PowerPoint, SketchUp…) et OBJ + texture (Blender…).
 
 ## Comment ça marche
 
 1. **Détourage** : le fond de la photo est supprimé automatiquement.
 2. **Analyse** : le modèle d'IA open source [TripoSR](https://github.com/VAST-AI-Research/TripoSR) déduit la forme 3D complète de l'objet, y compris le côté qu'on ne voit pas sur la photo.
 3. **Volume** : cette forme est convertie en maillage 3D, lissé et allégé.
-4. **Texture** : la vraie photo est projetée sur la face visible de l'objet, pour garder tous ses détails. Les côtés cachés reçoivent les couleurs estimées par l'IA, avec une transition douce entre les deux.
+4. **Texture** : la vraie photo est projetée sur la face visible de l'objet, pour garder tous ses détails. Les côtés cachés reçoivent les couleurs estimées par l'IA, avec une transition douce entre les deux, ou la photo en miroir pour un objet symétrique.
 5. **Export** : le modèle est enregistré en GLB et en OBJ, avec une image de texture.
 
 ## Ce qu'il faut
 
 | | Minimum | Conseillé |
 |---|---|---|
-| Système | Windows 10/11, macOS ou Linux | |
-| Python | 3.11, 3.12 ou 3.13 | **3.12** |
+| Système | Windows 10/11 64 bits (processeur Intel ou AMD), macOS sur Mac à puce Apple (M1 ou plus récent), ou Linux | |
+| Python | 3.11, 3.12 ou 3.13, en 64 bits (**pas 3.14**, pas encore compatible) | **3.13** |
 | Mémoire vive | 8 Go | 16 Go |
-| Espace disque | 6 Go (bibliothèques + modèles IA) | |
+| Espace disque | 6 Go sans carte NVIDIA, 11 Go avec une carte NVIDIA | |
 | Internet | pour l'installation et le premier lancement | |
+
+Les Mac à processeur Intel ne sont pas pris en charge : PyTorch n'y est plus mis à jour.
 
 Une fois installé et lancé une première fois, l'Atelier fonctionne sans Internet.
 
@@ -30,9 +32,10 @@ Une fois installé et lancé une première fois, l'Atelier fonctionne sans Inter
 
 ### Windows
 
-1. Installez **Python 3.12** depuis [python.org](https://www.python.org/downloads/). Pendant l'installation, **cochez la case « Add python.exe to PATH »**.
-2. Double-cliquez sur **`installer.bat`**. Comptez 5 à 15 minutes selon la connexion.
-3. Double-cliquez sur **`lancer.bat`**. L'Atelier s'ouvre dans votre navigateur.
+1. Installez **Python 3.13 (64 bits)** : sur [cette page](https://www.python.org/downloads/release/python-31315/), choisissez « Windows installer (64-bit) ». Pendant l'installation, **cochez la case « Add python.exe to PATH »**. N'installez pas Python 3.14, que proposent les gros boutons de python.org : il n'est pas encore compatible. Si vous utilisez le gestionnaire d'installation de Python, la commande `py install 3.13` fait la même chose.
+2. **Décompressez** le dossier de l'Atelier (clic droit › Extraire tout) dans un emplacement court, par exemple `C:\Atelier3D`.
+3. Double-cliquez sur **`installer.bat`**. Comptez 5 à 15 minutes selon la connexion, et jusqu'à une heure avec une carte NVIDIA (2,6 Go à télécharger en plus).
+4. Double-cliquez sur **`lancer.bat`**. L'Atelier s'ouvre dans votre navigateur. Laissez la fenêtre noire ouverte : la fermer arrête l'Atelier.
 
 Au premier lancement, les modèles d'IA (environ 2 Go) sont téléchargés : l'indicateur en haut à droite passe à « Prêt » une fois le téléchargement fini.
 
@@ -44,6 +47,8 @@ Dans un terminal, depuis ce dossier :
 ./installer.sh
 ./lancer.sh
 ```
+
+Sous Debian ou Ubuntu, installez d'abord le module d'environnements Python : `sudo apt install python3-venv` (ou `python3.12-venv` selon votre version).
 
 ## Utilisation
 
@@ -97,27 +102,31 @@ Options : `--qualite rapide|standard|fine`, `--symetrique`, `--sans-detourage`, 
 
 - **Site web** : le fichier GLB s'affiche avec [`<model-viewer>`](https://modelviewer.dev/) ou [three.js](https://threejs.org/).
 - **PowerPoint / Word** (Microsoft 365) : Insertion › Modèles 3D › à partir d'un fichier GLB.
+- **SketchUp** : Fichier › Importer › fichier GLB.
 - **Blender** : Fichier › Importer › glTF 2.0 (GLB) ou Wavefront (OBJ).
 
 ## Dépannage
 
-- **« Python est introuvable »** : réinstallez Python 3.12 en cochant « Add python.exe to PATH ».
+- **« Python est introuvable »** ou version refusée : installez Python 3.13 en 64 bits (voir Installation) en cochant « Add python.exe to PATH ». Le programme d'installation affiche la version qu'il a trouvée et la raison du refus.
+- **L'installation échoue** : lisez le message affiché juste au-dessus. Causes fréquentes : connexion Internet coupée, disque plein, antivirus, ou dossier non décompressé. Relancer `installer.bat` répare une installation interrompue.
 - **Le premier lancement reste sur « Chargement du modèle IA »** : les modèles se téléchargent (environ 2 Go). Vérifiez la connexion Internet et patientez.
+- **Petite carte graphique NVIDIA** : l'Atelier n'utilise la carte que si elle a au moins 4 Go de mémoire, sinon il calcule sur le processeur. En cas d'erreur liée à la carte graphique, forcez le processeur : dans l'Explorateur, ouvrez le dossier de l'Atelier, tapez `cmd` dans la barre d'adresse puis Entrée, et lancez `lancer.bat --appareil cpu` (sur macOS ou Linux : `./lancer.sh --appareil cpu`).
 - **« Mémoire insuffisante »** : fermez d'autres programmes ou utilisez la qualité « Rapide ».
 - **La page ne s'ouvre pas toute seule** : ouvrez l'adresse affichée dans la fenêtre noire (par exemple `http://127.0.0.1:7860/`).
-- **Carte graphique NVIDIA récente (RTX 50xx)** : si la création échoue avec une erreur CUDA, installez la version CUDA 13 de PyTorch : `.venv\Scripts\python.exe -m pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu130`.
+- **Carte graphique NVIDIA récente (RTX 50xx)** : si la création échoue avec une erreur CUDA, installez la version CUDA 13 de PyTorch : `.venv\Scripts\python.exe -m pip install --force-reinstall --no-deps torch --index-url https://download.pytorch.org/whl/cu130`.
+- **Microsoft Visual C++** : PyTorch a besoin du « Visual C++ Redistributable », présent sur la plupart des PC. S'il manque, le programme d'installation le signale ; installez-le depuis https://aka.ms/vs/17/release/vc_redist.x64.exe.
 
 ## Licences
 
-Tous les composants peuvent être utilisés à des fins commerciales :
+Les composants choisis autorisent un usage commercial :
 
 | Composant | Rôle | Licence |
 |---|---|---|
-| [TripoSR](https://github.com/VAST-AI-Research/TripoSR) (Tripo AI et Stability AI) | reconstruction 3D ; code adapté dans `tsr/` | MIT |
-| [DIS / isnet-general-use](https://github.com/xuebinqin/DIS), via [rembg](https://github.com/danielgatis/rembg) | détourage | Apache 2.0 / MIT |
+| [TripoSR](https://github.com/VAST-AI-Research/TripoSR) (Tripo AI et Stability AI), code et poids | reconstruction 3D ; code adapté dans `tsr/` | MIT ; les fichiers de `tsr/models/transformer/`, dérivés de diffusers, sont sous Apache 2.0 |
+| [U-2-Net](https://github.com/xuebinqin/U-2-Net) (`u2net`), via [rembg](https://github.com/danielgatis/rembg) | détourage | dépôt U-2-Net, qui publie aussi les poids du modèle : Apache 2.0 ; rembg : MIT |
 | [three.js](https://threejs.org/) | visionneuse 3D, copie dans `interface/vendor/three/` | MIT |
 | Bricolage Grotesque, Atkinson Hyperlegible | polices de l'interface | SIL OFL 1.1 |
 
-Le modèle de détourage par défaut des versions récentes de rembg (BRIA RMBG 2.0) est réservé à un usage non commercial. L'Atelier ne l'utilise pas : il demande explicitement `isnet-general-use`.
+Le choix du modèle de détourage est volontaire. rembg propose d'autres modèles dont les poids ont chacun leur licence : celui qu'il utilise par défaut dans ses versions récentes (BRIA RMBG 2.0) est réservé à un usage non commercial, et `isnet-general-use` a été entraîné sur un jeu de données non commercial. L'Atelier demande donc explicitement `u2net`.
 
-Le code de TripoSR a été modifié sur un point : le calcul du maillage utilise scikit-image au lieu de torchmcubes, qui demande une compilation.
+Modifications apportées au code de TripoSR : le calcul du maillage (`isosurface.py`) utilise scikit-image au lieu de torchmcubes, qui demande une compilation ; la configuration du modèle DINO est lue dans le cache local avant Internet (`tokenizers/image.py`) ; les fonctions inutilisées de `utils.py` (détourage, vidéo, orientation) ont été retirées ; `bake_texture.py` n'a pas été repris, la texture étant calculée par `moteur/texture.py`.

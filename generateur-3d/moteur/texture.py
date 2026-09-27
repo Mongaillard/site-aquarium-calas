@@ -188,10 +188,13 @@ def calculer_texture(model, scene_code, vertices, normals, faces, uvs, resolutio
 
         if symetrique:
             # objet symétrique (poisson de profil…) : le côté caché est le reflet du côté
-            # photographié. On projette la photo sur le maillage retourné dans l'axe de visée.
+            # photographié. On projette la photo sur le maillage retourné dans l'axe de visée,
+            # autour du plan médian de l'objet (TripoSR ne le centre pas en profondeur).
             miroir = np.array([-1.0, 1.0, 1.0])
-            poids_ar, photo_ar = _projection_photo(positions * miroir, normales * miroir,
-                                                   vertices_geo * miroir, faces_geo,
+            milieu = 0.5 * (vertices_geo[:, 0].min() + vertices_geo[:, 0].max())
+            decalage = np.array([2.0 * milieu, 0.0, 0.0])
+            poids_ar, photo_ar = _projection_photo(positions * miroir + decalage, normales * miroir,
+                                                   vertices_geo * miroir + decalage, faces_geo,
                                                    projection, photo_rgba, dist_bord)
             poids_ar = np.minimum(poids_ar, 1 - poids)
             melange = melange * (1 - poids_ar[:, None]) + photo_ar * poids_ar[:, None]

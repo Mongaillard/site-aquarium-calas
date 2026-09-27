@@ -37,14 +37,46 @@ class VolumeIntrouvable(Exception):
     """L'IA n'a reconstruit aucune surface à partir de la photo."""
 
 
+# En dessous, la carte graphique ne peut pas contenir le modèle (1,7 Go de poids) et ses calculs.
+MEMOIRE_GPU_MIN = 4 * 1024 ** 3
+
+
+def _cuda_utilisable():
+    """Vrai si une carte NVIDIA assez grande est présente et exécute réellement du code."""
+    if not torch.cuda.is_available():
+        return False
+    try:
+        if torch.cuda.get_device_properties(0).total_memory < MEMOIRE_GPU_MIN:
+            return False
+        torch.ones(1, device="cuda").add_(1)
+        torch.cuda.synchronize()
+        return True
+    except Exception:  # pilote trop ancien, carte non prise en charge…
+        return False
+
+
 def choisir_appareil(preference="auto"):
     if preference == "auto":
-        return "cuda" if torch.cuda.is_available() else "cpu"
+        return "cuda" if _cuda_utilisable() else "cpu"
     if preference == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("Aucune carte graphique NVIDIA (CUDA) n'est disponible.")
     if preference == "mps" and not torch.backends.mps.is_available():
         raise RuntimeError("L'accélération Apple (MPS) n'est pas disponible sur cet ordinateur.")
     return preference
+
+
+def fichiers_modele(depot, noms):
+    """Chemins locaux de fichiers Hugging Face : le cache d'abord, Internet seulement s'il en manque.
+
+    Ainsi l'Atelier démarre sans attendre quand l'ordinateur est hors ligne. Les fichiers
+    sont récupérés ensemble pour provenir de la même version du dépôt.
+    """
+    from huggingface_hub import hf_hub_download
+
+    try:
+        return [hf_hub_download(repo_id=depot, filename=nom, local_files_only=True) for nom in noms]
+    except Exception:  # pas encore (entièrement) dans le cache
+        return [hf_hub_download(repo_id=depot, filename=nom) for nom in noms]
 
 
 class Progression:
@@ -68,6 +100,7 @@ class Generateur3D:
     """Charge les modèles une fois, puis transforme des photos en modèles 3D."""
 
     def __init__(self, appareil="auto", modele=MODELE_PAR_DEFAUT):
+        self.preference = appareil
         self.appareil = choisir_appareil(appareil)
         self.nom_modele = modele
         self.model = None
@@ -78,14 +111,29 @@ class Generateur3D:
         """Charge TripoSR (téléchargé automatiquement la première fois, ~1,7 Go)."""
         from tsr.system import TSR
 
-        model = TSR.from_pretrained(self.nom_modele, config_name="config.yaml",
-                                    weight_name="model.ckpt")
+        if os.path.isdir(self.nom_modele):
+            dossier = self.nom_modele
+        else:
+            config, _ = fichiers_modele(self.nom_modele, ["config.yaml", "model.ckpt"])
+            dossier = os.path.dirname(config)
+        model = TSR.from_pretrained(dossier, config_name="config.yaml", weight_name="model.ckpt")
+        model.eval()
+        try:
+            self._placer(model)
+        except RuntimeError:
+            if self.preference != "auto" or self.appareil == "cpu":
+                raise
+            # carte graphique trop juste : on bascule sur le processeur
+            torch.cuda.empty_cache()
+            self.appareil = "cpu"
+            self._placer(model)
+        self.model = model
+        # prépare aussi le détourage (téléchargement de ~170 Mo la première fois)
+        self.detoureur._session_rembg()
+
+    def _placer(self, model):
         model.renderer.set_chunk_size(65536 if self.appareil == "cpu" else 32768)
         model.to(self.appareil)
-        model.eval()
-        self.model = model
-        # prépare aussi le détourage (téléchargement de ~180 Mo la première fois)
-        self.detoureur._session_rembg()
 
     def generer(self, photo, dossier_sortie, qualite="standard", detourage_auto=True,
                 nom="", rappel=None, symetrique=False):
@@ -124,7 +172,8 @@ class Generateur3D:
             maillage = _garder_parties_principales(maillage)
             suivi.etape("maillage", 0.85)
             # lissage de Taubin : efface l'aspect « bosselé » sans faire maigrir l'objet
-            trimesh.smoothing.filter_taubin(maillage, lamb=0.5, nu=-0.53, iterations=12)
+            # (trimesh applique lui-même le signe négatif du second pas : nu reste positif)
+            trimesh.smoothing.filter_taubin(maillage, lamb=0.5, nu=0.53, iterations=12)
             maillage = _simplifier(maillage, reglages["faces_max"])
 
             # 4. texture
@@ -238,7 +287,7 @@ def _exporter(dossier, maillage, vmap, faces_uv, uvs, image_texture, cadree, nom
 
 
 def _exporter_obj_zip(dossier, sommets, normales, faces, uvs):
-    """OBJ + MTL + texture dans un zip, pour Blender, SketchUp, etc."""
+    """OBJ + MTL + texture dans un zip, pour Blender et la plupart des logiciels 3D."""
     with tempfile.TemporaryDirectory() as tmp:
         lignes = ["# Atelier 3D", "mtllib modele.mtl", "o modele"]
         lignes += [f"v {x:.6f} {y:.6f} {z:.6f}" for x, y, z in sommets]

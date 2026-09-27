@@ -9,6 +9,15 @@ from transformers.models.vit.modeling_vit import ViTModel
 from ...utils import BaseModule
 
 
+# Modifié pour Atelier 3D : le fichier de configuration est lu dans le cache local
+# avant de contacter Hugging Face, pour démarrer sans attendre hors connexion.
+def _config_locale_ou_distante(depot: str) -> str:
+    try:
+        return hf_hub_download(repo_id=depot, filename="config.json", local_files_only=True)
+    except Exception:
+        return hf_hub_download(repo_id=depot, filename="config.json")
+
+
 class DINOSingleImageTokenizer(BaseModule):
     @dataclass
     class Config(BaseModule.Config):
@@ -20,10 +29,7 @@ class DINOSingleImageTokenizer(BaseModule):
     def configure(self) -> None:
         self.model: ViTModel = ViTModel(
             ViTModel.config_class.from_pretrained(
-                hf_hub_download(
-                    repo_id=self.cfg.pretrained_model_name_or_path,
-                    filename="config.json",
-                )
+                _config_locale_ou_distante(self.cfg.pretrained_model_name_or_path)
             )
         )
 

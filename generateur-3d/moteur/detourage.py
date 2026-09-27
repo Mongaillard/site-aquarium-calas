@@ -1,15 +1,21 @@
-"""Préparation de la photo : orientation, détourage et cadrage."""
+"""Préparation de la photo : orientation, couleurs, détourage et cadrage."""
+import io
+
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image, ImageCms, ImageOps
 from scipy import ndimage
 
-# Modèle de détourage « isnet-general-use » (projet DIS, licence Apache 2.0) :
-# précis, rapide sur processeur et utilisable commercialement.
-# Attention : le modèle par défaut récent de rembg (bria-rmbg) est sous licence
-# non commerciale, d'où le choix explicite ici.
-MODELE_DETOURAGE = "isnet-general-use"
+# Modèle de détourage « u2net » (projet U-2-Net, dépôt sous licence Apache 2.0) :
+# léger (170 Mo, peu de mémoire), rapide sur processeur et utilisable commercialement.
+# Attention : les poids d'autres modèles proposés par rembg ont des licences moins
+# claires ou non commerciales (bria-rmbg, le modèle par défaut récent, est
+# CC BY-NC ; isnet a été entraîné sur un jeu de données non commercial).
+MODELE_DETOURAGE = "u2net"
 
 TAILLE_MAX = 2048
+# Les photos de 200 mégapixels de certains téléphones dépassent la limite par défaut
+# de Pillow ; l'envoi est de toute façon plafonné à 40 Mo.
+Image.MAX_IMAGE_PIXELS = 300_000_000
 
 try:  # photos HEIC des iPhone
     from pillow_heif import register_heif_opener
@@ -23,10 +29,35 @@ class AucunObjetDetecte(Exception):
     pass
 
 
+def _vers_srgb(image, profil_icc):
+    """Convertit les couleurs vers sRGB (photos d'iPhone en Display P3, par exemple).
+
+    Sans cela, les couleurs d'une photo P3 seraient lues comme du sRGB et la texture
+    paraîtrait ternie. En cas de profil illisible, l'image est gardée telle quelle.
+    """
+    if not profil_icc or image.mode not in ("RGB", "RGBA", "CMYK"):
+        return image
+    try:
+        source = ImageCms.ImageCmsProfile(io.BytesIO(profil_icc))
+        alpha = image.getchannel("A") if image.mode == "RGBA" else None
+        base = image.convert("RGB") if alpha is not None else image
+        rgb = ImageCms.profileToProfile(base, source, ImageCms.createProfile("sRGB"),
+                                        outputMode="RGB")
+        if alpha is not None:
+            rgb.putalpha(alpha)
+        return rgb
+    except Exception:
+        return image
+
+
 def ouvrir_photo(chemin_ou_fichier):
-    """Ouvre la photo en respectant l'orientation EXIF (photos de téléphone)."""
+    """Ouvre la photo en respectant l'orientation EXIF et le profil de couleurs."""
     image = Image.open(chemin_ou_fichier)
+    # les grands JPEG sont décodés directement à taille réduite (plus rapide, moins de mémoire)
+    image.draft(image.mode, (TAILLE_MAX, TAILLE_MAX))
+    profil_icc = image.info.get("icc_profile")
     image = ImageOps.exif_transpose(image)
+    image = _vers_srgb(image, profil_icc)
     if image.mode not in ("RGB", "RGBA"):
         image = image.convert("RGBA" if "A" in image.getbands() or image.mode == "P" else "RGB")
     if max(image.size) > TAILLE_MAX:
