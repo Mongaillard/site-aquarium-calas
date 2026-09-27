@@ -6,18 +6,20 @@ const el = {
   etatMoteur: $('etat-moteur'), etatMoteurTexte: $('etat-moteur-texte'),
   formulaire: $('formulaire'), depot: $('depot'), choixPhoto: $('choix-photo'),
   depotVide: $('depot-vide'), depotApercu: $('depot-apercu'), apercuPhoto: $('apercu-photo'), nomPhoto: $('nom-photo'),
+  sansApercu: $('sans-apercu'),
   detourage: $('detourage'), symetrie: $('symetrie'), boutonCreer: $('bouton-creer'),
   suivi: $('suivi'), suiviTitre: $('suivi-titre'), suiviTemps: $('suivi-temps'), suiviBarre: $('suivi-barre'),
   suiviMessage: $('suivi-message'), etapes: $('etapes'), alerte: $('alerte'),
   titreModele: $('titre-modele'), sceneInfos: $('scene-infos'), actions: $('actions'),
   lienGlb: $('lien-glb'), lienObj: $('lien-obj'), boutonCapture: $('bouton-capture'), boutonDossier: $('bouton-dossier'),
   visionneuse: $('visionneuse'), visionneuseVide: $('visionneuse-vide'), visionneuseChargement: $('visionneuse-chargement'),
+  visionneuseInvite: $('visionneuse-invite'), visionneuseSans3D: $('visionneuse-sans-3d'), astuce: $('astuce'),
   commandes: $('commandes'), rotationAuto: $('rotation-auto'), voirPhoto: $('voir-photo'),
   photoReference: $('photo-reference'), photoReferenceImg: $('photo-reference-img'),
   cartes: $('cartes'), compteur: $('compteur'), galerieVide: $('galerie-vide'),
 };
 
-const etat = { photo: null, moteurPret: false, travail: null, modeles: [], courant: null };
+const etat = { photo: null, moteurPret: false, travail: null, envoi: false, modeles: [], courant: null };
 
 // ---------- préférences (confort, facultatif) ----------
 function lirePref(cle, defaut) {
@@ -35,7 +37,11 @@ async function api(chemin, options = {}) {
   });
   let donnees = null;
   try { donnees = await reponse.json(); } catch { /* réponse vide */ }
-  if (!reponse.ok) throw new Error((donnees && donnees.erreur) || `Erreur ${reponse.status}`);
+  if (!reponse.ok) {
+    const erreur = new Error((donnees && donnees.erreur) || `Erreur ${reponse.status}`);
+    erreur.statut = reponse.status; // l'Atelier a bien répondu (contrairement à une coupure réseau)
+    throw erreur;
+  }
   return donnees;
 }
 
@@ -68,7 +74,38 @@ function afficherAlerte(message) {
 const QUALITES = { rapide: 'Rapide', standard: 'Standard', fine: 'Fine' };
 
 // ---------- visionneuse ----------
-const visionneuse = new Visionneuse(el.visionneuse);
+function webglDisponible() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    return Boolean(gl);
+  } catch {
+    return false;
+  }
+}
+
+// sans accélération graphique (WebGL), seul l'aperçu 3D manque :
+// la création, la galerie et les téléchargements restent utilisables
+let visionneuse = null;
+if (webglDisponible()) {
+  try {
+    visionneuse = new Visionneuse(el.visionneuse);
+  } catch (erreur) {
+    console.warn('Aperçu 3D indisponible :', erreur);
+    el.visionneuse.querySelector('canvas')?.remove();
+  }
+}
+const apercu3D = visionneuse !== null;
+if (!apercu3D) {
+  visionneuse = {
+    definirFond() {}, definirRotation() {}, mettreEnPause() {}, vider() {},
+    charger: async () => null, capture: async () => null,
+  };
+  el.visionneuseInvite.hidden = true;
+  el.visionneuseSans3D.hidden = false;
+  el.astuce.hidden = true;
+  el.boutonCapture.hidden = true;
+}
 const fondPrefere = lirePref('fond', 'clair');
 const radioFond = document.querySelector(`input[name="fond"][value="${fondPrefere}"]`);
 if (radioFond) radioFond.checked = true;
@@ -90,7 +127,10 @@ el.voirPhoto.addEventListener('change', () => {
   el.photoReference.hidden = !el.voirPhoto.checked;
 });
 
+let affichage = 0; // numéro de la dernière demande d'affichage (un clic plus récent l'emporte)
+
 async function afficherModele(infos) {
+  const demande = ++affichage;
   etat.courant = infos;
   const base = `/resultats/${encodeURIComponent(infos.id)}/`;
   const version = encodeURIComponent(infos.date || '');
@@ -109,22 +149,25 @@ async function afficherModele(infos) {
   el.lienObj.download = `${fichier}-obj.zip`;
   el.photoReferenceImg.src = base + infos.fichiers.photo + '?v=' + version;
   el.actions.hidden = false;
-  el.commandes.hidden = false;
-  el.visionneuseVide.hidden = true;
-  el.visionneuseChargement.hidden = false;
+  el.commandes.hidden = !apercu3D;
+  el.visionneuseVide.hidden = apercu3D;
   marquerCarteActive();
+  if (!apercu3D) return;
+  el.visionneuseChargement.hidden = false;
   try {
     await visionneuse.charger(base + infos.fichiers.glb + '?v=' + version);
   } catch (erreur) {
-    afficherAlerte(`Le modèle n'a pas pu être affiché : ${erreur.message}`);
+    if (demande === affichage) afficherAlerte(`Le modèle n'a pas pu être affiché : ${erreur.message}`);
   } finally {
-    el.visionneuseChargement.hidden = true;
+    if (demande === affichage) el.visionneuseChargement.hidden = true;
   }
 }
 
 function viderVisionneuse() {
+  affichage++;
   etat.courant = null;
   visionneuse.vider();
+  el.visionneuseChargement.hidden = true;
   el.titreModele.textContent = 'Aucun modèle affiché';
   el.sceneInfos.textContent = '';
   el.actions.hidden = true;
@@ -208,6 +251,7 @@ function carteModele(infos) {
     non.focus();
     non.addEventListener('click', () => confirmer.remove());
     oui.addEventListener('click', async () => {
+      oui.disabled = non.disabled = true; // un double clic ne supprime qu'une fois
       try {
         await api(`/api/modeles/${encodeURIComponent(infos.id)}/supprimer`, { method: 'POST' });
         if (etat.courant?.id === infos.id) viderVisionneuse();
@@ -248,6 +292,8 @@ function choisirPhoto(fichier) {
   etat.photo = fichier;
   if (el.apercuPhoto.src.startsWith('blob:')) URL.revokeObjectURL(el.apercuPhoto.src);
   el.apercuPhoto.src = URL.createObjectURL(fichier);
+  el.apercuPhoto.hidden = false;
+  el.sansApercu.hidden = true;
   el.nomPhoto.textContent = fichier.name || 'Photo collée';
   el.depotVide.hidden = true;
   el.depotApercu.hidden = false;
@@ -255,9 +301,18 @@ function choisirPhoto(fichier) {
 }
 
 // un aperçu impossible (HEIC hors Safari) n'empêche pas la création
-el.apercuPhoto.addEventListener('error', () => { el.apercuPhoto.removeAttribute('src'); });
+el.apercuPhoto.addEventListener('error', () => {
+  if (!el.apercuPhoto.getAttribute('src')) return;
+  URL.revokeObjectURL(el.apercuPhoto.src);
+  el.apercuPhoto.removeAttribute('src');
+  el.apercuPhoto.hidden = true;
+  el.sansApercu.hidden = false;
+});
 
-el.choixPhoto.addEventListener('change', () => choisirPhoto(el.choixPhoto.files[0]));
+el.choixPhoto.addEventListener('change', () => {
+  choisirPhoto(el.choixPhoto.files[0]);
+  el.choixPhoto.value = ''; // pour pouvoir choisir de nouveau le même fichier après un dépôt ou un collage
+});
 ['dragenter', 'dragover'].forEach((type) => el.depot.addEventListener(type, (e) => {
   e.preventDefault();
   el.depot.classList.add('survol');
@@ -267,6 +322,12 @@ el.choixPhoto.addEventListener('change', () => choisirPhoto(el.choixPhoto.files[
   el.depot.classList.remove('survol');
 }));
 el.depot.addEventListener('drop', (e) => choisirPhoto(e.dataTransfer.files[0]));
+// une photo lâchée à côté de la zone ne doit pas remplacer l'Atelier dans l'onglet
+document.addEventListener('dragover', (e) => e.preventDefault());
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  if (!el.depot.contains(e.target)) choisirPhoto(e.dataTransfer?.files[0]);
+});
 document.addEventListener('paste', (e) => {
   const fichier = [...(e.clipboardData?.files || [])].find((f) => f.type.startsWith('image/'));
   if (fichier) choisirPhoto(fichier);
@@ -286,31 +347,44 @@ for (const [cle, case_a_cocher, defaut] of [['detourage', el.detourage, '1'], ['
 function majBouton() {
   const occupe = Boolean(etat.travail && ['en_attente', 'en_cours'].includes(etat.travail.etat));
   visionneuse.mettreEnPause(occupe);
-  el.boutonCreer.disabled = !etat.photo || occupe;
-  el.boutonCreer.textContent = occupe ? 'Création en cours…' : 'Créer le modèle 3D';
+  el.boutonCreer.disabled = !etat.photo || occupe || etat.envoi;
+  el.boutonCreer.textContent = etat.envoi ? 'Envoi de la photo…'
+    : occupe ? 'Création en cours…' : 'Créer le modèle 3D';
+}
+
+// le numéro de la création en cours est gardé pour la retrouver après un rechargement de la page
+function oublierTravail(id) {
+  if (lirePref('travail', '') === id) ecrirePref('travail', '');
 }
 
 // ---------- création ----------
 el.formulaire.addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!etat.photo) return;
+  // bouton désactivé dès le premier clic : un double clic ne lance qu'une création
+  if (!etat.photo || el.boutonCreer.disabled) return;
+  etat.envoi = true;
+  majBouton();
   afficherAlerte('');
+  const photo = etat.photo;
   const qualite = document.querySelector('input[name="qualite"]:checked').value;
   const parametres = new URLSearchParams({
-    nom: etat.photo.name || 'photo-collee.png',
+    nom: photo.name || 'photo-collee.png',
     qualite,
     detourage: el.detourage.checked ? '1' : '0',
     symetrie: el.symetrie.checked ? '1' : '0',
   });
   try {
-    const { id } = await api(`/api/generer?${parametres}`, { method: 'POST', body: etat.photo });
-    etat.travail = { id, etat: 'en_attente', nom: etat.photo.name };
-    el.suiviTitre.textContent = nomSansExtension(etat.photo.name || 'Photo collée');
+    const { id } = await api(`/api/generer?${parametres}`, { method: 'POST', body: photo });
+    ecrirePref('travail', id);
+    etat.travail = { id, etat: 'en_attente', nom: photo.name };
+    el.suiviTitre.textContent = nomSansExtension(photo.name || 'Photo collée');
     afficherSuivi(etat.travail);
-    majBouton();
     suivreTravail(id);
   } catch (erreur) {
     afficherAlerte(erreur.message);
+  } finally {
+    etat.envoi = false;
+    majBouton();
   }
 });
 
@@ -326,9 +400,9 @@ function afficherSuivi(travail) {
   });
   let message = '';
   if (travail.etat === 'en_attente') {
-    message = etat.moteurPret
-      ? 'En attente…'
-      : 'En attente du chargement du modèle IA. La création démarrera toute seule.';
+    if (!etat.moteurPret) message = 'En attente du chargement du modèle IA. La création démarrera toute seule.';
+    else if (travail.position > 1) message = `En attente · n°\u00a0${travail.position} dans la file`;
+    else message = 'En attente…';
   } else if (travail.etat === 'termine') {
     message = `Modèle prêt en ${duree(travail.modele?.duree_secondes)}.`;
   } else if (travail.etape === 'maillage') {
@@ -344,7 +418,10 @@ async function suivreTravail(id) {
     try {
       travail = await api(`/api/travaux/${encodeURIComponent(id)}`);
     } catch (erreur) {
-      afficherAlerte(`Le suivi de la création a été interrompu : ${erreur.message}. L'Atelier est-il toujours ouvert ?`);
+      const detail = erreur.statut ? erreur.message.replace(/\.$/, '') : "l'Atelier ne répond plus";
+      afficherAlerte(`Le suivi de la création a été interrompu : ${detail}. Vérifiez que la fenêtre de l'Atelier est toujours ouverte.`);
+      // une requête coupée par un rechargement de la page ne doit pas faire oublier la création
+      if (erreur.statut) oublierTravail(id);
       etat.travail = null;
       el.suivi.hidden = true;
       majBouton();
@@ -354,16 +431,42 @@ async function suivreTravail(id) {
     afficherSuivi(travail);
     majBouton();
     if (travail.etat === 'termine') {
+      oublierTravail(id);
       await chargerGalerie();
       await afficherModele(travail.modele);
       return;
     }
     if (travail.etat === 'erreur') {
+      oublierTravail(id);
       el.suivi.hidden = true;
       afficherAlerte(travail.message);
       return;
     }
   }
+}
+
+// une création lancée avant un rechargement de la page continue sur l'ordinateur : on reprend son suivi
+async function reprendreTravail() {
+  const id = lirePref('travail', '');
+  if (!id) return;
+  let travail;
+  try {
+    travail = await api(`/api/travaux/${encodeURIComponent(id)}`);
+  } catch (erreur) {
+    if (erreur.statut) oublierTravail(id); // l'Atelier a été relancé entre-temps
+    return;
+  }
+  if (!['en_attente', 'en_cours'].includes(travail.etat)) {
+    oublierTravail(id); // terminée (le modèle est déjà dans la galerie) ou échouée
+    if (travail.etat === 'erreur') afficherAlerte(`« ${nomSansExtension(travail.nom)} » : ${travail.message}`);
+    return;
+  }
+  if (etat.travail) return; // une autre création a été lancée entre-temps
+  etat.travail = travail;
+  el.suiviTitre.textContent = nomSansExtension(travail.nom);
+  afficherSuivi(travail);
+  majBouton();
+  suivreTravail(id);
 }
 
 // ---------- état du modèle IA ----------
@@ -388,6 +491,7 @@ async function surveillerMoteur() {
 
 // ---------- démarrage ----------
 surveillerMoteur();
+reprendreTravail();
 chargerGalerie().then(() => {
   if (etat.modeles.length) afficherModele(etat.modeles[0]);
 });

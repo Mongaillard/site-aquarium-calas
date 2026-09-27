@@ -32,7 +32,7 @@ Une fois installé et lancé une première fois, l'Atelier fonctionne sans Inter
 
 ### Windows
 
-1. Installez **Python 3.13 (64 bits)** : sur [cette page](https://www.python.org/downloads/release/python-31315/), choisissez « Windows installer (64-bit) ». Pendant l'installation, **cochez la case « Add python.exe to PATH »**. N'installez pas Python 3.14, que proposent les gros boutons de python.org : il n'est pas encore compatible. Si vous utilisez le gestionnaire d'installation de Python, la commande `py install 3.13` fait la même chose.
+1. Installez **Python 3.13 (64 bits)** : sur [cette page](https://www.python.org/downloads/release/python-31315/), choisissez « Windows installer (64-bit) ». Pendant l'installation, **cochez la case « Add python.exe to PATH »**. N'installez pas Python 3.14, que proposent les gros boutons de python.org : il n'est pas encore compatible. Si vous utilisez le gestionnaire d'installation de Python, la commande `py install 3.13-64` fait la même chose.
 2. **Décompressez** le dossier de l'Atelier (clic droit › Extraire tout) dans un emplacement court, par exemple `C:\Atelier3D`.
 3. Double-cliquez sur **`installer.bat`**. Comptez 5 à 15 minutes selon la connexion, et jusqu'à une heure avec une carte NVIDIA (2,6 Go à télécharger en plus).
 4. Double-cliquez sur **`lancer.bat`**. L'Atelier s'ouvre dans votre navigateur. Laissez la fenêtre noire ouverte : la fermer arrête l'Atelier.

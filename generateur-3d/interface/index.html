@@ -39,7 +39,7 @@
 
       <form id="formulaire" class="formulaire" novalidate>
         <label class="depot" id="depot" for="choix-photo">
-          <input type="file" id="choix-photo" accept="image/*,.heic,.heif" hidden>
+          <input type="file" id="choix-photo" class="sr" accept="image/*,.heic,.heif">
           <span class="depot-vide" id="depot-vide">
             <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 34V14a4 4 0 0 1 4-4h6l3-4h6l3 4h6a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4Z"/><circle cx="24" cy="23" r="7.5"/></svg>
             <strong>Déposez une photo ici</strong>
@@ -48,6 +48,7 @@
           </span>
           <span class="depot-apercu" id="depot-apercu" hidden>
             <img id="apercu-photo" alt="Photo choisie">
+            <span class="depot-sans-apercu" id="sans-apercu" hidden>Pas d'aperçu possible pour ce format de photo dans le navigateur. Vous pouvez quand même lancer la création.</span>
             <span class="depot-legende"><span id="nom-photo"></span><span class="lien">Changer</span></span>
           </span>
         </label>
@@ -95,7 +96,7 @@
       <div class="suivi" id="suivi" hidden aria-live="polite">
         <div class="suivi-entete">
           <strong id="suivi-titre">Création en cours</strong>
-          <span class="suivi-temps" id="suivi-temps">0 s</span>
+          <span class="suivi-temps" id="suivi-temps" aria-hidden="true">0 s</span>
         </div>
         <div class="barre" aria-hidden="true"><span id="suivi-barre"></span></div>
         <ol class="etapes" id="etapes">
@@ -138,7 +139,8 @@
       <div class="visionneuse" id="visionneuse">
         <div class="visionneuse-vide" id="visionneuse-vide">
           <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6 55 19v26L32 58 9 45V19z"/><path d="M32 32 55 19M32 32 9 19M32 32v26"/></svg>
-          <p><strong>Votre modèle 3D apparaîtra ici.</strong><br>Choisissez une photo à gauche, puis lancez la création.</p>
+          <p id="visionneuse-invite"><strong>Votre modèle 3D apparaîtra ici.</strong><br>Choisissez une photo à gauche, puis lancez la création.</p>
+          <p id="visionneuse-sans-3d" hidden><strong>Aperçu 3D indisponible sur cet ordinateur.</strong><br>Le navigateur n'a pas accès à l'accélération graphique. Vous pouvez quand même créer des modèles et télécharger les fichiers GLB ou OBJ.<br>Pour retrouver l'aperçu, activez « Utiliser l'accélération graphique si disponible » dans les paramètres du navigateur, puis relancez-le.</p>
         </div>
         <div class="visionneuse-chargement" id="visionneuse-chargement" hidden>Chargement du modèle…</div>
         <figure class="photo-reference" id="photo-reference" hidden>
@@ -161,7 +163,7 @@
           </div>
         </div>
       </div>
-      <p class="astuce">Faites glisser pour tourner autour de l'objet, molette ou pincement pour zoomer, clic droit pour déplacer.</p>
+      <p class="astuce" id="astuce">Faites glisser pour tourner autour de l'objet, molette ou pincement pour zoomer, clic droit pour déplacer.</p>
     </section>
 
     <section class="panneau galerie" aria-labelledby="titre-galerie">

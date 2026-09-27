@@ -151,12 +151,15 @@ code { font-size: 0.9em; background: var(--surface-2); padding: 0.05em 0.35em; b
 /* ---------- formulaire ---------- */
 .formulaire { display: flex; flex-direction: column; gap: 18px; }
 .depot {
-  display: block; cursor: pointer;
+  display: block; position: relative; cursor: pointer;
   border: 2px dashed var(--trait); border-radius: 12px;
   background: var(--surface-2);
   transition: border-color 0.15s, background 0.15s;
 }
 .depot:hover, .depot.survol { border-color: var(--accent); background: var(--accent-doux); }
+/* le champ fichier est invisible : l'anneau de focus clavier est porté par la zone de dépôt */
+.depot:focus-within { outline: 3px solid var(--eau); outline-offset: 2px; }
+.depot:focus-within:not(:has(:focus-visible)) { outline: none; }
 .depot-vide {
   display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px;
   padding: 28px 16px; color: var(--encre-douce);
@@ -169,6 +172,11 @@ code { font-size: 0.9em; background: var(--surface-2); padding: 0.05em 0.35em; b
   width: 100%; max-width: 100%; aspect-ratio: 4 / 3; object-fit: contain;
   border-radius: 8px;
   background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 16px 16px;
+}
+.depot-sans-apercu {
+  display: flex; align-items: center; justify-content: center; aspect-ratio: 4 / 3;
+  padding: 16px; border-radius: 8px; background: var(--surface);
+  color: var(--encre-douce); font-size: 0.85rem; text-align: center;
 }
 .depot-legende { display: flex; justify-content: space-between; gap: 10px; font-size: 0.85rem; }
 .depot-legende > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -271,7 +279,15 @@ code { font-size: 0.9em; background: var(--surface-2); padding: 0.05em 0.35em; b
   gap: 14px; text-align: center; padding: 24px; color: #4b6264; pointer-events: none;
 }
 .visionneuse-vide svg { width: 72px; height: 72px; fill: none; stroke: #8fa6a2; stroke-width: 2; stroke-linejoin: round; }
+.visionneuse-vide p { max-width: 56ch; }
 .visionneuse-vide strong { color: #10292b; }
+/* sur les fonds foncés de la scène, le message passe en clair */
+.visionneuse[data-fond="sombre"] .visionneuse-vide,
+.visionneuse[data-fond="aquarium"] .visionneuse-vide { color: #e3eeec; text-shadow: 0 1px 3px rgb(0 0 0 / 0.45); }
+.visionneuse[data-fond="sombre"] .visionneuse-vide strong,
+.visionneuse[data-fond="aquarium"] .visionneuse-vide strong { color: #ffffff; }
+.visionneuse[data-fond="sombre"] .visionneuse-vide svg,
+.visionneuse[data-fond="aquarium"] .visionneuse-vide svg { stroke: #a9c4bf; }
 .visionneuse-chargement { background: rgb(223 232 229 / 0.6); font-weight: 700; color: #10292b; }
 .photo-reference {
   position: absolute; top: 12px; right: 12px; margin: 0; width: min(28%, 180px);
@@ -318,6 +334,8 @@ code { font-size: 0.9em; background: var(--surface-2); padding: 0.05em 0.35em; b
   display: flex; flex-direction: column; width: 100%; padding: 0; border: 0; background: none; color: inherit;
   font: inherit; text-align: left; cursor: pointer;
 }
+/* la carte coupe ce qui dépasse : l'anneau de focus est dessiné à l'intérieur */
+.carte-ouvrir:focus-visible { outline-offset: -3px; border-radius: 11px; }
 .carte-ouvrir img {
   width: 100%; max-width: 100%; aspect-ratio: 1; object-fit: contain; padding: 10px;
   background: var(--surface-2);

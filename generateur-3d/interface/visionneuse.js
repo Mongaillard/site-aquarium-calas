@@ -79,6 +79,7 @@ export class Visionneuse {
     this.controles.addEventListener('change', () => { this.aRedessiner = true; });
 
     this.modele = null;
+    this.jeton = 0; // numéro du dernier chargement demandé
     this.textures = {};
     this.aRedessiner = true;
     this.definirFond('clair');
@@ -108,10 +109,12 @@ export class Visionneuse {
   }
 
   definirFond(nom) {
-    const fond = FONDS[nom] || FONDS.clair;
-    if (!this.textures[nom]) this.textures[nom] = degrade(fond.haut, fond.bas);
-    this.scene.background = this.textures[nom];
+    const cle = FONDS[nom] ? nom : 'clair';
+    const fond = FONDS[cle];
+    if (!this.textures[cle]) this.textures[cle] = degrade(fond.haut, fond.bas);
+    this.scene.background = this.textures[cle];
     this.sol.material.opacity = fond.ombre;
+    this.conteneur.dataset.fond = cle; // la feuille de style adapte les textes posés sur la scène
     this.aRedessiner = true;
   }
 
@@ -127,7 +130,13 @@ export class Visionneuse {
   }
 
   async charger(url) {
+    // si un autre modèle est demandé (ou la vue vidée) pendant le téléchargement, celui-ci est abandonné
+    const jeton = ++this.jeton;
     const gltf = await new GLTFLoader().loadAsync(url);
+    if (jeton !== this.jeton) {
+      liberer(gltf.scene);
+      return null;
+    }
     if (this.modele) {
       this.scene.remove(this.modele);
       liberer(this.modele);
@@ -177,6 +186,7 @@ export class Visionneuse {
   }
 
   vider() {
+    this.jeton++;
     if (!this.modele) return;
     this.scene.remove(this.modele);
     liberer(this.modele);

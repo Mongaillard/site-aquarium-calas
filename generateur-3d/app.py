@@ -4,17 +4,20 @@ Lancement :  python app.py        (ouvre automatiquement le navigateur)
 Options   :  --port 7860  --appareil auto|cpu|cuda|mps  --sans-navigateur
 """
 import argparse
+import http.client
 import io
 import json
 import os
 import queue
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import threading
 import time
 import traceback
+import urllib.error
 import webbrowser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -26,6 +29,8 @@ DOSSIER_INTERFACE = os.path.join(DOSSIER_APPLI, "interface")
 DOSSIER_RESULTATS = os.path.join(DOSSIER_APPLI, "resultats")
 TAILLE_MAX_PHOTO = 40 * 1024 * 1024
 ID_VALIDE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+# nom donné par identifiant() : AAAAMMJJ-HHMMSS-nom-de-la-photo
+DOSSIER_DE_CREATION = re.compile(r"^\d{8}-\d{6}-[A-Za-z0-9_-]+$")
 TYPES_MIME = {
     ".html": "text/html; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
@@ -66,6 +71,7 @@ class Atelier:
         threading.Thread(target=self._travailler, daemon=True).start()
 
     def _charger(self):
+        generateur = None
         try:
             self.moteur["message"] = "Chargement des bibliothèques…"
             from moteur.pipeline import Generateur3D
@@ -77,13 +83,27 @@ class Atelier:
             journal(self.moteur["message"])
             generateur.charger()
             self.generateur = generateur
-            self.moteur.update(etat="pret", message="Prêt")
+            # charger() peut basculer sur le processeur si la carte graphique ne suffit pas
+            self.moteur.update(etat="pret", message="Prêt", appareil=generateur.appareil)
             journal(f"Modèle IA prêt ({generateur.appareil}).")
         except Exception as erreur:
             traceback.print_exc()
-            self.moteur.update(etat="erreur", message=(
-                "Le modèle IA n'a pas pu être chargé. Vérifiez la connexion Internet "
-                f"lors de la première utilisation, puis relancez l'Atelier. Détail : {erreur}"))
+            if generateur is not None:
+                self.moteur["appareil"] = generateur.appareil
+            if probleme_de_reseau(erreur):
+                message = ("Le modèle IA n'a pas pu être téléchargé. Vérifiez la connexion Internet "
+                           "(nécessaire à la première utilisation), puis relancez l'Atelier. "
+                           f"Détail : {erreur}")
+            else:
+                message = "Le modèle IA n'a pas pu être chargé. "
+                # le conseil n'a de sens que si une carte graphique était en jeu
+                if (self.moteur["appareil"] or self.appareil_demande) in ("cuda", "mps"):
+                    commande = ("lancer.bat --appareil cpu" if sys.platform.startswith("win")
+                                else "./lancer.sh --appareil cpu")
+                    message += ("Essayez de relancer l'Atelier en mode processeur, avec la "
+                                f"commande « {commande} ». ")
+                message += f"Détail : {erreur}"
+            self.moteur.update(etat="erreur", message=message)
 
     def ajouter(self, contenu, nom, qualite, detourage_auto, symetrique):
         travail_id = identifiant(nom)
@@ -95,8 +115,12 @@ class Atelier:
         if extension not in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic"):
             extension = ".img"
         chemin_photo = os.path.join(dossier, "photo_originale" + extension)
-        with open(chemin_photo, "wb") as f:
-            f.write(contenu)
+        try:
+            with open(chemin_photo, "wb") as f:
+                f.write(contenu)
+        except OSError:  # disque plein… : pas de dossier à moitié rempli
+            shutil.rmtree(dossier, ignore_errors=True)
+            raise
         self.travaux[travail_id] = {
             "id": travail_id, "nom": nom or "Photo", "etat": "en_attente", "etape": None,
             "progression": 0.0, "message": "", "debut": None, "fin": None, "modele": None,
@@ -146,6 +170,32 @@ class Atelier:
         return etat
 
 
+MESSAGES_MEMOIRE = ("out of memory", "not enough memory", "can't allocate memory",
+                    "cannot allocate memory", "bad allocation", "failed to allocate")
+# erreurs des bibliothèques de téléchargement (requests, urllib3, httpx, huggingface_hub)
+ERREURS_RESEAU = {"RequestException", "ConnectionError", "Timeout", "ProxyError", "SSLError",
+                  "MaxRetryError", "NewConnectionError", "NameResolutionError", "TransportError",
+                  "TimeoutException", "HfHubHTTPError", "LocalEntryNotFoundError",
+                  "OfflineModeIsEnabled", "XetDownloadError"}
+MOTS_RESEAU = ("connection", "resolve", "resolution", "proxy", "timed out", "network",
+               "internet", "getaddrinfo")
+
+
+def probleme_de_reseau(erreur):
+    """Vrai si l'erreur (ou sa cause) ressemble à un téléchargement impossible."""
+    vues = set()
+    while erreur is not None and id(erreur) not in vues:
+        vues.add(id(erreur))
+        noms = {classe.__name__ for classe in type(erreur).__mro__}
+        texte = str(erreur).lower()
+        if (noms & ERREURS_RESEAU or any(mot in texte for mot in MOTS_RESEAU)
+                or isinstance(erreur, (ConnectionError, TimeoutError, socket.gaierror,
+                                       urllib.error.URLError))):
+            return True
+        erreur = erreur.__cause__ or erreur.__context__
+    return False
+
+
 def message_erreur(erreur):
     from moteur.detourage import AucunObjetDetecte
     from moteur.pipeline import VolumeIntrouvable
@@ -156,10 +206,13 @@ def message_erreur(erreur):
     if isinstance(erreur, VolumeIntrouvable):
         return ("L'IA n'a pas réussi à reconstruire de volume à partir de cette photo. "
                 "Essayez une autre photo de l'objet, seul et entier dans le cadre.")
-    if isinstance(erreur, MemoryError) or "out of memory" in str(erreur).lower():
+    texte = str(erreur).lower()
+    # PyTorch et onnxruntime signalent le manque de mémoire vive par un simple message
+    if (isinstance(erreur, MemoryError) or type(erreur).__name__ == "OutOfMemoryError"
+            or any(m in texte for m in MESSAGES_MEMOIRE)):
         return ("Mémoire insuffisante. Fermez d'autres programmes ou choisissez la qualité "
                 "« Rapide ».")
-    if "cannot identify image" in str(erreur).lower():
+    if "cannot identify image" in texte:
         return "Ce fichier n'est pas une image lisible. Utilisez une photo JPG, PNG ou WebP."
     return f"La création a échoué : {erreur}"
 
@@ -180,6 +233,48 @@ def lister_modeles():
     return modeles
 
 
+def nettoyer_resultats_orphelins():
+    """Efface les dossiers des créations interrompues (fenêtre fermée pendant un calcul…).
+
+    Sans infos.json, ils n'apparaissent pas dans la galerie mais gardent la photo sur le disque.
+    Seuls ceux qui n'ont pas changé depuis plus d'une heure sont effacés, pour ne pas gêner
+    un calcul en cours à côté (generer.py ou un autre Atelier)."""
+    try:
+        for nom in os.listdir(DOSSIER_RESULTATS):
+            dossier = os.path.join(DOSSIER_RESULTATS, nom)
+            # uniquement les dossiers créés par l'Atelier lui-même (nom horodaté + photo
+            # d'origine), jamais un dossier rangé à la main dans « resultats »
+            if (DOSSIER_DE_CREATION.match(nom) and os.path.isdir(dossier)
+                    and not os.path.islink(dossier)
+                    and not os.path.exists(os.path.join(dossier, "infos.json"))
+                    and any(f.startswith("photo_originale.") for f in os.listdir(dossier))
+                    and time.time() - os.path.getmtime(dossier) > 3600):
+                shutil.rmtree(dossier, ignore_errors=True)
+    except OSError:
+        pass
+
+
+def supprimer_modele(dossier):
+    """Efface le dossier d'un modèle ; renvoie False si un fichier n'a pas pu être effacé.
+
+    infos.json part en dernier : si un fichier est ouvert dans un autre programme, le modèle
+    reste dans la galerie et la suppression pourra être refaite."""
+    for nom in sorted(os.listdir(dossier), key=lambda n: n == "infos.json"):
+        chemin = os.path.join(dossier, nom)
+        try:
+            if os.path.isdir(chemin) and not os.path.islink(chemin):
+                shutil.rmtree(chemin)
+            else:
+                os.remove(chemin)
+        except OSError:
+            return False
+    try:
+        os.rmdir(dossier)
+    except OSError:  # dossier vide encore ouvert ailleurs : effacé à un prochain lancement
+        pass
+    return True
+
+
 def ouvrir_dans_explorateur(chemin):
     if sys.platform.startswith("win"):
         os.startfile(chemin)  # noqa: S606 (dossier local de l'application)
@@ -198,6 +293,10 @@ class Gestionnaire(BaseHTTPRequestHandler):
         pass
 
     # --- réponses ---------------------------------------------------------
+    def send_response(self, *args, **kwargs):
+        self.reponse_commencee = True
+        super().send_response(*args, **kwargs)
+
     def _json(self, donnees, statut=HTTPStatus.OK):
         corps = json.dumps(donnees, ensure_ascii=False).encode("utf-8")
         self.send_response(statut)
@@ -211,8 +310,14 @@ class Gestionnaire(BaseHTTPRequestHandler):
         self._json({"erreur": message}, statut)
 
     def _fichier(self, racine, relatif):
+        # contrôle sur le texte seul, avant tout accès au disque : sous Windows, un chemin
+        # réseau (\\serveur\partage, //serveur/partage) serait contacté par realpath()
+        morceaux = relatif.split("/")
+        if (any(c in relatif for c in ("\\", ":", "\x00"))
+                or any(m in ("", ".", "..") for m in morceaux)):
+            return self._erreur(HTTPStatus.NOT_FOUND, "Fichier introuvable.")
         racine = os.path.realpath(racine)
-        chemin = os.path.realpath(os.path.join(racine, relatif))
+        chemin = os.path.realpath(os.path.join(racine, *morceaux))
         if not chemin.startswith(racine + os.sep) or not os.path.isfile(chemin):
             return self._erreur(HTTPStatus.NOT_FOUND, "Fichier introuvable.")
         extension = os.path.splitext(chemin)[1].lower()
@@ -235,6 +340,25 @@ class Gestionnaire(BaseHTTPRequestHandler):
 
     # --- routes -----------------------------------------------------------
     def do_GET(self):
+        self._traiter(self._routes_get)
+
+    def do_POST(self):
+        self._traiter(self._routes_post)
+
+    def _traiter(self, routes):
+        # une erreur imprévue renvoie un message clair au lieu de couper la connexion
+        self.reponse_commencee = False
+        try:
+            routes()
+        except (ConnectionError, TimeoutError):
+            pass  # le navigateur a fermé la connexion (page quittée, téléchargement annulé…)
+        except Exception as erreur:
+            traceback.print_exc()
+            if not self.reponse_commencee:
+                self._erreur(HTTPStatus.INTERNAL_SERVER_ERROR,
+                             f"Erreur inattendue de l'Atelier : {erreur}")
+
+    def _routes_get(self):
         if not self._hote_autorise():
             return self._erreur(HTTPStatus.FORBIDDEN, "Accès refusé.")
         chemin = unquote(urlparse(self.path).path)
@@ -256,7 +380,7 @@ class Gestionnaire(BaseHTTPRequestHandler):
             return self._json(etat)
         return self._erreur(HTTPStatus.NOT_FOUND, "Page introuvable.")
 
-    def do_POST(self):
+    def _routes_post(self):
         if not self._requete_de_la_page():
             return self._erreur(HTTPStatus.FORBIDDEN, "Accès refusé.")
         url = urlparse(self.path)
@@ -269,7 +393,10 @@ class Gestionnaire(BaseHTTPRequestHandler):
             if not os.path.isfile(os.path.join(dossier, "infos.json")):
                 return self._erreur(HTTPStatus.NOT_FOUND, "Modèle introuvable.")
             if m.group(2) == "supprimer":
-                shutil.rmtree(dossier, ignore_errors=True)
+                if not supprimer_modele(dossier):
+                    return self._erreur(HTTPStatus.INTERNAL_SERVER_ERROR, (
+                        "Certains fichiers de ce modèle sont ouverts dans un autre programme. "
+                        "Fermez-le, puis réessayez."))
                 return self._json({"ok": True})
             try:
                 ouvrir_dans_explorateur(dossier)
@@ -306,8 +433,79 @@ class Gestionnaire(BaseHTTPRequestHandler):
         detourage_auto = parametres.get("detourage", ["1"])[0] != "0"
         symetrique = parametres.get("symetrie", ["0"])[0] == "1"
         nom = parametres.get("nom", ["photo"])[0][:120]
-        travail_id = self.atelier.ajouter(contenu, nom, qualite, detourage_auto, symetrique)
+        try:
+            travail_id = self.atelier.ajouter(contenu, nom, qualite, detourage_auto, symetrique)
+        except OSError as erreur:
+            traceback.print_exc()
+            return self._erreur(HTTPStatus.INTERNAL_SERVER_ERROR, (
+                "La photo n'a pas pu être enregistrée dans le dossier « resultats » "
+                f"(disque plein ?). Détail : {erreur}"))
         return self._json({"id": travail_id}, HTTPStatus.ACCEPTED)
+
+
+class Serveur(ThreadingHTTPServer):
+    # Sous Windows, SO_REUSEADDR laisserait un second Atelier prendre le port du premier :
+    # on le désactive et on réserve le port à ce seul programme.
+    allow_reuse_address = not sys.platform.startswith("win")
+
+    def server_bind(self):
+        if sys.platform.startswith("win") and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
+def atelier_existant(port):
+    """État renvoyé par un Atelier 3D déjà ouvert sur ce port, ou None."""
+    try:
+        connexion = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
+        try:
+            connexion.connect()
+            connexion.sock.settimeout(3)  # un Atelier occupé par une création répond moins vite
+            connexion.request("GET", "/api/etat")
+            etat = json.loads(connexion.getresponse().read(100_000))
+        finally:
+            connexion.close()
+    except Exception:
+        return None
+    return etat if isinstance(etat, dict) and "etat" in etat else None
+
+
+def desactiver_edition_rapide():
+    """Windows : un clic dans la fenêtre noire (mode « Édition rapide ») y bloque l'affichage,
+    et donc la création en cours, jusqu'à la touche Échap. On désactive ce mode."""
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        noyau = ctypes.WinDLL("kernel32", use_last_error=True)
+        noyau.GetStdHandle.restype = wintypes.HANDLE
+        noyau.GetStdHandle.argtypes = [wintypes.DWORD]
+        noyau.GetConsoleMode.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        noyau.SetConsoleMode.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        entree = noyau.GetStdHandle(-10 & 0xFFFFFFFF)  # STD_INPUT_HANDLE
+        mode = wintypes.DWORD()
+        if noyau.GetConsoleMode(entree, ctypes.byref(mode)):  # échoue s'il n'y a pas de console
+            # 0x40 : ENABLE_QUICK_EDIT_MODE ; 0x80 : ENABLE_EXTENDED_FLAGS, requis pour le changer
+            noyau.SetConsoleMode(entree, (mode.value & ~0x40) | 0x80)
+    except Exception:
+        pass
+
+
+def deja_ouvert(port, args):
+    """Vrai si un Atelier répond déjà sur ce port ; ouvre alors sa page au lieu d'en lancer un autre."""
+    moteur = atelier_existant(port)
+    if moteur is None:
+        return False
+    adresse = f"http://127.0.0.1:{port}/"
+    if not args.sans_navigateur:
+        webbrowser.open(adresse)
+    if moteur["etat"] == "erreur":  # message d'erreur : lancer.bat garde la fenêtre ouverte
+        sys.exit(f"L'Atelier 3D est déjà ouvert sur {adresse}, mais son modèle IA n'a pas "
+                 "pu être chargé. Fermez l'autre fenêtre de l'Atelier, puis relancez-le.")
+    journal(f"L'Atelier 3D est déjà ouvert sur {adresse} : inutile de le lancer une seconde fois.")
+    return True
 
 
 def main():
@@ -320,14 +518,22 @@ def main():
     os.makedirs(DOSSIER_RESULTATS, exist_ok=True)
     serveur = None
     for port in range(args.port, args.port + 20):
+        # déjà ouvert (double lancement) : on montre la page existante au lieu de recharger l'IA
+        if deja_ouvert(port, args):
+            return
         try:
-            serveur = ThreadingHTTPServer(("127.0.0.1", port), Gestionnaire)
+            serveur = Serveur(("127.0.0.1", port), Gestionnaire)
             break
         except OSError:
+            # un autre Atelier lancé au même instant vient peut-être de prendre ce port
+            if deja_ouvert(port, args):
+                return
             continue
     if serveur is None:
         sys.exit(f"Aucun port libre entre {args.port} et {args.port + 19}.")
     port = serveur.server_address[1]
+    desactiver_edition_rapide()
+    nettoyer_resultats_orphelins()  # avant le démarrage de la file des créations
     Gestionnaire.atelier = Atelier(args.appareil)
     Gestionnaire.hotes_autorises = {f"127.0.0.1:{port}", f"localhost:{port}"}
     adresse = f"http://127.0.0.1:{port}/"
