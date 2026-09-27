@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atelier 3D</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 9.5v13L16 29 4 22.5v-13z' fill='%23c4461a'/%3E%3Cpath d='M16 16 28 9.5M16 16 4 9.5M16 16v13' stroke='%23fff' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/interface/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/interface/vendor/three/three.module.min.js",
+        "three/addons/": "/interface/vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="entete">
+    <div class="marque">
+      <svg class="marque-logo" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 3 28 9.5v13L16 29 4 22.5v-13z" class="logo-fond"/>
+        <path d="M16 16 28 9.5M16 16 4 9.5M16 16v13" class="logo-aretes"/>
+      </svg>
+      <div>
+        <h1>Atelier 3D</h1>
+        <p class="marque-sous-titre">Une photo d'objet devient un modèle 3D texturé</p>
+      </div>
+    </div>
+    <div class="etat-moteur" id="etat-moteur" data-etat="chargement" role="status">
+      <span class="etat-point" aria-hidden="true"></span>
+      <span id="etat-moteur-texte">Démarrage…</span>
+    </div>
+  </header>
+
+  <main class="plan">
+    <section class="panneau creation" aria-labelledby="titre-creation">
+      <h2 id="titre-creation">Nouvelle création</h2>
+
+      <form id="formulaire" class="formulaire" novalidate>
+        <label class="depot" id="depot" for="choix-photo">
+          <input type="file" id="choix-photo" accept="image/*,.heic,.heif" hidden>
+          <span class="depot-vide" id="depot-vide">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 34V14a4 4 0 0 1 4-4h6l3-4h6l3 4h6a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4Z"/><circle cx="24" cy="23" r="7.5"/></svg>
+            <strong>Déposez une photo ici</strong>
+            <span>ou cliquez pour choisir un fichier</span>
+            <small>JPG, PNG, WebP ou HEIC · l'objet seul, entier dans le cadre</small>
+          </span>
+          <span class="depot-apercu" id="depot-apercu" hidden>
+            <img id="apercu-photo" alt="Photo choisie">
+            <span class="depot-legende"><span id="nom-photo"></span><span class="lien">Changer</span></span>
+          </span>
+        </label>
+
+        <fieldset class="reglage">
+          <legend>Qualité</legend>
+          <div class="segments" role="radiogroup">
+            <label class="segment">
+              <input type="radio" name="qualite" value="rapide">
+              <span><strong>Rapide</strong><small>≈ 30 s</small></span>
+            </label>
+            <label class="segment">
+              <input type="radio" name="qualite" value="standard" checked>
+              <span><strong>Standard</strong><small>≈ 1 min</small></span>
+            </label>
+            <label class="segment">
+              <input type="radio" name="qualite" value="fine">
+              <span><strong>Fine</strong><small>≈ 2 min</small></span>
+            </label>
+          </div>
+          <p class="aide">Durées indicatives sur un ordinateur récent sans carte graphique.</p>
+        </fieldset>
+
+        <label class="interrupteur">
+          <input type="checkbox" id="detourage" checked>
+          <span class="interrupteur-piste" aria-hidden="true"></span>
+          <span>
+            <strong>Supprimer le fond automatiquement</strong>
+            <small>Les PNG déjà détourés sont reconnus tout seuls.</small>
+          </span>
+        </label>
+
+        <label class="interrupteur">
+          <input type="checkbox" id="symetrie">
+          <span class="interrupteur-piste" aria-hidden="true"></span>
+          <span>
+            <strong>Côté caché en miroir de la photo</strong>
+            <small>Idéal pour un poisson photographié de profil. À éviter si l'objet porte du texte.</small>
+          </span>
+        </label>
+
+        <button type="submit" class="bouton bouton-principal" id="bouton-creer" disabled>Créer le modèle 3D</button>
+      </form>
+
+      <div class="suivi" id="suivi" hidden aria-live="polite">
+        <div class="suivi-entete">
+          <strong id="suivi-titre">Création en cours</strong>
+          <span class="suivi-temps" id="suivi-temps">0 s</span>
+        </div>
+        <div class="barre" aria-hidden="true"><span id="suivi-barre"></span></div>
+        <ol class="etapes" id="etapes">
+          <li data-etape="preparation">Détourage de la photo</li>
+          <li data-etape="analyse">Analyse de la forme par l'IA</li>
+          <li data-etape="maillage">Construction du volume 3D</li>
+          <li data-etape="texture">Calcul de la texture</li>
+          <li data-etape="export">Enregistrement des fichiers</li>
+        </ol>
+        <p class="suivi-message" id="suivi-message"></p>
+      </div>
+
+      <p class="alerte" id="alerte" role="alert" hidden></p>
+
+      <details class="conseils">
+        <summary>Conseils pour un bon résultat</summary>
+        <ul>
+          <li>Un seul objet, entier dans le cadre, sans autre objet qui le touche.</li>
+          <li>Un fond uni qui contraste avec l'objet, et une lumière douce sans reflets forts.</li>
+          <li>Photographiez légèrement de trois quarts et un peu au-dessus : l'IA comprend mieux le volume.</li>
+          <li>Le côté caché sur la photo est imaginé par l'IA : il est moins précis que la face visible.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="panneau scene" aria-labelledby="titre-modele">
+      <div class="scene-entete">
+        <div>
+          <h2 id="titre-modele">Aucun modèle affiché</h2>
+          <p class="scene-infos" id="scene-infos"></p>
+        </div>
+        <div class="actions" id="actions" hidden>
+          <a class="bouton" id="lien-glb" download>Télécharger GLB</a>
+          <a class="bouton" id="lien-obj" download>OBJ + texture</a>
+          <button type="button" class="bouton" id="bouton-capture">Capture PNG</button>
+          <button type="button" class="bouton bouton-discret" id="bouton-dossier">Ouvrir le dossier</button>
+        </div>
+      </div>
+
+      <div class="visionneuse" id="visionneuse">
+        <div class="visionneuse-vide" id="visionneuse-vide">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6 55 19v26L32 58 9 45V19z"/><path d="M32 32 55 19M32 32 9 19M32 32v26"/></svg>
+          <p><strong>Votre modèle 3D apparaîtra ici.</strong><br>Choisissez une photo à gauche, puis lancez la création.</p>
+        </div>
+        <div class="visionneuse-chargement" id="visionneuse-chargement" hidden>Chargement du modèle…</div>
+        <figure class="photo-reference" id="photo-reference" hidden>
+          <img id="photo-reference-img" alt="Photo d'origine détourée">
+          <figcaption>Photo d'origine</figcaption>
+        </figure>
+        <div class="commandes" id="commandes" hidden>
+          <label class="puce">
+            <input type="checkbox" id="rotation-auto" checked>
+            <span>Rotation</span>
+          </label>
+          <label class="puce">
+            <input type="checkbox" id="voir-photo">
+            <span>Photo d'origine</span>
+          </label>
+          <div class="fonds" role="radiogroup" aria-label="Fond de la scène">
+            <label title="Studio clair"><input type="radio" name="fond" value="clair" checked><span class="pastille pastille-clair"></span><span class="sr">Studio clair</span></label>
+            <label title="Studio sombre"><input type="radio" name="fond" value="sombre"><span class="pastille pastille-sombre"></span><span class="sr">Studio sombre</span></label>
+            <label title="Aquarium"><input type="radio" name="fond" value="aquarium"><span class="pastille pastille-aquarium"></span><span class="sr">Aquarium</span></label>
+          </div>
+        </div>
+      </div>
+      <p class="astuce">Faites glisser pour tourner autour de l'objet, molette ou pincement pour zoomer, clic droit pour déplacer.</p>
+    </section>
+
+    <section class="panneau galerie" aria-labelledby="titre-galerie">
+      <div class="galerie-entete">
+        <h2 id="titre-galerie">Mes modèles</h2>
+        <span class="compteur" id="compteur"></span>
+      </div>
+      <p class="galerie-vide" id="galerie-vide">Les modèles que vous créez sont rangés ici, et dans le dossier <code>resultats</code> de l'Atelier.</p>
+      <ul class="cartes" id="cartes"></ul>
+    </section>
+  </main>
+
+  <script type="module" src="/interface/app.js"></script>
+</body>
+</html>

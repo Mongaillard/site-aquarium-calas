@@ -1,0 +1,17 @@
+# Dépendances de l'Atelier 3D (Python 3.11 ou 3.12 recommandé).
+# PyTorch s'installe à part, avec la bonne version pour votre ordinateur :
+# les scripts installer.bat / installer.sh s'en chargent.
+omegaconf>=2.3
+einops>=0.7
+transformers>=4.40,<5
+huggingface-hub>=0.23
+trimesh>=4.4
+scikit-image>=0.22
+xatlas>=0.0.9
+fast-simplification>=0.1.7
+rembg>=2.0.57
+onnxruntime>=1.17
+scipy>=1.11
+numpy>=1.26
+Pillow>=10.1
+pillow-heif>=0.16
