@@ -466,7 +466,7 @@ pause :
 | **Animé** (par défaut) | `milicien-marche.webp`, 8 images par direction | Le mouvement se lit : on voit qui avance, qui est bloqué |
 | **Peint** | `chevalier.webp`, une pose par direction | Le détail de l'armure, au prix d'une silhouette figée |
 | **3D précalculée** (essai) | `chevalier-3d.webp` : un modèle 3D rendu à l'avance par Blender, 8 directions × course, repos, coup d'épée | Des directions et des pas parfaitement cohérents, sans rien coûter au téléphone |
-| **3D en direct** (essai) | `chevalier-3d.glb`, rendu à chaque image par three.js | L'unité tourne selon sa vraie direction, pas en huit crans ; l'animation se calcule à chaque image |
+| **3D en direct** (essai) | `chevalier-3d.json` (glTF), rendu à chaque image par three.js | L'unité tourne selon sa vraie direction, pas en huit crans ; l'animation se calcule à chaque image |
 
 Les deux essais de 3D utilisent le même modèle, un chevalier libre de droits
 (KayKit, CC0) en attendant celui de l'auteur, et la **même caméra** — la case
@@ -475,7 +475,7 @@ leur éclairage est étalonné l'un sur l'autre (couleur moyenne d'une même pos
 un niveau près). En direct, chaque unité est rendue dans une case d'un canevas
 WebGL hors écran au début de l'image, puis recopiée à sa place dans l'ordre du
 peintre : un arbre ou un toit devant elle la cache toujours. three.js (614 Ko)
-et le modèle (420 Ko) ne se téléchargent que si l'on choisit ce style ; sans
+et le modèle (527 Ko, 220 compressés) ne se téléchargent que si l'on choisit ce style ; sans
 WebGL, l'atlas précalculé le remplace. Le détail de la chaîne est dans
 `assets/SOURCES.md`.
 

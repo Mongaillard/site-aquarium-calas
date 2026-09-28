@@ -27,7 +27,7 @@ const ASSETS = [
   './js/ui.js',
   './js/audio.js',
   // Essais de 3D : le module et l'atlas précalculé. three.js (js/vendor) et le
-  // modèle .glb, lourds et facultatifs, entrent au cache au premier usage.
+  // modèle (glTF en JSON), lourds et facultatifs, entrent au cache au premier usage.
   './js/rendu3d.js',
   './assets/chevalier-3d.webp',
   './assets/heros.webp',

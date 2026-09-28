@@ -63,7 +63,9 @@ const ATLAS = {
       attaque: { lignes: [16, 17, 18, 19, 20, 21, 22, 23], images: 12 },
     },
     modele3d: {
-      src: 'assets/chevalier-3d.glb',
+      // glTF texte (JSON, données embarquées) : tout hébergeur le sert, ce qui
+      // n'est pas le cas du .glb binaire.
+      src: 'assets/chevalier-3d.json',
       camera: { elevation: 35, ortho: 3.8, cibleY: 1.0 },
       clips: { marche: 'Running_B', repos: 'Idle', attaque: '1H_Melee_Attack_Chop' },
     },

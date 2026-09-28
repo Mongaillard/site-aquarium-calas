@@ -24,7 +24,7 @@
 | `moulin.webp`, `camp-bucherons.webp`, `camp-mineurs.webp`, `ferme.webp`, `tour-guet.webp` | Les cinq autres bâtiments **2×2** : ailes à voiles, billes et haches, galerie et wagonnet, potager et charrette de foin, tour au belvédère — 216 px de large, dessinés sur 108 | idem |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 | `chevalier-3d.webp` | Essai « 3D précalculée » du milicien : un **chevalier 3D** rendu par Blender sous l'angle du jeu, huit directions × (course de 16 images, repos de 8, coup d'épée de 12), 128×128 par case | Modèle **KayKit Adventurers** de Kay Lousberg, domaine public (CC0) — voir « Deux essais de 3D » |
-| `chevalier-3d.glb` | Essai « 3D en direct » : le même modèle, allégé (ses dix pièces utiles, trois animations sur 76 : 420 Ko au lieu de 3,6 Mo) | idem |
+| `chevalier-3d.json` | Essai « 3D en direct » : le même modèle, allégé — ses dix pièces utiles, trois animations sur 76 — et mis en glTF texte, données embarquées (527 Ko, 220 compressés, au lieu de 3,6 Mo) : tout hébergeur sert du JSON, pas toujours le .glb binaire | idem |
 
 Ces images viennent de planches générées par l'auteur du dépôt (dont ChatGPT et
 Gemini pour le villageois), qui en est l'auteur ; chacune est détaillée
