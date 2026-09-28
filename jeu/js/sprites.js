@@ -45,6 +45,29 @@ const ATLAS = {
     // l'échange de canaux suffit et coûte moins cher qu'une conversion HSL.
     recolorage: 'echange',
   },
+  // Essai de 3D, même unité : le chevalier KayKit (CC0) passé par Blender sous
+  // l'angle du jeu (caméra orthographique à 35°, regard vers le nord), en huit
+  // directions — une course de 16 images, le repos et le coup d'épée. Rangées
+  // 0-7 la course, 8-15 le repos, 16-23 l'attaque ; la course se cale sur la
+  // distance (20 px par foulée : ses jambes courtes suivent le sol sans
+  // patiner). Le style « 3D en direct » rend le même modèle dans le navigateur
+  // (voir rendu3d.js), avec la même caméra : les deux se superposent.
+  militia3d: {
+    src: 'assets/chevalier-3d.webp',
+    cellW: 128, cellH: 128, cases: 8, images: 16, cycle: 20,
+    ancreY: 91.6, hauteurMonde: 70, natif: 'rouge',
+    // Cape et bouclier rouges ; la peau, orangée, reste hors de la fenêtre.
+    recolorage: { teinte: [338, 14], vers: 216, satMin: 0.35 },
+    poses8: {
+      repos: { lignes: [8, 9, 10, 11, 12, 13, 14, 15], images: 8, cadence: 7.5 },
+      attaque: { lignes: [16, 17, 18, 19, 20, 21, 22, 23], images: 12 },
+    },
+    modele3d: {
+      src: 'assets/chevalier-3d.glb',
+      camera: { elevation: 35, ortho: 3.8, cibleY: 1.0 },
+      clips: { marche: 'Running_B', repos: 'Idle', attaque: '1H_Melee_Attack_Chop' },
+    },
+  },
   // Bâtiments : une seule image, dessinée sur `largeurMonde` pixels et posée
   // sur l'emprise par sa ligne de sol (`sol`, fraction de la hauteur). Ils
   // débordent de leur emprise : un palais qui se lit de loin, un parvis qui
@@ -195,14 +218,25 @@ const charges = new Map();
  * choix se fait en cours de partie, et l'atlas correspondant n'est téléchargé
  * qu'au moment où on le demande.
  */
-const ALTERNATIVES = { militia: { anime: 'militia', peint: 'militiaPeint' } };
+const ALTERNATIVES = {
+  militia: { anime: 'militia', peint: 'militiaPeint', '3d-precalc': 'militia3d', '3d-direct': 'militia3d' },
+};
 export const STYLES = [
   { id: 'anime', nom: 'Animé', desc: 'Marche dessinée' },
   { id: 'peint', nom: 'Peint', desc: 'Illustration réduite' },
+  { id: '3d-precalc', nom: '3D précalculée', desc: 'Modèle 3D rendu à l’avance' },
+  { id: '3d-direct', nom: '3D en direct', desc: 'Modèle 3D animé en jeu' },
 ];
 let style = 'anime';
 
 export function styleUnites() { return style; }
+
+/**
+ * Style « 3D en direct » : le rendu dessine le modèle 3D lui-même. En
+ * attendant three.js et le modèle — ou sans WebGL —, l'atlas précalculé du
+ * même modèle sert de repli : c'est lui que `spriteDe` rend dans ce style.
+ */
+export function rendu3dDirect() { return style === '3d-direct'; }
 
 export function setStyleUnites(nouveau) {
   style = STYLES.some((s) => s.id === nouveau) ? nouveau : 'anime';
@@ -306,9 +340,10 @@ function rotationTeinte(image, l, h, regle) {
 
 /**
  * Variante d'équipe : l'image d'origine sert un camp, l'autre est recalculée.
- * Sans règle (végétation), les deux camps partagent l'image.
+ * Sans règle (végétation), les deux camps partagent l'image. Sert aussi à la
+ * texture d'un modèle 3D, recolorée selon la règle de son atlas.
  */
-function recolorer(def, image, l, h) {
+export function recolorer(def, image, l, h) {
   if (!def.recolorage) return image;
   return def.recolorage === 'echange'
     ? echangeCanaux(image, l, h)

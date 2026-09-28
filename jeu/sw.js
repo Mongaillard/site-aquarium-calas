@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v39';
+const CACHE = 'age-empires-mobile-v40';
 const ASSETS = [
   './',
   './index.html',
@@ -26,6 +26,10 @@ const ASSETS = [
   './js/input.js',
   './js/ui.js',
   './js/audio.js',
+  // Essais de 3D : le module et l'atlas précalculé. three.js (js/vendor) et le
+  // modèle .glb, lourds et facultatifs, entrent au cache au premier usage.
+  './js/rendu3d.js',
+  './assets/chevalier-3d.webp',
   './assets/heros.webp',
   './assets/milicien-marche.webp',
   './assets/villageois.webp',

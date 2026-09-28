@@ -28,7 +28,10 @@ const server = spawn('npx', ['--yes', 'http-server', GAME_DIR, '-p', String(PORT
 process.on('exit', () => { try { process.kill(-server.pid); } catch {} });
 await new Promise((r) => setTimeout(r, 1500));
 
-const browser = await chromium.launch();
+// WebGL logiciel (SwiftShader) : le style « 3D en direct » en a besoin, et un
+// Chromium sans écran ne l'autorise plus de lui-même. Seulement lui : forcer
+// tout le rendu sur SwiftShader ferait tomber le canevas 2D à 12 images/s.
+const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const context = await browser.newContext({ ...devices['Pixel 7'], hasTouch: true, isMobile: true });
 const page = await context.newPage();
 
@@ -92,7 +95,8 @@ const fps = await page.evaluate(() => new Promise((resolve) => {
 }));
 check('fluidité', fps >= 30, fps + ' images/s');
 
-// Les deux styles de personnage cohabitent et se changent en cours de partie.
+// Les styles de personnage cohabitent et se changent en cours de partie : animé,
+// peint, et les deux essais de 3D (vérifiés plus bas).
 const styles = await page.evaluate(async () => {
   const g = window.__jeu;
   const mod = await import('./js/sprites.js');
@@ -102,9 +106,9 @@ const styles = await page.evaluate(async () => {
   const apres = mod.spriteDe('militia').def.src;
   g.setStyleUnites('anime');
   await new Promise((r) => setTimeout(r, 400));
-  return { avant, apres, retour: mod.spriteDe('militia').def.src, choix: mod.STYLES.length };
+  return { avant, apres, retour: mod.spriteDe('militia').def.src, choix: mod.STYLES.map((st) => st.id).join(',') };
 });
-check('deux styles de personnage sont proposés', styles.choix === 2, styles.choix + ' styles');
+check('quatre styles de personnage sont proposés', styles.choix === 'anime,peint,3d-precalc,3d-direct', styles.choix);
 check('le style bascule en cours de partie',
   styles.avant !== styles.apres && styles.retour === styles.avant,
   `${styles.avant.split('/').pop()} → ${styles.apres.split('/').pop()} → ${styles.retour.split('/').pop()}`);
@@ -1650,6 +1654,90 @@ check('la consigne du ralliement s’efface une fois le point posé', finsDePart
 check('celle de l’attaque aussi, l’ordre donné', finsDePartie.attaque.avant && !finsDePartie.attaque.apres, JSON.stringify(finsDePartie.attaque));
 check('« + Or » : le villageois qui livre d’abord compte déjà à l’or', finsDePartie.plusOr.apres === finsDePartie.plusOr.avant + 1,
   `or ${finsDePartie.plusOr.avant} → ${finsDePartie.plusOr.apres}`);
+
+// ---------------------------------------------------------------------------
+// Deux essais de 3D pour le milicien : l'atlas précalculé par Blender, et le
+// même modèle rendu en direct par three.js.
+// ---------------------------------------------------------------------------
+const essai3d = await page.evaluate(async () => {
+  const g = window.__jeu, w = g.world, T = 32, R = g.renderer;
+  const mod = await import('./js/sprites.js');
+  const attendre = (ms) => new Promise((res) => setTimeout(res, ms));
+  const r = {};
+  g.setStyleUnites('3d-precalc');
+  for (let i = 0; i < 50 && !(mod.spriteDe('militia') && mod.spriteDe('militia').def.poses8); i++) await attendre(100);
+  const s = mod.spriteDe('militia');
+  r.atlas = s ? s.def.src : null;
+  if (!s) return r;
+  // Couleur d'équipe : cape et bouclier rouges d'origine, bleus chez le joueur 0.
+  const lire = (src) => { const c = document.createElement('canvas'); c.width = src.width; c.height = src.height; const x = c.getContext('2d'); x.drawImage(src, 0, 0); return x.getImageData(0, 0, c.width, c.height).data; };
+  const hsl = (rr, gg, bb) => { const mx = Math.max(rr, gg, bb) / 255, mn = Math.min(rr, gg, bb) / 255, l = (mx + mn) / 2; if (mx === mn) return [0, 0, l]; const d = mx - mn, sa = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); const Rr = rr / 255, G = gg / 255, B = bb / 255; let h; if (mx === Rr) h = ((G - B) / d + (G < B ? 6 : 0)) / 6; else if (mx === G) h = ((B - Rr) / d + 2) / 6; else h = ((Rr - G) / d + 4) / 6; return [h * 360, sa, l]; };
+  const bleu = lire(mod.imagePourJoueur(s, 0)), rouge = lire(mod.imagePourJoueur(s, 1));
+  let rougesChezBleu = 0, bleusChezBleu = 0, rougesChezRouge = 0;
+  for (let i = 0; i < bleu.length; i += 4) {
+    if (bleu[i + 3] < 128) continue;
+    const [hb, sb] = hsl(bleu[i], bleu[i + 1], bleu[i + 2]);
+    const [hr, sr] = hsl(rouge[i], rouge[i + 1], rouge[i + 2]);
+    if ((hb >= 345 || hb <= 10) && sb > 0.5) rougesChezBleu++;
+    if (hb >= 200 && hb <= 240 && sb > 0.35) bleusChezBleu++;
+    if ((hr >= 345 || hr <= 10) && sr > 0.5) rougesChezRouge++;
+  }
+  r.couleurs = { rougesChezBleu, bleusChezBleu, rougesChezRouge };
+  // Poses : le repos à l'arrêt, le coup d'épée pendant la frappe, la marche sinon.
+  const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const m = w.spawnUnit(0, 'militia', tc.x, tc.y + 5 * T);
+  const nom = (c) => (c ? Object.keys(s.def.poses8).find((k) => s.def.poses8[k] === c.pose) : 'marche');
+  r.poses = {
+    repos: nom(R.pose8De(m, s.def, { coup: -1, avance: false })),
+    coup: nom(R.pose8De(m, s.def, { coup: 0.4, avance: false })),
+    marche: nom(R.pose8De(m, s.def, { coup: -1, avance: true })),
+  };
+  // 3D en direct : le modèle, rendu dans une case, tourné selon l'unité.
+  g.setStyleUnites('3d-direct');
+  g.camera.zoom = 1.2;
+  g.camera.centerOn(m.x, m.y);
+  for (let i = 0; i < 100 && !(R.rendu3d && (R.rendu3d.pret || R.rendu3d.erreur)); i++) await attendre(100);
+  r.direct = { pret: !!(R.rendu3d && R.rendu3d.pret), erreur: R.rendu3d ? R.rendu3d.erreur : 'absent' };
+  if (r.direct.pret) {
+    const silhouette = async (facing) => {
+      m.facing = facing;
+      await attendre(200);
+      const c = R.rendu3d.cellule(m);
+      if (!c) return null;
+      const cv = document.createElement('canvas'); cv.width = cv.height = c.taille;
+      const x = cv.getContext('2d');
+      x.drawImage(R.rendu3d.canvas, c.sx, c.sy, c.taille, c.taille, 0, 0, c.taille, c.taille);
+      const px = x.getImageData(0, 0, c.taille, c.taille).data;
+      const a = [];
+      for (let i = 3; i < px.length; i += 4) a.push(px[i] > 128 ? 1 : 0);
+      return a;
+    };
+    const est = await silhouette(0), ouest = await silhouette(Math.PI);
+    r.direct.case = !!est && !!ouest;
+    if (est && ouest) {
+      r.direct.opaques = est.reduce((t, v) => t + v, 0);
+      r.direct.differents = est.reduce((t, v, i) => t + (v !== ouest[i] ? 1 : 0), 0);
+    }
+    r.direct.equipes = !!(R.rendu3d.materiaux && R.rendu3d.materiaux[0] !== R.rendu3d.materiaux[1]);
+  }
+  w.killEntity(m, null, true);
+  g.setStyleUnites('anime');
+  await attendre(100);
+  r.retour = !R.rendu3d;
+  return r;
+});
+check('3D précalculée : le milicien prend l’atlas rendu par Blender', essai3d.atlas === 'assets/chevalier-3d.webp', String(essai3d.atlas));
+check('sa cape rouge passe au bleu chez le joueur, reste rouge chez l’adversaire',
+  essai3d.couleurs && essai3d.couleurs.rougesChezBleu < 20 && essai3d.couleurs.bleusChezBleu > 2000 && essai3d.couleurs.rougesChezRouge > 2000,
+  JSON.stringify(essai3d.couleurs));
+check('ses poses dans les huit directions : repos à l’arrêt, coup d’épée en frappant, course en marchant',
+  essai3d.poses && essai3d.poses.repos === 'repos' && essai3d.poses.coup === 'attaque' && essai3d.poses.marche === 'marche', JSON.stringify(essai3d.poses));
+check('3D en direct : three.js et le modèle se chargent (WebGL)', essai3d.direct && essai3d.direct.pret, JSON.stringify(essai3d.direct));
+check('l’unité est rendue dans sa case, et tourne selon sa direction (est ≠ ouest)',
+  essai3d.direct && essai3d.direct.case && essai3d.direct.opaques > 400 && essai3d.direct.differents > essai3d.direct.opaques * 0.1,
+  essai3d.direct ? `${essai3d.direct.opaques} pixels opaques, ${essai3d.direct.differents} différents entre est et ouest` : '-');
+check('deux matériaux, un par camp ; revenir au style animé libère le rendu 3D', essai3d.direct && essai3d.direct.equipes && essai3d.retour,
+  JSON.stringify({ equipes: essai3d.direct && essai3d.direct.equipes, libere: essai3d.retour }));
 
 // Menu pause
 await page.evaluate(() => window.__jeu.togglePause());

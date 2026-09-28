@@ -16,6 +16,7 @@ import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
 import { setStyleUnites, styleUnites, spriteDe } from './sprites.js';
+import { webglDisponible } from './rendu3d.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 const MAX_CATCHUP = 5;
@@ -58,7 +59,7 @@ function storeSetup(setup) {
   try { localStorage.setItem(SETUP_KEY, JSON.stringify(setup)); } catch { /* stockage indisponible */ }
 }
 
-/** Style des personnages (animé ou peint) : conservé d'une partie à l'autre. */
+/** Style des personnages (animé, peint, ou l'un des deux essais de 3D) : conservé d'une partie à l'autre. */
 function loadStyle() {
   try { return localStorage.getItem(STYLE_KEY) || 'anime'; } catch { return 'anime'; }
 }
@@ -910,9 +911,17 @@ class Game {
   setStyleUnites(id) {
     setStyleUnites(id);
     try { localStorage.setItem(STYLE_KEY, styleUnites()); } catch { /* stockage indisponible */ }
-    this.ui.toast(styleUnites() === 'anime'
-      ? 'Personnages : marche dessinée'
-      : 'Personnages : illustration peinte');
+    const messages = {
+      anime: 'Personnages : marche dessinée',
+      peint: 'Personnages : illustration peinte',
+      '3d-precalc': 'Milicien : modèle 3D rendu à l’avance (essai)',
+      '3d-direct': 'Milicien : modèle 3D animé en direct (essai)',
+    };
+    if (styleUnites() === '3d-direct' && !webglDisponible()) {
+      this.ui.toast('3D en direct : WebGL indisponible ici — le rendu précalculé le remplace', 'warn');
+    } else {
+      this.ui.toast(messages[styleUnites()]);
+    }
   }
 
   styleUnites() { return styleUnites(); }

@@ -1,8 +1,9 @@
 # 🏰 Âge des Empires Mobile
 
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
-dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque :
-~10 300 lignes de JavaScript, du Canvas 2D, des pictogrammes vectoriels et 1,6 Mo
+dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque
+(seul l'essai « 3D en direct » charge three.js, et seulement si on le choisit) :
+~10 600 lignes de JavaScript, du Canvas 2D, des pictogrammes vectoriels et 1,6 Mo
 d'illustrations et de textures — dont les cycles de marche du milicien, du
 villageois, de l'éclaireur, du cerf et du cochon.
 
@@ -309,8 +310,11 @@ jeu/
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons générés à la volée (Web Audio)
-│   └── main.js           écrans et boucle de jeu
+│   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case
+│   ├── main.js           écrans et boucle de jeu
+│   └── vendor/           three.js réduit au nécessaire (chargé à la demande)
 ├── assets/               illustrations et textures (voir assets/SOURCES.md)
+├── outils/3d/            chaîne des essais de 3D : rendu Blender sans écran, atlas, modèle allégé
 ├── icons/                icônes de l'application
 ├── test/                 tests (voir plus bas)
 ├── package.json          scripts, Playwright en dépendance de développement
@@ -332,7 +336,7 @@ chemin sont mises en file avec un budget par tick pour éviter les à-coups.
 ```bash
 cd jeu
 npm test                  # simulation headless : 206 vérifications — deux IA jouent 16 minutes, sauvegarde comprise
-npm run test:navigateur   # Chromium (Playwright) : 207 vérifications — chargement, gestes, rendu, images/s
+npm run test:navigateur   # Chromium (Playwright) : 213 vérifications — chargement, gestes, rendu, images/s
 ```
 
 Le test headless vérifie que l'économie tourne, que les âges sont atteints, que
@@ -454,12 +458,26 @@ foulées d'un cavalier à la lance, la planche lue du nord dans le sens horaire
 et remise sur les secteurs du jeu. Il fait 54 px de face, un homme à pied 44 ;
 la foulée suit la distance, comme toutes les marches.
 
-**Deux partis pris sont jouables**, au choix dans le menu de pause :
+**Quatre styles sont jouables** pour le milicien, au choix dans le menu de
+pause :
 
 | Style | Sprite du milicien | Ce qu'on y gagne |
 | --- | --- | --- |
 | **Animé** (par défaut) | `milicien-marche.webp`, 8 images par direction | Le mouvement se lit : on voit qui avance, qui est bloqué |
 | **Peint** | `chevalier.webp`, une pose par direction | Le détail de l'armure, au prix d'une silhouette figée |
+| **3D précalculée** (essai) | `chevalier-3d.webp` : un modèle 3D rendu à l'avance par Blender, 8 directions × course, repos, coup d'épée | Des directions et des pas parfaitement cohérents, sans rien coûter au téléphone |
+| **3D en direct** (essai) | `chevalier-3d.glb`, rendu à chaque image par three.js | L'unité tourne selon sa vraie direction, pas en huit crans ; l'animation se calcule à chaque image |
+
+Les deux essais de 3D utilisent le même modèle, un chevalier libre de droits
+(KayKit, CC0) en attendant celui de l'auteur, et la **même caméra** — la case
+rendue en direct se pose exactement comme une case de l'atlas précalculé, et
+leur éclairage est étalonné l'un sur l'autre (couleur moyenne d'une même pose à
+un niveau près). En direct, chaque unité est rendue dans une case d'un canevas
+WebGL hors écran au début de l'image, puis recopiée à sa place dans l'ordre du
+peintre : un arbre ou un toit devant elle la cache toujours. three.js (614 Ko)
+et le modèle (420 Ko) ne se téléchargent que si l'on choisit ce style ; sans
+WebGL, l'atlas précalculé le remplace. Le détail de la chaîne est dans
+`assets/SOURCES.md`.
 
 Le choix est retenu d'un lancement à l'autre. Sans service worker, l'atlas
 peint n'est téléchargé que si on choisit ce style — l'animé, style par défaut,

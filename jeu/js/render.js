@@ -10,7 +10,9 @@ import { TILE, BUILDING_TYPES } from './config.js';
 import { iconePath, ICON_BOX } from './icones.js';
 import {
   chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche, poseSource,
+  rendu3dDirect,
 } from './sprites.js';
+import { Rendu3D } from './rendu3d.js';
 import { TERRAIN, BLOCK } from './map.js';
 import { planterDecor, ECHELLE_DECOR } from './decor.js';
 import { STATE, villagerTask } from './entities.js';
@@ -927,6 +929,7 @@ export class Renderer {
     // nord) reste caché par les toits — c'est l'effet voulu.
     // Un arbre se classe au pied de sa case, un peu avant une unité qui s'y
     // tiendrait devant : celle-ci est dessinée par-dessus le tronc.
+    this.preparer3d(list);
     const rang = (e) => (e.kind === 'building' ? e.ty * TILE + 8 : e.kind === 'vegetation' ? (e.ty + 1) * TILE - 6 : e.kind === 'decor' ? e.d.y - 1 : e.y);
     list.sort((a, b) => rang(a) - rang(b));
     for (const e of list) {
@@ -935,6 +938,39 @@ export class Renderer {
       else if (e.kind === 'decor') this.dessinerPiece(e.d, e.sprite);
       else this.drawUnit(e);
     }
+  }
+
+  /**
+   * Style « 3D en direct » : les unités au modèle 3D sont toutes rendues d'un
+   * coup, avant l'ordre du peintre — chacune dans sa case d'un canevas WebGL
+   * hors écran —, puis chacune y reprend sa case au moment d'être dessinée.
+   * Leur état d'animation est calculé ici une fois pour l'image (il avance
+   * la foulée) et gardé pour drawUnit.
+   */
+  preparer3d(list) {
+    if (!rendu3dDirect()) {
+      if (this.rendu3d) { this.rendu3d.liberer(); this.rendu3d = null; }
+      return;
+    }
+    const unites = [];
+    let def = null;
+    for (const e of list) {
+      if (e.kind !== 'unit') continue;
+      const sprite = spriteDe(e.type);
+      if (!sprite || !sprite.def.modele3d) continue;
+      def = sprite.def;
+      unites.push(e);
+    }
+    if (!def) return;
+    if (!this.rendu3d) this.rendu3d = new Rendu3D(def);
+    if (!this.rendu3d.pret) return;   // en attendant : l'atlas précalculé du même modèle
+    const anims = unites.map((u) => {
+      const anim = this.unitAnim(u);
+      u._anim3d = { image: this.frame, anim };
+      return anim;
+    });
+    const taille = Math.max(32, Math.min(256, Math.round((def.hauteurMonde * this.camera.zoom * this.dpr) / 8) * 8));
+    this.rendu3d.preparer(unites, anims, taille, this.horloge);
   }
 
   isEntityVisible(e) {
@@ -1169,7 +1205,8 @@ export class Renderer {
     const color = u.player.color;
     const r = u.radius;
     // Le corps monte à chaque appui et se balance ; l'ombre, elle, reste au sol.
-    const anim = this.unitAnim(u);
+    // (Une unité rendue en 3D a déjà son état pour cette image : voir preparer3d.)
+    const anim = u._anim3d && u._anim3d.image === this.frame ? u._anim3d.anim : this.unitAnim(u);
     const x = u.x + anim.marche * r * 0.09;
     const y = u.y - Math.abs(anim.marche) * r * 0.18;
 
@@ -1303,10 +1340,28 @@ export class Renderer {
   dessinerSprite(u, sprite, x, y, anim) {
     const ctx = this.ctx;
     const { cellW, cellH, cases, hauteurMonde, ancreY, pixel } = sprite.def;
-    const source = imagePourJoueur(sprite, u.playerIndex);
+    let source = imagePourJoueur(sprite, u.playerIndex);
     let sx, sy, miroir = false;
-    const choix = sprite.def.poses && u.isVillager ? this.poseDe(u, sprite.def, anim) : null;
-    if (choix) {
+    let largeurSource = cellW, hauteurSource = cellH;
+    const case3d = sprite.def.modele3d && this.rendu3d ? this.rendu3d.cellule(u) : null;
+    const choix = case3d ? null
+      : sprite.def.poses && u.isVillager ? this.poseDe(u, sprite.def, anim)
+        : sprite.def.poses8 ? this.pose8De(u, sprite.def, anim) : null;
+    if (case3d) {
+      // Rendue en 3D pour cette image : même cadrage qu'une case de l'atlas.
+      source = this.rendu3d.canvas;
+      sx = case3d.sx; sy = case3d.sy;
+      largeurSource = hauteurSource = case3d.taille;
+    } else if (choix && choix.pose.lignes) {
+      // Pose dessinée dans les huit directions (un modèle 3D rendu à l'avance) :
+      // la rangée suit la direction, pas de miroir ; le coup suit la frappe.
+      const { pose } = choix;
+      const k = choix.parCoup
+        ? Math.min(pose.images - 1, Math.floor(anim.coup * pose.images))
+        : Math.floor(this.horloge * pose.cadence + (u.id % 7) * 0.53) % pose.images;
+      sx = k * cellW;
+      sy = pose.lignes[caseDirection(u.facing, cases)] * cellH;
+    } else if (choix) {
       const { pose } = choix;
       // Une pose de travail se cadence sur l'horloge, décalée par unité pour
       // que dix bûcherons ne frappent pas en chœur ; le port suit la distance.
@@ -1345,8 +1400,10 @@ export class Renderer {
     const h = hauteurMonde;
     const w = (cellW / cellH) * h;
     // Le coup se lit par une fente en avant : l'épée est peinte dans l'image,
-    // on ne peut pas la faire tourner, mais le corps, lui, peut avancer.
-    const fente = anim.coup >= 0 ? Math.sin(anim.coup * Math.PI) * h * 0.14 : 0;
+    // on ne peut pas la faire tourner, mais le corps, lui, peut avancer. Un
+    // modèle 3D a son propre coup d'épée : ni fente ni traînée en plus.
+    const coupDessine = !!(sprite.def.poses8 && sprite.def.poses8.attaque);
+    const fente = anim.coup >= 0 && !coupDessine ? Math.sin(anim.coup * Math.PI) * h * 0.14 : 0;
     const px = x + Math.cos(u.facing) * fente;
     const py = y + Math.sin(u.facing) * fente;
     // L'ancre est la ligne des pieds dans la case, pas son bas : certaines
@@ -1354,12 +1411,12 @@ export class Renderer {
     const pieds = (ancreY || cellH) / cellH;
     if (pixel) ctx.imageSmoothingEnabled = false;   // du pixel art ne s'interpole pas
     if (miroir) { ctx.save(); ctx.translate(px * 2, 0); ctx.scale(-1, 1); }   // x devient 2·px − x : même place, retourné
-    ctx.drawImage(source, sx, sy, cellW, cellH,
+    ctx.drawImage(source, sx, sy, largeurSource, hauteurSource,
       px - w / 2, py + u.radius * 0.45 - h * pieds, w, h);
     if (miroir) ctx.restore();
     if (pixel) ctx.imageSmoothingEnabled = true;
 
-    if (anim.coup >= 0 && anim.coup < 0.55) {
+    if (anim.coup >= 0 && anim.coup < 0.55 && !coupDessine) {
       const p = anim.coup / 0.55;
       ctx.strokeStyle = `rgba(255,255,255,${0.45 * (1 - p)})`;
       ctx.lineWidth = 2;
@@ -1367,6 +1424,18 @@ export class Renderer {
       ctx.arc(px, py - u.radius * 0.4, u.radius * 1.6, u.facing - 0.9, u.facing + 0.3);
       ctx.stroke();
     }
+  }
+
+  /**
+   * Pose d'un soldat dont l'atlas porte ses poses dans les huit directions (un
+   * modèle 3D rendu à l'avance) : le coup d'épée pendant la frappe, le repos à
+   * l'arrêt, la marche sinon (null).
+   */
+  pose8De(u, def, anim) {
+    const P = def.poses8;
+    if (anim.coup >= 0 && P.attaque) return { pose: P.attaque, parCoup: true };
+    if (anim.avance || !P.repos) return null;
+    return { pose: P.repos };
   }
 
   /**

@@ -23,10 +23,13 @@
 | `archerie.webp`, `ecurie.webp`, `atelier-siege.webp`, `forge.webp` | Les quatre autres bâtiments **3×3** : cibles et râteliers de flèches, box à foin et selles, catapulte sous sa halle, forge à la cheminée fumante — 316 px de large, dessinés sur 158 | Illustrations générées par l'auteur du dépôt, livrées avec leur transparence |
 | `moulin.webp`, `camp-bucherons.webp`, `camp-mineurs.webp`, `ferme.webp`, `tour-guet.webp` | Les cinq autres bâtiments **2×2** : ailes à voiles, billes et haches, galerie et wagonnet, potager et charrette de foin, tour au belvédère — 216 px de large, dessinés sur 108 | idem |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
+| `chevalier-3d.webp` | Essai « 3D précalculée » du milicien : un **chevalier 3D** rendu par Blender sous l'angle du jeu, huit directions × (course de 16 images, repos de 8, coup d'épée de 12), 128×128 par case | Modèle **KayKit Adventurers** de Kay Lousberg, domaine public (CC0) — voir « Deux essais de 3D » |
+| `chevalier-3d.glb` | Essai « 3D en direct » : le même modèle, allégé (ses dix pièces utiles, trois animations sur 76 : 420 Ko au lieu de 3,6 Mo) | idem |
 
 Ces images viennent de planches générées par l'auteur du dépôt (dont ChatGPT et
 Gemini pour le villageois), qui en est l'auteur ; chacune est détaillée
-ci-dessous. Aucune image tierce n'est utilisée ici.
+ci-dessous. Seul le chevalier des essais de 3D vient d'ailleurs : un modèle
+KayKit du domaine public, en attendant celui de l'auteur.
 
 Les scripts de fabrication cités plus bas (`peps.py`, `decoupe-batiment.py`,
 `textures-sol.py`, `fabrique-villageois-rife.py`, `decoupe-planche.py`…) ne sont
@@ -507,3 +510,50 @@ arbres ont été essayés pour la nourriture : jolis, mais ils ne disaient pas
 WebP partout où c'est possible — seul le lancier reste un PNG indexé de 4 Ko :
 1,6 Mo pour les 31 images, sans différence visible à l'œil même agrandi trois
 fois.
+
+## Deux essais de 3D : le chevalier KayKit
+
+Question de l'auteur : un modèle 3D peut-il entrer dans le jeu en restant 3D ?
+Deux réponses, jouables côte à côte dans le menu de pause, sur le milicien. En
+attendant le modèle de l'auteur, elles utilisent le **chevalier KayKit
+Adventurers** de Kay Lousberg (domaine public, CC0) : 6 952 triangles, une
+texture en dégradés, un squelette et 76 animations.
+
+**Le modèle.** Des quinze pièces du fichier, dix servent : corps, tête, bras,
+jambes, casque, cape, l'épée à une main et le bouclier rond — les autres armes
+et boucliers, et une sphère d'aide, sont écartés. Trois animations : la course
+`Running_B`, le repos `Idle` et le coup `1H_Melee_Attack_Chop`. Pourquoi la
+course plutôt que la marche : ce chevalier a les jambes très courtes (bassin à
+0,35 unité), et mesurée sur l'animation — excursion avant-arrière d'un pied par
+rapport au bassin —, sa marche parcourt 0,7 unité par cycle : à la vitesse du
+milicien (une case par seconde), elle devrait jouer 1,7 fois trop vite ou
+patiner ; la course, 1,1 unité par cycle, tient la vitesse du jeu à son tempo
+d'origine. Le cycle est calé sur la distance, comme toutes les marches du jeu :
+20 px monde par foulée.
+
+**3D précalculée.** Blender tourne sans écran, en module Python (`bpy` 4.2) :
+import du glTF, caméra orthographique à 35° au-dessus de l'horizon regardant le
+nord (le personnage tourné vers le sud fait face au joueur, comme la case 0 de
+tous les atlas), soleil au nord-ouest et ciel pour les ombres, rendu Cycles
+(24 échantillons, débruité) sur fond transparent, espace colorimétrique
+« Standard » pour garder les couleurs de la texture. Huit directions, le
+squelette tourné de 45° à chaque fois — le glTF s'importe en quaternions, il
+faut repasser en angles d'Euler pour que la rotation compte. 288 images de
+128×128 en 70 s, montées en un atlas de 2 048×3 072 (415 Ko en WebP) : rangées
+0-7 la course, 8-15 le repos, 16-23 le coup ; l'ancre des pieds est la
+projection de l'origine du modèle (64 ; 91,6). Pas de « peps » : le rendu est
+net d'origine, et doit se superposer au rendu en direct. La couleur d'équipe
+est la règle du lancier : cape et bouclier rouges d'origine, basculés en bleu
+pour le joueur (fenêtre 338°–14°), la peau orangée épargnée.
+
+**3D en direct.** three.js 0.186, réduit par esbuild à ce que le jeu utilise —
+rendu WebGL, lumières, mixeur d'animations, chargeur glTF, clonage de squelette
+— en un module de 614 Ko (159 Ko compressé), sa licence MIT conservée en fin de
+fichier. Chaque unité a son clone du modèle, son mixeur et sa scène ; son
+animation n'a pas d'horloge propre : le jeu lui dicte la course selon la
+distance parcourue, le repos selon l'horloge, le coup selon le rechargement de
+l'arme — les mêmes règles que l'atlas. La caméra et le cadrage sont ceux de
+l'atlas, et l'éclairage est étalonné sur le rendu Blender : même pose, même
+case, couleur moyenne (124, 129, 136) contre (125, 130, 137). La texture de
+l'autre camp est recolorée au chargement par la même fonction que les atlas.
+
