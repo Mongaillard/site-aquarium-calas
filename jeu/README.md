@@ -482,7 +482,8 @@ WebGL, l'atlas précalculé le remplace. Le détail de la chaîne est dans
 Le choix est retenu d'un lancement à l'autre. Sans service worker, l'atlas
 peint n'est téléchargé que si on choisit ce style — l'animé, style par défaut,
 l'est toujours ; une fois le jeu installé, le service worker garde les deux pour
-le hors-ligne (107 Ko à eux deux). Le verdict à
+le hors-ligne (107 Ko à eux deux), l'atlas de la 3D précalculée avec eux
+(406 Ko), three.js et le modèle au premier usage. Le verdict à
 l'écran est net : **la marche dessinée l'emporte**. À la taille d'une unité, ce
 qui se lit n'est pas le détail d'un personnage mais son mouvement ; la peinture
 réduite devient une tache sombre. Elle garde sa place là où elle est vue en
