@@ -182,14 +182,76 @@ async function rangerCache(cle, src, cuit) {
 }
 
 /**
+ * Le glTF texte porte son tampon en base64 (`data:`) et sa texture dans ce
+ * tampon ; GLTFLoader les chargerait par des adresses `data:` et `blob:`, que
+ * la politique de sécurité de l'artefact claude.ai interdit (« Failed to load
+ * buffer »). On lui donne donc un .glb reconstruit en mémoire, le tampon dans
+ * son bloc binaire et sans image ; les images sont rendues à part (Blob, à
+ * décoder par createImageBitmap, sans adresse) avec, par nom de matériau,
+ * l'image de sa couleur de base.
+ */
+function gltfSansAdresses(octets) {
+  const g = JSON.parse(new TextDecoder().decode(octets));
+  const tampon = g.buffers[0];
+  const base64 = tampon.uri.slice(tampon.uri.indexOf(',') + 1);
+  const texte = atob(base64);
+  const bin = new Uint8Array(texte.length);
+  for (let i = 0; i < texte.length; i++) bin[i] = texte.charCodeAt(i);
+  delete tampon.uri;
+  tampon.byteLength = bin.length;
+  const images = (g.images || []).map((im) => {
+    const v = g.bufferViews[im.bufferView];
+    const debut = v.byteOffset || 0;
+    return new Blob([bin.subarray(debut, debut + v.byteLength)], { type: im.mimeType || 'image/png' });
+  });
+  const cartes = {};
+  for (const mat of g.materials || []) {
+    const t = mat.pbrMetallicRoughness && mat.pbrMetallicRoughness.baseColorTexture;
+    if (!t) continue;
+    cartes[mat.name] = g.textures[t.index].source;
+    delete mat.pbrMetallicRoughness.baseColorTexture;
+  }
+  delete g.textures; delete g.images; delete g.samplers;
+  // Conteneur GLB : en-tête, bloc JSON (complété d'espaces), bloc binaire (de zéros).
+  const json = new TextEncoder().encode(JSON.stringify(g));
+  const lj = Math.ceil(json.length / 4) * 4, lb = Math.ceil(bin.length / 4) * 4;
+  const glb = new ArrayBuffer(12 + 8 + lj + 8 + lb);
+  const vue = new DataView(glb), octetsGlb = new Uint8Array(glb);
+  vue.setUint32(0, 0x46546c67, true); vue.setUint32(4, 2, true); vue.setUint32(8, glb.byteLength, true);
+  vue.setUint32(12, lj, true); vue.setUint32(16, 0x4e4f534a, true);
+  octetsGlb.set(json, 20); octetsGlb.fill(0x20, 20 + json.length, 20 + lj);
+  vue.setUint32(20 + lj, lb, true); vue.setUint32(24 + lj, 0x004e4942, true);
+  octetsGlb.set(bin, 28 + lj);
+  return { glb, images, cartes };
+}
+
+/**
  * Charge le modèle (octets du fichier glTF) et cuit toutes ses animations.
  * `sur` : suréchantillonnage du rendu ; `anticrenelage` : celui de WebGL.
  */
 export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticrenelage = true } = {}) {
   const m = MODELES[cle];
   const THREE = await import('./vendor/three-jeu.min.js');
-  const gltf = await new Promise((ok, echec) => new THREE.GLTFLoader().parse(octets, '', ok, echec));
+  const { glb, images, cartes } = gltfSansAdresses(octets);
+  const gltf = await new Promise((ok, echec) => new THREE.GLTFLoader().parse(glb, '', ok, echec));
   const modele = gltf.scene;
+  // La texture, décodée à part et posée sur son matériau.
+  const textures = await Promise.all(images.map(async (blob) => {
+    const bmp = await createImageBitmap(blob);
+    const toileTexture = document.createElement('canvas');
+    toileTexture.width = bmp.width; toileTexture.height = bmp.height;
+    toileTexture.getContext('2d').drawImage(bmp, 0, 0);
+    bmp.close?.();
+    const t = new THREE.CanvasTexture(toileTexture);
+    t.flipY = false;                        // convention glTF
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }));
+  modele.traverse((o) => {
+    if (!o.isMesh || !(o.material.name in cartes)) return;
+    o.material.map = textures[cartes[o.material.name]];
+    o.material.needsUpdate = true;
+  });
   // Les matériaux de l'Atelier sont mats (rugosité 1, pas de métal) : la
   // texture peinte porte déjà ses ombres.
   modele.traverse((o) => { if (o.isMesh) o.frustumCulled = false; });

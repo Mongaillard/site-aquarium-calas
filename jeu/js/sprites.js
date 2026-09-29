@@ -251,10 +251,12 @@ let style = '3d';
  * seule la fenêtre des bleus francs bascule, comme pour l'illustration.
  */
 const EN_3D = {
-  // L'écharpe est bleu franc ; peau, cuir, chemise et outils sont orangés ou crème.
+  // L'écharpe du modèle est un bleu marine terne (saturation 0,18 à 0,30,
+  // mesurée sur l'atlas cuit) : le seuil descend à 0,14. Peau, cuir, chemise
+  // sont orangés ou crème, le fer des outils presque gris (saturation < 0,06).
   villagerAtelier: {
     modele: 'villager', unite: 'villager', repli: 'villager', natif: 'bleu',
-    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+    recolorage: { teinte: [195, 255], vers: 0, satMin: 0.14, saturer: 2.3 },
   },
   // Cuit à la demande, la première fois qu'un Atlante paraît : pas de planche
   // dessinée pour patienter (il est dessiné au code le temps de la cuisson),
@@ -361,6 +363,7 @@ function rotationTeinte(image, l, h, regle) {
   const cible = regle.vers / 360;
   const satMin = regle.satMin ?? 0.3;
   const lumMax = regle.lumMax ?? 1;
+  const saturer = regle.saturer ?? 1;   // un bleu terne devient un rouge qui se lit
   const dedans = a <= b
     ? (d) => d >= a && d <= b
     : (d) => d >= a || d <= b;      // fenêtre à cheval sur 0°
@@ -371,7 +374,7 @@ function rotationTeinte(image, l, h, regle) {
       if (p[i + 3] === 0) continue;
       const [teinte, sat, lum] = versHSL(p[i], p[i + 1], p[i + 2]);
       if (sat <= satMin || lum >= lumMax || !dedans(teinte * 360)) continue;
-      const [r, g, bl] = versRGB(cible, sat, lum);
+      const [r, g, bl] = versRGB(cible, Math.min(1, sat * saturer), lum);
       p[i] = r; p[i + 1] = g; p[i + 2] = bl;
     }
     ctx.putImageData(data, 0, 0);
@@ -424,7 +427,8 @@ function chargerModele(cle) {
     })
     .catch((erreur) => {
       entree.absent = true;
-      entree.raison = (erreur && erreur.message) || String(erreur);
+      // Un message de GLTFLoader peut citer tout un fichier : on n'en garde que le début.
+      entree.raison = String((erreur && erreur.message) || erreur).slice(0, 140);
       console.warn('Modèle 3D indisponible, l’illustration dessinée le remplace :', erreur);
       annoncerModeles3d();
     });
