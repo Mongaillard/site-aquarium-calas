@@ -23,6 +23,8 @@
 | `archerie.webp`, `ecurie.webp`, `atelier-siege.webp`, `forge.webp` | Les quatre autres bâtiments **3×3** : cibles et râteliers de flèches, box à foin et selles, catapulte sous sa halle, forge à la cheminée fumante — 316 px de large, dessinés sur 158 | Illustrations générées par l'auteur du dépôt, livrées avec leur transparence |
 | `moulin.webp`, `camp-bucherons.webp`, `camp-mineurs.webp`, `ferme.webp`, `tour-guet.webp` | Les cinq autres bâtiments **2×2** : ailes à voiles, billes et haches, galerie et wagonnet, potager et charrette de foin, tour au belvédère — 216 px de large, dessinés sur 108 | idem |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
+| `modeles/milicien.json` | Le **chevalier en 3D** (milicien, style « 3D ») : maillage texturé, squelette de 52 os, sept animations (marche, garde, marche et attaque à l'épée, coup de poing, coup reçu, mort), épée et bouclier | Modèle et animations faits par l'auteur du dépôt dans son Atelier 3D (photo → 3D, puis Animer) |
+| `modeles/villageois.json` | Le **villageois en 3D** (style « 3D ») : onze animations (repos, marche, récolter, construire, porter, couper du bois, miner, dépecer, coup de poing, coup reçu, mort) et leurs six outils | idem |
 | `chevalier-3d.webp` | Essai « 3D précalculée » du milicien : un **chevalier 3D** rendu par Blender sous l'angle du jeu, huit directions × (course de 16 images, repos de 8, coup d'épée de 12), 128×128 par case | Modèle **KayKit Adventurers** de Kay Lousberg, domaine public (CC0) — voir « Deux essais de 3D » |
 | `chevalier-3d.json` | Essai « 3D en direct » : le même modèle, allégé — ses dix pièces utiles, trois animations sur 76 — et mis en glTF texte, données embarquées (527 Ko, 220 compressés, au lieu de 3,6 Mo) : tout hébergeur sert du JSON, pas toujours le .glb binaire | idem |
 
@@ -64,6 +66,22 @@ Sa recoloration d'équipe ne peut pas suivre la même règle que l'illustration 
 le rouge du tabard y voisine avec la peau du visage et le cuir. Une bascule large
 repeignait le visage en bleu ; on ne prend donc que les rouges francs (teinte
 338°–14°), ce qui épargne la peau et le cuir, dont la teinte est orangée.
+
+## Les unités en 3D
+
+Le milicien et le villageois du style « 3D » (le style par défaut) ne sont pas
+des planches : ce sont les modèles animés de l'Atelier 3D (exportés en `.glb`,
+passés en glTF texte, données en base64 : tout hébergeur sert du JSON), que le
+jeu cuit lui-même au premier lancement (`js/modele3d.js`, avec le paquet
+three.js réduit de l'essai « 3D en direct », `js/vendor/three-jeu.min.js`). Caméra commune des sprites — orthographique, au sud, 30°
+au-dessus de l'horizon —, huit directions par animation, 2 px d'atlas par px
+monde, bords francs et liseré sombre comme les exports de l'Atelier. Le
+résultat est gardé dans le Cache Storage (`aem-modeles-3d`) : les lancements
+suivants le relisent en une seconde, sans three.js. Pour changer de modèle,
+remplacer le fichier : l'empreinte change, la cuisson se refait
+une fois. Les styles « Animé » et « Peint » gardent les planches dessinées, et
+servent aussi le temps de la première cuisson, ou si l'appareil n'a pas de
+WebGL.
 
 ## Le cycle de marche
 

@@ -15,7 +15,7 @@ import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
-import { setStyleUnites, styleUnites, spriteDe } from './sprites.js';
+import { setStyleUnites, styleUnites, spriteDe, chargerSprites } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
 
 const DT = 1 / TICKS_PER_SECOND;
@@ -61,7 +61,7 @@ function storeSetup(setup) {
 
 /** Style des personnages (animé, peint, ou l'un des deux essais de 3D) : conservé d'une partie à l'autre. */
 function loadStyle() {
-  try { return localStorage.getItem(STYLE_KEY) || 'anime'; } catch { return 'anime'; }
+  try { return localStorage.getItem(STYLE_KEY) || '3d'; } catch { return '3d'; }
 }
 
 export function speedDef(id) {
@@ -907,15 +907,16 @@ class Game {
     return ok;
   }
 
-  /** Style des personnages : illustration animée ou peinture réduite. */
+  /** Style des personnages : modèle 3D, illustration animée ou peinture réduite. */
   setStyleUnites(id) {
     setStyleUnites(id);
     try { localStorage.setItem(STYLE_KEY, styleUnites()); } catch { /* stockage indisponible */ }
     const messages = {
+      '3d': 'Personnages : tes modèles 3D animés',
       anime: 'Personnages : marche dessinée',
       peint: 'Personnages : illustration peinte',
-      '3d-precalc': 'Milicien : modèle 3D rendu à l’avance (essai)',
-      '3d-direct': 'Milicien : modèle 3D animé en direct (essai)',
+      '3d-precalc': 'Milicien : chevalier d’essai rendu à l’avance',
+      '3d-direct': 'Milicien : chevalier d’essai animé en direct',
     };
     if (styleUnites() === '3d-direct' && !webglDisponible()) {
       this.ui.toast('3D en direct : WebGL indisponible ici — le rendu précalculé le remplace', 'warn');
@@ -1131,6 +1132,10 @@ function setupStartScreen() {
 
 setupStartScreen();
 showStartScreen();
+// Les illustrations se chargent — et les unités en 3D se cuisent — pendant
+// que le joueur choisit sa partie : elles sont prêtes quand elle commence.
+setStyleUnites(loadStyle());
+chargerSprites();
 
 // Mode hors ligne : uniquement là où le jeu est déployé en entier (le
 // manifeste accompagne alors le service worker). Ailleurs — page embarquée,

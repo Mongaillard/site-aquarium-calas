@@ -759,7 +759,10 @@ export class UI {
           <small class="credits-auteurs">${l.auteurs.join(' · ')}</small></li>
         <li><b>Illustrations</b> (personnages, bâtiments, arbres, décor, textures de sol et
           d'eau) — générées par l'auteur du jeu, puis découpées et détourées pour le jeu.</li>
-        <li><b>Chevalier 3D d'essai</b> (styles « 3D ») — KayKit Adventurers, par
+        <li><b>Chevalier et villageois 3D</b> (style « 3D ») — modèles et animations de l'auteur du
+          jeu, faits dans son Atelier 3D ; cuits par
+          <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (licence MIT).</li>
+        <li><b>Chevalier 3D d'essai</b> (styles « 3D précalculée » et « 3D en direct ») — KayKit Adventurers, par
           <a href="https://www.kaylousberg.com" target="_blank" rel="noopener">Kay Lousberg</a>,
           domaine public (CC0) ; rendu en direct par
           <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (licence MIT).</li>

@@ -2,7 +2,7 @@
 
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque
-(seul l'essai « 3D en direct » charge three.js, et seulement si on le choisit) :
+(three.js ne sert qu'aux personnages en 3D : il les cuit une fois, puis tout est du Canvas 2D) :
 ~10 600 lignes de JavaScript, du Canvas 2D, des pictogrammes vectoriels et 1,6 Mo
 d'illustrations et de textures — dont les cycles de marche du milicien, du
 villageois, de l'éclaireur, du cerf et du cochon.
@@ -310,6 +310,7 @@ jeu/
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons générés à la volée (Web Audio)
+│   ├── modele3d.js       personnages 3D : les modèles de l'Atelier cuits en atlas au premier lancement
 │   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case
 │   ├── main.js           écrans et boucle de jeu
 │   └── vendor/           three.js réduit au nécessaire (chargé à la demande)
@@ -458,12 +459,13 @@ foulées d'un cavalier à la lance, la planche lue du nord dans le sens horaire
 et remise sur les secteurs du jeu. Il fait 54 px de face, un homme à pied 44 ;
 la foulée suit la distance, comme toutes les marches.
 
-**Quatre styles sont jouables** pour le milicien, au choix dans le menu de
-pause :
+**Cinq styles sont jouables** pour le milicien (le villageois : les deux
+premiers), au choix dans le menu de pause :
 
 | Style | Sprite du milicien | Ce qu'on y gagne |
 | --- | --- | --- |
-| **Animé** (par défaut) | `milicien-marche.webp`, 8 images par direction | Le mouvement se lit : on voit qui avance, qui est bloqué |
+| **3D** (par défaut) | `modeles/milicien.json` et `modeles/villageois.json` : les modèles animés de l'auteur (Atelier 3D), cuits par le jeu en atlas de huit directions au premier lancement, puis gardés en cache | Ses propres personnages, toutes leurs animations — combat, gestes de travail tournés vers leur cible, chute — sans rien dessiner |
+| **Animé** | `milicien-marche.webp`, 8 images par direction | Le mouvement se lit : on voit qui avance, qui est bloqué |
 | **Peint** | `chevalier.webp`, une pose par direction | Le détail de l'armure, au prix d'une silhouette figée |
 | **3D précalculée** (essai) | `chevalier-3d.webp` : un modèle 3D rendu à l'avance par Blender, 8 directions × course, repos, coup d'épée | Des directions et des pas parfaitement cohérents, sans rien coûter au téléphone |
 | **3D en direct** (essai) | `chevalier-3d.json` (glTF), rendu à chaque image par three.js | L'unité tourne selon sa vraie direction, pas en huit crans ; l'animation se calcule à chaque image |

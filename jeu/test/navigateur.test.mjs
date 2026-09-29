@@ -95,8 +95,27 @@ const fps = await page.evaluate(() => new Promise((resolve) => {
 }));
 check('fluidité', fps >= 30, fps + ' images/s');
 
-// Les styles de personnage cohabitent et se changent en cours de partie : animé,
-// peint, et les deux essais de 3D (vérifiés plus bas).
+// Le style par défaut : le milicien et le villageois cuits par le jeu depuis
+// les modèles 3D de l'auteur (js/modele3d.js), toutes leurs animations comprises.
+const cuisson = await page.evaluate(async () => {
+  const mod = await import('./js/sprites.js');
+  const debut = performance.now();
+  while (performance.now() - debut < 150000) {
+    const m = mod.spriteDe('militia'), v = mod.spriteDe('villager');
+    if (m && m.def.cuit3d && v && v.def.cuit3d) {
+      return { ms: Math.round(performance.now() - debut), milicien: Object.keys(m.def.clips).sort().join(','), villageois: Object.keys(v.def.clips).length };
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return null;
+});
+check('le milicien et le villageois sont cuits depuis leurs modèles 3D',
+  !!cuisson && cuisson.milicien === 'attaque,marche,mort,repos,touche' && cuisson.villageois === 11,
+  cuisson ? `${cuisson.ms} ms, milicien : ${cuisson.milicien}, villageois : ${cuisson.villageois} animations` : 'pas prêts après 150 s');
+
+// Les styles de personnage cohabitent et se changent en cours de partie : les
+// modèles 3D de l'auteur (par défaut, vérifiés juste après), animé, peint, et
+// les deux essais de 3D (vérifiés plus bas).
 const styles = await page.evaluate(async () => {
   const g = window.__jeu;
   const mod = await import('./js/sprites.js');
@@ -104,11 +123,11 @@ const styles = await page.evaluate(async () => {
   g.setStyleUnites('peint');
   await new Promise((r) => setTimeout(r, 900));
   const apres = mod.spriteDe('militia').def.src;
-  g.setStyleUnites('anime');
+  g.setStyleUnites('3d');
   await new Promise((r) => setTimeout(r, 400));
   return { avant, apres, retour: mod.spriteDe('militia').def.src, choix: mod.STYLES.map((st) => st.id).join(',') };
 });
-check('quatre styles de personnage sont proposés', styles.choix === 'anime,peint,3d-precalc,3d-direct', styles.choix);
+check('cinq styles de personnage sont proposés', styles.choix === '3d,anime,peint,3d-precalc,3d-direct', styles.choix);
 check('le style bascule en cours de partie',
   styles.avant !== styles.apres && styles.retour === styles.avant,
   `${styles.avant.split('/').pop()} → ${styles.apres.split('/').pop()} → ${styles.retour.split('/').pop()}`);

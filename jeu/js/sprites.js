@@ -21,6 +21,8 @@ const batiment = (src, cellW, cellH, largeurMonde) => ({
   recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
 });
 
+import { TILE, UNIT_TYPES } from './config.js';
+import { MODELES, modeleCuit } from './modele3d.js';
 import { PIECES_DECOR } from './decor-pieces.js';
 
 /** Les images 0..n-1 dans l'ordre : une rangée déjà remontée et interpolée. */
@@ -215,21 +217,48 @@ const PAS = Math.PI / 4;
 const charges = new Map();
 
 /**
- * Deux styles cohabitent pour la même unité : `anime` (marche dessinée, huit
- * images par direction) et `peint` (illustration réduite, pose unique). Le
- * choix se fait en cours de partie, et l'atlas correspondant n'est téléchargé
- * qu'au moment où on le demande.
+ * Plusieurs styles cohabitent pour la même unité : `3d`, par défaut (les
+ * modèles animés de l'auteur, faits dans l'Atelier 3D et cuits au premier
+ * lancement : voir modele3d.js), `anime` (marche dessinée, huit images par
+ * direction), `peint` (illustration réduite, pose unique), et les deux essais
+ * de 3D du milicien sur un chevalier libre de droits, `3d-precalc` et
+ * `3d-direct`. Le choix se fait en cours de partie, et l'atlas correspondant
+ * n'est chargé qu'au moment où on le demande.
  */
 const ALTERNATIVES = {
-  militia: { anime: 'militia', peint: 'militiaPeint', '3d-precalc': 'militia3d', '3d-direct': 'militia3d' },
+  militia: {
+    '3d': 'militiaAtelier', anime: 'militia', peint: 'militiaPeint', '3d-precalc': 'militia3d', '3d-direct': 'militia3d',
+  },
+  // Le villageois n'a ni illustration peinte ni essai de 3D : sa planche sert
+  // à tous les styles sauf « 3D ».
+  villager: { '3d': 'villagerAtelier', anime: 'villager', peint: 'villager', '3d-precalc': 'villager', '3d-direct': 'villager' },
 };
 export const STYLES = [
+  { id: '3d', nom: '3D', desc: 'Tes modèles animés' },
   { id: 'anime', nom: 'Animé', desc: 'Marche dessinée' },
   { id: 'peint', nom: 'Peint', desc: 'Illustration réduite' },
-  { id: '3d-precalc', nom: '3D précalculée', desc: 'Modèle 3D rendu à l’avance' },
-  { id: '3d-direct', nom: '3D en direct', desc: 'Modèle 3D animé en jeu' },
+  { id: '3d-precalc', nom: '3D précalculée', desc: 'Essai : chevalier rendu à l’avance' },
+  { id: '3d-direct', nom: '3D en direct', desc: 'Essai : chevalier animé en jeu' },
 ];
-let style = 'anime';
+let style = '3d';
+
+/**
+ * Unités cuites depuis un modèle 3D. `repli` : l'atlas dessiné, affiché le
+ * temps de la cuisson, ou pour de bon si le téléphone n'a pas de WebGL. Le
+ * tabard et le bouclier sont bleu franc, l'acier gris-bleu à peine saturé :
+ * seule la fenêtre des bleus francs bascule, comme pour l'illustration.
+ */
+const EN_3D = {
+  // L'écharpe est bleu franc ; peau, cuir, chemise et outils sont orangés ou crème.
+  villagerAtelier: {
+    modele: 'villager', unite: 'villager', repli: 'villager', natif: 'bleu',
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  militiaAtelier: {
+    modele: 'militia', unite: 'militia', repli: 'militia', natif: 'bleu',
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+};
 
 export function styleUnites() { return style; }
 
@@ -241,7 +270,7 @@ export function styleUnites() { return style; }
 export function rendu3dDirect() { return style === '3d-direct'; }
 
 export function setStyleUnites(nouveau) {
-  style = STYLES.some((s) => s.id === nouveau) ? nouveau : 'anime';
+  style = STYLES.some((s) => s.id === nouveau) ? nouveau : '3d';
   for (const alt of Object.values(ALTERNATIVES)) chargerAtlas(alt[style]);
 }
 
@@ -352,8 +381,48 @@ export function recolorer(def, image, l, h) {
     : rotationTeinte(image, l, h, def.recolorage);
 }
 
+/**
+ * Cuit un modèle 3D, une seule fois. Chaque animation devient un atlas à part
+ * (sa case, son ancre), recoloré pour l'autre camp comme une illustration. La
+ * fiche de la marche reste au premier niveau : ce qui ne connaît que la marche
+ * (cadreSource, imageDeMarche) la lit comme n'importe quel atlas.
+ */
+function chargerModele(cle) {
+  const d = EN_3D[cle];
+  const entree = { def: null, pret: false };
+  charges.set(cle, entree);
+  chargerAtlas(d.repli);
+  const unite = UNIT_TYPES[d.unite];
+  modeleCuit(d.modele, unite ? unite.speed * TILE : 32)
+    .then(({ cycle, clips }) => {
+      for (const c of Object.values(clips)) {
+        const autre = recolorer(d, c.canvas, c.canvas.width, c.canvas.height);
+        c.variantes = d.natif === 'bleu' ? { bleu: c.canvas, rouge: autre } : { rouge: c.canvas, bleu: autre };
+      }
+      const { marche } = clips;
+      // `poses` : les gestes de travail sous les noms de Renderer.poseDe.
+      const poses = {};
+      for (const nom of ['repos', 'cueillir', 'construire', 'porter', 'bois', 'or', 'viande']) if (clips[nom]) poses[nom] = clips[nom];
+      entree.def = {
+        cuit3d: true, src: MODELES[d.modele].src, cellW: marche.cellW, cellH: marche.cellH, cases: 8, images: marche.images, cycle,
+        ancreY: marche.ancreY, hauteurMonde: marche.hauteurMonde, natif: d.natif, clips,
+        poses: Object.keys(poses).length > 1 ? poses : null,
+      };
+      entree.variantes = marche.variantes;
+      entree.pret = true;
+    })
+    .catch((erreur) => {
+      entree.absent = true;
+      console.warn('Modèle 3D indisponible, l’illustration dessinée le remplace :', erreur);
+    });
+}
+
 /** Charge un atlas donné, une seule fois. */
 function chargerAtlas(cle) {
+  if (EN_3D[cle]) {
+    if (!charges.has(cle) && typeof document !== 'undefined') chargerModele(cle);
+    return;
+  }
   const def = ATLAS[cle];
   if (!def || charges.has(cle) || typeof document === 'undefined') return;
   const entree = { def, pret: false, variantes: null };
@@ -458,8 +527,12 @@ export function textureSol(cle, zoom = 1) {
 /** Sprite prêt à dessiner pour ce type d'unité, ou null. */
 export function spriteDe(type) {
   const alt = ALTERNATIVES[type];
-  const e = charges.get(alt ? alt[style] : type);
-  return e && e.pret ? e : null;
+  const cle = alt ? alt[style] : type;
+  const e = charges.get(cle);
+  if (e && e.pret) return e;
+  // Un modèle 3D encore en cuisson (ou impossible à cuire) : son illustration.
+  const repli = EN_3D[cle] && charges.get(EN_3D[cle].repli);
+  return repli && repli.pret ? repli : null;
 }
 
 /** Le joueur 0 est bleu, le joueur 1 rouge (voir PLAYER_COLORS). */

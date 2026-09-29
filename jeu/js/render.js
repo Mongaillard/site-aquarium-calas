@@ -6,7 +6,7 @@
 // sont des tracés vectoriels (voir icones.js).
 // ---------------------------------------------------------------------------
 
-import { TILE, BUILDING_TYPES } from './config.js';
+import { TILE, BUILDING_TYPES, UNIT_TYPES } from './config.js';
 import { iconePath, ICON_BOX } from './icones.js';
 import {
   chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche, poseSource,
@@ -301,6 +301,7 @@ export class Renderer {
     this.drawTerrain(view);
     this.drawResources(view);
     this.drawRubble();
+    this.dessinerCadavres();
     this.drawEntities();
     this.drawProjectiles();
     this.drawEffects();
@@ -1338,6 +1339,7 @@ export class Renderer {
    * comme dans AoE — sinon un chevalier de dix-huit pixels ne se lirait pas.
    */
   dessinerSprite(u, sprite, x, y, anim) {
+    if (sprite.def.cuit3d) { this.dessinerModele3D(u, sprite, x, y, anim); return; }
     const ctx = this.ctx;
     const { cellW, cellH, cases, hauteurMonde, ancreY, pixel } = sprite.def;
     let source = imagePourJoueur(sprite, u.playerIndex);
@@ -1380,22 +1382,7 @@ export class Renderer {
       ({ sx, sy } = cadreSource(sprite.def, k, image));
       miroir = !!(sprite.def.miroirs && sprite.def.miroirs[k]);   // l'ouest est l'est retourné
     }
-    // Socle aux couleurs du joueur : de loin, une armure reste une tache
-    // sombre, et l'appartenance doit se lire d'un coup d'œil. C'est la
-    // solution d'AoE, et elle vaut mieux qu'un personnage repeint en entier.
-    // Un animal sauvage n'a pas de camp : pas de socle.
-    if (!u.isAnimal || u.playerIndex >= 0) {
-      const sol = y + u.radius * 0.45;
-      ctx.fillStyle = u.player.color.main;
-      ctx.globalAlpha = 0.55;
-      ctx.beginPath();
-      ctx.ellipse(x, sol - 1, u.radius * 0.78, u.radius * 0.34, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = u.player.color.light;
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-    }
+    this.dessinerSocle(u, x, y);
 
     const h = hauteurMonde;
     const w = (cellW / cellH) * h;
@@ -1436,6 +1423,112 @@ export class Renderer {
     if (anim.coup >= 0 && P.attaque) return { pose: P.attaque, parCoup: true };
     if (anim.avance || !P.repos) return null;
     return { pose: P.repos };
+  }
+
+  /**
+   * Socle aux couleurs du joueur : de loin, une armure reste une tache
+   * sombre, et l'appartenance doit se lire d'un coup d'œil. C'est la
+   * solution d'AoE, et elle vaut mieux qu'un personnage repeint en entier.
+   * Un animal sauvage n'a pas de camp : pas de socle.
+   */
+  dessinerSocle(u, x, y) {
+    if (u.isAnimal && u.playerIndex < 0) return;
+    const ctx = this.ctx;
+    const sol = y + u.radius * 0.45;
+    ctx.fillStyle = u.player.color.main;
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.ellipse(x, sol - 1, u.radius * 0.78, u.radius * 0.34, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = u.player.color.light;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  /**
+   * Personnage cuit depuis son modèle 3D (voir modele3d.js) : une animation
+   * par état, chacune dans son atlas, en huit directions — un geste de travail
+   * se tourne vers sa cible au lieu d'être retourné en miroir. L'attaque passe
+   * avant tout ; en chemin, la marche (le fagot sur l'épaule si l'on rapporte
+   * du bois) ; au travail, le geste de la tâche ; à l'arrêt, un coup encaissé
+   * fait broncher, sinon la garde ou le repos. L'arme bouge vraiment : ni
+   * fente simulée ni traînée.
+   */
+  dessinerModele3D(u, sprite, x, y, anim) {
+    const { clips } = sprite.def;
+    let clip = null, image = 0, angle = u.facing;
+    const cible = this.cibleDe(u);
+    const versCible = () => (cible ? Math.atan2(cible.y - u.y, cible.x - u.x) : u.facing);
+    const parHorloge = (c) => Math.floor((this.horloge / c.duree + (u.id % 7) * 0.37) * c.images);
+    const parDistance = (c) => Math.floor(((anim.distance || 0) / (c.cycle || sprite.def.cycle || 40)) * c.images);
+    // L'attaque tient dans l'intervalle entre deux coups, jamais au-delà.
+    const dureeCoup = Math.min(clips.attaque.duree, (u.def.attackSpeed || 2) * 0.9);
+    if (anim.depuisCoup >= 0 && anim.depuisCoup < dureeCoup) {
+      clip = clips.attaque;
+      image = Math.floor((anim.depuisCoup / dureeCoup) * clip.images);
+      angle = versCible();
+    } else if (anim.avance) {
+      clip = clips.porter && u.isVillager && u.carry.amount > 0.5 && u.carry.type === 'wood' ? clips.porter : clips.marche;
+      image = parDistance(clip);
+    } else if (sprite.def.poses && u.isVillager && u.state !== STATE.ATTACK) {
+      // Entre deux coups de poing, pas de marteau : la garde, tournée vers l'adversaire.
+      const choix = this.poseDe(u, sprite.def, anim);
+      if (choix && choix.pose !== clips.repos) {
+        clip = choix.pose;
+        image = choix.parDistance ? parDistance(clip) : parHorloge(clip);
+        if (clip !== clips.porter) angle = versCible();
+      }
+    }
+    if (!clip) {
+      if (u.state === STATE.ATTACK && cible) angle = versCible();
+      const recu = this.world.time - u.lastHitAt;
+      if (recu >= 0 && recu < clips.touche.duree) {
+        clip = clips.touche;
+        image = Math.floor((recu / clip.duree) * clip.images);
+      } else {
+        // Décalé par unité : dix soldats au repos ne respirent pas en chœur.
+        clip = clips.repos;
+        image = parHorloge(clip);
+      }
+    }
+    image = Math.min(clip.images - 1, Math.max(0, image % clip.images));
+    this.dessinerSocle(u, x, y);
+    this.poserImage3D(clip, u.playerIndex, caseDirection(angle, 8), image, x, y + u.radius * 0.45);
+  }
+
+  /** Ce vers quoi l'unité travaille ou frappe : le gisement, sinon sa cible. */
+  cibleDe(u) {
+    if (u.resourceTile) return { x: u.resourceTile.tx * TILE + TILE / 2, y: u.resourceTile.ty * TILE + TILE / 2 };
+    return u.target && !u.target.dead ? u.target : null;
+  }
+
+  /** Une image d'un atlas cuit, posée par sa ligne des pieds en (x, sol). */
+  poserImage3D(clip, joueur, k, image, x, sol) {
+    const { cellW, cellH, ancreY, hauteurMonde } = clip;
+    const h = hauteurMonde, w = (cellW / cellH) * h;
+    const source = joueur === 0 ? clip.variantes.bleu : clip.variantes.rouge;
+    this.ctx.drawImage(source, image * cellW, k * cellH, cellW, cellH,
+      x - w / 2, sol - h * (ancreY / cellH), w, h);
+  }
+
+  /**
+   * Les morts des unités en 3D : la chute, puis le corps à terre qui
+   * s'efface. Sous les vivants — on marche à côté, pas dessous.
+   */
+  dessinerCadavres() {
+    const ctx = this.ctx;
+    for (const fx of this.world.effects) {
+      if (fx.kind !== 'cadavre' || !this.world.isVisible(fx.x, fx.y)) continue;
+      const sprite = spriteDe(fx.type);
+      if (!sprite || !sprite.def.cuit3d) continue;
+      const clip = sprite.def.clips.mort;
+      const ecoule = fx.max - fx.life;
+      const image = Math.min(clip.images - 1, Math.floor((ecoule / clip.duree) * clip.images));
+      ctx.globalAlpha = Math.min(1, fx.life / 1.5);
+      this.poserImage3D(clip, fx.joueur, caseDirection(fx.facing, 8), image, fx.x, fx.y + (UNIT_TYPES[fx.type]?.radius || 9) * 0.45);
+      ctx.globalAlpha = 1;
+    }
   }
 
   /**
@@ -1587,6 +1680,9 @@ export class Renderer {
     return {
       marche: Math.sin(u._walk) * force,
       coup: enCoup ? ecoule / (cadence * 0.34) : -1,
+      // Secondes depuis le dernier coup porté (-1 : aucun en cours) — le
+      // modèle 3D joue son attaque entière, plus longue que la fente.
+      depuisCoup: u.attackCooldown > 0 && ecoule >= 0 ? ecoule : -1,
       distance: u._distance,
       avance: u._vitesse > 3,
     };

@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v40';
+const CACHE = 'age-empires-mobile-v41';
 const ASSETS = [
   './',
   './index.html',
@@ -26,10 +26,16 @@ const ASSETS = [
   './js/input.js',
   './js/ui.js',
   './js/audio.js',
-  // Essais de 3D : le module et l'atlas précalculé. three.js (js/vendor) et le
-  // modèle (glTF en JSON), lourds et facultatifs, entrent au cache au premier usage.
+  // Essais de 3D : le module et l'atlas précalculé. Le modèle de l'essai en
+  // direct (glTF en JSON), facultatif, entre au cache au premier usage.
   './js/rendu3d.js',
   './assets/chevalier-3d.webp',
+  // Le milicien et le villageois en 3D (le style par défaut) : les modèles, et
+  // three.js qui les cuit au premier lancement.
+  './js/modele3d.js',
+  './js/vendor/three-jeu.min.js',
+  './assets/modeles/milicien.json',
+  './assets/modeles/villageois.json',
   './assets/heros.webp',
   './assets/milicien-marche.webp',
   './assets/villageois.webp',
@@ -70,7 +76,9 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      // Les unités en 3D déjà cuites (js/modele3d.js) survivent aux mises à
+      // jour : leur clé porte l'empreinte du modèle et la version de la cuisson.
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== 'aem-modeles-3d').map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });

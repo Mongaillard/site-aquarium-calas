@@ -619,6 +619,14 @@ export class World {
         if (source && this.players[source.playerIndex]) this.players[source.playerIndex].stats.killed++;
       }
       this.effects.push({ kind: 'death', x: entity.x, y: entity.y, life: 1.2, max: 1.2, color: owner.color.main });
+      // Le corps reste un moment à terre : une unité en 3D y joue sa chute
+      // (voir Renderer.dessinerCadavres) ; les autres n'en dessinent rien.
+      if (!entity.isAnimal) {
+        this.effects.push({
+          kind: 'cadavre', x: entity.x, y: entity.y, type: entity.type, facing: entity.facing,
+          joueur: entity.playerIndex, life: 6, max: 6,
+        });
+      }
       if (entity.isAnimal) this.deposerCarcasse(entity);
     } else {
       const i = this.buildings.indexOf(entity);
