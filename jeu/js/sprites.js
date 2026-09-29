@@ -410,11 +410,34 @@ function chargerModele(cle) {
       };
       entree.variantes = marche.variantes;
       entree.pret = true;
+      annoncerModeles3d();
     })
     .catch((erreur) => {
       entree.absent = true;
+      entree.raison = (erreur && erreur.message) || String(erreur);
       console.warn('Modèle 3D indisponible, l’illustration dessinée le remplace :', erreur);
+      annoncerModeles3d();
     });
+}
+
+/** Prévient le jeu qu'une cuisson vient de finir (ou d'échouer) : voir etatModeles3d. */
+function annoncerModeles3d() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('modeles3d'));
+}
+
+/**
+ * Où en sont les unités du style « 3D » : `attente` (pas encore demandées),
+ * `cuisson` (le premier lancement les prépare ; les planches dessinées servent
+ * en attendant), `pret`, ou `absent` avec sa raison (pas de WebGL, fichier
+ * introuvable…).
+ */
+export function etatModeles3d() {
+  const entrees = Object.values(ALTERNATIVES).map((a) => a['3d']).filter((c) => EN_3D[c]).map((c) => charges.get(c));
+  if (entrees.some((e) => !e)) return { etat: 'attente' };
+  const echec = entrees.find((e) => e.absent);
+  if (echec) return { etat: 'absent', raison: echec.raison };
+  if (entrees.every((e) => e.pret)) return { etat: 'pret' };
+  return { etat: 'cuisson', faits: entrees.filter((e) => e.pret).length, total: entrees.length };
 }
 
 /** Charge un atlas donné, une seule fois. */

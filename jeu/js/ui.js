@@ -10,7 +10,7 @@ import {
 } from './config.js';
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
 import { iconeSVG, ICONES_LICENCE } from './icones.js';
-import { STYLES } from './sprites.js';
+import { STYLES, etatModeles3d } from './sprites.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -639,6 +639,17 @@ export class UI {
 
   // --- Notifications --------------------------------------------------------
 
+  /** Où en sont les personnages 3D, sous les styles du menu de pause. */
+  texteModeles3d() {
+    const e = etatModeles3d();
+    const texte = {
+      cuisson: 'Tes personnages 3D se préparent (au premier lancement seulement) : les dessins servent en attendant.',
+      pret: 'Tes personnages 3D sont prêts.',
+      absent: `Tes personnages 3D n’ont pas pu se préparer sur cet appareil (${e.raison}) : les dessins les remplacent.`,
+    }[e.etat];
+    return texte ? `<p class="hint">${texte}</p>` : '';
+  }
+
   toast(message, kind = 'info') {
     // Message identique déjà affiché : on incrémente plutôt que d'empiler.
     const last = this.nodes.alerts.lastElementChild;
@@ -696,6 +707,7 @@ export class UI {
       <div class="options row">${vitesses}</div>
       <h3 class="modal-sub">Style des personnages</h3>
       <div class="options row">${styles}</div>
+      ${this.texteModeles3d()}
       <div class="modal-actions">
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="help">Comment jouer</button>

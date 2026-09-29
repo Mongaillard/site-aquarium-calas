@@ -15,7 +15,7 @@ import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
-import { setStyleUnites, styleUnites, spriteDe, chargerSprites } from './sprites.js';
+import { setStyleUnites, styleUnites, spriteDe, chargerSprites, etatModeles3d } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
 
 const DT = 1 / TICKS_PER_SECOND;
@@ -27,7 +27,9 @@ const audio = new AudioEngine();
 const AUTO_WORKERS_KEY = 'aem.autoWorkers';
 const SPEED_KEY = 'aem.vitesse';
 const SETUP_KEY = 'aem.reglages';
-const STYLE_KEY = 'aem.styleUnites';
+// v2 : le style « 3D » (les modèles de l'auteur) arrive par défaut une fois,
+// même chez qui avait retenu un autre style — dont les essais de 3D.
+const STYLE_KEY = 'aem.styleUnites.v2';
 /** Intervalle de sauvegarde automatique, en secondes réelles. */
 const AUTOSAVE_INTERVAL = 30;
 
@@ -1136,6 +1138,14 @@ showStartScreen();
 // que le joueur choisit sa partie : elles sont prêtes quand elle commence.
 setStyleUnites(loadStyle());
 chargerSprites();
+// Si la cuisson finit en pleine partie, les personnages changent sous les
+// yeux du joueur : on le lui dit, comme on lui dit si elle a échoué.
+window.addEventListener('modeles3d', () => {
+  if (!currentGame || !currentGame.running || styleUnites() !== '3d') return;
+  const e = etatModeles3d();
+  if (e.etat === 'pret') currentGame.ui.toast('Tes personnages 3D sont prêts');
+  else if (e.etat === 'absent') currentGame.ui.toast(`Personnages 3D indisponibles ici (${e.raison}) : dessins à la place`, 'warn');
+});
 
 // Mode hors ligne : uniquement là où le jeu est déployé en entier (le
 // manifeste accompagne alors le service worker). Ailleurs — page embarquée,
