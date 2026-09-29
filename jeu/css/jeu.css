@@ -1,0 +1,633 @@
+/* ---------------------------------------------------------------------------
+   Âge des Empires Mobile — interface
+   Pensée « pouce d'abord » : cibles ≥ 44 px, barres compactes, zones sûres
+   des encoches respectées, aucun défilement parasite.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --bg: #141b24;
+  --panel: rgba(22, 30, 40, 0.92);
+  --panel-solid: #1a2330;
+  --border: rgba(255, 255, 255, 0.12);
+  --text: #eef2f6;
+  --muted: #9fb0c0;
+  --gold: #e8b64c;
+  --gold-dark: #b98a2c;
+  --good: #63c363;
+  --warn: #e0b93c;
+  --error: #e06a5b;
+  --radius: 12px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* --- Icônes ----------------------------------------------------------------
+   Des tracés vectoriels, pas des emoji : même dessin sur tous les téléphones,
+   net à tout zoom, et teinté par la couleur du texte qui les porte. */
+svg.ic { fill: currentColor; display: block; flex: 0 0 auto; }
+svg.ic.inline { display: inline-block; vertical-align: -2px; margin-right: 1px; }
+.res-icon svg.ic, .worker-chip svg.ic { opacity: .95; }
+.cmd-icon svg.ic, .bc-icon svg.ic, .wr-icon svg.ic, .qicon svg.ic { margin: 0 auto; }
+.portrait svg.ic { width: 30px; height: 30px; }
+.chip svg.ic { display: inline-block; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hidden { display: none !important; }
+
+/* --- Canvas --------------------------------------------------------------- */
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  display: block;
+}
+
+/* --- Écran d'accueil ------------------------------------------------------ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  /* `align-items: center` rognait le haut de la carte dès qu'elle dépassait
+     l'écran : le titre devenait inatteignable, même en faisant défiler. Des
+     marges automatiques centrent quand ça tient, et laissent défiler sinon. */
+  align-items: flex-start;
+  justify-content: center;
+  padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom));
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #2c3e50 0%, transparent 60%),
+    linear-gradient(160deg, #16202b 0%, #0f161e 100%);
+  overflow-y: auto;
+}
+
+.start-card {
+  width: min(560px, 100%);
+  margin: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.start-card h1 {
+  margin: 0 0 6px;
+  font-size: clamp(24px, 6vw, 34px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.start-card h1 em { color: var(--gold); font-style: normal; }
+.crest { font-size: 1.1em; margin-right: 6px; }
+
+.tagline { margin: 0 0 18px; color: var(--muted); font-size: 15px; line-height: 1.45; }
+
+/* Le chevalier de l'écran d'accueil : décoratif, il s'efface si la place manque. */
+.start-head { display: flex; align-items: flex-start; gap: 14px; }
+.start-head > div { min-width: 0; }
+.hero {
+  flex: 0 0 auto;
+  height: 132px;
+  width: auto;
+  margin-top: 2px;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .55));
+  image-rendering: auto;
+}
+@media (max-width: 360px) { .hero { height: 104px; } }
+
+/* Portrait peint dans le panneau de sélection. */
+.portrait.illustre { padding: 0; overflow: hidden; background: linear-gradient(180deg, #2a3646, #18212c); }
+.portrait.illustre img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.portrait.illustre img.adverse { filter: hue-rotate(155deg) saturate(1.35); }
+
+/* Écran de fin : le chevalier debout, ou à terre. */
+.fin-illustration { display: block; height: 130px; width: auto; margin: -4px auto 6px; filter: drop-shadow(0 8px 14px rgba(0,0,0,.5)); }
+.fin-illustration.tombe { height: auto; width: 140px; }   /* source petite : on évite de trop l'agrandir */
+
+.start-card h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 18px 0 8px;
+}
+
+.options { display: grid; gap: 8px; }
+.options.row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.options.row:has(> :nth-child(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Quatre choix sur un écran de 360 px : « Tranquille » imposait sa largeur,
+   et « Blitz ×2 » sortait de l'écran. Deux par ligne. */
+@media (max-width: 380px) {
+  .options.row:has(> :nth-child(4)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Partie interrompue : la reprise passe avant tout le reste de l'écran. */
+.resume-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gold-dark);
+  background: rgba(232, 182, 76, 0.10);
+}
+.resume-info { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+.btn.ghost { background: none; border-color: transparent; color: var(--muted); }
+.btn.small { min-height: 36px; padding: 6px 10px; font-size: 13px; font-weight: 500; }
+.modal-sub { margin: 16px 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+.scores tr.total td { border-top: 1px solid var(--border); padding-top: 8px; color: var(--gold); }
+#game-timer.urgent { color: #ff9d8a; font-weight: 700; }
+
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 12px 14px;
+  min-height: 52px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .08s;
+}
+.option.compact { align-items: center; text-align: center; padding: 10px 8px; }
+.option:active { transform: scale(0.98); }
+.option.active { border-color: var(--gold); background: rgba(232, 182, 76, 0.14); }
+.option-name { font-weight: 650; font-size: 15px; }
+.option-desc { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+
+.start-actions { display: flex; gap: 10px; margin-top: 22px; }
+
+.btn {
+  flex: 1;
+  min-height: 48px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:active { transform: scale(0.98); }
+.btn.primary {
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  border-color: var(--gold-dark);
+  color: #241a05;
+}
+.btn.large { font-size: 17px; min-height: 54px; }
+.btn.danger { border-color: rgba(224, 106, 91, .5); color: #ffb4a8; }
+
+.howto { margin-top: 16px; }
+.howto ul, ul.help { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.howto b, ul.help b { color: var(--text); }
+.credits-auteurs { display: block; margin-top: 3px; font-size: 11px; line-height: 1.5; color: rgba(159,176,192,.75); }
+ul.help a { color: var(--gold); }
+.credits { margin: 16px 0 0; font-size: 12px; color: rgba(159, 176, 192, .65); text-align: center; }
+
+/* --- HUD ------------------------------------------------------------------ */
+
+#hud {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+#hud > * { pointer-events: auto; }
+
+#topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(6px + var(--safe-top)) calc(8px + var(--safe-right)) 6px calc(8px + var(--safe-left));
+  background: linear-gradient(180deg, rgba(15, 21, 28, .95) 0%, rgba(15, 21, 28, .55) 70%, transparent 100%);
+}
+
+.top-left { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.res-group { display: flex; gap: 5px; flex-wrap: nowrap; }
+.res {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .5);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.res-icon { font-size: 12px; display: flex; align-items: center; color: var(--gold); }
+#res-pop.warn { color: var(--error); }
+
+.top-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+#age-box {
+  display: flex; align-items: center; gap: 5px;
+  padding: 2px 8px 2px 4px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+#age-label { color: var(--gold); font-weight: 650; }
+#age-box .sep { color: var(--muted); }
+#game-timer { color: var(--muted); font-variant-numeric: tabular-nums; }
+.age-progress { width: 54px; height: 3px; background: rgba(255,255,255,.2); border-radius: 2px; overflow: hidden; }
+.age-progress span { display: block; height: 100%; background: var(--gold); width: 0; transition: width .2s linear; }
+
+.icon-btn {
+  width: 38px; height: 38px;
+  color: var(--text);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, .42);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+#minimap-wrap {
+  position: absolute;
+  top: calc(50px + var(--safe-top));
+  right: calc(8px + var(--safe-right));
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .5);
+  border: 1px solid var(--border);
+  line-height: 0;
+}
+#minimap { width: 104px; height: 104px; border-radius: 6px; touch-action: none; }
+
+#alerts {
+  position: absolute;
+  top: calc(74px + var(--safe-top));
+  left: calc(10px + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Place laissée à la minimap, à droite : sur 360 px, les notifications
+     mordaient sur elle. */
+  max-width: min(60vw, 320px, calc(100vw - 150px - var(--safe-left) - var(--safe-right)));
+  pointer-events: none;
+}
+.toast {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(16, 22, 30, .93);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  animation: toast-in .18s ease-out;
+}
+.toast.good { border-left-color: var(--good); }
+.toast.warn { border-left-color: var(--warn); }
+.toast.error { border-left-color: var(--error); }
+.toast.leaving { opacity: 0; transform: translateX(-8px); transition: .35s; }
+.toast-count { opacity: .7; font-variant-numeric: tabular-nums; }
+@keyframes toast-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+
+#build-hint {
+  position: absolute;
+  left: 50%;
+  /* Au-dessus de la barre des ouvriers : en haut, la bulle recouvrait les
+     notifications (« Emplacement impossible ici ») et la minimap. */
+  bottom: calc(var(--bottom-height, 126px) + 44px + var(--safe-bottom));
+  transform: translateX(-50%);
+  width: max-content;   /* sinon `left: 50%` la bride à une demi-largeur d'écran */
+  pointer-events: none;   /* simple consigne : le doigt doit atteindre la carte dessous */
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(232, 182, 76, .92);
+  color: #241a05;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  max-width: 82vw;
+}
+
+/* --- Barre des ouvriers ---------------------------------------------------- */
+
+#worker-bar {
+  position: absolute;
+  left: calc(8px + var(--safe-left));
+  /* Aussi large que ses pastilles, pas plus : étendue de bord à bord, sa
+     partie vide, transparente, avalait les appuis destinés à la carte. */
+  max-width: calc(100% - 16px - var(--safe-left) - var(--safe-right));
+  bottom: calc(var(--bottom-height, 126px) + var(--safe-bottom));
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+#worker-bar::-webkit-scrollbar { display: none; }
+
+.worker-chip, .worker-open {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, .55);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.worker-chip b { font-weight: 700; }
+.worker-chip:active, .worker-open:active { transform: scale(.96); }
+.worker-open { border-color: var(--gold-dark); background: rgba(232, 182, 76, .9); color: #241a05; font-size: 15px; }
+.worker-chip.idle.has-idle {
+  border-color: var(--gold);
+  background: rgba(232, 182, 76, .9);
+  color: #241a05;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: .72; } }
+
+/* --- Panneau d'affectation ------------------------------------------------- */
+
+.worker-list { display: grid; gap: 8px; margin-bottom: 4px; }
+.worker-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .05);
+}
+.worker-row .wr-label {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; color: var(--text); font: inherit;
+  text-align: left; cursor: pointer; padding: 4px 0; min-width: 0;
+}
+.worker-row .wr-icon { font-size: 20px; display: flex; color: var(--gold); }
+.worker-row .wr-name { font-weight: 600; font-size: 14px; }
+.worker-row .wr-hint { font-size: 11px; color: var(--muted); }
+.worker-row .wr-controls { display: flex; align-items: center; gap: 6px; }
+.worker-row .wr-count { min-width: 26px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wr-btn {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .08);
+  color: var(--text);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+.wr-btn:active { transform: scale(.94); }
+.wr-btn[disabled] { opacity: .35; }
+
+.switch-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .04);
+  cursor: pointer;
+}
+.switch-row input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--gold); }
+.switch-row b { display: block; font-size: 13.5px; }
+.switch-row small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.4; margin-top: 2px; }
+
+/* --- Barre du bas --------------------------------------------------------- */
+
+#bottombar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  background: linear-gradient(0deg, rgba(15, 21, 28, .97) 60%, rgba(15, 21, 28, .0) 100%);
+}
+
+#selection-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+}
+#selection-panel .hint { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+
+.portrait {
+  width: 46px; height: 46px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .45);
+  border: 2px solid var(--team, var(--border));
+  flex-shrink: 0;
+}
+#selection-panel .info { min-width: 0; flex: 1; max-width: 340px; }
+#selection-panel .name { font-size: 14.5px; font-weight: 650; }
+#selection-panel .name .enemy { color: var(--error); font-weight: 500; font-size: 12px; }
+#selection-panel .hp { height: 4px; border-radius: 2px; background: rgba(255,255,255,.18); margin: 4px 0 3px; overflow: hidden; }
+#selection-panel .hp span { display: block; height: 100%; background: var(--good); }
+#selection-panel .stats { font-size: 11.5px; color: var(--muted); }
+
+.multi { flex: 1; }
+.multi-title { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  display: flex; align-items: center; gap: 4px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.queue { display: flex; gap: 4px; margin-left: auto; }
+.queue-item {
+  width: 38px; height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.4);
+  color: var(--text);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  padding: 2px;
+}
+.qicon { font-size: 15px; line-height: 1; display: flex; }
+.qbar { width: 26px; height: 3px; background: rgba(255,255,255,.2); border-radius: 2px; overflow: hidden; }
+.qbar span { display: block; height: 100%; background: var(--gold); }
+
+#command-panel {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+#command-panel::-webkit-scrollbar { display: none; }
+
+.cmd {
+  flex: 0 0 auto;
+  min-width: 72px;
+  min-height: 62px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .07);
+  color: var(--text);
+  cursor: pointer;
+}
+.cmd:active { transform: scale(0.97); }
+.cmd.disabled { opacity: .42; }
+.cmd.toggled { border-color: var(--gold); background: rgba(232, 182, 76, .2); }
+.cmd.highlight { border-color: var(--gold); background: linear-gradient(180deg, rgba(232,182,76,.28), rgba(232,182,76,.12)); }
+/* « Détruire » armé : un second appui rase le bâtiment. */
+.cmd.danger { border-color: #e0604c; background: rgba(224, 96, 76, .28); color: #ffd9d2; }
+.cmd.compact { min-width: 54px; padding: 6px 4px; }
+.cmd.compact .cmd-label { font-size: 9.5px; }
+.cmd-icon { font-size: 19px; line-height: 1; display: flex; }
+.cmd-label { font-size: 11px; font-weight: 600; text-align: center; line-height: 1.15; }
+.cmd-cost { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+/* --- Panneaux superposés -------------------------------------------------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  background: rgba(8, 12, 17, .72);
+  backdrop-filter: blur(3px);
+}
+
+#build-menu, #worker-menu { align-items: flex-end; }
+.sheet {
+  width: 100%;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border-top: 1px solid var(--border);
+  border-radius: 18px 18px 0 0;
+  padding: 10px 12px calc(12px + var(--safe-bottom));
+  /* Le panneau des ouvriers n'a pas de liste défilante : en paysage, ses
+     dernières lignes et la bascule sortaient de l'écran, inatteignables. */
+  overflow-y: auto;
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sheet-head h2 { margin: 0; font-size: 17px; }
+
+.build-list { overflow-y: auto; display: grid; gap: 8px; grid-template-columns: 1fr; }
+.build-card {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.05);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.build-card.disabled { opacity: .45; }
+.bc-icon { font-size: 26px; display: flex; align-items: center; justify-content: center; color: var(--gold); }
+.bc-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bc-name { font-weight: 650; font-size: 14.5px; }
+.bc-desc { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+.bc-cost { font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+#modal { align-items: center; justify-content: center; padding: 16px; }
+.modal-card {
+  width: min(420px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--panel-solid);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.5);
+}
+.modal-card.wide { width: min(520px, 100%); }
+.modal-card h2 { margin: 0 0 6px; font-size: 20px; }
+.modal-card .subtitle { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+
+.scores { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.scores th, .scores td { padding: 7px 6px; text-align: right; border-bottom: 1px solid var(--border); }
+.scores th:first-child, .scores td:first-child { text-align: left; color: var(--muted); }
+.scores th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+
+/* --- Adaptations ---------------------------------------------------------- */
+
+@media (min-width: 720px) {
+  .build-list { grid-template-columns: 1fr 1fr; }
+  .sheet { border-radius: 18px; max-width: 720px; margin: 0 auto 16px; border: 1px solid var(--border); }
+  #build-menu, #worker-menu { align-items: center; justify-content: center; }
+  #minimap { width: 150px; height: 150px; }
+  .cmd { min-width: 84px; min-height: 70px; }
+}
+
+/* Téléphone en paysage : on comprime la barre basse pour garder la carte visible. */
+@media (max-width: 360px) {
+  .res { padding: 3px 6px; font-size: 11.5px; }
+  #alerts { max-width: min(70vw, calc(100vw - 150px - var(--safe-left) - var(--safe-right))); }
+}
+
+@media (orientation: landscape) and (max-height: 480px) {
+  /* Trois notifications au plus : la quatrième passait sous la barre des ouvriers. */
+  #alerts .toast:nth-last-child(n+4) { display: none; }
+  .worker-chip, .worker-open { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+  #selection-panel { min-height: 38px; }
+  .portrait { width: 38px; height: 38px; font-size: 20px; }
+  .cmd { min-height: 54px; min-width: 66px; }
+  .cmd.compact { min-width: 48px; }
+  .cmd-icon { font-size: 17px; }
+  #minimap { width: 84px; height: 84px; }
+  .res { padding: 4px 7px; font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
