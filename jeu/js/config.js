@@ -99,6 +99,17 @@ export const UNIT_TYPES = {
     from: 'barracks', age: 1,
     desc: 'Redoutable contre la cavalerie et les engins de siège.',
   },
+  // L'unité de l'Atelier 3D : un homme-poisson venu de l'Atlantide. Pas de
+  // planche dessinée, seulement son modèle animé (js/modele3d.js).
+  triton: {
+    id: 'triton', name: 'Atlante', icon: 'triton', class: 'infantry',
+    cost: { food: 55, gold: 35 }, trainTime: 18, hp: 60, speed: 1.05,
+    attack: 6, attackType: 'melee', range: 1.1, attackSpeed: 2.0,
+    bonus: { cavalry: 6 },
+    meleeArmor: 1, pierceArmor: 1, los: 5, radius: 10,
+    from: 'barracks', age: 1,
+    desc: 'Homme-poisson au trident, venu de l’Atlantide : robuste, et sa longue arme tient la cavalerie à distance.',
+  },
   archer: {
     id: 'archer', name: 'Archer', icon: 'archer', class: 'archer',
     cost: { wood: 25, gold: 45 }, trainTime: 18, hp: 30, speed: 1.0,
@@ -204,7 +215,7 @@ export const BUILDING_TYPES = {
   barracks: {
     id: 'barracks', name: 'Caserne', icon: 'barracks', fem: true,
     cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
-    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['militia', 'spearman'], age: 0,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['militia', 'spearman', 'triton'], age: 0,
     desc: 'Forme l’infanterie.',
   },
   archery: {

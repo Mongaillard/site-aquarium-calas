@@ -232,6 +232,8 @@ const ALTERNATIVES = {
   // Le villageois n'a ni illustration peinte ni essai de 3D : sa planche sert
   // à tous les styles sauf « 3D ».
   villager: { '3d': 'villagerAtelier', anime: 'villager', peint: 'villager', '3d-precalc': 'villager', '3d-direct': 'villager' },
+  // L'homme-poisson n'existe qu'en 3D : son modèle sert à tous les styles.
+  triton: { '3d': 'tritonAtelier', anime: 'tritonAtelier', peint: 'tritonAtelier', '3d-precalc': 'tritonAtelier', '3d-direct': 'tritonAtelier' },
 };
 export const STYLES = [
   { id: '3d', nom: '3D', desc: 'Tes modèles animés' },
@@ -254,6 +256,14 @@ const EN_3D = {
     modele: 'villager', unite: 'villager', repli: 'villager', natif: 'bleu',
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
+  // Cuit à la demande, la première fois qu'un Atlante paraît : pas de planche
+  // dessinée pour patienter (il est dessiné au code le temps de la cuisson),
+  // mais aucune attente au démarrage pour qui n'en forme pas. Bleu franc de la
+  // crête et du pagne seulement : la peau turquoise (teinte < 205°) ne bascule pas.
+  tritonAtelier: {
+    modele: 'triton', unite: 'triton', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [205, 255], vers: 0, satMin: 0.45 },
+  },
   militiaAtelier: {
     modele: 'militia', unite: 'militia', repli: 'militia', natif: 'bleu',
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
@@ -271,7 +281,7 @@ export function rendu3dDirect() { return style === '3d-direct'; }
 
 export function setStyleUnites(nouveau) {
   style = STYLES.some((s) => s.id === nouveau) ? nouveau : '3d';
-  for (const alt of Object.values(ALTERNATIVES)) chargerAtlas(alt[style]);
+  for (const alt of Object.values(ALTERNATIVES)) if (!EN_3D[alt[style]]?.aLaDemande) chargerAtlas(alt[style]);
 }
 
 function versHSL(r, g, b) {
@@ -432,10 +442,16 @@ function annoncerModeles3d() {
  * introuvable…).
  */
 export function etatModeles3d() {
-  const entrees = Object.values(ALTERNATIVES).map((a) => a['3d']).filter((c) => EN_3D[c]).map((c) => charges.get(c));
+  const cles = Object.values(ALTERNATIVES).map((a) => a['3d']).filter((c) => EN_3D[c])
+    .filter((c) => !EN_3D[c].aLaDemande || charges.has(c));
+  const entrees = cles.map((c) => charges.get(c));
   if (entrees.some((e) => !e)) return { etat: 'attente' };
-  const echec = entrees.find((e) => e.absent);
-  if (echec) return { etat: 'absent', raison: echec.raison };
+  const echecs = cles.filter((c) => charges.get(c).absent);
+  if (echecs.length) {
+    // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
+    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson' };
+    return { etat: 'absent', raison: echecs.map((c) => `${noms[EN_3D[c].unite] || EN_3D[c].unite} : ${charges.get(c).raison}`).join(' ; ') };
+  }
   if (entrees.every((e) => e.pret)) return { etat: 'pret' };
   return { etat: 'cuisson', faits: entrees.filter((e) => e.pret).length, total: entrees.length };
 }
@@ -474,7 +490,7 @@ export function chargerSprites() {
   for (const cle of Object.keys(ATLAS)) {
     if (!variantes.has(cle) || ALTERNATIVES[cle]) chargerAtlas(cle);
   }
-  for (const alt of Object.values(ALTERNATIVES)) chargerAtlas(alt[style]);
+  for (const alt of Object.values(ALTERNATIVES)) if (!EN_3D[alt[style]]?.aLaDemande) chargerAtlas(alt[style]);
 }
 
 // ---------------------------------------------------------------------------
@@ -553,6 +569,7 @@ export function spriteDe(type) {
   const cle = alt ? alt[style] : type;
   const e = charges.get(cle);
   if (e && e.pret) return e;
+  if (!e && EN_3D[cle]?.aLaDemande) chargerAtlas(cle);   // premier Atlante à l'écran
   // Un modèle 3D encore en cuisson (ou impossible à cuire) : son illustration.
   const repli = EN_3D[cle] && charges.get(EN_3D[cle].repli);
   return repli && repli.pret ? repli : null;

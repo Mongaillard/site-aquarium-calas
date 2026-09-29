@@ -47,6 +47,16 @@ export const MODELES = {
     parDistance: ['marche', 'porter'],
     accessoires: null,
   },
+  // L'homme-poisson atlante : son trident reste en main partout, comme l'épée.
+  triton: {
+    src: 'assets/modeles/atlante.json',
+    taille: 43,
+    clips: { marche: 'marche_trident', repos: 'garde', attaque: 'attaque_trident', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: 'garde',
+  },
   militia: {
     src: 'assets/modeles/milicien.json',
     taille: 42,
@@ -113,9 +123,27 @@ export async function modeleCuit(cle, vitessePxS) {
     const lu = await lireCache(cleCache);
     if (lu) return lu;
   } catch { /* cache illisible : on recuit */ }
-  const cuit = await cuireModele(cle, vitessePxS, octets);
+  const cuit = await aTourDeRole(async () => {
+    try {
+      return await cuireModele(cle, vitessePxS, octets);
+    } catch (erreur) {
+      // Un téléphone à court de mémoire graphique : une seconde cuisson, plus
+      // légère (sans suréchantillonnage ni anticrénelage), avant d'abandonner.
+      console.warn(`Cuisson de ${cle} : ${erreur && erreur.message} — nouvel essai, plus léger`);
+      return cuireModele(cle, vitessePxS, octets, { sur: 1, anticrenelage: false });
+    }
+  });
   rangerCache(cleCache, m.src, cuit).catch(() => { /* stockage plein ou privé : tant pis */ });
   return cuit;
+}
+
+// Une cuisson à la fois : deux contextes WebGL et leurs grandes toiles en même
+// temps dépassaient la mémoire graphique de certains téléphones.
+let file = Promise.resolve();
+function aTourDeRole(tache) {
+  const tour = file.then(tache);
+  file = tour.catch(() => {});
+  return tour;
 }
 
 async function lireCache(cle) {
@@ -153,8 +181,11 @@ async function rangerCache(cle, src, cuit) {
   await cache.put(cle, new Response(JSON.stringify(meta), { headers: { 'Content-Type': 'application/json' } }));
 }
 
-/** Charge le modèle (octets du fichier glTF) et cuit toutes ses animations. */
-export async function cuireModele(cle, vitessePxS, octets) {
+/**
+ * Charge le modèle (octets du fichier glTF) et cuit toutes ses animations.
+ * `sur` : suréchantillonnage du rendu ; `anticrenelage` : celui de WebGL.
+ */
+export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticrenelage = true } = {}) {
   const m = MODELES[cle];
   const THREE = await import('./vendor/three-jeu.min.js');
   const gltf = await new Promise((ok, echec) => new THREE.GLTFLoader().parse(octets, '', ok, echec));
@@ -234,8 +265,9 @@ export async function cuireModele(cle, vitessePxS, octets) {
   const ancreX = CADRE.gauche * pxParM, ancreY = CADRE.haut * pxParM;
 
   const toile = document.createElement('canvas');
-  toile.width = travailL * SUR; toile.height = travailH * SUR;
-  const rendu = new THREE.WebGLRenderer({ canvas: toile, alpha: true, antialias: true, preserveDrawingBuffer: true });
+  toile.width = travailL * sur; toile.height = travailH * sur;
+  const rendu = new THREE.WebGLRenderer({ canvas: toile, alpha: true, antialias: anticrenelage, preserveDrawingBuffer: true });
+  const gl = rendu.getContext();
   rendu.setPixelRatio(1);
   rendu.setClearColor(0x000000, 0);
   rendu.outputColorSpace = THREE.SRGBColorSpace;
@@ -247,22 +279,27 @@ export async function cuireModele(cle, vitessePxS, octets) {
   camera.lookAt(0, 0, 0);
 
   const clips = {};
+  // Une seule bande de travail pour toutes les animations, rendue à la fin :
+  // Safari compte la mémoire des toiles tant qu'elles ne sont pas libérées.
+  const bande = document.createElement('canvas');
+  bande.width = travailL * Math.max(...Object.values(m.images)); bande.height = travailH * 8;
+  const bctx = bande.getContext('2d', { willReadFrequently: true });
+  if (!bctx) throw new Error('mémoire graphique saturée (toile de travail refusée)');
+  bctx.imageSmoothingQuality = 'high';
   try {
     for (const [etat, nom] of Object.entries(m.clips)) {
       const clip = clipDe(nom);
       const n = m.images[etat];
       const boucle = m.boucles.includes(etat);
       // Rangée = direction, colonne = image : la disposition de cadreSource.
-      const bande = document.createElement('canvas');
-      bande.width = travailL * n; bande.height = travailH * 8;
-      const bctx = bande.getContext('2d');
-      bctx.imageSmoothingQuality = 'high';
+      bctx.clearRect(0, 0, bande.width, bande.height);
       for (let k = 0; k < 8; k++) {
         pivot.rotation.y = (k * Math.PI) / 4;
         for (let i = 0; i < n; i++) {
           const t = boucle ? (i / n) * clip.duration : (i / Math.max(1, n - 1)) * clip.duration;
           poser(clip, t);
           rendu.render(scene, camera);
+          if (gl.isContextLost()) throw new Error('mémoire graphique saturée (contexte WebGL perdu)');
           bctx.drawImage(toile, i * travailL, k * travailH, travailL, travailH);
         }
         await pause();   // rendre la main : le menu reste fluide pendant la cuisson
@@ -278,6 +315,8 @@ export async function cuireModele(cle, vitessePxS, octets) {
     melangeur.stopAllAction();
     rendu.dispose();
     rendu.forceContextLoss();
+    bande.width = bande.height = 0;   // libère la mémoire tout de suite (Safari)
+    toile.width = toile.height = 0;
   }
   return { cycle: clips.marche.cycle, clips };
 }
@@ -288,12 +327,13 @@ export async function cuireModele(cle, vitessePxS, octets) {
  */
 function recadrer(bande, n, L, H, ancreX, ancreY) {
   const ctx = bande.getContext('2d', { willReadFrequently: true });
-  const px = ctx.getImageData(0, 0, bande.width, bande.height).data;
+  const largeur = L * n, hauteur = H * 8;   // la partie de la bande que cette animation occupe
+  const px = ctx.getImageData(0, 0, largeur, hauteur).data;
   let gauche = Infinity, droite = -Infinity, haut = Infinity, bas = -Infinity;
-  for (let y = 0; y < bande.height; y++) {
+  for (let y = 0; y < hauteur; y++) {
     const cy = y % H;
-    for (let x = 0; x < bande.width; x++) {
-      if (px[(y * bande.width + x) * 4 + 3] < 110) continue;
+    for (let x = 0; x < largeur; x++) {
+      if (px[(y * largeur + x) * 4 + 3] < 110) continue;
       const cx = x % L;
       if (cx < gauche) gauche = cx;
       if (cx > droite) droite = cx;
@@ -309,6 +349,7 @@ function recadrer(bande, n, L, H, ancreX, ancreY) {
   const atlas = document.createElement('canvas');
   atlas.width = cellW * n; atlas.height = cellH * 8;
   const actx = atlas.getContext('2d', { willReadFrequently: true });
+  if (!actx) throw new Error('mémoire graphique saturée (atlas refusé)');
   for (let k = 0; k < 8; k++) {
     for (let i = 0; i < n; i++) {
       actx.drawImage(bande, i * L + x0, k * H + y0, cellW, cellH, i * cellW, k * cellH, cellW, cellH);
