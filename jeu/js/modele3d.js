@@ -51,11 +51,11 @@ export const MODELES = {
   triton: {
     src: 'assets/modeles/atlante.json',
     taille: 43,
-    clips: { marche: 'marche_trident', repos: 'garde', attaque: 'attaque_trident', touche: 'coup_recu', mort: 'mort' },
+    clips: { marche: 'marche_trident', repos: 'garde_trident', attaque: 'attaque_trident', touche: 'coup_recu', mort: 'mort' },
     images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
-    accessoires: 'garde',
+    accessoires: 'garde_trident',
   },
   militia: {
     src: 'assets/modeles/milicien.json',
