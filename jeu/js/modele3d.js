@@ -86,6 +86,16 @@ export const MODELES = {
     parDistance: ['marche'],
     accessoires: null,
   },
+  // Le lancier atlante : casque à cimier, cuirasse d'écailles, la lance au poing.
+  spearman: {
+    src: 'assets/modeles/lancier.json',
+    taille: 43,
+    clips: { marche: 'marche_lance', repos: 'garde_lance', attaque: 'attaque_lance', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: 'garde_lance',
+  },
   militia: {
     src: 'assets/modeles/milicien.json',
     taille: 42,

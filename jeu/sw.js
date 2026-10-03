@@ -39,6 +39,7 @@ const ASSETS = [
   './assets/modeles/atlante.json',
   './assets/modeles/archer.json',
   './assets/modeles/hydre.json',
+  './assets/modeles/lancier.json',
   './assets/portrait-hydre.webp',
   './assets/heros.webp',
   './assets/milicien-marche.webp',

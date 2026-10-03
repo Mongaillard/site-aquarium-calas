@@ -238,6 +238,8 @@ const ALTERNATIVES = {
   archer: { '3d': 'archerAtelier', anime: 'archer', peint: 'archer', '3d-precalc': 'archer', '3d-direct': 'archer' },
   // L'homme-poisson n'existe qu'en 3D : son modèle sert à tous les styles.
   triton: { '3d': 'tritonAtelier', anime: 'tritonAtelier', peint: 'tritonAtelier', '3d-precalc': 'tritonAtelier', '3d-direct': 'tritonAtelier' },
+  // Le lancier : son modèle en style « 3D », le pixel art d'origine dans les autres.
+  spearman: { '3d': 'spearmanAtelier', anime: 'spearman', peint: 'spearman', '3d-precalc': 'spearman', '3d-direct': 'spearman' },
   // L'Hydre aussi : pas de planche dessinée, son modèle dans tous les styles.
   hydra: { '3d': 'hydraAtelier', anime: 'hydraAtelier', peint: 'hydraAtelier', '3d-precalc': 'hydraAtelier', '3d-direct': 'hydraAtelier' },
 };
@@ -286,6 +288,12 @@ const EN_3D = {
   hydraAtelier: {
     modele: 'hydra', unite: 'hydra', repli: null, natif: 'bleu', aLaDemande: true,
     recolorage: { teinte: [176, 255], vers: 0, satMin: 0.3 },
+  },
+  // Cuit à la demande ; le pixel art du lancier sert le temps de la cuisson.
+  // Tunique et cimier bleu franc basculent ; bronze, cuir et peau restent.
+  spearmanAtelier: {
+    modele: 'spearman', unite: 'spearman', repli: 'spearman', natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
   militiaAtelier: {
     modele: 'militia', unite: 'militia', repli: 'militia', natif: 'bleu',
@@ -474,7 +482,7 @@ export function etatModeles3d() {
   const echecs = cles.filter((c) => charges.get(c).absent);
   if (echecs.length) {
     // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
-    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre' };
+    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier' };
     return { etat: 'absent', raison: echecs.map((c) => `${noms[EN_3D[c].unite] || EN_3D[c].unite} : ${charges.get(c).raison}`).join(' ; ') };
   }
   if (entrees.every((e) => e.pret)) return { etat: 'pret' };
