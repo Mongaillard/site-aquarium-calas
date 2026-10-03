@@ -22,7 +22,7 @@ const batiment = (src, cellW, cellH, largeurMonde) => ({
 });
 
 import { TILE, UNIT_TYPES } from './config.js';
-import { MODELES, modeleCuit } from './modele3d.js';
+import { MODELES, modeleCuit, ALPHA_EQUIPE } from './modele3d.js';
 import { PIECES_DECOR } from './decor-pieces.js';
 
 /** Les images 0..n-1 dans l'ordre : une rangée déjà remontée et interpolée. */
@@ -467,6 +467,74 @@ export function recolorer(def, image, l, h) {
 }
 
 /**
+ * La règle de couleur d'équipe d'un modèle cuit, sous la forme que la cuisson
+ * attend : `dedans(r, g, b)` dit si une couleur peinte est celle du camp
+ * (mêmes fenêtres que rotationTeinte et echangeCanaux), `cle` la résume pour
+ * le cache, `saturer` ravive ces pixels-là.
+ */
+function regleEquipe(d) {
+  const regle = d.recolorage;
+  if (!regle) return null;
+  if (regle === 'echange') return { cle: 'echange', dedans: (r, g, b) => b > r + 18 };
+  const [a, b] = regle.teinte;
+  const satMin = regle.satMin ?? 0.3, lumMax = regle.lumMax ?? 1;
+  const dans = a <= b ? (t) => t >= a && t <= b : (t) => t >= a || t <= b;
+  return {
+    cle: [a, b, satMin, lumMax, regle.saturer ?? 1].join('_'),
+    saturer: regle.saturer,
+    dedans: (r, g, bl) => {
+      const [teinte, sat, lum] = versHSL(r, g, bl);
+      return sat > satMin && lum < lumMax && dans(teinte * 360);
+    },
+  };
+}
+
+/**
+ * L'atlas cuit de l'autre camp : seuls les pixels marqués à la cuisson
+ * (ALPHA_EQUIPE) changent de teinte. L'étalonnage a pu raviver un acier
+ * bleuté voisin : il n'était pas marqué, il ne bouge pas.
+ */
+function teinterEquipe(d, canvas) {
+  const regle = d.recolorage;
+  const l = canvas.width, h = canvas.height;
+  const { canvas: sortie, ctx } = copie(canvas, l, h);
+  try {
+    const data = ctx.getImageData(0, 0, l, h);
+    const p = data.data;
+    for (let i = 0; i < p.length; i += 4) {
+      if (p[i + 3] !== ALPHA_EQUIPE) continue;
+      if (regle === 'echange') {
+        const bleu = p[i + 2];
+        p[i] = Math.min(255, bleu + 30);
+        p[i + 1] = Math.round(p[i + 1] * 0.55);
+        p[i + 2] = Math.round(bleu * 0.28);
+      } else {
+        const [, sat, lum] = versHSL(p[i], p[i + 1], p[i + 2]);
+        const [r, g, b] = versRGB(regle.vers / 360, sat, lum);
+        p[i] = r; p[i + 1] = g; p[i + 2] = b;
+      }
+    }
+    ctx.putImageData(data, 0, 0);
+  } catch { /* canvas illisible : ce camp gardera la couleur d'origine */ }
+  return sortie;
+}
+
+/**
+ * Les deux camps d'un atlas cuit. Celui d'origine est l'atlas lui-même ;
+ * l'autre ne se fabrique qu'au premier dessin d'une unité de ce camp — une
+ * partie où seul le joueur forme des Hydres ne garde pas en mémoire des
+ * Hydres rouges que personne ne verra.
+ */
+function variantesEquipe(d, canvas) {
+  if (!d.recolorage) return { bleu: canvas, rouge: canvas };
+  let autre = null;
+  const faire = () => autre || (autre = teinterEquipe(d, canvas));
+  return d.natif === 'bleu'
+    ? { bleu: canvas, get rouge() { return faire(); } }
+    : { rouge: canvas, get bleu() { return faire(); } };
+}
+
+/**
  * Cuit un modèle 3D, une seule fois. Chaque animation devient un atlas à part
  * (sa case, son ancre), recoloré pour l'autre camp comme une illustration. La
  * fiche de la marche reste au premier niveau : ce qui ne connaît que la marche
@@ -478,12 +546,9 @@ function chargerModele(cle) {
   charges.set(cle, entree);
   chargerAtlas(d.repli);
   const unite = UNIT_TYPES[d.unite];
-  modeleCuit(d.modele, unite ? unite.speed * TILE : 32)
+  modeleCuit(d.modele, unite ? unite.speed * TILE : 32, regleEquipe(d))
     .then(({ cycle, clips }) => {
-      for (const c of Object.values(clips)) {
-        const autre = recolorer(d, c.canvas, c.canvas.width, c.canvas.height);
-        c.variantes = d.natif === 'bleu' ? { bleu: c.canvas, rouge: autre } : { rouge: c.canvas, bleu: autre };
-      }
+      for (const c of Object.values(clips)) c.variantes = variantesEquipe(d, c.canvas);
       const { marche } = clips;
       // `poses` : les gestes de travail sous les noms de Renderer.poseDe.
       const poses = {};

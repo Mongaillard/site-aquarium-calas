@@ -2001,5 +2001,30 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
   }
 }
 
+// ---------------------------------------------------------------------------
+// Affichage lissé : entre deux pas de simulation, sans rien changer au jeu.
+// ---------------------------------------------------------------------------
+{
+  console.log('\n— Affichage lissé —');
+  const w = sandbox(21);
+  const c = centreDe(w);
+  const libre = w.map.findFreeTile(c.tx + 2, c.ty + 6, 6);
+  const u = w.spawnUnit(0, 'scout', libre.tx * TILE + TILE / 2, libre.ty * TILE + TILE / 2);
+  u.moveTo(u.x + TILE * 8, u.y);
+  advance(w, 1.5);
+  const avant = { x: u.px, y: u.py }, apres = { x: u.x, y: u.y };
+  const pas = Math.hypot(apres.x - avant.x, apres.y - avant.y);
+  w.lisser(0.5);
+  const milieu = { x: u.x, y: u.y };
+  w.delisser();
+  check('entre deux pas, une unité en marche est dessinée à mi-chemin', pas > 1
+    && Math.abs(milieu.x - (avant.x + apres.x) / 2) < 1e-9 && Math.abs(milieu.y - (avant.y + apres.y) / 2) < 1e-9,
+    `pas de ${pas.toFixed(2)} px`);
+  check('le dessin fini, la vraie position est remise', u.x === apres.x && u.y === apres.y);
+  const empreinteAvant = JSON.stringify(serializeWorld(w));
+  w.lisser(0.3); w.delisser();
+  check('lisser puis délisser ne change rien à la partie', JSON.stringify(serializeWorld(w)) === empreinteAvant);
+}
+
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : '❌ ' + failures + ' test(s) en échec'}`);
 process.exit(failures === 0 ? 0 : 1);

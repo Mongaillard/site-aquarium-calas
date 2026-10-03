@@ -76,8 +76,9 @@ export function speedDef(id) {
  * alpha : c'est elle qu'on interroge. Sans canvas du tout, on dit oui.
  */
 function pixelOpaque(sprite, u, v) {
-  const { bleu, rouge } = sprite.variantes;
-  const image = bleu && bleu.getContext ? bleu : rouge;
+  // (Sans déstructurer : l'autre camp d'un modèle cuit se fabrique à la lecture.)
+  const { bleu } = sprite.variantes;
+  const image = bleu && bleu.getContext ? bleu : sprite.variantes.rouge;
   if (!image || !image.getContext) return true;
   // Un canvas verrouillé (image d'une autre origine) refuse la lecture : on
   // retombe alors sur le rectangle entier, comme avant.
@@ -175,8 +176,11 @@ class Game {
     if (this.idleNoticeCooldown > 0) this.idleNoticeCooldown -= realDt;
     this.processEvents();
     this.pruneSelection();
+    // Le dessin se fait entre deux pas de simulation (voir World.lisser).
+    this.world.lisser(this.accumulator / DT);
     this.renderer.render(realDt);
     this.renderer.drawMinimap();
+    this.world.delisser();
     this.ui.update(realDt);
     if (this.alertCooldown > 0) this.alertCooldown -= realDt;
     requestAnimationFrame(this.loop);

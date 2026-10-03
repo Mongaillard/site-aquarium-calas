@@ -286,11 +286,49 @@ export class World {
     return b;
   }
 
+  // --- Affichage lissé ------------------------------------------------------
+
+  /**
+   * La simulation avance par pas de 1/20 s ; l'écran, lui, affiche soixante
+   * images par seconde. Le temps d'un dessin, unités et projectiles sont placés
+   * ENTRE leur position d'avant le dernier pas et l'actuelle (`a` : part du pas
+   * suivant déjà écoulée, de 0 à 1) — ils glissent au lieu d'avancer par
+   * à-coups. `delisser` remet aussitôt les vraies positions : la simulation
+   * ne voit jamais rien de tout cela.
+   */
+  lisser(a) {
+    const t = a < 0 ? 0 : a > 1 ? 1 : a;
+    for (let i = 0; i < this.units.length; i++) {
+      const u = this.units[i];
+      u.rx = u.x; u.ry = u.y;
+      if (u.px === undefined) continue;
+      u.x = u.px + (u.x - u.px) * t;
+      u.y = u.py + (u.y - u.py) * t;
+    }
+    for (let i = 0; i < this.projectiles.length; i++) {
+      const p = this.projectiles[i];
+      p.rx = p.x; p.ry = p.y; p.rTravel = p.travel;
+      if (p.px === undefined) continue;
+      p.x = p.px + (p.x - p.px) * t;
+      p.y = p.py + (p.y - p.py) * t;
+      p.travel = p.pTravel + (p.travel - p.pTravel) * t;
+    }
+  }
+
+  delisser() {
+    for (let i = 0; i < this.units.length; i++) { const u = this.units[i]; u.x = u.rx; u.y = u.ry; }
+    for (let i = 0; i < this.projectiles.length; i++) { const p = this.projectiles[i]; p.x = p.rx; p.y = p.ry; p.travel = p.rTravel; }
+  }
+
   // --- Boucle de simulation -------------------------------------------------
 
   update(dt) {
     if (this.gameOver) return;
     this.time += dt;
+    // Où chacun se tenait avant ce pas : l'affichage glisse de là jusqu'à la
+    // position nouvelle (voir lisser), au lieu de sauter vingt fois par seconde.
+    for (let i = 0; i < this.units.length; i++) { const u = this.units[i]; u.px = u.x; u.py = u.y; }
+    for (let i = 0; i < this.projectiles.length; i++) { const p = this.projectiles[i]; p.px = p.x; p.py = p.y; p.pTravel = p.travel; }
     if (this.popWarnCooldown > 0) this.popWarnCooldown -= dt;
 
     this.rebuildGrid();

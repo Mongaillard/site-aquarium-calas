@@ -482,6 +482,25 @@ premiers), au choix dans le menu de pause :
 | **3D précalculée** (essai) | `chevalier-3d.webp` : un modèle 3D rendu à l'avance par Blender, 8 directions × course, repos, coup d'épée | Des directions et des pas parfaitement cohérents, sans rien coûter au téléphone |
 | **3D en direct** (essai) | `chevalier-3d.json` (glTF), rendu à chaque image par three.js | L'unité tourne selon sa vraie direction, pas en huit crans ; l'animation se calcule à chaque image |
 
+**Fluidité et couleurs du style 3D.** Trois réglages font qu'un modèle cuit en
+images ne paraît ni saccadé ni terne :
+
+- *Positions lissées* — la simulation avance vingt fois par seconde, l'écran
+  affiche soixante images : le temps d'un dessin, unités et projectiles sont
+  placés entre leur position d'avant le dernier pas et l'actuelle
+  (`World.lisser`, `js/game.js`). Ils glissent au lieu d'avancer par à-coups ;
+  la simulation, elle, ne voit rien (les vraies positions sont remises
+  aussitôt).
+- *Images fondues* — seize images pour un tour de marche, douze pour un coup,
+  et chaque image se fond dans la suivante (`Renderer.poserImage3D`) : le
+  mouvement est continu sans une image de plus en mémoire.
+- *Couleurs étalonnées* — à la cuisson (`REGLAGE`, `js/modele3d.js`) : tons
+  sombres relevés, couleurs ravivées, lumière plus enveloppante. La couleur
+  d'équipe est reconnue AVANT l'étalonnage, sur la couleur peinte, et marquée
+  dans l'opacité du pixel ; l'atlas de l'autre camp ne se fabrique qu'à la
+  première unité de ce camp à l'écran (la mémoire d'une partie en est presque
+  divisée par deux).
+
 Les deux essais de 3D utilisent le même modèle, un chevalier libre de droits
 (KayKit, CC0) en attendant celui de l'auteur, et la **même caméra** — la case
 rendue en direct se pose exactement comme une case de l'atlas précalculé, et

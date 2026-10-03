@@ -22,8 +22,10 @@
 
 /**
  * Les unités en 3D. `clips` associe chaque état du jeu à une animation du
- * fichier, `images` le nombre d'images tirées de chacune (celles de l'Atelier,
- * unites_jeu.json). `taille` est la hauteur à l'écran, en px monde, de la pose
+ * fichier, `images` le nombre d'images tirées de chacune : seize pour un tour
+ * de marche, douze pour un coup — le rendu fond en plus chaque image dans la
+ * suivante (Renderer.poserImage3D), si bien qu'un repos de six images respire
+ * sans à-coup. `taille` est la hauteur à l'écran, en px monde, de la pose
  * de repos vue de face — la même mesure que l'Atelier. `accessoires` : pour le
  * milicien, l'épée et le bouclier restent en main dans TOUTES les animations,
  * à la place qu'ils ont dans celle-ci (le fichier les cache pendant le coup
@@ -44,8 +46,8 @@ export const MODELES = {
       cueillir: 'recolter', construire: 'construire', porter: 'porter', bois: 'couper_bois', or: 'miner', viande: 'depecer',
     },
     images: {
-      marche: 12, repos: 6, attaque: 6, touche: 5, mort: 10,
-      cueillir: 8, construire: 6, porter: 8, bois: 8, or: 8, viande: 6,
+      marche: 16, repos: 6, attaque: 8, touche: 5, mort: 10,
+      cueillir: 8, construire: 8, porter: 12, bois: 10, or: 10, viande: 6,
     },
     boucles: ['marche', 'repos', 'cueillir', 'construire', 'porter', 'bois', 'or', 'viande'],
     // Suivent le sol plutôt que l'horloge : les pieds ne patinent pas.
@@ -57,7 +59,7 @@ export const MODELES = {
     src: 'assets/modeles/atlante.json',
     taille: 43,
     clips: { marche: 'marche_trident', repos: 'garde_trident', attaque: 'attaque_trident', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_trident',
@@ -67,7 +69,7 @@ export const MODELES = {
     src: 'assets/modeles/archer.json',
     taille: 40,
     clips: { marche: 'marche_arc', repos: 'garde_arc', attaque: 'tir_arc', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 10, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 14, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_arc',
@@ -83,7 +85,7 @@ export const MODELES = {
     src: 'assets/modeles/hydre.json',
     taille: 66,
     clips: { marche: 'trot', repos: 'repos', attaque: 'attaque_morsure', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -96,7 +98,7 @@ export const MODELES = {
     src: 'assets/modeles/cavalier.json',
     taille: 78,
     clips: { marche: 'trot', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -107,7 +109,7 @@ export const MODELES = {
     src: 'assets/modeles/belier.json',
     taille: 62,
     clips: { marche: 'marche', repos: 'repos', attaque: 'attaque', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 10, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -118,7 +120,7 @@ export const MODELES = {
     src: 'assets/modeles/catapulte.json',
     taille: 55,
     clips: { marche: 'marche', repos: 'repos', attaque: 'tir', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 14, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -129,7 +131,7 @@ export const MODELES = {
     src: 'assets/modeles/champion.json',
     taille: 46,
     clips: { marche: 'marche_epee', repos: 'garde', attaque: 'attaque_epee', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde',
@@ -139,7 +141,7 @@ export const MODELES = {
     src: 'assets/modeles/eclaireur.json',
     taille: 74,
     clips: { marche: 'course', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -150,7 +152,7 @@ export const MODELES = {
     src: 'assets/modeles/pretresse.json',
     taille: 40,
     clips: { marche: 'marche_trident', repos: 'garde_trident', attaque: 'celebrer', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_trident',
@@ -160,7 +162,7 @@ export const MODELES = {
     src: 'assets/modeles/lancier.json',
     taille: 43,
     clips: { marche: 'marche_lance', repos: 'garde_lance', attaque: 'attaque_lance', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_lance',
@@ -169,7 +171,7 @@ export const MODELES = {
     src: 'assets/modeles/milicien.json',
     taille: 42,
     clips: { marche: 'marche_epee', repos: 'garde', attaque: 'attaque_epee', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde',
@@ -185,8 +187,20 @@ const LUMIERE = [-0.55, 0.75, 0.45];   // repère caméra : en haut à gauche, u
 // sur l'union de ses images.
 const CADRE = { gauche: 2.1, droite: 2.1, haut: 2.5, bas: 1.3 };
 const MARGE = 2;            // px d'atlas autour de l'emprise (le contour y loge)
-/** Lumières (× π : l'éclairage physique de three.js) et retouche des couleurs. */
-export const REGLAGE = { ambiante: 0.78, directe: 0.7, saturation: 1.0, contraste: 1.08 };
+/**
+ * Lumières (× π : l'éclairage physique de three.js) et étalonnage des couleurs.
+ * Une texture peinte, éclairée puis réduite à quarante pixels sur de l'herbe,
+ * sort terne : `gamma` (< 1) relève les tons sombres et moyens, `saturation`
+ * ravive les couleurs — moins celles qui sont déjà vives (`retenue`), pour ne
+ * pas les brûler —, `contraste` écarte autour du gris moyen.
+ */
+export const REGLAGE = { ambiante: 0.95, directe: 0.5, gamma: 0.82, saturation: 1.4, retenue: 0.6, contraste: 1.0 };
+/**
+ * Les pixels de la couleur d'équipe portent cette opacité (au lieu de 255) :
+ * la cuisson les reconnaît sur la couleur PEINTE, avant l'étalonnage, et
+ * l'autre camp se teinte plus tard en ne touchant qu'eux (sprites.js).
+ */
+export const ALPHA_EQUIPE = 254;
 
 // Rendre la main entre deux directions, sans minuterie : un onglet en arrière-
 // plan bride setTimeout à une fois par seconde, pas les messages.
@@ -201,7 +215,7 @@ const pause = () => new Promise((r) => {
 // lancement, les atlas reviennent en un instant, sans three.js. La clé porte
 // l'empreinte du fichier et la version de la cuisson — un nouveau modèle, ou
 // une caméra retouchée ici, refait la cuisson une fois.
-const VERSION_CUISSON = 1;
+const VERSION_CUISSON = 2;
 const CACHE = 'aem-modeles-3d';
 
 /** Empreinte FNV-1a du fichier : deux modèles différents, deux clés. */
@@ -217,15 +231,17 @@ function empreinte(octets) {
  * (puis rangés). Renvoie `{ cycle, clips: { marche: { canvas, cellW, cellH,
  * ancreY, hauteurMonde, images, duree, boucle, cycle, lacher }, … } }`, ou lève une
  * erreur (pas de WebGL, fichier absent) : l'appelant garde alors
- * l'illustration dessinée.
+ * l'illustration dessinée. `equipe` : `{ cle, dedans(r, g, b), saturer }`, la
+ * règle qui reconnaît la couleur d'équipe (voir ALPHA_EQUIPE).
  */
-export async function modeleCuit(cle, vitessePxS) {
+export async function modeleCuit(cle, vitessePxS, equipe = null) {
   const m = MODELES[cle];
   const reponse = await fetch(m.src);
   if (!reponse.ok) throw new Error(`${m.src} : ${reponse.status}`);
   const octets = await reponse.arrayBuffer();
   const url = new URL(m.src, location.href);
-  url.searchParams.set('cuisson', `${VERSION_CUISSON}-${empreinte(octets)}-${m.taille}-${m.tourne || 0}-${vitessePxS}`);
+  const reglage = Object.values(REGLAGE).join('_');
+  url.searchParams.set('cuisson', `${VERSION_CUISSON}-${empreinte(octets)}-${m.taille}-${m.tourne || 0}-${vitessePxS}-${Object.values(m.images).join('.')}-${reglage}-${equipe ? equipe.cle : ''}`);
   const cleCache = url.href;
   try {
     const lu = await lireCache(cleCache);
@@ -233,12 +249,12 @@ export async function modeleCuit(cle, vitessePxS) {
   } catch { /* cache illisible : on recuit */ }
   const cuit = await aTourDeRole(async () => {
     try {
-      return await cuireModele(cle, vitessePxS, octets);
+      return await cuireModele(cle, vitessePxS, octets, { equipe });
     } catch (erreur) {
       // Un téléphone à court de mémoire graphique : une seconde cuisson, plus
       // légère (sans suréchantillonnage ni anticrénelage), avant d'abandonner.
       console.warn(`Cuisson de ${cle} : ${erreur && erreur.message} — nouvel essai, plus léger`);
-      return cuireModele(cle, vitessePxS, octets, { sur: 1, anticrenelage: false });
+      return cuireModele(cle, vitessePxS, octets, { sur: 1, anticrenelage: false, equipe });
     }
   });
   rangerCache(cleCache, m.src, cuit).catch(() => { /* stockage plein ou privé : tant pis */ });
@@ -337,7 +353,7 @@ function gltfSansAdresses(octets) {
  * Charge le modèle (octets du fichier glTF) et cuit toutes ses animations.
  * `sur` : suréchantillonnage du rendu ; `anticrenelage` : celui de WebGL.
  */
-export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticrenelage = true } = {}) {
+export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticrenelage = true, equipe = null } = {}) {
   const m = MODELES[cle];
   const THREE = await import('./vendor/three-jeu.min.js');
   const { glb, images, cartes } = gltfSansAdresses(octets);
@@ -479,7 +495,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticren
         }
         await pause();   // rendre la main : le menu reste fluide pendant la cuisson
       }
-      clips[etat] = recadrer(bande, n, travailL, travailH, ancreX, ancreY);
+      clips[etat] = recadrer(bande, n, travailL, travailH, ancreX, ancreY, equipe);
       clips[etat].duree = clip.duration;
       clips[etat].boucle = boucle;
       if (etat === 'attaque' && m.lacher != null) clips[etat].lacher = m.lacher;
@@ -501,7 +517,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticren
  * Recadre une bande de travail sur l'union des emprises, ancre au milieu
  * d'une case de largeur paire, puis passe le contour et la netteté.
  */
-function recadrer(bande, n, L, H, ancreX, ancreY) {
+function recadrer(bande, n, L, H, ancreX, ancreY, equipe) {
   const ctx = bande.getContext('2d', { willReadFrequently: true });
   const largeur = L * n, hauteur = H * 8;   // la partie de la bande que cette animation occupe
   const px = ctx.getImageData(0, 0, largeur, hauteur).data;
@@ -531,30 +547,42 @@ function recadrer(bande, n, L, H, ancreX, ancreY) {
       actx.drawImage(bande, i * L + x0, k * H + y0, cellW, cellH, i * cellW, k * cellH, cellW, cellH);
     }
   }
-  netteteEtContour(actx, atlas.width, atlas.height);
+  netteteEtContour(actx, atlas.width, atlas.height, equipe);
   return { canvas: atlas, cellW, cellH, ancreY: ay - y0, hauteurMonde: cellH / DENSITE, images: n };
 }
 
 /**
  * Le traitement des sprites de l'Atelier : bords francs (un sprite réduit à
  * quarante pixels s'interpole mieux qu'un bord à demi transparent), couleurs
- * un peu relevées, et un liseré sombre qui détache le personnage de l'herbe.
+ * étalonnées (REGLAGE), couleur d'équipe marquée (ALPHA_EQUIPE), et un liseré
+ * sombre qui détache le personnage de l'herbe.
  */
-function netteteEtContour(ctx, l, h) {
+function netteteEtContour(ctx, l, h, equipe) {
   const img = ctx.getImageData(0, 0, l, h);
   const p = img.data;
   const plein = new Uint8Array(l * h);
+  const { gamma, saturation, retenue, contraste } = REGLAGE;
+  const courbe = new Float32Array(256);
+  for (let v = 0; v < 256; v++) courbe[v] = Math.pow(v / 255, gamma) * 255;
   for (let i = 0; i < l * h; i++) {
     const o = i * 4;
     if (p[o + 3] < 110) { p[o + 3] = 0; continue; }
     plein[i] = 1;
-    p[o + 3] = 255;
-    const r = p[o], g = p[o + 1], b = p[o + 2];
+    const deLEquipe = equipe ? equipe.dedans(p[o], p[o + 1], p[o + 2]) : false;
+    p[o + 3] = deLEquipe ? ALPHA_EQUIPE : 255;
+    const r = courbe[p[o]], g = courbe[p[o + 1]], b = courbe[p[o + 2]];
     const gris = 0.299 * r + 0.587 * g + 0.114 * b;
-    for (let c = 0; c < 3; c++) {
-      const v = gris + (p[o + c] - gris) * REGLAGE.saturation;
-      p[o + c] = Math.max(0, Math.min(255, (v - 128) * REGLAGE.contraste + 128));
-    }
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let k = 1 + (saturation - 1) * (1 - (max > 0 ? (max - min) / max : 0) * retenue);
+    // Une couleur d'équipe terne (l'écharpe marine du villageois) se ravive
+    // pour les deux camps, pas seulement pour celui qu'on reteinte.
+    if (deLEquipe && equipe.saturer) k *= equipe.saturer;
+    // Jamais au-delà de ce que les canaux peuvent porter : la teinte ne dérive pas.
+    if (max > gris) k = Math.min(k, (255 - gris) / (max - gris));
+    if (min < gris) k = Math.min(k, gris / (gris - min));
+    p[o] = Math.max(0, Math.min(255, (gris + (r - gris) * k - 128) * contraste + 128));
+    p[o + 1] = Math.max(0, Math.min(255, (gris + (g - gris) * k - 128) * contraste + 128));
+    p[o + 2] = Math.max(0, Math.min(255, (gris + (b - gris) * k - 128) * contraste + 128));
   }
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < l; x++) {

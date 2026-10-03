@@ -145,6 +145,16 @@ export class Camera {
   }
 }
 
+/**
+ * Position dans une animation cuite au temps `t` (secondes), en images et
+ * fraction d'image. Une boucle répartit ses images sur un tour et recommence ;
+ * un geste va de la première à la dernière, puis y reste.
+ */
+function positionImage(clip, t) {
+  if (clip.boucle) return ((((t / clip.duree) % 1) + 1) % 1) * clip.images;
+  return clamp(t / clip.duree, 0, 1) * (clip.images - 1);
+}
+
 /** Rampe douce de 0 (x ≤ a) à 1 (x ≥ b). */
 function lisse(a, b, x) {
   const t = clamp((x - a) / (b - a), 0, 1);
@@ -1458,11 +1468,13 @@ export class Renderer {
    */
   dessinerModele3D(u, sprite, x, y, anim) {
     const { clips } = sprite.def;
+    // `image` est une position dans l'animation, fraction d'image comprise :
+    // poserImage3D fond l'image entière dans la suivante.
     let clip = null, image = 0, angle = u.facing;
     const cible = this.cibleDe(u);
     const versCible = () => (cible ? Math.atan2(cible.y - u.y, cible.x - u.x) : u.facing);
-    const parHorloge = (c) => Math.floor((this.horloge / c.duree + (u.id % 7) * 0.37) * c.images);
-    const parDistance = (c) => Math.floor(((anim.distance || 0) / (c.cycle || sprite.def.cycle || 40)) * c.images);
+    const parHorloge = (c) => positionImage(c, this.horloge + (u.id % 7) * 0.37 * c.duree);
+    const parDistance = (c) => (((anim.distance || 0) / (c.cycle || sprite.def.cycle || 40)) % 1) * c.images;
     // L'attaque tient dans l'intervalle entre deux coups, jamais au-delà.
     const dureeCoup = Math.min(clips.attaque.duree, (u.def.attackSpeed || 2) * 0.9);
     // Un tir à l'arc a son instant de lâcher (`lacher`, en secondes) : c'est
@@ -1481,7 +1493,7 @@ export class Renderer {
     }
     if (tCoup >= 0) {
       clip = clips.attaque;
-      image = Math.floor((tCoup / clip.duree) * clip.images);
+      image = positionImage(clip, tCoup);
       angle = versCible();
     } else if (anim.avance) {
       clip = clips.porter && u.isVillager && u.carry.amount > 0.5 && u.carry.type === 'wood' ? clips.porter : clips.marche;
@@ -1500,14 +1512,13 @@ export class Renderer {
       const recu = this.world.time - u.lastHitAt;
       if (recu >= 0 && recu < clips.touche.duree) {
         clip = clips.touche;
-        image = Math.floor((recu / clip.duree) * clip.images);
+        image = positionImage(clip, recu);
       } else {
         // Décalé par unité : dix soldats au repos ne respirent pas en chœur.
         clip = clips.repos;
         image = parHorloge(clip);
       }
     }
-    image = Math.min(clip.images - 1, Math.max(0, image % clip.images));
     this.dessinerSocle(u, x, y);
     this.poserImage3D(clip, u.playerIndex, caseDirection(angle, 8), image, x, y + u.radius * 0.45);
   }
@@ -1518,13 +1529,29 @@ export class Renderer {
     return u.target && !u.target.dead ? u.target : null;
   }
 
-  /** Une image d'un atlas cuit, posée par sa ligne des pieds en (x, sol). */
+  /**
+   * Une image d'un atlas cuit, posée par sa ligne des pieds en (x, sol).
+   * `image` porte une fraction : l'image entière est dessinée, puis la
+   * suivante par-dessus, opaque à hauteur de cette fraction. Douze images
+   * par seconde deviennent un mouvement continu — sans une image de plus en
+   * mémoire. Une boucle enchaîne sa dernière image sur la première ; un
+   * geste (coup, chute) s'arrête sur la dernière.
+   */
   poserImage3D(clip, joueur, k, image, x, sol) {
-    const { cellW, cellH, ancreY, hauteurMonde } = clip;
+    const { cellW, cellH, ancreY, hauteurMonde, images } = clip;
     const h = hauteurMonde, w = (cellW / cellH) * h;
     const source = joueur === 0 ? clip.variantes.bleu : clip.variantes.rouge;
-    this.ctx.drawImage(source, image * cellW, k * cellH, cellW, cellH,
-      x - w / 2, sol - h * (ancreY / cellH), w, h);
+    const ctx = this.ctx;
+    const dx = x - w / 2, dy = sol - h * (ancreY / cellH);
+    let i = Math.floor(image), part = image - i;
+    if (clip.boucle) i = ((i % images) + images) % images;
+    else if (i >= images - 1) { i = images - 1; part = 0; } else if (i < 0) { i = 0; part = 0; }
+    ctx.drawImage(source, i * cellW, k * cellH, cellW, cellH, dx, dy, w, h);
+    if (part < 0.04) return;
+    const opacite = ctx.globalAlpha;
+    ctx.globalAlpha = opacite * part;
+    ctx.drawImage(source, ((i + 1) % images) * cellW, k * cellH, cellW, cellH, dx, dy, w, h);
+    ctx.globalAlpha = opacite;
   }
 
   /**
@@ -1539,7 +1566,7 @@ export class Renderer {
       if (!sprite || !sprite.def.cuit3d) continue;
       const clip = sprite.def.clips.mort;
       const ecoule = fx.max - fx.life;
-      const image = Math.min(clip.images - 1, Math.floor((ecoule / clip.duree) * clip.images));
+      const image = positionImage(clip, ecoule);
       ctx.globalAlpha = Math.min(1, fx.life / 1.5);
       this.poserImage3D(clip, fx.joueur, caseDirection(fx.facing, 8), image, fx.x, fx.y + (UNIT_TYPES[fx.type]?.radius || 9) * 0.45);
       ctx.globalAlpha = 1;
