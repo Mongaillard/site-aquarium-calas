@@ -59,6 +59,8 @@ export const PORTRAITS = {
   priest: 'assets/portrait-pretresse.webp',
   knight: 'assets/portrait-cavalier.webp',
   spearman: 'assets/portrait-lancier.webp',
+  champion: 'assets/portrait-champion.webp',
+  scout: 'assets/portrait-eclaireur.webp',
 };
 
 export const RESOURCE_ICONS = { food: 'food', wood: 'wood', gold: 'gold' };

@@ -242,6 +242,12 @@ const ALTERNATIVES = {
   spearman: { '3d': 'spearmanAtelier', anime: 'spearman', peint: 'spearman', '3d-precalc': 'spearman', '3d-direct': 'spearman' },
   // Le Cavalier lourd n'avait qu'un dessin au code : son modèle dans tous les styles.
   knight: { '3d': 'knightAtelier', anime: 'knightAtelier', peint: 'knightAtelier', '3d-precalc': 'knightAtelier', '3d-direct': 'knightAtelier' },
+  // L'Éclaireur : son modèle en style « 3D », sa planche dessinée dans les autres.
+  scout: { '3d': 'scoutAtelier', anime: 'scout', peint: 'scout', '3d-precalc': 'scout', '3d-direct': 'scout' },
+  // Le Bélier : dessiné au code le temps de la cuisson, son modèle ensuite.
+  ram: { '3d': 'ramAtelier', anime: 'ramAtelier', peint: 'ramAtelier', '3d-precalc': 'ramAtelier', '3d-direct': 'ramAtelier' },
+  // Le Champion aussi.
+  champion: { '3d': 'championAtelier', anime: 'championAtelier', peint: 'championAtelier', '3d-precalc': 'championAtelier', '3d-direct': 'championAtelier' },
   // La Prêtresse n'existe qu'en 3D.
   priest: { '3d': 'priestAtelier', anime: 'priestAtelier', peint: 'priestAtelier', '3d-precalc': 'priestAtelier', '3d-direct': 'priestAtelier' },
   // L'Hydre aussi : pas de planche dessinée, son modèle dans tous les styles.
@@ -296,6 +302,22 @@ const EN_3D = {
   // Caparaçon, tabard et plumet bleu franc basculent ; l'acier et la robe du cheval restent.
   knightAtelier: {
     modele: 'knight', unite: 'knight', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  // Cape, bandeau et tapis de selle bleu franc basculent. Chaque camp commence avec un
+  // éclaireur : sa planche dessinée le montre le temps de la cuisson.
+  scoutAtelier: {
+    modele: 'scout', unite: 'scout', repli: 'scout', natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  // Tuiles du toit et bannières bleu franc basculent ; bois et bronze restent.
+  ramAtelier: {
+    modele: 'ram', unite: 'ram', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  // Tabard, cape, cimier et bouclier bleu franc basculent ; l'acier reste.
+  championAtelier: {
+    modele: 'champion', unite: 'champion', repli: null, natif: 'bleu', aLaDemande: true,
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
   // Robe blanche, étole et ceinture bleu franc : seules celles-ci basculent.
@@ -496,7 +518,7 @@ export function etatModeles3d() {
   const echecs = cles.filter((c) => charges.get(c).absent);
   if (echecs.length) {
     // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
-    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier' };
+    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier' };
     return { etat: 'absent', raison: echecs.map((c) => `${noms[EN_3D[c].unite] || EN_3D[c].unite} : ${charges.get(c).raison}`).join(' ; ') };
   }
   if (entrees.every((e) => e.pret)) return { etat: 'pret' };

@@ -101,6 +101,37 @@ export const MODELES = {
     parDistance: ['marche'],
     accessoires: null,
   },
+  // Le Bélier : un engin, pas un personnage — châssis, poutre suspendue qui va et
+  // vient, quatre roues (un quart de tour par cycle : elles ont quatre rayons).
+  ram: {
+    src: 'assets/modeles/belier.json',
+    taille: 62,
+    clips: { marche: 'marche', repos: 'repos', attaque: 'attaque', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 10, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: null,
+  },
+  // Le Champion : armure de plates, épée et bouclier — les animations du milicien.
+  champion: {
+    src: 'assets/modeles/champion.json',
+    taille: 46,
+    clips: { marche: 'marche_epee', repos: 'garde', attaque: 'attaque_epee', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: 'garde',
+  },
+  // L'Éclaireur : cheval léger, lance couchée ; il va au galop.
+  scout: {
+    src: 'assets/modeles/eclaireur.json',
+    taille: 74,
+    clips: { marche: 'course', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: null,
+  },
   // La Prêtresse : son bâton est un trident ; son « attaque » est le geste du soin
   // (les bras levés), joué à chaque soin rendu.
   priest: {

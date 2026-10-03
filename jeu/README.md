@@ -322,7 +322,7 @@ jeu/
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons générés à la volée (Web Audio)
-│   ├── modele3d.js       personnages 3D (milicien, villageois, archer, lancier, Atlante, Cavalier, Prêtresse, Hydre) : modèles de l'Atelier cuits en atlas
+│   ├── modele3d.js       unités 3D (milicien, villageois, archer, lancier, Atlante, Champion, Éclaireur, Cavalier, Bélier, Prêtresse, Hydre) : modèles de l'Atelier cuits en atlas
 │   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case
 │   ├── main.js           écrans et boucle de jeu
 │   └── vendor/           three.js réduit au nécessaire (chargé à la demande)
