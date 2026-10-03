@@ -258,14 +258,23 @@ inactif, `H` pour revenir au Centre-Ville.
 - **3 ressources** : nourriture (buissons à baies, fermes, chasse au cerf, cochons), bois (forêts), or (filons).
 - **3 âges** : Âge Sombre → Âge Féodal → Âge des Châteaux, chacun débloquant
   bâtiments, unités et technologies.
-- **9 unités** : villageois, milicien, lancier, Atlante, archer, éclaireur, cavalier,
-  bélier et Hydre. Chaque unité a des bonus contre une catégorie (le lancier mange
-  la cavalerie, le cavalier fond sur les archers, le bélier démolit les bâtiments).
-  L'**Hydre**, monstre à sept têtes, s'invoque au Temple à l'Âge des Châteaux
-  (200 de nourriture, 200 d'or) : elle encaisse et mord comme une escouade, et
-  occupe trois places de population.
+- **12 unités** : villageois, milicien, lancier, Atlante, Champion, archer, éclaireur,
+  cavalier, bélier, Catapulte, Prêtresse et Hydre. Chaque unité a des bonus contre
+  une catégorie (le lancier mange la cavalerie, le cavalier fond sur les archers,
+  le bélier démolit les bâtiments).
+  - La **Prêtresse** (Temple, Âge Féodal) ne se bat pas : elle soigne d'elle-même
+    l'allié blessé le plus mal en point à sa portée (8 points de vie toutes les
+    2 s). Toucher une unité blessée avec une Prêtresse en main l'y envoie.
+  - Le **Champion** (caserne, Âge des Châteaux) : infanterie lourde.
+  - La **Catapulte** (atelier de siège, Âge des Châteaux) lance un boulet sur un
+    point : dégâts de zone à l'arrivée, bonus contre les bâtiments. Une troupe
+    en mouvement l'esquive.
+  - L'**Hydre**, monstre à sept têtes, s'invoque au Temple à l'Âge des Châteaux
+    (200 de nourriture, 200 d'or) : elle encaisse et mord comme une escouade, et
+    occupe trois places de population.
 - **13 bâtiments** : Centre-Ville, maisons, moulin, camps de dépôt, fermes,
-  caserne, archerie, écurie, atelier de siège, forge, Temple de l'Hydre, tour de guet.
+  caserne, archerie, écurie, atelier de siège, forge, Temple de l'Hydre (dès
+  l'Âge Féodal), tour de guet.
 - **4 technologies** : brouette, armes forgées, flèches barbelées, armure d'écailles.
 - **Brouillard de guerre**, minimap, points de ralliement, files de production,
   réparation, annulation de chantier avec remboursement.
@@ -313,7 +322,7 @@ jeu/
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons générés à la volée (Web Audio)
-│   ├── modele3d.js       personnages 3D (milicien, villageois, archer, Atlante, Hydre) : modèles de l'Atelier cuits en atlas
+│   ├── modele3d.js       personnages 3D (milicien, villageois, archer, lancier, Atlante, Cavalier, Prêtresse, Hydre) : modèles de l'Atelier cuits en atlas
 │   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case
 │   ├── main.js           écrans et boucle de jeu
 │   └── vendor/           three.js réduit au nécessaire (chargé à la demande)

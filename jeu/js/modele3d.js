@@ -86,6 +86,30 @@ export const MODELES = {
     parDistance: ['marche'],
     accessoires: null,
   },
+  // Le Cavalier lourd : un cheval caparaçonné (squelette « quatre pattes » de
+  // l'Atelier) et son chevalier, dont le bras droit porte l'épée. Sa marche du
+  // jeu est le trot. `taille` compte la longueur du cheval vue de face en
+  // plongée : de profil, cheval et cavalier font une fois et demie un homme.
+  knight: {
+    src: 'assets/modeles/cavalier.json',
+    taille: 78,
+    clips: { marche: 'trot', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: null,
+  },
+  // La Prêtresse : son bâton est un trident ; son « attaque » est le geste du soin
+  // (les bras levés), joué à chaque soin rendu.
+  priest: {
+    src: 'assets/modeles/pretresse.json',
+    taille: 40,
+    clips: { marche: 'marche_trident', repos: 'garde_trident', attaque: 'celebrer', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: 'garde_trident',
+  },
   // Le lancier atlante : casque à cimier, cuirasse d'écailles, la lance au poing.
   spearman: {
     src: 'assets/modeles/lancier.json',

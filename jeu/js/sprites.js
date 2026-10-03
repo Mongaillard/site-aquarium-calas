@@ -240,6 +240,10 @@ const ALTERNATIVES = {
   triton: { '3d': 'tritonAtelier', anime: 'tritonAtelier', peint: 'tritonAtelier', '3d-precalc': 'tritonAtelier', '3d-direct': 'tritonAtelier' },
   // Le lancier : son modèle en style « 3D », le pixel art d'origine dans les autres.
   spearman: { '3d': 'spearmanAtelier', anime: 'spearman', peint: 'spearman', '3d-precalc': 'spearman', '3d-direct': 'spearman' },
+  // Le Cavalier lourd n'avait qu'un dessin au code : son modèle dans tous les styles.
+  knight: { '3d': 'knightAtelier', anime: 'knightAtelier', peint: 'knightAtelier', '3d-precalc': 'knightAtelier', '3d-direct': 'knightAtelier' },
+  // La Prêtresse n'existe qu'en 3D.
+  priest: { '3d': 'priestAtelier', anime: 'priestAtelier', peint: 'priestAtelier', '3d-precalc': 'priestAtelier', '3d-direct': 'priestAtelier' },
   // L'Hydre aussi : pas de planche dessinée, son modèle dans tous les styles.
   hydra: { '3d': 'hydraAtelier', anime: 'hydraAtelier', peint: 'hydraAtelier', '3d-precalc': 'hydraAtelier', '3d-direct': 'hydraAtelier' },
 };
@@ -288,6 +292,16 @@ const EN_3D = {
   hydraAtelier: {
     modele: 'hydra', unite: 'hydra', repli: null, natif: 'bleu', aLaDemande: true,
     recolorage: { teinte: [176, 255], vers: 0, satMin: 0.3 },
+  },
+  // Caparaçon, tabard et plumet bleu franc basculent ; l'acier et la robe du cheval restent.
+  knightAtelier: {
+    modele: 'knight', unite: 'knight', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  // Robe blanche, étole et ceinture bleu franc : seules celles-ci basculent.
+  priestAtelier: {
+    modele: 'priest', unite: 'priest', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
   // Cuit à la demande ; le pixel art du lancier sert le temps de la cuisson.
   // Tunique et cimier bleu franc basculent ; bronze, cuir et peau restent.
@@ -482,7 +496,7 @@ export function etatModeles3d() {
   const echecs = cles.filter((c) => charges.get(c).absent);
   if (echecs.length) {
     // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
-    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier' };
+    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier' };
     return { etat: 'absent', raison: echecs.map((c) => `${noms[EN_3D[c].unite] || EN_3D[c].unite} : ${charges.get(c).raison}`).join(' ; ') };
   }
   if (entrees.every((e) => e.pret)) return { etat: 'pret' };
