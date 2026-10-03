@@ -685,7 +685,7 @@ export class World {
 
   recomputePopulation() {
     for (const p of this.players) { p.pop = 0; p.popCap = 0; }
-    for (const u of this.units) if (!u.dead && !u.isAnimal) this.players[u.playerIndex].pop++;
+    for (const u of this.units) if (!u.dead && !u.isAnimal) this.players[u.playerIndex].pop += u.def.pop || 1;
     for (const b of this.buildings) {
       if (b.dead || !b.complete || !b.def.popBonus) continue;
       this.players[b.playerIndex].popCap += b.def.popBonus;

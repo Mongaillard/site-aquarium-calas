@@ -771,8 +771,8 @@ export class UI {
           <small class="credits-auteurs">${l.auteurs.join(' · ')}</small></li>
         <li><b>Illustrations</b> (personnages, bâtiments, arbres, décor, textures de sol et
           d'eau) — générées par l'auteur du jeu, puis découpées et détourées pour le jeu.</li>
-        <li><b>Chevalier, villageois et Atlante 3D</b> — modèles et animations de l'auteur du
-          jeu, faits dans son Atelier 3D ; icône du trident dessinée pour le jeu ; cuits par
+        <li><b>Chevalier, villageois, archer, Atlante et Hydre 3D</b> — modèles et animations de l'auteur du
+          jeu, faits dans son Atelier 3D ; icônes du trident, de l'Hydre et du Temple dessinées pour le jeu ; cuits par
           <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (licence MIT).</li>
         <li><b>Chevalier 3D d'essai</b> (styles « 3D précalculée » et « 3D en direct ») — KayKit Adventurers, par
           <a href="https://www.kaylousberg.com" target="_blank" rel="noopener">Kay Lousberg</a>,

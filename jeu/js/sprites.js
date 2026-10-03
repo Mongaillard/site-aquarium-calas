@@ -85,6 +85,7 @@ const ATLAS = {
   stable: batiment('assets/ecurie.webp', 316, 282, 158),
   siege: batiment('assets/atelier-siege.webp', 316, 309, 158),
   blacksmith: batiment('assets/forge.webp', 316, 306, 158),
+  temple: batiment('assets/temple.webp', 316, 317, 158),
   house: batiment('assets/maison.webp', 216, 186, 108),
   mill: batiment('assets/moulin.webp', 216, 235, 108),
   lumbercamp: batiment('assets/camp-bucherons.webp', 216, 191, 108),
@@ -232,8 +233,13 @@ const ALTERNATIVES = {
   // Le villageois n'a ni illustration peinte ni essai de 3D : sa planche sert
   // à tous les styles sauf « 3D ».
   villager: { '3d': 'villagerAtelier', anime: 'villager', peint: 'villager', '3d-precalc': 'villager', '3d-direct': 'villager' },
+  // L'archer n'avait qu'un dessin au code : son modèle 3D en style « 3D »,
+  // le dessin au code dans les autres styles (aucun atlas « archer »).
+  archer: { '3d': 'archerAtelier', anime: 'archer', peint: 'archer', '3d-precalc': 'archer', '3d-direct': 'archer' },
   // L'homme-poisson n'existe qu'en 3D : son modèle sert à tous les styles.
   triton: { '3d': 'tritonAtelier', anime: 'tritonAtelier', peint: 'tritonAtelier', '3d-precalc': 'tritonAtelier', '3d-direct': 'tritonAtelier' },
+  // L'Hydre aussi : pas de planche dessinée, son modèle dans tous les styles.
+  hydra: { '3d': 'hydraAtelier', anime: 'hydraAtelier', peint: 'hydraAtelier', '3d-precalc': 'hydraAtelier', '3d-direct': 'hydraAtelier' },
 };
 export const STYLES = [
   { id: '3d', nom: '3D', desc: 'Tes modèles animés' },
@@ -265,6 +271,21 @@ const EN_3D = {
   tritonAtelier: {
     modele: 'triton', unite: 'triton', repli: null, natif: 'bleu', aLaDemande: true,
     recolorage: { teinte: [205, 255], vers: 0, satMin: 0.45 },
+  },
+  // Cuit à la demande, comme l'Atlante : dessiné au code le temps de la
+  // cuisson. Tunique bleu roi, pans bleu canard (teinte 195 à 210°) et
+  // pantalon marine (saturation 0,2 à 0,3) basculent ; peau, cuir, or et bois
+  // de l'arc (teinte < 45°) restent.
+  archerAtelier: {
+    modele: 'archer', unite: 'archer', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [190, 255], vers: 0, satMin: 0.2 },
+  },
+  // Cuite à la demande, à la première Hydre invoquée. Corps turquoise (teinte
+  // 180 à 200°), crinières et nageoires bleu franc (200 à 240°) : tout bascule,
+  // l'Hydre adverse est rouge ; l'or des colliers (20 à 60°) reste.
+  hydraAtelier: {
+    modele: 'hydra', unite: 'hydra', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [176, 255], vers: 0, satMin: 0.3 },
   },
   militiaAtelier: {
     modele: 'militia', unite: 'militia', repli: 'militia', natif: 'bleu',
@@ -453,7 +474,7 @@ export function etatModeles3d() {
   const echecs = cles.filter((c) => charges.get(c).absent);
   if (echecs.length) {
     // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
-    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson' };
+    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre' };
     return { etat: 'absent', raison: echecs.map((c) => `${noms[EN_3D[c].unite] || EN_3D[c].unite} : ${charges.get(c).raison}`).join(' ; ') };
   }
   if (entrees.every((e) => e.pret)) return { etat: 'pret' };

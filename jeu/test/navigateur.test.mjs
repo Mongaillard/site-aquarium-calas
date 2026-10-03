@@ -682,7 +682,7 @@ const batimentsIllustres = await page.evaluate(async () => {
 });
 const NOMS = {
   towncenter: 'le Centre-Ville', barracks: 'la caserne', house: 'la maison', mill: 'le moulin', lumbercamp: 'le camp de bûcherons',
-  miningcamp: 'le camp minier', farm: 'la ferme', archery: 'l’archerie', stable: 'l’écurie', siege: 'l’atelier de siège', blacksmith: 'la forge', tower: 'la tour de guet',
+  miningcamp: 'le camp minier', farm: 'la ferme', archery: 'l’archerie', stable: 'l’écurie', siege: 'l’atelier de siège', blacksmith: 'la forge', tower: 'la tour de guet', temple: 'le Temple',
 };
 for (const [type, nom] of Object.entries(NOMS)) {
   const b = batimentsIllustres[type];

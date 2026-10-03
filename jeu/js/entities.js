@@ -1525,7 +1525,8 @@ export class Building extends Entity {
   updateProduction(dt) {
     if (this.queue.length === 0) return;
     const item = this.queue[0];
-    if (item.kind === 'unit' && this.player.pop >= this.player.popCap) {
+    // Il faut la place de l'unité entière : une Hydre en occupe trois.
+    if (item.kind === 'unit' && this.player.pop + (UNIT_TYPES[item.id].pop || 1) > this.player.popCap) {
       this.world.notifyPopBlocked(this.playerIndex);
       return;
     }

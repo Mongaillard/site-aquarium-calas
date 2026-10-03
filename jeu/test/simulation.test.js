@@ -1800,5 +1800,68 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
   }
 }
 
+// ---------------------------------------------------------------------------
+// Le Temple et l'Hydre : un bâtiment de l'Âge des Châteaux, une unité qui
+// occupe trois places de population.
+// ---------------------------------------------------------------------------
+{
+  const w = new World({ seed: 5, mapSize: 'medium', difficulty: 'normal' });
+  w.ais = [];
+  const p = w.players[0];
+  p.resources = { food: 5000, wood: 5000, gold: 5000 };
+  const tc = w.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
+  const libre = (type, depuis = 4) => {
+    for (let r = depuis; r <= 14; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === r && w.canPlace(0, type, tc.tx + dx, tc.ty + dy, true)) return { tx: tc.tx + dx, ty: tc.ty + dy };
+    }
+    return null;
+  };
+  p.age = 2;
+  const spot = libre('temple');
+  p.age = 1;
+  check('le Temple attend l’Âge des Châteaux', !!spot && !w.canPlace(0, 'temple', spot.tx, spot.ty, true));
+  p.age = 2;
+  const temple = w.spawnBuilding(0, 'temple', spot.tx, spot.ty, true);
+  w.recomputePopulation();
+  const hydres = () => w.units.filter((u) => u.playerIndex === 0 && u.type === 'hydra' && !u.dead);
+  // Mise en place du Classique : 4 villageois et un éclaireur pour 8 places — trois libres.
+  const avant = { pop: p.pop, cap: p.popCap, food: p.resources.food, gold: p.resources.gold };
+  const lancee = w.trainUnit(temple, 'hydra');
+  check('le Temple invoque l’Hydre contre 200 de nourriture et 200 d’or',
+    lancee && p.resources.food === avant.food - 200 && p.resources.gold === avant.gold - 200,
+    `nourriture ${avant.food} → ${p.resources.food}, or ${avant.gold} → ${p.resources.gold}`);
+  advance(w, 47, () => hydres().length > 0);
+  check('l’Hydre sort du Temple et occupe trois places', hydres().length === 1 && p.pop === avant.pop + 3,
+    `${hydres().length} hydre, population ${avant.pop} → ${p.pop}/${p.popCap}`);
+  // Une place libre ne suffit pas : il en faut trois.
+  const victime = w.units.find((u) => u.playerIndex === 0 && u.isVillager);
+  w.killEntity(victime, null, true);
+  w.trainUnit(temple, 'hydra');
+  advance(w, 50);
+  check('une seconde Hydre attend d’avoir ses trois places (une seule libre)', hydres().length === 1 && temple.queue.length === 1,
+    `${hydres().length} hydre, population ${p.pop}/${p.popCap}, file ${temple.queue.length}`);
+  const maison = libre('house', 5);
+  w.spawnBuilding(0, 'house', maison.tx, maison.ty, true);
+  w.recomputePopulation();
+  // (une file bloquée par la population n'avance pas : l'invocation reprend là)
+  advance(w, 47, () => hydres().length > 1);
+  check('… et sort une fois qu’une maison les lui donne', hydres().length === 2, `${hydres().length} hydres, population ${p.pop}/${p.popCap}`);
+  // Elle se bat : trois miliciens adverses ne viennent pas à bout d'une Hydre.
+  const h = hydres()[0];
+  const soldats = [0, 1, 2].map((i) => w.spawnUnit(1, 'militia', h.x + TILE * 2, h.y + (i - 1) * TILE * 0.8));
+  for (const s of soldats) s.attackEntity(h);
+  advance(w, 60, () => soldats.every((s) => s.dead) || h.dead);
+  check('une Hydre vient à bout de trois miliciens', !h.dead && soldats.every((s) => s.dead),
+    `Hydre ${Math.round(h.hp)}/${h.maxHp} PV, miliciens en vie : ${soldats.filter((s) => !s.dead).length}`);
+  // Sauvegarde : l'Hydre, ses points de vie et la population reviennent tels quels.
+  const repris = restoreWorld(JSON.parse(JSON.stringify(serializeWorld(w))));
+  const h2 = repris && repris.units.filter((u) => u.playerIndex === 0 && u.type === 'hydra');
+  check('une partie avec Temple et Hydres se sauvegarde et se reprend',
+    !!repris && h2.length === hydres().length && repris.players[0].pop === p.pop
+      && repris.buildings.some((b) => b.type === 'temple' && b.playerIndex === 0)
+      && Math.round(h2.find((u) => u.id === h.id).hp) === Math.round(h.hp),
+    repris ? `${h2.length} hydres, population ${repris.players[0].pop}` : 'reprise impossible');
+}
+
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : '❌ ' + failures + ' test(s) en échec'}`);
 process.exit(failures === 0 ? 0 : 1);

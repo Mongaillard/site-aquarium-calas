@@ -1464,9 +1464,23 @@ export class Renderer {
     const parDistance = (c) => Math.floor(((anim.distance || 0) / (c.cycle || sprite.def.cycle || 40)) * c.images);
     // L'attaque tient dans l'intervalle entre deux coups, jamais au-delà.
     const dureeCoup = Math.min(clips.attaque.duree, (u.def.attackSpeed || 2) * 0.9);
-    if (anim.depuisCoup >= 0 && anim.depuisCoup < dureeCoup) {
+    // Un tir à l'arc a son instant de lâcher (`lacher`, en secondes) : c'est
+    // là que le jeu lance la flèche. L'archer bande donc pendant la fin de sa
+    // recharge, lâche avec le jeu, puis finit son geste.
+    let tCoup = -1;
+    const { lacher } = clips.attaque;
+    if (lacher != null) {
+      const cadence = u.def.attackSpeed || 2;
+      if (anim.depuisCoup >= 0 && anim.depuisCoup < clips.attaque.duree - lacher) tCoup = lacher + anim.depuisCoup;
+      else if (u.state === STATE.ATTACK && cible && anim.depuisCoup >= 0 && cadence - anim.depuisCoup <= lacher) {
+        tCoup = lacher - (cadence - anim.depuisCoup);
+      }
+    } else if (anim.depuisCoup >= 0 && anim.depuisCoup < dureeCoup) {
+      tCoup = (anim.depuisCoup / dureeCoup) * clips.attaque.duree;
+    }
+    if (tCoup >= 0) {
       clip = clips.attaque;
-      image = Math.floor((anim.depuisCoup / dureeCoup) * clip.images);
+      image = Math.floor((tCoup / clip.duree) * clip.images);
       angle = versCible();
     } else if (anim.avance) {
       clip = clips.porter && u.isVillager && u.carry.amount > 0.5 && u.carry.type === 'wood' ? clips.porter : clips.marche;

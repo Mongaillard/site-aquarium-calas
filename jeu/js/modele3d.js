@@ -29,6 +29,9 @@
  * à la place qu'ils ont dans celle-ci (le fichier les cache pendant le coup
  * reçu et la mort) ; sans lui, chaque animation montre ses propres outils
  * (panier, marteau, hache, pioche, couteau, fagot du villageois).
+ * `accessoiresFiges` : les seuls états où cette place s'impose — pour
+ * l'archer, l'arc reste en main quand il est touché ou tombe, mais le tir
+ * garde son propre geste (l'arc pivote, la flèche paraît puis part).
  */
 export const MODELES = {
   villager: {
@@ -56,6 +59,32 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_trident',
+  },
+  // L'archer : arc en main (gauche), flèche encochée seulement pendant le tir.
+  archer: {
+    src: 'assets/modeles/archer.json',
+    taille: 40,
+    clips: { marche: 'marche_arc', repos: 'garde_arc', attaque: 'tir_arc', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 10, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: 'garde_arc',
+    accessoiresFiges: ['touche', 'mort'],
+    // Secondes : la flèche quitte l'arc à cet instant de « tir_arc » (évènement
+    // « tir » du pack Archer de l'Atelier). Le rendu y cale le tir du jeu.
+    lacher: 0.95,
+  },
+  // L'Hydre : la bibliothèque « quatre pattes » de l'Atelier sur un squelette
+  // à trois cous. Sa marche du jeu est le trot — à sa vitesse, c'est lui qui
+  // ne patine pas. Une fois et demie la taille d'un homme, et bien plus longue.
+  hydra: {
+    src: 'assets/modeles/hydre.json',
+    taille: 66,
+    clips: { marche: 'trot', repos: 'repos', attaque: 'attaque_morsure', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 8, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: null,
   },
   militia: {
     src: 'assets/modeles/milicien.json',
@@ -107,7 +136,7 @@ function empreinte(octets) {
 /**
  * Les atlas d'une unité en 3D : lus dans le cache s'ils y sont, sinon cuits
  * (puis rangés). Renvoie `{ cycle, clips: { marche: { canvas, cellW, cellH,
- * ancreY, hauteurMonde, images, duree, boucle, cycle }, … } }`, ou lève une
+ * ancreY, hauteurMonde, images, duree, boucle, cycle, lacher }, … } }`, ou lève une
  * erreur (pas de WebGL, fichier absent) : l'appelant garde alors
  * l'illustration dessinée.
  */
@@ -296,16 +325,18 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticren
   const poseAccessoires = m.accessoires
     ? accessoires.map((o) => ({ o, p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone() }))
     : [];
-  const poser = (clip, t) => {
+  const poser = (clip, t, etat) => {
     jouer(clip, t);
-    for (const a of poseAccessoires) { a.o.position.copy(a.p); a.o.quaternion.copy(a.q); a.o.scale.copy(a.s); }
+    if (!m.accessoiresFiges || m.accessoiresFiges.includes(etat)) {
+      for (const a of poseAccessoires) { a.o.position.copy(a.p); a.o.quaternion.copy(a.q); a.o.scale.copy(a.s); }
+    }
     modele.updateMatrixWorld(true);
   };
 
   // Échelle : la pose de repos, de face, mesure `taille` px monde de haut.
   const hauteurRepos = (() => {
     pivot.rotation.y = 0;
-    poser(clipDe(m.clips.repos), 0);
+    poser(clipDe(m.clips.repos), 0, 'repos');
     let bas = Infinity, haut = -Infinity;
     const v = new THREE.Vector3();
     modele.traverse((o) => {
@@ -359,7 +390,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticren
         pivot.rotation.y = (k * Math.PI) / 4;
         for (let i = 0; i < n; i++) {
           const t = boucle ? (i / n) * clip.duration : (i / Math.max(1, n - 1)) * clip.duration;
-          poser(clip, t);
+          poser(clip, t, etat);
           rendu.render(scene, camera);
           if (gl.isContextLost()) throw new Error('mémoire graphique saturée (contexte WebGL perdu)');
           bctx.drawImage(toile, i * travailL, k * travailH, travailL, travailH);
@@ -369,6 +400,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticren
       clips[etat] = recadrer(bande, n, travailL, travailH, ancreX, ancreY);
       clips[etat].duree = clip.duration;
       clips[etat].boucle = boucle;
+      if (etat === 'attaque' && m.lacher != null) clips[etat].lacher = m.lacher;
       // Une animation qui suit le sol couvre, en un tour, la distance parcourue
       // pendant sa durée à la vitesse de l'unité : les pieds ne patinent pas.
       if (m.parDistance.includes(etat)) clips[etat].cycle = Math.max(8, Math.round((vitessePxS || 32) * clip.duration));

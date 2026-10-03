@@ -55,6 +55,7 @@ export const RESOURCE_LABELS = {
  */
 export const PORTRAITS = {
   militia: 'assets/portrait-milicien.webp',
+  hydra: 'assets/portrait-hydre.webp',
 };
 
 export const RESOURCE_ICONS = { food: 'food', wood: 'wood', gold: 'gold' };
@@ -145,6 +146,18 @@ export const UNIT_TYPES = {
     meleeArmor: 2, pierceArmor: 7, los: 4, radius: 13,
     from: 'siege', age: 2,
     desc: 'Démolit les bâtiments. Lent et vulnérable aux lanciers.',
+  },
+  // La créature de l'Atelier 3D : sept têtes sur trois cous, invoquée au
+  // Temple. Lente à venir et chère, elle vaut une escouade — et en occupe la
+  // place : trois de population (`pop`, 1 pour toute autre unité).
+  hydra: {
+    id: 'hydra', name: 'Hydre', icon: 'hydra', class: 'monster',
+    cost: { food: 200, gold: 200 }, trainTime: 45, hp: 280, speed: 0.9,
+    attack: 14, attackType: 'melee', range: 1.3, attackSpeed: 2.0,
+    bonus: { building: 6 },
+    meleeArmor: 2, pierceArmor: 2, los: 6, radius: 16, pop: 3,
+    from: 'temple', age: 2,
+    desc: 'Monstre à sept têtes invoqué au Temple : encaisse et mord comme une escouade. Occupe 3 places de population.',
   },
   // Les animaux vivent sur la carte : ni produits, ni comptés dans la
   // population, sans camp (voir Animal, entities.js). `food` est ce que rend
@@ -242,6 +255,12 @@ export const BUILDING_TYPES = {
     meleeArmor: 2, pierceArmor: 7, los: 6, age: 1,
     techs: ['forging', 'scaleArmor', 'fletching'],
     desc: 'Améliore l’armement et l’armure de toutes vos troupes.',
+  },
+  temple: {
+    id: 'temple', name: 'Temple de l’Hydre', icon: 'temple',
+    cost: { wood: 200, gold: 100 }, buildTime: 55, hp: 900, size: 3,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['hydra'], age: 2,
+    desc: 'Invoque l’Hydre, le monstre à sept têtes.',
   },
   tower: {
     id: 'tower', name: 'Tour de guet', icon: 'tower', fem: true,

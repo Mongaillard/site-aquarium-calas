@@ -22,9 +22,13 @@
 | `maison.webp` | La **maison** : un dôme de cristal, un toit bleu, une échoppe, 216×186, dessinée sur 108 px pour une emprise de 64 | Illustration générée par l'auteur du dépôt, livrée avec sa transparence |
 | `archerie.webp`, `ecurie.webp`, `atelier-siege.webp`, `forge.webp` | Les quatre autres bâtiments **3×3** : cibles et râteliers de flèches, box à foin et selles, catapulte sous sa halle, forge à la cheminée fumante — 316 px de large, dessinés sur 158 | Illustrations générées par l'auteur du dépôt, livrées avec leur transparence |
 | `moulin.webp`, `camp-bucherons.webp`, `camp-mineurs.webp`, `ferme.webp`, `tour-guet.webp` | Les cinq autres bâtiments **2×2** : ailes à voiles, billes et haches, galerie et wagonnet, potager et charrette de foin, tour au belvédère — 216 px de large, dessinés sur 108 | idem |
+| `temple.webp` | Le **Temple de l'Hydre** (3×3, Âge des Châteaux) : colonnade et fronton au coquillage, dôme bleu, bassin d'où se dresse une statue d'hydre, braseros à flamme cyan — 316×317, dessiné sur 158 px | Illustration demandée à ChatGPT avec quatre bâtiments du jeu pour modèle de style, livrée avec sa transparence ; même chaîne que les douze autres |
 | `lancier.png` | Atlas des **huit orientations** d'un homme d'armes en pixel art, sprite du lancier | GIF animé fourni par l'auteur du dépôt (48×48, 8 images, fond déjà transparent) |
 | `modeles/milicien.json` | Le **chevalier en 3D** (milicien, style « 3D ») : maillage texturé, squelette de 52 os, sept animations (marche, garde, marche et attaque à l'épée, coup de poing, coup reçu, mort), épée et bouclier | Modèle et animations faits par l'auteur du dépôt dans son Atelier 3D (photo → 3D, puis Animer) |
 | `modeles/atlante.json` | L'**homme-poisson atlante** (unité « Atlante », caserne, Âge Féodal) : cinq animations (garde, marche et attaque au trident, coup reçu, mort), trident de bronze | Modèle de l'auteur du dépôt ; animations du pack Lancier de son Atelier 3D, lance remplacée par un trident |
+| `modeles/archer.json` | L'**archer en 3D** (style « 3D ») : cinq animations (garde et marche l'arc au poing, tir avec flèche encochée, coup reçu, mort), arc et flèche | Modèle de l'auteur du dépôt (photo → 3D TripoSG, texture repeinte sur la forme) ; animations du pack Archer de son Atelier 3D |
+| `modeles/hydre.json` | L'**Hydre** (unité invoquée au Temple) : sept têtes sur trois colonnes de cous, squelette sur mesure de 44 os, sept animations (repos, marche, trot, galop, morsure, coup reçu, mort par affaissement) ; le jeu joue le trot pour sa marche | Modèle de l'auteur du dépôt (six vues → 3D TripoSG, texture repeinte sur la forme) ; animations de la bibliothèque « quatre pattes » de son Atelier 3D, étendues aux sept têtes |
+| `portrait-hydre.webp` | Les têtes de l'Hydre, 90×108 : son portrait dans le panneau de sélection | Rendu du même modèle |
 | `modeles/villageois.json` | Le **villageois en 3D** (style « 3D ») : onze animations (repos, marche, récolter, construire, porter, couper du bois, miner, dépecer, coup de poing, coup reçu, mort) et leurs six outils | idem |
 | `chevalier-3d.webp` | Essai « 3D précalculée » du milicien : un **chevalier 3D** rendu par Blender sous l'angle du jeu, huit directions × (course de 16 images, repos de 8, coup d'épée de 12), 128×128 par case | Modèle **KayKit Adventurers** de Kay Lousberg, domaine public (CC0) — voir « Deux essais de 3D » |
 | `chevalier-3d.json` | Essai « 3D en direct » : le même modèle, allégé — ses dix pièces utiles, trois animations sur 76 — et mis en glTF texte, données embarquées (527 Ko, 220 compressés, au lieu de 3,6 Mo) : tout hébergeur sert du JSON, pas toujours le .glb binaire | idem |
@@ -83,6 +87,14 @@ remplacer le fichier : l'empreinte change, la cuisson se refait
 une fois. Les styles « Animé » et « Peint » gardent les planches dessinées, et
 servent aussi le temps de la première cuisson, ou si l'appareil n'a pas de
 WebGL.
+
+L'**Hydre** n'existe qu'en 3D, comme l'Atlante et l'archer : cuite à la demande,
+à la première invoquée. Sa hauteur de repos fait 66 px monde (un homme : 42), sa
+marche du jeu est le trot de l'Atelier — c'est lui qui couvre, par foulée, la
+distance que l'unité parcourt à sa vitesse. Pour l'adversaire, tout le bleu et
+le turquoise (teinte 176° à 255°) basculent au rouge ; l'or des colliers reste.
+Son icône est la silhouette de profil du modèle, tracée en chemin ; celle du
+Temple est dessinée à la main.
 
 ## Le cycle de marche
 
@@ -364,6 +376,17 @@ filtrer, la couleur des pixels opaques est étendue sous les pixels
 transparents voisins, sinon le masque flou aspire le fond retiré dans les
 bords. Le palais pèse 71 Ko, un 3×3 une cinquantaine, un 2×2 entre 23 et 33 :
 **491 Ko** pour les douze bâtiments.
+
+Le **Temple de l'Hydre** est venu après : les quatre bâtiments 3×3 les plus
+typés (Centre-Ville, caserne, forge, écurie), agrandis deux fois et posés côte à
+côte sur un fond olive, ont servi de modèle de style à une seule demande
+(« un nouveau bâtiment exactement dans ce style, cette vue »). L'image, 1254 px
+de côté, est livrée avec sa transparence ; `fabrique_batiment.py` refait la
+chaîne des douze autres — alpha renormalisé, voile retiré sous 48, liseré
+rouge et vert du pourtour effacé, recadrage, réduction à 316 px en alpha
+prémultiplié, couleur étendue sous les bords, peps, WebP. Ses toits, son dôme
+et ses bannières basculent (11 % des pixels) ; l'eau du bassin, les flammes et
+la statue, cyan ou turquoise (teinte < 200°), restent.
 
 La couleur d'équipe suit la règle du chevalier animé — seule la fenêtre du bleu
 franc (200°–255°) bascule : dômes, toits, bannières et auvents passent au

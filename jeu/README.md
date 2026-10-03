@@ -258,11 +258,14 @@ inactif, `H` pour revenir au Centre-Ville.
 - **3 ressources** : nourriture (buissons à baies, fermes, chasse au cerf, cochons), bois (forêts), or (filons).
 - **3 âges** : Âge Sombre → Âge Féodal → Âge des Châteaux, chacun débloquant
   bâtiments, unités et technologies.
-- **7 unités** : villageois, milicien, lancier, archer, éclaireur, cavalier, bélier.
-  Chaque unité a des bonus contre une catégorie (le lancier mange la cavalerie,
-  le cavalier fond sur les archers, le bélier démolit les bâtiments).
-- **12 bâtiments** : Centre-Ville, maisons, moulin, camps de dépôt, fermes,
-  caserne, archerie, écurie, atelier de siège, forge, tour de guet.
+- **9 unités** : villageois, milicien, lancier, Atlante, archer, éclaireur, cavalier,
+  bélier et Hydre. Chaque unité a des bonus contre une catégorie (le lancier mange
+  la cavalerie, le cavalier fond sur les archers, le bélier démolit les bâtiments).
+  L'**Hydre**, monstre à sept têtes, s'invoque au Temple à l'Âge des Châteaux
+  (200 de nourriture, 200 d'or) : elle encaisse et mord comme une escouade, et
+  occupe trois places de population.
+- **13 bâtiments** : Centre-Ville, maisons, moulin, camps de dépôt, fermes,
+  caserne, archerie, écurie, atelier de siège, forge, Temple de l'Hydre, tour de guet.
 - **4 technologies** : brouette, armes forgées, flèches barbelées, armure d'écailles.
 - **Brouillard de guerre**, minimap, points de ralliement, files de production,
   réparation, annulation de chantier avec remboursement.
@@ -310,7 +313,7 @@ jeu/
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons générés à la volée (Web Audio)
-│   ├── modele3d.js       personnages 3D (milicien, villageois, Atlante) : modèles de l'Atelier cuits en atlas
+│   ├── modele3d.js       personnages 3D (milicien, villageois, archer, Atlante, Hydre) : modèles de l'Atelier cuits en atlas
 │   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case
 │   ├── main.js           écrans et boucle de jeu
 │   └── vendor/           three.js réduit au nécessaire (chargé à la demande)
@@ -464,7 +467,7 @@ premiers), au choix dans le menu de pause :
 
 | Style | Sprite du milicien | Ce qu'on y gagne |
 | --- | --- | --- |
-| **3D** (par défaut) | `modeles/milicien.json` et `modeles/villageois.json` : les modèles animés de l'auteur (Atelier 3D), cuits par le jeu en atlas de huit directions au premier lancement, puis gardés en cache | Ses propres personnages, toutes leurs animations — combat, gestes de travail tournés vers leur cible, chute — sans rien dessiner |
+| **3D** (par défaut) | `modeles/milicien.json`, `modeles/villageois.json` et `modeles/archer.json` : les modèles animés de l'auteur (Atelier 3D), cuits par le jeu en atlas de huit directions au premier lancement, puis gardés en cache | Ses propres personnages, toutes leurs animations — combat, gestes de travail tournés vers leur cible, chute — sans rien dessiner |
 | **Animé** | `milicien-marche.webp`, 8 images par direction | Le mouvement se lit : on voit qui avance, qui est bloqué |
 | **Peint** | `chevalier.webp`, une pose par direction | Le détail de l'armure, au prix d'une silhouette figée |
 | **3D précalculée** (essai) | `chevalier-3d.webp` : un modèle 3D rendu à l'avance par Blender, 8 directions × course, repos, coup d'épée | Des directions et des pas parfaitement cohérents, sans rien coûter au téléphone |
