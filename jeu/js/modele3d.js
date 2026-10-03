@@ -112,6 +112,18 @@ export const MODELES = {
     parDistance: ['marche'],
     accessoires: null,
   },
+  // La Catapulte : le bras se tend pendant la fin de la recharge, part à
+  // l'instant du tir (`lacher`), claque sur sa butée puis se réarme lentement.
+  catapult: {
+    src: 'assets/modeles/catapulte.json',
+    taille: 55,
+    clips: { marche: 'marche', repos: 'repos', attaque: 'tir', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 12, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: null,
+    lacher: 0.25,
+  },
   // Le Champion : armure de plates, épée et bouclier — les animations du milicien.
   champion: {
     src: 'assets/modeles/champion.json',

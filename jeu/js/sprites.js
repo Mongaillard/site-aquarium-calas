@@ -246,6 +246,8 @@ const ALTERNATIVES = {
   scout: { '3d': 'scoutAtelier', anime: 'scout', peint: 'scout', '3d-precalc': 'scout', '3d-direct': 'scout' },
   // Le Bélier : dessiné au code le temps de la cuisson, son modèle ensuite.
   ram: { '3d': 'ramAtelier', anime: 'ramAtelier', peint: 'ramAtelier', '3d-precalc': 'ramAtelier', '3d-direct': 'ramAtelier' },
+  // La Catapulte n'existe qu'en 3D.
+  catapult: { '3d': 'catapultAtelier', anime: 'catapultAtelier', peint: 'catapultAtelier', '3d-precalc': 'catapultAtelier', '3d-direct': 'catapultAtelier' },
   // Le Champion aussi.
   champion: { '3d': 'championAtelier', anime: 'championAtelier', peint: 'championAtelier', '3d-precalc': 'championAtelier', '3d-direct': 'championAtelier' },
   // La Prêtresse n'existe qu'en 3D.
@@ -313,6 +315,11 @@ const EN_3D = {
   // Tuiles du toit et bannières bleu franc basculent ; bois et bronze restent.
   ramAtelier: {
     modele: 'ram', unite: 'ram', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  // Seule la butée rembourrée est bleu franc : c'est elle qui bascule.
+  catapultAtelier: {
+    modele: 'catapult', unite: 'catapult', repli: null, natif: 'bleu', aLaDemande: true,
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
   // Tabard, cape, cimier et bouclier bleu franc basculent ; l'acier reste.
@@ -518,7 +525,7 @@ export function etatModeles3d() {
   const echecs = cles.filter((c) => charges.get(c).absent);
   if (echecs.length) {
     // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
-    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier' };
+    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte' };
     return { etat: 'absent', raison: echecs.map((c) => `${noms[EN_3D[c].unite] || EN_3D[c].unite} : ${charges.get(c).raison}`).join(' ; ') };
   }
   if (entrees.every((e) => e.pret)) return { etat: 'pret' };
