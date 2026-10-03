@@ -56,6 +56,9 @@ export const RESOURCE_LABELS = {
 export const PORTRAITS = {
   militia: 'assets/portrait-milicien.webp',
   hydra: 'assets/portrait-hydre.webp',
+  priest: 'assets/portrait-pretresse.webp',
+  knight: 'assets/portrait-cavalier.webp',
+  spearman: 'assets/portrait-lancier.webp',
 };
 
 export const RESOURCE_ICONS = { food: 'food', wood: 'wood', gold: 'gold' };

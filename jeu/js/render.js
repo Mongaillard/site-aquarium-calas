@@ -1224,7 +1224,8 @@ export class Renderer {
       ctx.stroke();
     }
 
-    if (u.type === 'ram') {
+    // Le bélier dessiné au code ne sert plus qu'en attendant son modèle 3D (ou sans WebGL).
+    if (u.type === 'ram' && !spriteDe('ram')) {
       ctx.fillStyle = '#6b4a2a';
       ctx.save();
       ctx.translate(x, y - 2);

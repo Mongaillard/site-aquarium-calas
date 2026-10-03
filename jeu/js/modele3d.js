@@ -32,6 +32,8 @@
  * `accessoiresFiges` : les seuls états où cette place s'impose — pour
  * l'archer, l'arc reste en main quand il est touché ou tombe, mais le tir
  * garde son propre geste (l'arc pivote, la flèche paraît puis part).
+ * `tourne` : angle (degrés) à ajouter pour que l'avant du modèle regarde le sud
+ * dans la case 0 — les engins viennent d'une vue de trois quarts.
  */
 export const MODELES = {
   villager: {
@@ -180,7 +182,7 @@ export async function modeleCuit(cle, vitessePxS) {
   if (!reponse.ok) throw new Error(`${m.src} : ${reponse.status}`);
   const octets = await reponse.arrayBuffer();
   const url = new URL(m.src, location.href);
-  url.searchParams.set('cuisson', `${VERSION_CUISSON}-${empreinte(octets)}-${m.taille}-${vitessePxS}`);
+  url.searchParams.set('cuisson', `${VERSION_CUISSON}-${empreinte(octets)}-${m.taille}-${m.tourne || 0}-${vitessePxS}`);
   const cleCache = url.href;
   try {
     const lu = await lireCache(cleCache);
@@ -368,8 +370,11 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticren
   };
 
   // Échelle : la pose de repos, de face, mesure `taille` px monde de haut.
+  // `tourne` (degrés) : un engin modélisé depuis une vue de trois quarts n'a pas
+  // son avant sur l'axe du modèle — on le remet face à la caméra de la case 0.
+  const tourne = ((m.tourne || 0) * Math.PI) / 180;
   const hauteurRepos = (() => {
-    pivot.rotation.y = 0;
+    pivot.rotation.y = tourne;
     poser(clipDe(m.clips.repos), 0, 'repos');
     let bas = Infinity, haut = -Infinity;
     const v = new THREE.Vector3();
@@ -421,7 +426,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = SUR, anticren
       // Rangée = direction, colonne = image : la disposition de cadreSource.
       bctx.clearRect(0, 0, bande.width, bande.height);
       for (let k = 0; k < 8; k++) {
-        pivot.rotation.y = (k * Math.PI) / 4;
+        pivot.rotation.y = (k * Math.PI) / 4 + tourne;
         for (let i = 0; i < n; i++) {
           const t = boucle ? (i / n) * clip.duration : (i / Math.max(1, n - 1)) * clip.duration;
           poser(clip, t, etat);
