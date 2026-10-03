@@ -16,7 +16,7 @@ import { Rendu3D } from './rendu3d.js';
 import { TERRAIN, BLOCK } from './map.js';
 import { planterDecor, ECHELLE_DECOR } from './decor.js';
 import { STATE, villagerTask } from './entities.js';
-import { clamp, bruitPeriodique } from './utils.js';
+import { clamp, dist, bruitPeriodique } from './utils.js';
 
 // Variantes volontairement proches : un écart trop marqué transforme la
 // prairie en damier et fatigue l'œil sur un petit écran.
@@ -1632,6 +1632,19 @@ export class Renderer {
     ctx.lineWidth = 2;
     for (const p of this.world.projectiles) {
       if (!this.world.isVisible(p.x, p.y)) continue;
+      if (p.sol) {
+        // Un boulet : son ombre court au sol, lui monte en cloche au-dessus.
+        const total = Math.max(1, dist(p.startX, p.startY, p.sol.x, p.sol.y));
+        const t = clamp(p.travel / total, 0, 1);
+        const haut = Math.sin(t * Math.PI) * Math.min(70, total * 0.32);
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, 4.5, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#5d564c';
+        ctx.beginPath(); ctx.arc(p.x, p.y - 6 - haut, 4.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#8d8578';
+        ctx.beginPath(); ctx.arc(p.x - 1.2, p.y - 7.2 - haut, 1.6, 0, Math.PI * 2); ctx.fill();
+        continue;
+      }
       const a = p.angle || 0;
       ctx.beginPath();
       ctx.moveTo(p.x - Math.cos(a) * 7, p.y - Math.sin(a) * 7);
@@ -1755,6 +1768,10 @@ export class Renderer {
         this.semerParticules(fx.x, fx.y - 4, 7, { color: fx.color || '#777', speed: 46, life: 0.75, size: 2 });
       } else if (fx.kind === 'hit') {
         this.semerParticules(fx.x, fx.y, 3, { color: '#ffe08a', speed: 40, life: 0.3, gravity: 30 });
+      } else if (fx.kind === 'impact') {
+        this.semerParticules(fx.x, fx.y, 14, { color: '#b9a98a', speed: 70, life: 0.6, size: 2.2 });
+      } else if (fx.kind === 'soin') {
+        this.semerParticules(fx.x, fx.y, 5, { color: '#8ff0c0', speed: 22, life: 0.7, gravity: -40, size: 1.8 });
       }
     }
   }
@@ -1763,7 +1780,7 @@ export class Renderer {
     const ctx = this.ctx;
     for (const fx of this.world.effects) {
       // Comme les projectiles et les sons : un combat hors de vue ne se montre pas.
-      if ((fx.kind === 'hit' || fx.kind === 'death') && !this.world.isVisible(fx.x, fx.y)) continue;
+      if ((fx.kind === 'hit' || fx.kind === 'death' || fx.kind === 'impact' || fx.kind === 'soin') && !this.world.isVisible(fx.x, fx.y)) continue;
       const t = 1 - fx.life / fx.max;
       if (fx.kind === 'hit') {
         ctx.strokeStyle = `rgba(255,220,120,${1 - t})`;
@@ -1771,6 +1788,21 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(fx.x, fx.y, 4 + t * 10, 0, Math.PI * 2);
         ctx.stroke();
+      } else if (fx.kind === 'impact') {
+        // Le boulet d'une catapulte : l'onde de son rayon, qui s'efface.
+        ctx.strokeStyle = `rgba(230,200,150,${(1 - t) * 0.9})`;
+        ctx.lineWidth = 3 * (1 - t) + 1;
+        ctx.beginPath();
+        ctx.ellipse(fx.x, fx.y, fx.rayon * (0.35 + t * 0.65), fx.rayon * (0.35 + t * 0.65) * 0.6, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (fx.kind === 'soin') {
+        // Un soin : une croix claire qui monte au-dessus du patient.
+        const y = fx.y - 10 - t * 14;
+        ctx.globalAlpha = 1 - t;
+        ctx.fillStyle = '#8ff0c0';
+        ctx.fillRect(fx.x - 1.5, y - 5, 3, 10);
+        ctx.fillRect(fx.x - 5, y - 1.5, 10, 3);
+        ctx.globalAlpha = 1;
       } else if (fx.kind === 'ping') {
         // Retour visuel d'un ordre donné au doigt.
         ctx.strokeStyle = fx.color || '#9bf6a0';

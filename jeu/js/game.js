@@ -519,6 +519,23 @@ export class World {
     return null;
   }
 
+  /**
+   * L'allié blessé le plus mal en point à portée d'une soigneuse : une unité
+   * de son camp (ni elle-même, ni une bête, ni un abrité), à qui il manque
+   * des points de vie.
+   */
+  findWoundedAllyNear(entity, radius) {
+    let best = null, bestRatio = 1;
+    this.grid.forEachNear(entity.x, entity.y, radius, (other) => {
+      if (other === entity || other.dead || other.kind !== 'unit' || other.isAnimal || other.garrisonedIn) return;
+      if (other.playerIndex !== entity.playerIndex || other.hp >= other.maxHp) return;
+      if (dist(entity.x, entity.y, other.x, other.y) > radius) return;
+      const ratio = other.hp / other.maxHp;
+      if (ratio < bestRatio) { bestRatio = ratio; best = other; }
+    });
+    return best;
+  }
+
   entitiesOfPlayer(playerIndex, filter) {
     return this.entities.filter((e) => !e.dead && e.playerIndex === playerIndex && (!filter || filter(e)));
   }
@@ -566,6 +583,14 @@ export class World {
 
   performAttack(attacker, target) {
     if (!target || target.dead) return;
+    // Le geste d'une soigneuse rend des points de vie au lieu d'en ôter.
+    if (attacker.def.heal) {
+      if (target.playerIndex !== attacker.playerIndex) return;
+      target.hp = Math.min(target.maxHp, target.hp + attacker.def.heal);
+      this.effects.push({ kind: 'soin', x: target.x, y: target.y - 8, life: 0.7, max: 0.7 });
+      this.pushEvent({ type: 'heal', x: target.x, y: target.y, player: attacker.playerIndex });
+      return;
+    }
     const damage = computeDamage(attacker.def, attacker.player, target);
     if (attacker.def.projectile) {
       this.projectiles.push(new Projectile(this, attacker, target, damage));
@@ -577,12 +602,32 @@ export class World {
     }
   }
 
+  /**
+   * Le boulet d'une catapulte touche le sol : tout ce qui n'est pas du camp
+   * du tireur, dans son rayon, encaisse le coup (calculé pour chacun : armure
+   * et bonus contre les bâtiments compris). Les bêtes sauvages sont épargnées.
+   */
+  impactDeZone(pr) {
+    const rayon = pr.splash * TILE;
+    const tireur = pr.source;
+    const def = tireur.def, joueur = this.players[tireur.playerIndex] || this.gaia;
+    const touches = [];
+    this.grid.forEachNear(pr.x, pr.y, rayon + TILE * 2, (e) => {
+      if (e.dead || e.garrisonedIn || e.playerIndex === tireur.playerIndex) return;
+      if (e.isAnimal && e.playerIndex < 0) return;
+      if (e.edgeDistanceTo(pr.x, pr.y) <= rayon) touches.push(e);
+    });
+    for (const e of touches) e.takeDamage(def ? computeDamage(def, joueur, e) : pr.damage, tireur);
+    this.effects.push({ kind: 'impact', x: pr.x, y: pr.y, rayon, life: 0.5, max: 0.5 });
+    this.pushEvent({ type: 'melee', x: pr.x, y: pr.y, player: tireur.playerIndex });
+  }
+
   onDamaged(entity, source, amount) {
     // Riposte : une unité inoccupée rend les coups, sauf attitude « sans
     // attaque ». Les villageois ne se défendent que contre d'autres villageois
     // (comme dans AoE : face à un soldat, mieux vaut fuir ou se réfugier).
     if (entity.kind === 'unit' && source && !source.dead && !entity.garrisonedIn
-        && entity.stance !== 'passive'
+        && entity.stance !== 'passive' && !entity.def.heal
         && (entity.state === STATE.IDLE || (entity.state === STATE.MOVE && !entity.destination))) {
       entity.attackEntity(source, true);
     } else if (entity.kind === 'unit' && entity.isVillager && source && !source.dead
@@ -1015,9 +1060,20 @@ export class World {
         return { kind: 'hunt', target, workers: villagers.length };
       }
     }
+    // Un allié blessé sous le doigt, une soigneuse en main : elle va le soigner.
+    if (target && target.playerIndex === playerIndex && target.kind === 'unit' && !target.isAnimal
+        && !target.dead && target.hp < target.maxHp) {
+      const soigneuses = units.filter((u) => u.def.heal && u !== target);
+      if (soigneuses.length) {
+        for (const s of soigneuses) s.attackEntity(target);
+        return { kind: 'heal', target };
+      }
+    }
     if (target && target.playerIndex !== playerIndex && !target.dead) {
       for (const u of units) {
         if (u.isVillager && target.kind === 'building' && !target.complete) continue;
+        // Une soigneuse n'attaque pas : elle suit la troupe jusque-là.
+        if (u.def.heal) { u.moveTo(worldX, worldY); continue; }
         u.attackEntity(target);
       }
       return { kind: target.isAnimal ? 'hunt' : 'attack', target, workers: units.filter((u) => u.isVillager).length };

@@ -14,6 +14,7 @@
 
 import { World } from './game.js';
 import { Projectile } from './entities.js';
+import { entityDef } from './config.js';
 
 export const SAVE_KEY = 'aem.partie';
 export const SAVE_VERSION = 1;
@@ -42,9 +43,11 @@ function serializeProjectile(pr) {
     x: pr.x, y: pr.y, target: refId(pr.target), source: refId(pr.source), damage: pr.damage,
     // Tireur tombé pendant le vol : la flèche touche quand même. On garde ce
     // que l'impact consulte de lui (son camp, sa position).
-    tireur: { x: pr.source.x, y: pr.source.y, player: pr.source.playerIndex },
+    tireur: { x: pr.source.x, y: pr.source.y, player: pr.source.playerIndex, type: pr.source.type },
     lastX: pr.lastX, lastY: pr.lastY, startX: pr.startX, startY: pr.startY,
     travel: pr.travel, totalDist: pr.totalDist,
+    // Un boulet vise un point du sol, pas une cible (voir Projectile).
+    sol: pr.sol ? { x: pr.sol.x, y: pr.sol.y } : null,
   };
 }
 
@@ -349,10 +352,14 @@ export function restoreWorld(data) {
   // évaporés. On les laisse tomber seulement si la cible a disparu : celle d'un
   // tireur mort en route touche encore, comme dans la partie d'origine.
   for (const saved of data.projectiles || []) {
-    const target = cible(saved.target), t = saved.tireur;
-    const source = cible(saved.source) || (t && { x: t.x, y: t.y, playerIndex: t.player, dead: true });
+    const t = saved.tireur;
+    // Un boulet n'a pas besoin de sa cible pour finir sa course : son point de chute suffit.
+    const target = cible(saved.target) || (saved.sol && { x: saved.sol.x, y: saved.sol.y });
+    const source = cible(saved.source)
+      || (t && { x: t.x, y: t.y, playerIndex: t.player, dead: true, type: t.type, def: entityDef(t.type) });
     if (!source || !target) continue;
     const pr = new Projectile(world, source, target, saved.damage);
+    if (saved.sol) pr.sol = { x: saved.sol.x, y: saved.sol.y };
     Object.assign(pr, {
       x: saved.x, y: saved.y, lastX: saved.lastX, lastY: saved.lastY,
       startX: saved.startX, startY: saved.startY,

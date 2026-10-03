@@ -372,6 +372,10 @@ function sandbox(seed = 3) {
   return world;
 }
 
+function centreDe(world, i = 0) {
+  return world.buildings.find((b) => b.playerIndex === i && b.type === 'towncenter');
+}
+
 function advance(world, seconds, stop) {
   const ticks = Math.round(seconds * TICKS_PER_SECOND);
   for (let i = 0; i < ticks; i++) {
@@ -1801,8 +1805,8 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
 }
 
 // ---------------------------------------------------------------------------
-// Le Temple et l'Hydre : un bâtiment de l'Âge des Châteaux, une unité qui
-// occupe trois places de population.
+// Le Temple et l'Hydre : un bâtiment de l'Âge Féodal, une unité de l'Âge des
+// Châteaux qui occupe trois places de population.
 // ---------------------------------------------------------------------------
 {
   const w = new World({ seed: 5, mapSize: 'medium', difficulty: 'normal' });
@@ -1816,13 +1820,15 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     }
     return null;
   };
-  p.age = 2;
-  const spot = libre('temple');
   p.age = 1;
-  check('le Temple attend l’Âge des Châteaux', !!spot && !w.canPlace(0, 'temple', spot.tx, spot.ty, true));
-  p.age = 2;
+  const spot = libre('temple');
+  p.age = 0;
+  check('le Temple attend l’Âge Féodal', !!spot && !w.canPlace(0, 'temple', spot.tx, spot.ty, true));
+  p.age = 1;
   const temple = w.spawnBuilding(0, 'temple', spot.tx, spot.ty, true);
   w.recomputePopulation();
+  check('… et l’Hydre, l’Âge des Châteaux', !w.canTrain(temple, 'hydra').ok && w.canTrain(temple, 'priest').ok);
+  p.age = 2;
   const hydres = () => w.units.filter((u) => u.playerIndex === 0 && u.type === 'hydra' && !u.dead);
   // Mise en place du Classique : 4 villageois et un éclaireur pour 8 places — trois libres.
   const avant = { pop: p.pop, cap: p.popCap, food: p.resources.food, gold: p.resources.gold };
@@ -1861,6 +1867,138 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
       && repris.buildings.some((b) => b.type === 'temple' && b.playerIndex === 0)
       && Math.round(h2.find((u) => u.id === h.id).hp) === Math.round(h.hp),
     repris ? `${h2.length} hydres, population ${repris.players[0].pop}` : 'reprise impossible');
+}
+
+// ---------------------------------------------------------------------------
+// La Prêtresse (soin), la Catapulte (boulet de zone) et le Champion.
+// ---------------------------------------------------------------------------
+{
+  const monde = (seed = 9) => {
+    const w = new World({ seed, mapSize: 'medium', difficulty: 'normal' });
+    w.ais = [];
+    w.players[0].age = 2; w.players[1].age = 2;
+    w.players[0].resources = { food: 5000, wood: 5000, gold: 5000 };
+    return w;
+  };
+  // Un coin dégagé, loin des deux bases : les scènes s'y jouent sans voisins.
+  const clairiere = (w) => {
+    for (let ty = 8; ty < w.map.h - 8; ty += 3) for (let tx = 8; tx < w.map.w - 8; tx += 3) {
+      if (w.map.startPositions.some((b) => Math.hypot(tx - b.tx, ty - b.ty) < 18)) continue;
+      let ok = true;
+      for (let dy = -5; dy <= 5 && ok; dy++) for (let dx = -5; dx <= 5 && ok; dx++) if (!w.map.isOpenTile(tx + dx, ty + dy)) ok = false;
+      if (ok) return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
+    }
+    return null;
+  };
+
+  // --- La Prêtresse ---
+  {
+    const w = monde();
+    const c = clairiere(w);
+    const pretresse = w.spawnUnit(0, 'priest', c.x, c.y);
+    const blesse = w.spawnUnit(0, 'militia', c.x + TILE * 2, c.y);
+    const intact = w.spawnUnit(0, 'militia', c.x - TILE * 2, c.y);
+    blesse.stance = 'passive'; intact.stance = 'passive';
+    blesse.hp = 13;
+    advance(w, 5);
+    check('la Prêtresse soigne d’elle-même l’allié blessé à portée', blesse.hp > 13 && blesse.hp <= blesse.maxHp && intact.hp === intact.maxHp,
+      `13 → ${blesse.hp} PV en 5 s`);
+    advance(w, 12);
+    check('… jusqu’à la guérison, puis s’arrête', blesse.hp === blesse.maxHp && pretresse.state === STATE.IDLE && !pretresse.target,
+      `${blesse.hp}/${blesse.maxHp} PV, état ${pretresse.state}`);
+    // Un ennemi blessé à portée : elle ne le soigne pas, et ne riposte pas quand il la frappe.
+    const ennemi = w.spawnUnit(1, 'militia', c.x + TILE * 1.2, c.y + TILE);
+    ennemi.hp = 20; ennemi.stance = 'passive';
+    advance(w, 4);
+    const pvEnnemi = ennemi.hp;
+    ennemi.attackEntity(pretresse);
+    advance(w, 3);
+    check('elle ne soigne pas l’ennemi et ne lui rend pas ses coups', pvEnnemi === 20 && ennemi.hp === 20 && pretresse.hp < pretresse.maxHp && pretresse.target !== ennemi,
+      `ennemi ${ennemi.hp} PV, Prêtresse ${pretresse.hp}/${pretresse.maxHp}, cible ${pretresse.target ? pretresse.target.type : 'aucune'}`);
+    w.killEntity(ennemi, null, true);
+    // L'ordre du joueur : toucher un allié blessé envoie la Prêtresse le soigner, même hors de vue.
+    const loin = w.spawnUnit(0, 'knight', c.x + TILE * 4.5, c.y - TILE * 4.5);
+    loin.stance = 'passive'; loin.hp = 40;
+    pretresse.setStance('passive');
+    advance(w, 3);
+    const sansOrdre = loin.hp;
+    const ordre = w.commandUnits([pretresse], loin.x, loin.y);
+    advance(w, 10);
+    check('touchée par le joueur, une unité blessée reçoit la Prêtresse', sansOrdre === 40 && ordre && ordre.kind === 'heal' && loin.hp > 40,
+      `ordre ${ordre && ordre.kind}, ${sansOrdre} → ${loin.hp} PV`);
+    // Face à un ennemi désigné, elle suit la troupe sans frapper.
+    const cible = w.spawnUnit(1, 'spearman', c.x - TILE * 4, c.y + TILE * 3);
+    cible.stance = 'passive';
+    const soldat = w.spawnUnit(0, 'militia', c.x, c.y + TILE);
+    w.commandUnits([pretresse, soldat], cible.x, cible.y);
+    check('ordre d’attaque : le soldat attaque, la Prêtresse se déplace', soldat.target === cible && pretresse.target !== cible && pretresse.state === STATE.MOVE,
+      `soldat → ${soldat.target ? soldat.target.type : '-'}, Prêtresse ${pretresse.state}`);
+  }
+
+  // --- La Catapulte ---
+  {
+    const w = monde(11);
+    const c = clairiere(w);
+    const cata = w.spawnUnit(0, 'catapult', c.x - TILE * 3, c.y);
+    cata.stance = 'standGround';
+    const groupe = [0, 1, 2].map((i) => w.spawnUnit(1, 'militia', c.x + TILE * 2.5, c.y + (i - 1) * TILE * 0.7));
+    const ami = w.spawnUnit(0, 'militia', c.x + TILE * 2.5, c.y - TILE * 0.2);
+    const ecarte = w.spawnUnit(1, 'militia', c.x + TILE * 2.5, c.y + TILE * 4);
+    for (const u of [...groupe, ami, ecarte]) u.stance = 'passive';
+    cata.attackEntity(groupe[1]);
+    advance(w, 3, () => w.projectiles.length === 0 && groupe[1].hp < groupe[1].maxHp);
+    check('le boulet de la Catapulte blesse tout le groupe visé', groupe.every((u) => u.hp < u.maxHp),
+      `PV du groupe : ${groupe.map((u) => u.hp).join(', ')}`);
+    check('… mais ni les siens, ni l’ennemi resté à l’écart', ami.hp === ami.maxHp && ecarte.hp === ecarte.maxHp,
+      `allié ${ami.hp}/${ami.maxHp}, ennemi écarté ${ecarte.hp}/${ecarte.maxHp}`);
+    // Le boulet vise un point : une cible qui a quitté les lieux n'est pas touchée.
+    // (un éclaireur au galop, pris pour cible en pleine course)
+    const coureur = w.spawnUnit(1, 'scout', c.x + TILE * 3, c.y - TILE * 4.5);
+    coureur.stance = 'passive';
+    cata.stop(); cata.attackCooldown = 0;
+    coureur.moveTo(c.x + TILE * 3, c.y + TILE * 4.5);
+    advance(w, 0.6);
+    cata.attackEntity(coureur);
+    const tire = advance(w, 6, () => w.projectiles.length > 0);
+    cata.stop();
+    advance(w, 4, () => w.projectiles.length === 0);
+    check('une cible en pleine course esquive le boulet', tire && coureur.hp === coureur.maxHp && w.projectiles.length === 0, `${coureur.hp}/${coureur.maxHp} PV`);
+    // Contre un bâtiment : le bonus de siège, et la sauvegarde d'un boulet en vol.
+    const tx = Math.floor(c.x / TILE) + 4, ty = Math.floor(c.y / TILE) + 2;
+    const maison = w.spawnBuilding(1, 'house', tx, ty, true);
+    cata.x = maison.x - TILE * 6; cata.y = maison.y; cata.attackCooldown = 0;
+    cata.attackEntity(maison);
+    advance(w, 8, () => w.projectiles.length > 0);
+    const enVol = w.projectiles.length;
+    const repris = restoreWorld(JSON.parse(JSON.stringify(serializeWorld(w))));
+    advance(w, 3, () => w.projectiles.length === 0);
+    const perte = maison.maxHp - maison.hp;
+    let perteReprise = -1;
+    if (repris) {
+      advance(repris, 3, () => repris.projectiles.length === 0);
+      const m2 = repris.buildings.find((b) => b.id === maison.id);
+      perteReprise = m2.maxHp - m2.hp;
+    }
+    check('un boulet démolit : 26 + 34 contre un bâtiment, moins son armure', enVol === 1 && perte === 26 + 34 - 1, `${perte} points de dégâts`);
+    check('un boulet en vol se sauvegarde et frappe aussi après reprise', perteReprise === perte, `${perteReprise} après reprise`);
+  }
+
+  // --- Le Champion ---
+  {
+    const w = monde(12);
+    const p = w.players[0];
+    const caserne = w.spawnBuilding(0, 'barracks', centreDe(w).tx + 6, centreDe(w).ty, true);
+    p.age = 1;
+    const tropTot = w.canTrain(caserne, 'champion').ok;
+    p.age = 2;
+    check('le Champion se forme à la caserne, à l’Âge des Châteaux', !tropTot && w.canTrain(caserne, 'champion').ok);
+    const c = clairiere(w);
+    const champion = w.spawnUnit(0, 'champion', c.x, c.y);
+    const milicien = w.spawnUnit(1, 'militia', c.x + TILE, c.y);
+    champion.attackEntity(milicien); milicien.attackEntity(champion);
+    advance(w, 40, () => champion.dead || milicien.dead);
+    check('un Champion bat un milicien en duel', milicien.dead && !champion.dead, `Champion ${Math.round(champion.hp)}/${champion.maxHp} PV`);
+  }
 }
 
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : '❌ ' + failures + ' test(s) en échec'}`);

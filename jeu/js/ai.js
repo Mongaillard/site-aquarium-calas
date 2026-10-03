@@ -19,7 +19,9 @@ const JOB_RATIOS = [
 const ARMY_COMPOSITION = [
   ['militia'],
   ['archer', 'spearman', 'archer'],
-  ['knight', 'archer', 'knight', 'ram'],
+  // Âge des Châteaux : la caserne reprend du service (Champion), l'atelier alterne
+  // bélier et catapulte.
+  ['knight', 'archer', 'champion', 'knight', 'ram', 'catapult'],
 ];
 
 export class AIPlayer {

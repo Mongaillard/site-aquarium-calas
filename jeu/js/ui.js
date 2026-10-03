@@ -331,7 +331,9 @@ export class UI {
           ? (def.capturable ? 'sauvage — approchez un villageois' : 'gibier — envoyez des villageois')
           : 'capturé — un villageois l’abat');
       } else if (first.kind === 'unit') {
-        rows.push(`${ic('aggressive')} ${def.attack} · ${ic('defensive')} ${first.meleeArmor()}/${first.pierceArmor()}`);
+        rows.push(def.heal
+          ? `${ic('pointsDeVie')} +${def.heal} · ${ic('defensive')} ${first.meleeArmor()}/${first.pierceArmor()}`
+          : `${ic('aggressive')} ${def.attack} · ${ic('defensive')} ${first.meleeArmor()}/${first.pierceArmor()}`);
         rows.push(`${ic(first.stanceDef.icon)} ${first.stanceDef.name}`);
         if (first.buildQueue && first.buildQueue.length > 0) {
           rows.push(`${ic('chantier')} ${first.buildQueue.length} chantier(s) en file`);

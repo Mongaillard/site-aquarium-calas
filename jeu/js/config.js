@@ -138,6 +138,14 @@ export const UNIT_TYPES = {
     from: 'stable', age: 2,
     desc: 'Cavalerie lourde. Fonce sur les archers et les villageois.',
   },
+  champion: {
+    id: 'champion', name: 'Champion', icon: 'champion', class: 'infantry',
+    cost: { food: 70, gold: 50 }, trainTime: 22, hp: 85, speed: 0.95,
+    attack: 9, attackType: 'melee', range: 0.8, attackSpeed: 1.8,
+    meleeArmor: 3, pierceArmor: 2, los: 5, radius: 10,
+    from: 'barracks', age: 2,
+    desc: 'Infanterie lourde en armure complète : tient la ligne là où le milicien plie.',
+  },
   ram: {
     id: 'ram', name: 'Bélier', icon: 'ram', class: 'siege',
     cost: { wood: 160, gold: 75 }, trainTime: 26, hp: 200, speed: 0.6,
@@ -158,6 +166,30 @@ export const UNIT_TYPES = {
     meleeArmor: 2, pierceArmor: 2, los: 6, radius: 16, pop: 3,
     from: 'temple', age: 2,
     desc: 'Monstre à sept têtes invoqué au Temple : encaisse et mord comme une escouade. Occupe 3 places de population.',
+  },
+  // La Prêtresse ne se bat pas : elle soigne. Son « coup » est un soin — même
+  // portée, même cadence que l'attaque d'une autre unité, mais sa cible est un
+  // allié blessé, à qui chaque geste rend `heal` points de vie.
+  priest: {
+    id: 'priest', name: 'Prêtresse', icon: 'priest', class: 'support',
+    cost: { food: 40, gold: 80 }, trainTime: 28, hp: 30, speed: 0.95,
+    attack: 0, attackType: 'melee', range: 3.5, attackSpeed: 2.0, heal: 8,
+    meleeArmor: 0, pierceArmor: 0, los: 6, radius: 8,
+    from: 'temple', age: 1,
+    desc: 'Soigne les unités blessées à portée : 8 points de vie toutes les 2 s. Sans défense — gardez-la derrière vos lignes.',
+  },
+  // La Catapulte : un boulet lancé sur un POINT (là où se tenait la cible),
+  // qui blesse tout ce qui s'y trouve à l'arrivée dans un rayon de `splash`
+  // cases. Une troupe qui bouge l'esquive ; un bâtiment, jamais.
+  catapult: {
+    id: 'catapult', name: 'Catapulte', icon: 'siege', class: 'siege',
+    cost: { wood: 180, gold: 110 }, trainTime: 30, hp: 70, speed: 0.55,
+    attack: 26, attackType: 'melee', range: 7, attackSpeed: 5.0,
+    bonus: { building: 34 },
+    meleeArmor: 0, pierceArmor: 6, los: 8, radius: 13,
+    projectile: true, splash: 1.1,
+    from: 'siege', age: 2,
+    desc: 'Lance des boulets de loin : dégâts de zone, redoutable contre les bâtiments et les troupes serrées. Lente, sans défense au corps à corps.',
   },
   // Les animaux vivent sur la carte : ni produits, ni comptés dans la
   // population, sans camp (voir Animal, entities.js). `food` est ce que rend
@@ -228,7 +260,7 @@ export const BUILDING_TYPES = {
   barracks: {
     id: 'barracks', name: 'Caserne', icon: 'barracks', fem: true,
     cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
-    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['militia', 'spearman', 'triton'], age: 0,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['militia', 'spearman', 'triton', 'champion'], age: 0,
     desc: 'Forme l’infanterie.',
   },
   archery: {
@@ -246,7 +278,7 @@ export const BUILDING_TYPES = {
   siege: {
     id: 'siege', name: 'Atelier de siège', icon: 'siege',
     cost: { wood: 200 }, buildTime: 50, hp: 800, size: 3,
-    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['ram'], age: 2,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['ram', 'catapult'], age: 2,
     desc: 'Construit les engins de siège.',
   },
   blacksmith: {
@@ -259,8 +291,8 @@ export const BUILDING_TYPES = {
   temple: {
     id: 'temple', name: 'Temple de l’Hydre', icon: 'temple',
     cost: { wood: 200, gold: 100 }, buildTime: 55, hp: 900, size: 3,
-    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['hydra'], age: 2,
-    desc: 'Invoque l’Hydre, le monstre à sept têtes.',
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['priest', 'hydra'], age: 1,
+    desc: 'Forme les Prêtresses, qui soignent vos troupes ; à l’Âge des Châteaux, invoque l’Hydre.',
   },
   tower: {
     id: 'tower', name: 'Tour de guet', icon: 'tower', fem: true,

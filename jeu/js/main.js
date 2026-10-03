@@ -460,7 +460,7 @@ class Game {
     }
     const colors = {
       attack: '#ff6b6b', hunt: '#ff9b6b', gather: '#ffd166', build: '#8ecae6',
-      repair: '#8ecae6', garrison: '#c39bf6', move: '#9bf6a0',
+      repair: '#8ecae6', garrison: '#c39bf6', move: '#9bf6a0', heal: '#8ff0c0',
     };
     this.pingOrder(worldX, worldY, colors[result ? result.kind : 'move'] || '#9bf6a0');
     this.audio.play('order');

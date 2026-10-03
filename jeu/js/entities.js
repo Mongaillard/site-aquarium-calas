@@ -161,7 +161,10 @@ export class Unit extends Entity {
     this.scanCooldown = world.rng.next() * 0.5;
     // Attitude à la manière d'AoE : décide si l'unité engage d'elle-même,
     // jusqu'où elle poursuit, et si elle revient à son poste.
-    this.stance = UNIT_TYPES[type].class === 'villager' ? DEFAULT_STANCE.villager : DEFAULT_STANCE.military;
+    // Une soigneuse garde son poste : elle soigne ce qui passe à portée, sans
+    // suivre un blessé à l'autre bout de la carte.
+    this.stance = UNIT_TYPES[type].class === 'villager' ? DEFAULT_STANCE.villager
+      : UNIT_TYPES[type].heal ? 'defensive' : DEFAULT_STANCE.military;
     this.guardPoint = null;      // poste à tenir
     this.autoTarget = false;     // cible prise d'initiative (poursuite limitée)
     this.groupSpeed = 0;         // vitesse imposée par le groupe (0 = libre)
@@ -546,10 +549,15 @@ export class Unit extends Entity {
     const radius = this.stance === 'standGround'
       ? this.rangePx() + this.radius
       : this.def.los * TILE;
-    const enemy = this.world.findEnemyNear(this, radius);
+    const enemy = this.chercherCible(radius);
     if (!enemy) return false;
     this.attackEntity(enemy, true);
     return true;
+  }
+
+  /** Ce que l'unité prend pour cible d'elle-même : un ennemi — ou, pour une soigneuse, un allié blessé. */
+  chercherCible(radius) {
+    return this.def.heal ? this.world.findWoundedAllyNear(this, radius) : this.world.findEnemyNear(this, radius);
   }
 
   updateMove(dt, aggressive) {
@@ -572,7 +580,9 @@ export class Unit extends Entity {
 
   updateAttack(dt) {
     const target = this.target;
-    if (!target || target.dead || target.garrisonedIn) {
+    // Une soigneuse a fini quand son patient est guéri (ou n'est plus des siens).
+    const gueri = this.def.heal && target && (target.hp >= target.maxHp || target.playerIndex !== this.playerIndex);
+    if (!target || target.dead || target.garrisonedIn || gueri) {
       this.target = null;
       const rally = this.rallyAfterFight;
       this.rallyAfterFight = null;
@@ -580,7 +590,7 @@ export class Unit extends Entity {
       // Cible abattue : on prend la suivante si l'attitude le permet, sinon
       // on regagne son poste.
       if (this.stance !== 'passive' && this.stance !== 'standGround') {
-        const next = this.world.findEnemyNear(this, this.def.los * TILE * 0.8);
+        const next = this.chercherCible(this.def.los * TILE * 0.8);
         if (next && this.withinChaseLimit(next)) { this.attackEntity(next, true); return; }
       }
       this.returnToGuard();
@@ -1579,9 +1589,29 @@ export class Projectile {
     this.startY = this.y;
     this.travel = 0;
     this.totalDist = Math.max(1, dist(this.x, this.y, target.x, target.y));
+    // Un boulet (`splash`, en cases) vise le SOL où se tenait la cible, plus
+    // lentement qu'une flèche, et y frappe tout ce qui s'y trouve à l'arrivée.
+    this.splash = (source.def && source.def.splash) || 0;
+    if (this.splash) { this.sol = { x: target.x, y: target.y }; this.speed = 6.5 * TILE; }
   }
 
   update(dt) {
+    if (this.sol) {
+      const dx = this.sol.x - this.x, dy = this.sol.y - this.y;
+      const d = Math.hypot(dx, dy);
+      const step = this.speed * dt;
+      this.travel += step;
+      if (d <= step) {
+        this.x = this.sol.x; this.y = this.sol.y;
+        this.dead = true;
+        this.world.impactDeZone(this);
+        return;
+      }
+      this.x += (dx / d) * step;
+      this.y += (dy / d) * step;
+      this.angle = Math.atan2(dy, dx);
+      return;
+    }
     // Une cible entrée dans un abri a quitté la carte : la flèche finit sa
     // course là où elle l'a vue en dernier, sans la toucher.
     const enJeu = this.target && !this.target.dead && !this.target.garrisonedIn;
