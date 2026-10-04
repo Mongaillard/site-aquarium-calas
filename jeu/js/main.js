@@ -332,7 +332,8 @@ class Game {
    */
   mesures() {
     const t = this.instants, m = memoireTroupes();
-    const ips = t.length > 1 ? ((t.length - 1) * 1000) / (t[t.length - 1] - t[0]) : 0;
+    const duree = t.length > 1 ? t[t.length - 1] - t[0] : 0;
+    const ips = duree > 0 ? ((t.length - 1) * 1000) / duree : 0;   // pas de cadence sans durée
     return { ips, mo: m.mo, troupes: m.troupes, dpr: this.renderer.dpr, incidents: lireTemoin().incidents };
   }
 
