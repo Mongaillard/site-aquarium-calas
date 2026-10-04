@@ -10,7 +10,7 @@ import {
 } from './config.js';
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
 import { iconeSVG, ICONES_LICENCE } from './icones.js';
-import { STYLES, etatModeles3d } from './sprites.js';
+import { STYLES, etatModeles3d, portraitAdverse } from './sprites.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -22,6 +22,21 @@ function poserIconesDeCout(racine) {
   for (const marqueur of racine.querySelectorAll('[data-cout]')) {
     marqueur.innerHTML = iconeSVG(marqueur.dataset.cout, 12, 'inline');
   }
+}
+
+/**
+ * Portrait d'une unité adverse : seules les couleurs de son camp passent au
+ * rouge (la règle de son modèle), sur une toile qui remplace l'image. Sans
+ * règle connue, on retombe sur l'ancien filtre de teinte.
+ */
+function teinterPortrait(img, type) {
+  const poser = () => {
+    if (!img.isConnected) return;
+    const toile = portraitAdverse(type, img);
+    if (toile) img.replaceWith(toile); else img.classList.add('adverse');
+  };
+  if (img.complete && img.naturalWidth) poser();
+  else img.addEventListener('load', poser, { once: true });
 }
 
 export class UI {
@@ -360,15 +375,17 @@ export class UI {
       node.innerHTML = `
         <div class="portrait${PORTRAITS[first.type] ? ' illustre' : ''}" style="--team:${first.player.color.main}">${
           PORTRAITS[first.type]
-            // Un portrait peint est bleu : l'adversaire le porte en rouge, par
-            // rotation de teinte — plutôt qu'une seconde image à télécharger.
-            ? `<img src="${PORTRAITS[first.type]}" alt="" class="${mine ? '' : 'adverse'}">`
+            // Un portrait peint est bleu : l'adversaire le porte en rouge —
+            // voir teinterPortrait, plutôt qu'une seconde image à télécharger.
+            ? `<img src="${PORTRAITS[first.type]}" alt="" class="${mine ? '' : 'ennemi'}">`
             : iconeSVG(def.icon, 30)}</div>
         <div class="info">
           <div class="name">${def.name}${mine ? '' : first.isAnimal && first.playerIndex < 0 ? ' <span class="enemy">(sauvage)</span>' : ' <span class="enemy">(ennemi)</span>'}</div>
           <div class="hp"><span style="width:${Math.round((first.hp / first.maxHp) * 100)}%"></span></div>
           <div class="stats">${ic('pointsDeVie')} ${Math.ceil(first.hp)}/${first.maxHp} · ${rows.join(' · ')}</div>
         </div>`;
+      const portraitEnnemi = node.querySelector('.portrait img.ennemi');
+      if (portraitEnnemi) teinterPortrait(portraitEnnemi, first.type);
       if (first.kind === 'building' && first.queue.length > 0) {
         node.insertAdjacentHTML('beforeend', this.renderQueue(first));
         // Les boutons de la file sont recréés à chaque rendu du panneau (le
@@ -702,6 +719,14 @@ export class UI {
         <span class="option-name">${st.nom}</span>
         <span class="option-desc">${st.desc}</span>
       </button>`).join('');
+    const finesses = [
+      { id: 'fine', nom: 'Fine', desc: 'Tous les pixels de l’écran' },
+      { id: 'legere', nom: 'Légère', desc: 'Si le jeu rame ou chauffe' },
+    ].map((f) => `
+      <button class="option compact ${f.id === this.game.finesse ? 'active' : ''}" data-finesse="${f.id}">
+        <span class="option-name">${f.nom}</span>
+        <span class="option-desc">${f.desc}</span>
+      </button>`).join('');
     const modal = this.showModal(`
       <h2>Partie en pause</h2>
       <p class="hint">La partie est sauvegardée : vous pouvez fermer l'onglet et la reprendre plus tard.</p>
@@ -710,6 +735,8 @@ export class UI {
       <h3 class="modal-sub">Style des personnages</h3>
       <div class="options row">${styles}</div>
       ${this.texteModeles3d()}
+      <h3 class="modal-sub">Finesse de l’image</h3>
+      <div class="options row">${finesses}</div>
       <div class="modal-actions">
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="help">Comment jouer</button>
@@ -726,6 +753,12 @@ export class UI {
       btn.addEventListener('click', () => {
         this.game.setStyleUnites(btn.dataset.style);
         modal.querySelectorAll('[data-style]').forEach((b) => b.classList.toggle('active', b === btn));
+      }, this.ecoute());
+    });
+    modal.querySelectorAll('[data-finesse]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.game.setFinesse(btn.dataset.finesse);
+        modal.querySelectorAll('[data-finesse]').forEach((b) => b.classList.toggle('active', b === btn));
       }, this.ecoute());
     });
     modal.querySelector('[data-act="resume"]').addEventListener('click', () => this.game.togglePause(), this.ecoute());
@@ -773,7 +806,7 @@ export class UI {
           <small class="credits-auteurs">${l.auteurs.join(' · ')}</small></li>
         <li><b>Illustrations</b> (personnages, bâtiments, arbres, décor, textures de sol et
           d'eau) — générées par l'auteur du jeu, puis découpées et détourées pour le jeu.</li>
-        <li><b>Chevalier, villageois, archer, lancier, Atlante, Champion, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse et Hydre 3D</b> — modèles et animations de l'auteur du
+        <li><b>Chevalier, villageois, archer, lancier, Atlante, Champion, Arbalétrier, Archer monté, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse et Hydre 3D</b> — modèles et animations de l'auteur du
           jeu, faits dans son Atelier 3D ; icônes du trident, de l'Hydre et du Temple dessinées pour le jeu ; cuits par
           <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (licence MIT).</li>
         <li><b>Chevalier 3D d'essai</b> (styles « 3D précalculée » et « 3D en direct ») — KayKit Adventurers, par

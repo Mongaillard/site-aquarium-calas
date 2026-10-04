@@ -17,6 +17,7 @@ import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
 import { setStyleUnites, styleUnites, spriteDe, chargerSprites, etatModeles3d } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
+import { DENSITE } from './modele3d.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 const MAX_CATCHUP = 5;
@@ -30,6 +31,7 @@ const SETUP_KEY = 'aem.reglages';
 // v2 : le style « 3D » (les modèles de l'auteur) arrive par défaut une fois,
 // même chez qui avait retenu un autre style — dont les essais de 3D.
 const STYLE_KEY = 'aem.styleUnites.v2';
+const FINESSE_KEY = 'aem.finesse.v1';
 /** Intervalle de sauvegarde automatique, en secondes réelles. */
 const AUTOSAVE_INTERVAL = 30;
 
@@ -59,6 +61,15 @@ function loadSetup() {
 
 function storeSetup(setup) {
   try { localStorage.setItem(SETUP_KEY, JSON.stringify(setup)); } catch { /* stockage indisponible */ }
+}
+
+/**
+ * Finesse de l'image : « fine » (tous les pixels de l'écran, jusqu'à trois par
+ * point) ou « legere » (deux au plus, si le jeu rame ou chauffe). Le choix du
+ * joueur est conservé ; le garde-fou automatique, lui, ne retient rien.
+ */
+function loadFinesse() {
+  try { return localStorage.getItem(FINESSE_KEY) === 'legere' ? 'legere' : 'fine'; } catch { return 'fine'; }
 }
 
 /** Style des personnages (animé, peint, ou l'un des deux essais de 3D) : conservé d'une partie à l'autre. */
@@ -102,6 +113,11 @@ class Game {
     this.ecouteurs = new AbortController();
     this.camera = new Camera(this.world);
     this.renderer = new Renderer(this.canvas, this.world, this.camera);
+    this.finesse = loadFinesse();
+    this.renderer.reglerFinesse(this.finesse === 'legere' ? 2 : 3);
+    // Le garde-fou de cadence a réduit la toile : le zoom de départ, s'il n'a
+    // pas été touché, se recale sur le zoom net de cette toile-là.
+    this.renderer.surToileReduite = () => this.recalerZoom();
     this.renderer.initMinimap(document.getElementById('minimap'));
     this.audio = audio;
     this.ui = new UI(this);
@@ -127,7 +143,7 @@ class Game {
     const home = this.world.buildings.find(
       (b) => b.playerIndex === this.world.humanIndex && b.type === 'towncenter');
     if (home) this.camera.centerOn(home.x, home.y);
-    this.camera.zoom = clamp(this.camera.viewWidth / (24 * TILE), this.camera.minZoom, 1.1);
+    this.zoomInitial = this.camera.zoom = this.zoomDeDepart();
 
     window.addEventListener('resize', () => this.renderer.resize(), { signal: this.ecouteurs.signal });
     // Le téléphone peut couper l'onglet sans prévenir : on écrit avant de partir,
@@ -145,6 +161,52 @@ class Game {
     if (!repris) this.ui.toast('Affectez vos villageois : touchez-les, puis touchez un arbre, un buisson ou un filon.');
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
+  }
+
+  /**
+   * Le zoom de départ : une vingtaine de cases en largeur, mais calé sur un
+   * zoom NET — celui où une case d'atlas d'une troupe (DENSITE pixels par
+   * pixel monde) couvre exactement ses pixels d'écran, ou exactement la
+   * moitié. Sur un iPhone (trois pixels par point) : 2/3, dix-huit cases en
+   * largeur, un fantassin de 84 pixels réels au lieu de 43 étirés à 64.
+   */
+  zoomDeDepart() {
+    const cam = this.camera;
+    const voulu = clamp(cam.viewWidth / (20 * TILE), cam.minZoom, 1.1);
+    let net = DENSITE / this.renderer.dpr;
+    while (net > voulu * 1.42) net /= 2;
+    return clamp(net, cam.minZoom, 1.1);
+  }
+
+  /**
+   * En fin de pincement, si le zoom est à 7 % près d'un zoom NET (une case
+   * d'atlas = ses pixels d'écran, leur double ou leur moitié), il s'y cale :
+   * la scène retombe exactement pixel pour pixel au lieu de rester un peu
+   * molle à 0,95 ou 1,05 fois ce zoom.
+   */
+  calerZoom(x, y) {
+    const cam = this.camera, net = DENSITE / this.renderer.dpr;
+    for (const z of [net, net * 2, net / 2]) {
+      if (z < cam.minZoom || z > cam.maxZoom) continue;
+      const r = cam.zoom / z;
+      if (r > 0.93 && r < 1.07 && r !== 1) { cam.zoomBy(1 / r, x, y); cam.zoom = z; cam.clampPosition(); return; }
+    }
+  }
+
+  /** Après un changement de finesse : le zoom de départ suit, sauf si le joueur l'a déjà réglé. */
+  recalerZoom() {
+    if (this.camera.zoom !== this.zoomInitial) return;
+    this.zoomInitial = this.camera.zoom = this.zoomDeDepart();
+    this.camera.clampPosition();
+  }
+
+  /** Finesse de l'image, choisie au menu de pause (voir loadFinesse). */
+  setFinesse(id) {
+    this.finesse = id === 'legere' ? 'legere' : 'fine';
+    try { localStorage.setItem(FINESSE_KEY, this.finesse); } catch { /* stockage indisponible */ }
+    this.renderer.reglerFinesse(this.finesse === 'legere' ? 2 : 3);
+    this.recalerZoom();
+    this.ui.toast(this.finesse === 'legere' ? 'Image légère : deux pixels par point' : 'Image fine : tous les pixels de l’écran');
   }
 
   // --- Boucle ---------------------------------------------------------------
@@ -179,9 +241,16 @@ class Game {
     // Le dessin se fait entre deux pas de simulation (voir World.lisser).
     this.world.lisser(this.accumulator / DT);
     this.renderer.sousPas = this.accumulator;   // secondes de jeu écoulées depuis le dernier pas
-    this.renderer.render(realDt);
-    this.renderer.drawMinimap();
-    this.world.delisser();
+    try {
+      this.renderer.render(realDt);
+      this.renderer.drawMinimap();
+    } catch (erreur) {
+      // Une image ratée ne doit ni laisser les positions lissées en place, ni
+      // arrêter la boucle : on le dit une fois, et la partie continue.
+      if (!this.erreurDessin) { this.erreurDessin = true; console.error('Dessin interrompu :', erreur); }
+    } finally {
+      this.world.delisser();
+    }
     this.ui.update(realDt);
     if (this.alertCooldown > 0) this.alertCooldown -= realDt;
     requestAnimationFrame(this.loop);
@@ -1146,6 +1215,7 @@ chargerSprites();
 // Si la cuisson finit en pleine partie, les personnages changent sous les
 // yeux du joueur : on le lui dit, comme on lui dit si elle a échoué.
 window.addEventListener('modeles3d', () => {
+  if (currentGame && currentGame.renderer) currentGame.renderer.cuissonVue();
   if (!currentGame || !currentGame.running || styleUnites() !== '3d') return;
   const e = etatModeles3d();
   if (e.etat === 'pret') currentGame.ui.toast('Tes personnages 3D sont prêts');

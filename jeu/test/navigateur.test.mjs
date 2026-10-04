@@ -1413,7 +1413,7 @@ const relecture = await page.evaluate(async () => {
   }
   g.camera.centerOn(or.tx * T + T / 2, or.ty * T + T / 2);
   await attendre(300);
-  const cle = `${g.camera.zoom < 0.75 ? 1 : 0}:${Math.floor(or.tx / 8)}:${Math.floor(or.ty / 8)}`;
+  const cle = `${g.renderer.solFinRefuse || g.camera.zoom * g.renderer.dpr < 1.5 ? 1 : 0}:${Math.floor(or.tx / 8)}:${Math.floor(or.ty / 8)}`;
   const avant = g.renderer.troncons.get(cle);
   const i = or.ty * w.map.w + or.tx, terrain0 = w.map.terrain[i];
   w.map.clearResource(i);

@@ -334,7 +334,7 @@ jeu/
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons générés à la volée (Web Audio)
-│   ├── modele3d.js       unités 3D (milicien, villageois, archer, lancier, Atlante, Champion, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse, Hydre) : modèles de l'Atelier cuits en atlas
+│   ├── modele3d.js       unités 3D (milicien, villageois, archer, Arbalétrier, Archer monté, lancier, Atlante, Champion, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse, Hydre) : modèles de l'Atelier cuits en atlas
 │   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case
 │   ├── main.js           écrans et boucle de jeu
 │   └── vendor/           three.js réduit au nécessaire (chargé à la demande)
@@ -488,30 +488,69 @@ premiers), au choix dans le menu de pause :
 
 | Style | Sprite du milicien | Ce qu'on y gagne |
 | --- | --- | --- |
-| **3D** (par défaut) | `modeles/milicien.json`, `modeles/villageois.json` et `modeles/archer.json` : les modèles animés de l'auteur (Atelier 3D), cuits par le jeu en atlas de huit directions au premier lancement, puis gardés en cache | Ses propres personnages, toutes leurs animations — combat, gestes de travail tournés vers leur cible, chute — sans rien dessiner |
+| **3D** (par défaut) | `modeles/milicien.json`, `modeles/villageois.json` et `modeles/archer.json` : les modèles animés de l'auteur (Atelier 3D), cuits par le jeu en atlas de cinq directions (les trois autres en miroir) au premier lancement, puis gardés en cache | Ses propres personnages, toutes leurs animations — combat, gestes de travail tournés vers leur cible, chute — sans rien dessiner |
 | **Animé** | `milicien-marche.webp`, 8 images par direction | Le mouvement se lit : on voit qui avance, qui est bloqué |
 | **Peint** | `chevalier.webp`, une pose par direction | Le détail de l'armure, au prix d'une silhouette figée |
 | **3D précalculée** (essai) | `chevalier-3d.webp` : un modèle 3D rendu à l'avance par Blender, 8 directions × course, repos, coup d'épée | Des directions et des pas parfaitement cohérents, sans rien coûter au téléphone |
 | **3D en direct** (essai) | `chevalier-3d.json` (glTF), rendu à chaque image par three.js | L'unité tourne selon sa vraie direction, pas en huit crans ; l'animation se calcule à chaque image |
 
-**Fluidité et couleurs du style 3D.** Trois réglages font qu'un modèle cuit en
-images ne paraît ni saccadé ni terne :
+**Fluidité, netteté et couleurs du style 3D.** Ce qui fait qu'un modèle cuit en
+images ne paraît ni saccadé, ni flou, ni terne :
 
 - *Positions lissées* — la simulation avance vingt fois par seconde, l'écran
   affiche soixante images : le temps d'un dessin, unités et projectiles sont
   placés entre leur position d'avant le dernier pas et l'actuelle
   (`World.lisser`, `js/game.js`). Ils glissent au lieu d'avancer par à-coups ;
   la simulation, elle, ne voit rien (les vraies positions sont remises
-  aussitôt).
+  aussitôt). Coups, impacts et chutes avancent eux aussi entre deux pas.
 - *Images fondues* — seize images pour un tour de marche, douze pour un coup,
   et chaque image se fond dans la suivante (`Renderer.poserImage3D`) : le
   mouvement est continu sans une image de plus en mémoire.
-- *Couleurs étalonnées* — à la cuisson (`REGLAGE`, `js/modele3d.js`) : tons
-  sombres relevés, couleurs ravivées, lumière plus enveloppante. La couleur
-  d'équipe est reconnue AVANT l'étalonnage, sur la couleur peinte, et marquée
-  dans l'opacité du pixel ; l'atlas de l'autre camp ne se fabrique qu'à la
-  première unité de ce camp à l'écran (la mémoire d'une partie en est presque
-  divisée par deux).
+- *Une texture lue proprement* — la texture d'un modèle de l'Atelier est un
+  atlas en miettes : des centaines d'îlots serrés, la peau à côté du bronze à
+  côté du bleu. Un personnage de quatre-vingts pixels la lit huit fois trop
+  grande ; lue par ses niveaux réduits (le réglage par défaut de three.js),
+  chaque pixel moyennait des dizaines de texels, voisins d'îlots compris, et
+  toutes les couleurs tiraient vers le même brun. La cuisson la lit donc à sa
+  finesse d'origine, sur un rendu quatre fois plus grand que l'atlas, puis
+  réduit ce RENDU de moitié en moitié (`cuireModele`, `js/modele3d.js`).
+- *Couleurs du dessin* — lumière légère (la texture porte déjà ses ombres) et
+  étalonnage doux (`REGLAGE`), réglés sur un banc d'essai face aux dessins
+  d'origine : même luminosité et même saturation moyennes. La caméra regarde
+  les troupes de 22° au-dessus de l'horizon (les bâtiments sont dessinés de
+  plus haut) : on voit un visage et un torse, pas le dessus d'un casque.
+- *Pixel pour pixel sur le téléphone* — la toile du jeu suit l'écran jusqu'à
+  trois pixels par point (elle était plafonnée à deux, donc étirée une fois et
+  demie sur un iPhone). Le zoom de départ est calé sur un zoom « net »
+  (`zoomDeDepart`, `js/main.js`) — sur un iPhone, 2/3 : une case d'atlas couvre
+  exactement ses pixels d'écran. La caméra se pose sur un pixel entier de la
+  toile, et troupes et bâtiments avec elle (`calerX`, `calerY`) : sol,
+  bâtiments et troupes, tous à deux pixels par pixel monde, sont recopiés sans
+  rééchantillonnage. Un fantassin y fait 84 vrais pixels de haut, au lieu de
+  43 étirés sur 64 ; on voit dix-huit cases en largeur au lieu de vingt-quatre.
+  En fin de pincement, un zoom tout proche d'un zoom net s'y cale (`calerZoom`).
+- *Garde-fou de cadence* — par fenêtres de cent vingt images
+  (`Renderer.surveillerCadence`) : deux fenêtres de suite sous quarante-cinq
+  images par seconde, et la toile passe à deux pixels par point pour une
+  fenêtre témoin. Nettement plus rapide : on y reste, le zoom de départ se
+  recale à 0,5. Pas mieux (un téléphone en économie d'énergie tourne à trente
+  images par seconde quoi qu'on dessine) : on remonte à trois. Le menu de
+  pause offre aussi le choix à la main, « Finesse de l'image : Fine /
+  Légère », retenu d'une partie à l'autre ; `?dpr=2` dans l'adresse l'impose
+  pour un essai.
+- *Cinq directions, trois en miroir* — sud, sud-est, est, nord-est et nord
+  sont cuites ; nord-ouest, ouest et sud-ouest sont leur miroir, comme dans
+  Age of Empires (un soldat tourné vers l'ouest tient donc son arme de la
+  main gauche). Avec la chute gardée à demi-finesse (elle est la plus large
+  des animations, et le corps s'efface), les atlas des quatorze troupes d'un
+  camp pèsent 174 Mo, contre 372 en huit directions. Si la mémoire graphique
+  manque quand même, la cuisson retente plus léger, jusqu'à un pixel par
+  pixel monde, avant de rendre la main à l'illustration ; le sol, lui, passe
+  au niveau grossier puis à des tuiles de couleur — jamais un écran noir.
+- *Couleur d'équipe* — reconnue à la cuisson, avant l'étalonnage, et marquée
+  dans l'opacité du pixel (liseré compris) ; l'acier clair d'une lame n'en fait
+  pas partie. L'atlas de l'autre camp ne se fabrique qu'à la première unité de
+  ce camp à l'écran.
 
 Les deux essais de 3D utilisent le même modèle, un chevalier libre de droits
 (KayKit, CC0) en attendant celui de l'auteur, et la **même caméra** — la case

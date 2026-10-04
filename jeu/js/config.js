@@ -62,6 +62,8 @@ export const PORTRAITS = {
   champion: 'assets/portrait-champion.webp',
   scout: 'assets/portrait-eclaireur.webp',
   catapult: 'assets/portrait-catapulte.webp',
+  crossbowman: 'assets/portrait-arbaletrier.webp',
+  horseArcher: 'assets/portrait-archer-monte.webp',
   ram: 'assets/portrait-belier.webp',
 };
 
@@ -131,7 +133,7 @@ export const UNIT_TYPES = {
   // L'Arbalétrier : un carreau lourd, lent à recharger, qui perce les armures —
   // la réponse de l'Archerie à l'infanterie lourde.
   crossbowman: {
-    id: 'crossbowman', name: 'Arbalétrier', icon: 'archer', class: 'archer',
+    id: 'crossbowman', name: 'Arbalétrier', icon: 'crossbowman', class: 'archer',
     cost: { wood: 40, gold: 60 }, trainTime: 22, hp: 40, speed: 0.95,
     attack: 9, attackType: 'pierce', range: 6, attackSpeed: 3.2,
     bonus: { infantry: 3 },
@@ -143,7 +145,7 @@ export const UNIT_TYPES = {
   // L'Archer monté : la portée d'un archer, les jambes d'un cheval. Il harcèle
   // et s'esquive ; les lanciers le fauchent comme toute cavalerie.
   horseArcher: {
-    id: 'horseArcher', name: 'Archer monté', icon: 'archer', class: 'cavalry',
+    id: 'horseArcher', name: 'Archer monté', icon: 'horseArcher', class: 'cavalry',
     cost: { wood: 50, gold: 70 }, trainTime: 26, hp: 60, speed: 1.45,
     attack: 5, attackType: 'pierce', range: 4.5, attackSpeed: 2.0,
     meleeArmor: 0, pierceArmor: 1, los: 7, radius: 11,

@@ -10,7 +10,7 @@ import { TILE, BUILDING_TYPES, UNIT_TYPES } from './config.js';
 import { iconePath, ICON_BOX } from './icones.js';
 import {
   chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche, poseSource,
-  rendu3dDirect,
+  rendu3dDirect, etatModeles3d,
 } from './sprites.js';
 import { Rendu3D } from './rendu3d.js';
 import { TERRAIN, BLOCK } from './map.js';
@@ -213,7 +213,14 @@ export class Renderer {
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.world = world;
     this.camera = camera;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Trois pixels de toile par point sur un téléphone qui en a trois : à deux,
+    // toute l'image était étirée une fois et demie par le navigateur, donc
+    // floue. Si la cadence ne suit pas, on redescend à deux (surveillerCadence).
+    // « ?dpr=2 » ou « ?dpr=3 » dans l'adresse impose la valeur, pour un essai.
+    this.dprForce = 0;
+    try { this.dprForce = Math.min(3, Number(new URLSearchParams(location.search).get('dpr')) || 0); } catch { /* pas d'adresse */ }
+    this.dpr = this.dprForce || Math.min(window.devicePixelRatio || 1, 3);
+    this.cadence = { n: 0, duree: 0, suite: 0, temoin: 0, haut: 0, attente: 0, echecs: 0, souillee: false, fige: this.dprForce > 0 };
     this.ghost = null;
     this.selectionBox = null;
     this.showGrid = false;
@@ -288,12 +295,69 @@ export class Renderer {
     this.camera.setViewport(w, h);
   }
 
+  /**
+   * Plafond de pixels de toile par point : 3 (« Fine ») ou 2 (« Légère »,
+   * choisie au menu de pause). Remet le garde-fou à zéro ; à 2, il n'a plus
+   * rien à surveiller.
+   */
+  reglerFinesse(plafond) {
+    const voulu = this.dprForce || Math.min(window.devicePixelRatio || 1, plafond);
+    this.cadence = { n: 0, duree: 0, suite: 0, temoin: 0, haut: 0, attente: 0, echecs: 0, souillee: false, fige: this.dprForce > 0 || plafond < 3 };
+    if (voulu !== this.dpr) { this.dpr = voulu; this.resize(); }
+  }
+
+  /** Une cuisson de modèle vient de finir : la fenêtre de mesure en cours ne vaut rien. */
+  cuissonVue() { this.cadence.souillee = true; }
+
+  /**
+   * Garde-fou de la toile à trois pixels par point, par fenêtres de cent vingt
+   * images. Deux fenêtres de suite sous quarante-cinq images par seconde : on
+   * passe à deux pixels par point pour UNE fenêtre témoin. Si elle est
+   * nettement plus rapide (un cinquième de mieux), c'est bien la toile qui
+   * pesait : on y reste pour la partie, et le zoom de départ se recale
+   * (surToileReduite). Sinon — un téléphone en économie d'énergie tourne à
+   * trente images par seconde quoi qu'on dessine — on remonte à trois et on
+   * attend de plus en plus longtemps avant de réessayer. Une fenêtre où un
+   * modèle se cuisait, ou qui contient un retour d'arrière-plan, est écartée.
+   * Rien n'est retenu d'une partie à l'autre.
+   */
+  surveillerCadence(dt) {
+    const c = this.cadence;
+    if (c.fige || (this.dpr <= 2 && !c.temoin)) return;
+    if (dt >= 0.2) { c.souillee = true; return; }
+    if (c.attente > 0) { c.attente--; return; }
+    c.n++; c.duree += dt;
+    if (c.n < 120) return;
+    const moyenne = c.duree / c.n;
+    const ecartee = c.souillee || etatModeles3d().etat === 'cuisson';
+    c.n = 0; c.duree = 0; c.souillee = false;
+    if (ecartee) { c.suite = 0; return; }
+    if (c.temoin) {
+      if (moyenne < c.temoin * 0.8) {
+        c.fige = true;
+        if (this.surToileReduite) this.surToileReduite();
+      } else {
+        this.dpr = c.haut; this.resize();
+        c.attente = 1800 * 2 ** c.echecs; c.echecs++;
+      }
+      c.temoin = 0; c.suite = 0;
+      return;
+    }
+    c.suite = moyenne > 1 / 45 ? c.suite + 1 : 0;
+    if (c.suite >= 2) {
+      c.temoin = moyenne; c.haut = this.dpr;
+      this.dpr = 2; this.resize();
+      c.attente = 20;   // le temps que le sol se recuise à l'autre niveau
+    }
+  }
+
   // --- Boucle de rendu ------------------------------------------------------
 
   render(dt = 1 / 60) {
     this.horloge = (this.horloge || 0) + dt;   // cadence des poses de travail
     const ctx = this.ctx;
     this.frame++;
+    this.surveillerCadence(dt);
     this.dt = Math.min(0.05, dt);
     this.suivreEffets();
     this.majParticules(this.dt);
@@ -302,10 +366,18 @@ export class Renderer {
     ctx.fillRect(0, 0, this.width, this.height);
 
     const cam = this.camera;
+    // Du monde à la toile : pixel de toile = monde × echelle + origine, et
+    // l'origine est un pixel ENTIER. Au zoom de départ (echelle 2), tronçons
+    // de sol, bâtiments et troupes — tous à deux pixels par pixel monde —
+    // sont alors recopiés pixel pour pixel ; la caméra glisse par pas d'un
+    // pixel d'écran. calerX / calerY posent une image sur un pixel entier.
+    this.versToile = {
+      echelle: cam.zoom * this.dpr,
+      x: Math.round((this.width / 2 - cam.x * cam.zoom) * this.dpr),
+      y: Math.round((this.height / 2 - cam.y * cam.zoom) * this.dpr),
+    };
     ctx.save();
-    ctx.translate(this.width / 2, this.height / 2);
-    ctx.scale(cam.zoom, cam.zoom);
-    ctx.translate(-cam.x, -cam.y);
+    ctx.setTransform(this.versToile.echelle, 0, 0, this.versToile.echelle, this.versToile.x, this.versToile.y);
 
     const view = this.visibleTileRange();
     this.drawTerrain(view);
@@ -356,7 +428,13 @@ export class Renderer {
     if (decorPret !== this.decorCuit) { this.decorCuit = decorPret; this.troncons.clear(); }
     this.oublierTronconsModifies();
     const zoom = this.camera.zoom;
-    const nappes = this.nappesPour(zoom);
+    // Le niveau du tronçon se compte en pixels de toile : à trois pixels par
+    // point, le niveau fin (2 px par pixel monde) sert dès le zoom 0,5 — sinon
+    // le sol serait étiré deux fois. Et la nappe est celle DU NIVEAU, pas celle
+    // du zoom : un tronçon fin peint avec la nappe demi-taille coûterait quatre
+    // fois la mémoire pour une herbe aussi floue.
+    const niveau = (this.solFinRefuse || zoom * this.dpr < 1.5) ? 1 : 0;
+    const nappes = this.nappesPour(niveau === 0 ? 1 : 0.5);
     if (!nappes) { this.drawTerrainTuiles(view); return; }
 
     // Le sol est pré-rendu par TRONÇONS de TRONCON × TRONCON cases, mis en
@@ -366,7 +444,6 @@ export class Renderer {
     // coûtait des centaines d'opérations. Deux résolutions : fine (2 px par
     // pixel monde) pour le jeu, grossière au zoom arrière — réduire une nappe
     // de trop scintille au défilement.
-    const niveau = zoom < 0.75 ? 1 : 0;
     const taille = TRONCON * TILE;
     const cx0 = Math.floor(Math.max(0, view.left) / taille), cx1 = Math.floor(Math.min(this.world.map.pixelWidth - 1, view.right) / taille);
     const cy0 = Math.floor(Math.max(0, view.top) / taille), cy1 = Math.floor(Math.min(this.world.map.pixelHeight - 1, view.bottom) / taille);
@@ -382,12 +459,22 @@ export class Renderer {
     this.ctx.beginPath();
     this.ctx.rect(0, 0, this.world.map.pixelWidth, this.world.map.pixelHeight);
     this.ctx.clip();
-    for (let cy = cy0; cy <= cy1; cy++) {
+    let manque = false;
+    for (let cy = cy0; cy <= cy1 && !manque; cy++) {
       for (let cx = cx0; cx <= cx1; cx++) {
-        this.ctx.drawImage(this.troncon(cx, cy, niveau, nappes), cx * taille - r, cy * taille - r, taille + 2 * r, taille + 2 * r);
+        const t = this.troncon(cx, cy, niveau, nappes);
+        if (!t) { manque = true; break; }
+        this.ctx.drawImage(t, cx * taille - r, cy * taille - r, taille + 2 * r, taille + 2 * r);
       }
     }
     this.ctx.restore();
+    // Une toile refusée (mémoire graphique pleine) : le niveau fin est
+    // abandonné pour la partie ; si même le grossier manque, des tuiles de
+    // couleur, sans aucune toile — jamais un écran noir.
+    if (manque) {
+      if (niveau === 0) this.solFinRefuse = true;
+      this.drawTerrainTuiles(view);
+    }
   }
 
   /**
@@ -419,8 +506,15 @@ export class Renderer {
     const cache = this.troncons;
     let c = cache.get(cle);
     if (c) { cache.delete(cle); cache.set(cle, c); return c; }   // le plus récent en dernier
-    if (cache.size >= (this.tronconsMax || TRONCONS_MAX)) cache.delete(cache.keys().next().value);
-    c = this.rendreTroncon(cx, cy, niveau === 0 ? 2 : 1, nappes);
+    if (cache.size >= (this.tronconsMax || TRONCONS_MAX)) {
+      // Le plus ancien sort, et sa toile est rendue tout de suite (Safari
+      // compte la mémoire des toiles tant qu'elles ne sont pas vidées).
+      const cleVieux = cache.keys().next().value;
+      const vieux = cache.get(cleVieux);
+      cache.delete(cleVieux);
+      if (vieux) vieux.width = vieux.height = 0;
+    }
+    try { c = this.rendreTroncon(cx, cy, niveau === 0 ? 2 : 1, nappes); } catch { return null; }
     cache.set(cle, c);
     return c;
   }
@@ -437,6 +531,7 @@ export class Renderer {
     const canvas = document.createElement('canvas');
     canvas.width = cote * echelle; canvas.height = cote * echelle;
     const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('mémoire graphique saturée (tronçon de sol refusé)');
     ctx.setTransform(echelle, 0, 0, echelle, -X0 * echelle, -Y0 * echelle);
 
     const { presents, masques, etendues, rivage } = this.couverturesTroncon(X0, Y0, cote);
@@ -1098,8 +1193,8 @@ export class Renderer {
     const source = imagePourJoueur(sprite, b.playerIndex);
     const dw = largeurMonde;
     const dh = (cellH / cellW) * dw;
-    const dx = b.x - dw / 2;
-    const dy = y + w - dh * (sol ?? 1);
+    const dx = this.calerX(b.x - dw / 2);
+    const dy = this.calerY(y + w - dh * (sol ?? 1));
     if (!b.complete) {
       const part = Math.max(0.12, b.progressRatio);
       ctx.save();
@@ -1331,7 +1426,7 @@ export class Renderer {
       ctx.stroke();
     }
 
-    if (u.def.class === 'archer') {
+    if (u.def.projectile && !u.def.splash) {   // tout tireur à flèches, à pied ou monté
       ctx.strokeStyle = '#d9c9a3';
       ctx.lineWidth = 1.6;
       ctx.beginPath();
@@ -1523,6 +1618,10 @@ export class Renderer {
     this.poserImage3D(clip, u.playerIndex, caseDirection(angle, 8), image, x, y + u.radius * 0.45);
   }
 
+  /** L'abscisse (l'ordonnée) monde la plus proche qui tombe sur un pixel entier de la toile. */
+  calerX(x) { const t = this.versToile; return (Math.round(x * t.echelle + t.x) - t.x) / t.echelle; }
+  calerY(y) { const t = this.versToile; return (Math.round(y * t.echelle + t.y) - t.y) / t.echelle; }
+
   /** Ce vers quoi l'unité travaille ou frappe : le gisement, sinon sa cible. */
   cibleDe(u) {
     if (u.resourceTile) return { x: u.resourceTile.tx * TILE + TILE / 2, y: u.resourceTile.ty * TILE + TILE / 2 };
@@ -1542,16 +1641,30 @@ export class Renderer {
     const h = hauteurMonde, w = (cellW / cellH) * h;
     const source = joueur === 0 ? clip.variantes.bleu : clip.variantes.rouge;
     const ctx = this.ctx;
-    const dx = x - w / 2, dy = sol - h * (ancreY / cellH);
+    // Cinq directions cuites : nord-ouest, ouest et sud-ouest sont le miroir
+    // du nord-est, de l'est et du sud-est (la case est centrée sur l'ancre).
+    const miroir = k >= (clip.directions || 8);
+    if (miroir) k = 8 - k;
+    // Posé sur un pixel entier de la toile : au zoom de départ une case d'atlas
+    // couvre exactement ses pixels d'écran, et rien n'est rééchantillonné.
+    const dx = this.calerX(x - w / 2), dy = this.calerY(sol - h * (ancreY / cellH));
     let i = Math.floor(image), part = image - i;
     if (clip.boucle) i = ((i % images) + images) % images;
     else if (i >= images - 1) { i = images - 1; part = 0; } else if (i < 0) { i = 0; part = 0; }
+    if (miroir) {
+      // Retourné autour de l'axe de la case, lui-même posé sur un pixel entier.
+      const axe = dx + w / 2;
+      ctx.save();
+      ctx.translate(axe, 0); ctx.scale(-1, 1); ctx.translate(-axe, 0);
+    }
     ctx.drawImage(source, i * cellW, k * cellH, cellW, cellH, dx, dy, w, h);
-    if (part < 0.04) return;
-    const opacite = ctx.globalAlpha;
-    ctx.globalAlpha = opacite * part;
-    ctx.drawImage(source, ((i + 1) % images) * cellW, k * cellH, cellW, cellH, dx, dy, w, h);
-    ctx.globalAlpha = opacite;
+    if (part >= 0.04) {
+      const opacite = ctx.globalAlpha;
+      ctx.globalAlpha = opacite * part;
+      ctx.drawImage(source, ((i + 1) % images) * cellW, k * cellH, cellW, cellH, dx, dy, w, h);
+      ctx.globalAlpha = opacite;
+    }
+    if (miroir) ctx.restore();
   }
 
   /**
@@ -1888,11 +2001,9 @@ export class Renderer {
       world.fog.dirty = false;
     }
     const ctx = this.ctx;
-    const cam = this.camera;
+    const t = this.versToile;   // la même transformation que le monde : le brouillard reste aligné
     ctx.save();
-    ctx.translate(this.width / 2, this.height / 2);
-    ctx.scale(cam.zoom, cam.zoom);
-    ctx.translate(-cam.x, -cam.y);
+    ctx.setTransform(t.echelle, 0, 0, t.echelle, t.x, t.y);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.fogCanvas, 0, 0, map.pixelWidth, map.pixelHeight);
     ctx.restore();

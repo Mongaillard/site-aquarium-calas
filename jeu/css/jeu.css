@@ -116,7 +116,7 @@ html, body {
 
 /* Portrait peint dans le panneau de sélection. */
 .portrait.illustre { padding: 0; overflow: hidden; background: linear-gradient(180deg, #2a3646, #18212c); }
-.portrait.illustre img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.portrait.illustre img, .portrait.illustre canvas { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
 .portrait.illustre img.adverse { filter: hue-rotate(155deg) saturate(1.35); }
 
 /* Écran de fin : le chevalier debout, ou à terre. */

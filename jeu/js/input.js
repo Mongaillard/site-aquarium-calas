@@ -155,7 +155,11 @@ export class InputController {
     if (!pointer) return;
 
     if (this.mode === 'pinch') {
-      if (this.pointers.size < 2) this.mode = this.pointers.size === 1 ? 'pan' : 'idle';
+      if (this.pointers.size < 2) {
+        this.mode = this.pointers.size === 1 ? 'pan' : 'idle';
+        // Le pincement finit tout près d'un zoom net : on s'y cale.
+        if (this.pinchStart && this.game.calerZoom) this.game.calerZoom(this.pinchStart.midX, this.pinchStart.midY);
+      }
       return;
     }
     // Le doigt resté posé après un pincement : la vue a bougé, ce n'est pas

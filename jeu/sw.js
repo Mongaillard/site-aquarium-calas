@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v46';
+const CACHE = 'age-empires-mobile-v47';
 const ASSETS = [
   './',
   './index.html',
@@ -46,6 +46,8 @@ const ASSETS = [
   './assets/modeles/champion.json',
   './assets/modeles/belier.json',
   './assets/modeles/catapulte.json',
+  './assets/modeles/arbaletrier.json',
+  './assets/modeles/archer-monte.json',
   './assets/portrait-hydre.webp',
   './assets/portrait-pretresse.webp',
   './assets/portrait-cavalier.webp',
@@ -54,6 +56,8 @@ const ASSETS = [
   './assets/portrait-eclaireur.webp',
   './assets/portrait-catapulte.webp',
   './assets/portrait-belier.webp',
+  './assets/portrait-arbaletrier.webp',
+  './assets/portrait-archer-monte.webp',
   './assets/heros.webp',
   './assets/milicien-marche.webp',
   './assets/villageois.webp',

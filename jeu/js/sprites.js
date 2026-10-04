@@ -248,6 +248,8 @@ const ALTERNATIVES = {
   ram: { '3d': 'ramAtelier', anime: 'ramAtelier', peint: 'ramAtelier', '3d-precalc': 'ramAtelier', '3d-direct': 'ramAtelier' },
   // La Catapulte n'existe qu'en 3D.
   catapult: { '3d': 'catapultAtelier', anime: 'catapultAtelier', peint: 'catapultAtelier', '3d-precalc': 'catapultAtelier', '3d-direct': 'catapultAtelier' },
+  crossbowman: { '3d': 'crossbowmanAtelier', anime: 'crossbowmanAtelier', peint: 'crossbowmanAtelier', '3d-precalc': 'crossbowmanAtelier', '3d-direct': 'crossbowmanAtelier' },
+  horseArcher: { '3d': 'horseArcherAtelier', anime: 'horseArcherAtelier', peint: 'horseArcherAtelier', '3d-precalc': 'horseArcherAtelier', '3d-direct': 'horseArcherAtelier' },
   // Le Champion aussi.
   champion: { '3d': 'championAtelier', anime: 'championAtelier', peint: 'championAtelier', '3d-precalc': 'championAtelier', '3d-direct': 'championAtelier' },
   // La Prêtresse n'existe qu'en 3D.
@@ -320,6 +322,16 @@ const EN_3D = {
   // Seule la butée rembourrée est bleu franc : c'est elle qui bascule.
   catapultAtelier: {
     modele: 'catapult', unite: 'catapult', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  // Gambison, cape turquoise (teinte 185 à 200°) et plumet : tout le bleu bascule ; l'or et le blanc restent.
+  crossbowmanAtelier: {
+    modele: 'crossbowman', unite: 'crossbowman', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [178, 255], vers: 0, satMin: 0.32 },
+  },
+  // Tunique, tapis de selle et crin du casque bleu franc basculent ; le cheval blanc et l'or restent.
+  horseArcherAtelier: {
+    modele: 'horseArcher', unite: 'horseArcher', repli: null, natif: 'bleu', aLaDemande: true,
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
   // Tabard, cape, cimier et bouclier bleu franc basculent ; l'acier reste.
@@ -467,6 +479,29 @@ export function recolorer(def, image, l, h) {
 }
 
 /**
+ * Le portrait d'une unité ADVERSE : la même image, la fenêtre de teinte de son
+ * camp basculée — la règle de son modèle 3D, celle des troupes à l'écran. Un
+ * filtre de teinte sur toute l'image, lui, verdissait la peau et le bois.
+ * Rend une toile, gardée pour la fois suivante, ou null (pas de règle connue,
+ * image illisible) : l'appelant garde alors le filtre.
+ */
+const portraitsAdverses = new Map();
+export function portraitAdverse(type, image) {
+  if (portraitsAdverses.has(type)) return portraitsAdverses.get(type);
+  const alt = ALTERNATIVES[type];
+  const d = alt && EN_3D[alt['3d']];
+  let toile = null;
+  if (d && d.recolorage && d.recolorage !== 'echange' && image.naturalWidth) {
+    try {
+      toile = rotationTeinte(image, image.naturalWidth, image.naturalHeight, d.recolorage);
+      toile.getContext('2d').getImageData(0, 0, 1, 1);   // illisible : rotationTeinte l'a rendue sans la teinter
+    } catch { toile = null; }
+  }
+  portraitsAdverses.set(type, toile);
+  return toile;
+}
+
+/**
  * La règle de couleur d'équipe d'un modèle cuit, sous la forme que la cuisson
  * attend : `dedans(r, g, b)` dit si une couleur peinte est celle du camp
  * (mêmes fenêtres que rotationTeinte et echangeCanaux), `cle` la résume pour
@@ -480,11 +515,17 @@ function regleEquipe(d) {
   const satMin = regle.satMin ?? 0.3, lumMax = regle.lumMax ?? 1;
   const dans = a <= b ? (t) => t >= a && t <= b : (t) => t >= a || t <= b;
   return {
-    cle: [a, b, satMin, lumMax, regle.saturer ?? 1].join('_'),
+    cle: [a, b, satMin, lumMax, regle.saturer ?? 1, 'acier'].join('_'),
     saturer: regle.saturer,
     dedans: (r, g, bl) => {
       const [teinte, sat, lum] = versHSL(r, g, bl);
-      return sat > satMin && lum < lumMax && dans(teinte * 360);
+      if (!(sat > satMin && lum < lumMax && dans(teinte * 360))) return false;
+      // Un acier poli tire sur le bleu pâle, et la saturation « HSL » d'un ton
+      // clair s'emballe : sans ce garde-fou, la lame de l'épée passait au rose
+      // dans le camp rouge. Un tissu d'équipe, même en pleine lumière, garde
+      // au moins un tiers de sa couleur.
+      const max = Math.max(r, g, bl);
+      return !(lum > 0.6 && (max - Math.min(r, g, bl)) / max < 0.3);
     },
   };
 }
@@ -497,9 +538,13 @@ function regleEquipe(d) {
 function teinterEquipe(d, canvas) {
   const regle = d.recolorage;
   const l = canvas.width, h = canvas.height;
-  const { canvas: sortie, ctx } = copie(canvas, l, h);
+  let toile = null;
   try {
-    const data = ctx.getImageData(0, 0, l, h);
+    // Safari peut refuser une toile de plus quand son budget est plein
+    // (getContext rend alors null) : tout se passe dans le try.
+    const c = copie(canvas, l, h);
+    toile = c.canvas;
+    const data = c.ctx.getImageData(0, 0, l, h);
     const p = data.data;
     for (let i = 0; i < p.length; i += 4) {
       if (p[i + 3] !== ALPHA_EQUIPE) continue;
@@ -514,9 +559,14 @@ function teinterEquipe(d, canvas) {
         p[i] = r; p[i + 1] = g; p[i + 2] = b;
       }
     }
-    ctx.putImageData(data, 0, 0);
-  } catch { /* canvas illisible : ce camp gardera la couleur d'origine */ }
-  return sortie;
+    c.ctx.putImageData(data, 0, 0);
+    return toile;
+  } catch {
+    // Toile refusée ou illisible : ce camp garde l'atlas d'origine (le socle
+    // de couleur, sous l'unité, dit toujours à qui elle est).
+    if (toile) toile.width = toile.height = 0;
+    return canvas;
+  }
 }
 
 /**
@@ -528,7 +578,15 @@ function teinterEquipe(d, canvas) {
 function variantesEquipe(d, canvas) {
   if (!d.recolorage) return { bleu: canvas, rouge: canvas };
   let autre = null;
-  const faire = () => autre || (autre = teinterEquipe(d, canvas));
+  // Fabriqué au premier dessin, donc PENDANT le rendu : rien ne doit en sortir
+  // qui arrêterait la boucle du jeu. L'échec est retenu (pas de nouvel essai
+  // à chaque image).
+  const faire = () => {
+    if (!autre) {
+      try { autre = teinterEquipe(d, canvas); } catch { autre = canvas; }
+    }
+    return autre;
+  };
   return d.natif === 'bleu'
     ? { bleu: canvas, get rouge() { return faire(); } }
     : { rouge: canvas, get bleu() { return faire(); } };
@@ -590,7 +648,7 @@ export function etatModeles3d() {
   const echecs = cles.filter((c) => charges.get(c).absent);
   if (echecs.length) {
     // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
-    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte' };
+    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte', crossbowman: 'arbalétrier', horseArcher: 'archer monté' };
     return { etat: 'absent', raison: echecs.map((c) => `${noms[EN_3D[c].unite] || EN_3D[c].unite} : ${charges.get(c).raison}`).join(' ; ') };
   }
   if (entrees.every((e) => e.pret)) return { etat: 'pret' };

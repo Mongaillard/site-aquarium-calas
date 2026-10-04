@@ -8,7 +8,7 @@ import { serializeWorld, restoreWorld } from '../js/save.js';
 import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
 import { formatTime, dist, RNG } from '../js/utils.js';
 import { STATE, Projectile } from '../js/entities.js';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { TERRAIN, BLOCK } from '../js/map.js';
 import { planterRivage, planterCampagne, planterDecor, plansDEau, hacher, MARE_MAX, CUITES } from '../js/decor.js';
 
@@ -1425,6 +1425,15 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     const manquants = [...modules, 'index.html', 'css/jeu.css', 'manifest.webmanifest', ...images].filter((f) => !cache.has(f));
     check('hors ligne : le cache garde tous les modules, la feuille de style et les images', manquants.length === 0,
       manquants.join(', ') || `${modules.size} modules, ${images.size} images`);
+    // Un seul fichier absent, et l'installation du service worker échoue en bloc ;
+    // un modèle 3D cité par le jeu mais non livré laisse son unité en pastille.
+    const modeles3d = new Set();
+    for (const [, f] of lire('js/modele3d.js').matchAll(/'(assets\/modeles\/[\w-]+\.json)'/g)) modeles3d.add(f);
+    const absents = [...new Set([...cache, ...modeles3d])].filter((f) => f && !existsSync(new URL(`../${f}`, import.meta.url)));
+    check('tout fichier cité par le cache hors ligne et par les modèles 3D existe', absents.length === 0,
+      absents.join(', ') || `${cache.size} fichiers en cache, ${modeles3d.size} modèles`);
+    const horsCache = [...modeles3d].filter((f) => !cache.has(f));
+    check('chaque modèle 3D est gardé hors ligne', horsCache.length === 0, horsCache.join(', '));
   }
 }
 
@@ -2028,27 +2037,44 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     if (ok) c = { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
   }
   // Le carreau : 9 + 3 contre l'infanterie, moins l'armure perforante du Champion (2).
-  const arbaletrier = w.spawnUnit(0, 'crossbowman', c.x - TILE * 2.5, c.y);
-  const champion = w.spawnUnit(1, 'champion', c.x + TILE * 2.5, c.y);
+  // À 5,9 cases : hors de portée d'un archer (5), dans celle de l'arbalète (6).
+  const arbaletrier = w.spawnUnit(0, 'crossbowman', c.x - TILE * 2.95, c.y);
+  const champion = w.spawnUnit(1, 'champion', c.x + TILE * 2.95, c.y);
   champion.stance = 'passive'; arbaletrier.stance = 'standGround';
+  const poste = { x: arbaletrier.x, y: arbaletrier.y };
   arbaletrier.attackEntity(champion);
   advance(w, 6, () => champion.hp < champion.maxHp);
   const carreau = champion.maxHp - champion.hp;
-  check('un carreau perce l’armure du Champion', carreau === 9 + 3 - 2, `${carreau} points de dégâts à 5 cases`);
+  check('un carreau perce l’armure du Champion', carreau === 9 + 3 - 2, `${carreau} points de dégâts`);
+  check('l’Arbalétrier tire de plus loin que l’archer, sans quitter son poste',
+    carreau > 0 && arbaletrier.x === poste.x && arbaletrier.y === poste.y, 'à 5,9 cases');
   champion.hp = 0; w.killEntity ? w.killEntity(champion) : (champion.dead = true);
   arbaletrier.dead = true;
   w.units = w.units.filter((u) => !u.dead);
 
   // L'Archer monté tire de loin, court plus vite qu'un fantassin, et le lancier le fauche.
-  const monte = w.spawnUnit(0, 'horseArcher', c.x - TILE * 2, c.y + TILE * 3);
-  const cible = w.spawnUnit(1, 'militia', c.x + TILE * 2, c.y + TILE * 3);
+  const monte = w.spawnUnit(0, 'horseArcher', c.x - TILE * 2.4, c.y + TILE * 3);
+  const cible = w.spawnUnit(1, 'militia', c.x + TILE * 2.4, c.y + TILE * 3);
   cible.stance = 'passive'; monte.stance = 'standGround';
+  const selle = { x: monte.x, y: monte.y };
   monte.attackEntity(cible);
   advance(w, 5, () => cible.hp < cible.maxHp);
   const distance = dist(monte.x, monte.y, cible.x, cible.y) / TILE;
-  check('l’Archer monté touche à distance, sans bouger', cible.hp < cible.maxHp && distance > 3.5, `à ${distance.toFixed(1)} cases`);
+  check('l’Archer monté touche à 4,8 cases, sans bouger', cible.hp < cible.maxHp && monte.x === selle.x && monte.y === selle.y, `cible à ${distance.toFixed(1)} cases après le coup`);
+  // Les vitesses, mesurées sur deux secondes de course et non lues dans la fiche.
+  const course = (type, rang) => {
+    const u = w.spawnUnit(0, type, c.x - TILE * 5, c.y - TILE * (3 + rang));
+    const x0 = u.x;
+    u.stance = 'passive';
+    u.moveTo(u.x + TILE * 10, u.y);
+    return () => u.x - x0;
+  };
+  const coureurs = { horseArcher: course('horseArcher', 0), champion: course('champion', 1), scout: course('scout', 2) };
+  advance(w, 2);
+  const parcouru = Object.fromEntries(Object.entries(coureurs).map(([k, f]) => [k, f()]));
   check('il court plus vite qu’un fantassin, moins qu’un éclaireur',
-    monte.def.speed > champion.def.speed && monte.def.speed < w.spawnUnit(0, 'scout', c.x, c.y - TILE * 4).def.speed);
+    parcouru.horseArcher > parcouru.champion * 1.2 && parcouru.horseArcher < parcouru.scout,
+    Object.entries(parcouru).map(([k, v]) => `${k} ${(v / TILE).toFixed(1)}`).join(' · ') + ' cases en 2 s');
   const lancier = w.spawnUnit(1, 'spearman', monte.x + TILE * 0.8, monte.y);
   const avant = monte.hp;
   monte.stance = 'passive';

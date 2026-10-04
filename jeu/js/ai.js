@@ -462,13 +462,15 @@ export class AIPlayer {
           + (pourCommande && !commandee && pourCommande[k] ? pourCommande[k] : 0);
         return player.resources[k] >= def.cost[k] + keep;
       });
-      if (affordable) this.world.trainUnit(b, pick);
+      // La commande part : le chrono de patience repart pour la suivante.
+      if (affordable && this.world.trainUnit(b, pick) && commandee) this.commandeDepuis = this.world.time;
     }
 
     const threat = this.findThreat();
     if (threat) {
       this.defendUntil = this.world.time + 8;
       for (const u of this.army) {
+        if (u.def.heal) continue;   // une soigneuse ne « frappe » pas : elle soigne d'elle-même
         if (u.state === STATE.IDLE || u.state === STATE.MOVE || !u.target) u.attackEntity(threat);
       }
       // Les villageois vraiment menacés se mettent à l'abri : garnison du
@@ -547,15 +549,35 @@ export class AIPlayer {
    * formation comptent déjà.
    */
   commande() {
-    const age = this.player.age;
+    const c = this.commandeVoulue();
+    if (!c) { this.commandeType = null; return null; }
+    // Une commande qui n'aboutit pas (plus d'or sur la carte, économie à
+    // genoux) ne doit pas geler le reste de l'armée : après quatre minutes
+    // d'attente — le temps de réunir 200 d'or même à un or par seconde —, on
+    // la laisse de côté une minute, puis on réessaie.
+    const t = this.world.time;
+    if (this.commandeType !== c.type) { this.commandeType = c.type; this.commandeDepuis = t; }
+    const attente = t - this.commandeDepuis;
+    if (attente > 240) {
+      if (attente > 300) this.commandeDepuis = t;
+      return null;
+    }
+    return c;
+  }
+
+  commandeVoulue() {
+    const player = this.player;
+    const age = player.age;
+    // Pas de commande sans la place de la loger : une Hydre occupe trois places.
+    const place = player.popCap - player.pop;
     const enFile = (b, types) => b.queue.filter((q) => types.includes(q.id)).length;
     const temple = this.completed.find((b) => b.type === 'temple');
-    if (temple && age >= UNIT_TYPES.hydra.age) {
+    if (temple && age >= UNIT_TYPES.hydra.age && place >= (UNIT_TYPES.hydra.pop || 1)) {
       const hydres = this.army.filter((u) => u.type === 'hydra').length + enFile(temple, ['hydra']);
       if (hydres < HYDRES_VOULUES) return { type: 'hydra', batiment: temple };
     }
     const atelier = this.completed.find((b) => b.type === 'siege');
-    if (atelier && age >= UNIT_TYPES.ram.age) {
+    if (atelier && age >= UNIT_TYPES.ram.age && place >= 1) {
       const engins = this.army.filter((u) => u.def.class === 'siege').length + enFile(atelier, ['ram', 'catapult']);
       if (engins < ENGINS_VOULUS) return { type: engins % 2 === 0 ? 'catapult' : 'ram', batiment: atelier };
     }
@@ -632,6 +654,6 @@ export class AIPlayer {
     const enemyIndex = this.index === 0 ? 1 : 0;
     const target = this.world.entities.find((e) => !e.dead && !e.isAnimal && e.playerIndex === enemyIndex);
     if (!target) return;
-    for (const u of this.units) if (u.state === STATE.IDLE) u.attackEntity(target);
+    for (const u of this.units) if (u.state === STATE.IDLE && !u.def.heal) u.attackEntity(target);
   }
 }
