@@ -389,12 +389,18 @@ class Game {
     // Exception : le doigt posé franchement sur un de ses bâtiments le
     // sélectionne quand même — en plein raid, il faut pouvoir produire.
     const ownBuilding = this.devantSousLeDoigt(p, this.world.entityAt(p.x, p.y, this.world.humanIndex, 0), this.world.humanIndex);
-    let enemy = ownUnits.length > 0 && !(ownBuilding && ownBuilding.kind === 'building')
+    // Autre exception : des soigneuses seules en main n'attaquent pas. Un allié
+    // blessé sous le doigt passe alors avant l'ennemi : en mêlée — là où le
+    // soin sert le plus — cet ennemi est à deux pas, il captait l'appui et la
+    // soigneuse marchait dans le combat au lieu de soigner.
+    const allie = this.world.entityAt(p.x, p.y, this.world.humanIndex, tolerance);
+    const aSoigner = this.world.ordreSurAllie(ownUnits, allie) === 'heal' ? allie : null;
+    let enemy = ownUnits.length > 0 && !aSoigner && !(ownBuilding && ownBuilding.kind === 'building')
       ? this.world.enemyAt(p.x, p.y, this.world.humanIndex, tolerance) : null;
     // Le doigt sur les toits d'un palais ennemi : c'est lui qu'on attaque, et
     // l'ordre vise son centre — le point touché, lui, est hors de l'emprise.
     let cible = p;
-    if (!enemy && ownUnits.length > 0 && !ownBuilding) {
+    if (!enemy && !aSoigner && ownUnits.length > 0 && !ownBuilding) {
       const illustre = this.batimentIllustreSous(p.x, p.y);
       if (illustre && illustre.playerIndex !== this.world.humanIndex) { enemy = illustre; cible = { x: illustre.x, y: illustre.y }; }
     }
@@ -403,7 +409,7 @@ class Game {
       return;
     }
 
-    const entity = this.devantSousLeDoigt(p, this.world.entityAt(p.x, p.y, null, tolerance));
+    const entity = aSoigner || this.devantSousLeDoigt(p, this.world.entityAt(p.x, p.y, null, tolerance));
     const isMine = entity && entity.playerIndex === this.world.humanIndex;
     const visible = entity && (isMine || this.renderer.isEntityVisible(entity));
 
