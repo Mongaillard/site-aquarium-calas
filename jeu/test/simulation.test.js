@@ -2035,13 +2035,16 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     advance(w, 3, () => w.projectiles.length === 0 && groupe[1].hp < groupe[1].maxHp);
     check('le boulet de la Catapulte blesse tout le groupe visé', groupe.every((u) => u.hp < u.maxHp),
       `PV du groupe : ${groupe.map((u) => u.hp).join(', ')}`);
-    check('… mais ni les siens, ni l’ennemi resté à l’écart', ami.hp === ami.maxHp && ecarte.hp === ecarte.maxHp,
+    // (Tir ami depuis les réglages d'équilibre : l'allié pris dans l'explosion est blessé lui aussi.)
+    check('… les siens pris dans l’explosion aussi, mais pas l’ennemi resté à l’écart', ami.hp < ami.maxHp && ecarte.hp === ecarte.maxHp,
       `allié ${ami.hp}/${ami.maxHp}, ennemi écarté ${ecarte.hp}/${ecarte.maxHp}`);
     // Le boulet vise un point : une cible qui a quitté les lieux n'est pas touchée.
     // (un éclaireur au galop, pris pour cible en pleine course)
     const coureur = w.spawnUnit(1, 'scout', c.x + TILE * 3, c.y - TILE * 4.5);
     coureur.stance = 'passive';
-    cata.stop(); cata.attackCooldown = 0;
+    // (Sans attaque : sinon, pendant l'élan du coureur, elle tire d'elle-même sur
+    // le groupe — et c'est ce boulet-là, pas celui du coureur, que l'on jugeait.)
+    cata.stop(); cata.setStance('passive'); cata.attackCooldown = 0;
     coureur.moveTo(c.x + TILE * 3, c.y + TILE * 4.5);
     advance(w, 0.6);
     cata.attackEntity(coureur);
@@ -2113,7 +2116,7 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     for (let dy = -6; dy <= 6 && ok; dy++) for (let dx = -6; dx <= 6 && ok; dx++) if (!w.map.isOpenTile(tx + dx, ty + dy)) ok = false;
     if (ok) c = { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
   }
-  // Le carreau : 9 + 3 contre l'infanterie, moins l'armure perforante du Champion (2).
+  // Le carreau : 9 + 8 contre l'infanterie, moins l'armure perforante du Champion (2).
   // À 5,9 cases : hors de portée d'un archer (5), dans celle de l'arbalète (6).
   const arbaletrier = w.spawnUnit(0, 'crossbowman', c.x - TILE * 2.95, c.y);
   const champion = w.spawnUnit(1, 'champion', c.x + TILE * 2.95, c.y);
@@ -2122,7 +2125,7 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
   arbaletrier.attackEntity(champion);
   advance(w, 6, () => champion.hp < champion.maxHp);
   const carreau = champion.maxHp - champion.hp;
-  check('un carreau perce l’armure du Champion', carreau === 9 + 3 - 2, `${carreau} points de dégâts`);
+  check('un carreau perce l’armure du Champion', carreau === 9 + 8 - 2, `${carreau} points de dégâts`);
   check('l’Arbalétrier tire de plus loin que l’archer, sans quitter son poste',
     carreau > 0 && arbaletrier.x === poste.x && arbaletrier.y === poste.y, 'à 5,9 cases');
   champion.hp = 0; w.killEntity ? w.killEntity(champion) : (champion.dead = true);
