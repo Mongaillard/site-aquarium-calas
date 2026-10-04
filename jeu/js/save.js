@@ -15,6 +15,7 @@
 import { World } from './game.js';
 import { Projectile } from './entities.js';
 import { entityDef } from './config.js';
+import { formatTime } from './utils.js';
 
 export const SAVE_KEY = 'aem.partie';
 export const SAVE_VERSION = 1;
@@ -243,7 +244,8 @@ export function restoreWorld(data) {
     p.defeated = saved.defeated;
     p.autoWorkers = saved.autoWorkers;
     p.mods = { ...p.mods, ...saved.mods };
-    p.stats = { ...saved.stats, gathered: { ...saved.stats.gathered } };
+    // (Une statistique née depuis la sauvegarde garde sa valeur de départ.)
+    p.stats = { ...p.stats, ...saved.stats, gathered: { ...saved.stats.gathered } };
     // `ageProgress` référence un bâtiment : rattaché plus bas.
     p.ageProgress = saved.ageProgress ? { ...saved.ageProgress } : null;
   });
@@ -443,4 +445,92 @@ export function clearSave() {
   const store = storage();
   if (!store) return;
   try { store.removeItem(SAVE_KEY); } catch { /* rien à faire */ }
+}
+
+// --- Palmarès ------------------------------------------------------------------
+//
+// Ce qui reste d'une partie finie : par format et par difficulté, les
+// victoires, les défaites, le meilleur temps de victoire et le meilleur score
+// d'une partie Express. Rangé sous sa propre clé, à part de la partie en
+// cours : `clearSave` n'y touche pas, et une sauvegarde refusée pour sa version
+// ne l'emporte pas avec elle.
+
+export const PALMARES_KEY = 'aem.palmares.v1';
+/** En dessous, un abandon n'est pas une partie : on s'est trompé de réglage, on relance. */
+const ABANDON_COMPTE_APRES = 60;
+
+const compteur = (v) => (Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+
+/** Le palmarès entier ; vide si rien n'est rangé, ou si le stockage est indisponible ou abîmé. */
+export function lirePalmares() {
+  const store = storage();
+  if (!store) return {};
+  try {
+    const data = JSON.parse(store.getItem(PALMARES_KEY) || '{}');
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * La ligne d'un format et d'une difficulté, toujours complète : `temps` est le
+ * meilleur temps de victoire (en secondes, `null` sans victoire au terrain),
+ * `score` le meilleur score d'une partie chronométrée (0 s'il n'y en a pas).
+ */
+export function lignePalmares(palmares, mode, difficulty) {
+  const l = (palmares && palmares[`${mode}.${difficulty}`]) || {};
+  return {
+    victoires: compteur(l.victoires), defaites: compteur(l.defaites),
+    temps: compteur(l.temps) || null, score: compteur(l.score),
+  };
+}
+
+/**
+ * Inscrit une partie finie. Renvoie `null` si elle ne compte pas (abandon dans
+ * la première minute) ou si rien ne peut être retenu sur cet appareil ; sinon
+ * la ligne à jour et, pour le temps et pour le score, ce que cette partie en a
+ * fait — `{ valeur, ancien, record }`, ou `null` quand elle ne concourt pas.
+ */
+export function inscrireAuPalmares({ mode, difficulty, humanIndex = 0, result }) {
+  const store = storage();
+  if (!store || !result) return null;
+  if (result.resigned && result.time < ABANDON_COMPTE_APRES) return null;
+  const palmares = lirePalmares();
+  const ligne = lignePalmares(palmares, mode, difficulty);
+  if (result.victory) ligne.victoires++;
+  else if (result.winner !== -1) ligne.defaites++;   // une égalité n'est ni l'une ni l'autre
+
+  // Le temps ne récompense qu'une victoire au terrain : aux points, toutes les
+  // parties durent le temps imparti.
+  let temps = null;
+  if (result.victory && !result.timeUp) {
+    const valeur = Math.max(1, Math.floor(result.time));
+    temps = { valeur, ancien: ligne.temps, record: ligne.temps === null || valeur < ligne.temps };
+    if (temps.record) ligne.temps = valeur;
+  }
+  // Le score d'un camp rasé ou qui abandonne ne dit rien : seules concourent
+  // les parties gagnées ou menées jusqu'au bout du temps.
+  let score = null;
+  if (Array.isArray(result.scores) && !result.resigned && (result.victory || result.timeUp)) {
+    const valeur = compteur(result.scores[humanIndex]);
+    score = { valeur, ancien: ligne.score || null, record: valeur > ligne.score };
+    if (score.record) ligne.score = valeur;
+  }
+
+  palmares[`${mode}.${difficulty}`] = ligne;
+  // Écriture refusée (navigation privée, quota) : mieux vaut ne rien annoncer
+  // qu'un record qui ne sera pas retenu.
+  try { store.setItem(PALMARES_KEY, JSON.stringify(palmares)); } catch { return null; }
+  return { ligne, temps, score };
+}
+
+/** Le palmarès en une ligne, pour l'accueil (« 3 victoires · meilleur temps 18:42 ») ; vide s'il n'y a rien à montrer. */
+export function resumePalmares(ligne) {
+  if (!ligne || (!ligne.victoires && !ligne.score)) return '';
+  const morceaux = [];
+  if (ligne.victoires) morceaux.push(`${ligne.victoires} victoire${ligne.victoires > 1 ? 's' : ''}`);
+  if (ligne.temps) morceaux.push(`meilleur temps ${formatTime(ligne.temps)}`);
+  if (ligne.score) morceaux.push(`meilleur score ${ligne.score.toLocaleString('fr-FR')}`);
+  return morceaux.join(' · ');
 }

@@ -383,8 +383,9 @@ export const GAME_SPEEDS = [
 export const DEFAULT_SPEED = 'normal';
 
 /**
- * Formats de partie. `victory` vaut 'conquest' (raser la civilisation adverse,
- * comme dans AoE) ou 'towncenter' (le dernier Centre-Ville tombé donne la
+ * Formats de partie. `victory` vaut 'conquest' (raser tout ce qui forme des
+ * troupes chez l'adversaire : Centres-Villes et bâtiments militaires, voir
+ * World.checkVictory) ou 'towncenter' (le dernier Centre-Ville tombé donne la
  * victoire — une partie courte et tranchée). `aiRush` accélère d'autant
  * l'horloge d'attaque de l'IA : sans ça, en Express, elle attaquerait après la
  * fin de la partie.

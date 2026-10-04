@@ -8,7 +8,10 @@ import {
   CIVILISATIONS, civDe, ficheDe, nomDe,
 } from './config.js';
 import { World } from './game.js';
-import { saveGame, loadSave, clearSave, restoreWorld } from './save.js';
+import {
+  saveGame, loadSave, clearSave, restoreWorld,
+  lirePalmares, lignePalmares, inscrireAuPalmares, resumePalmares,
+} from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
 import { UI, FoyersAttaque, toucherArmee } from './ui.js';
@@ -314,7 +317,12 @@ class Game {
         case 'gameOver':
           this.audio.play(event.result.victory ? 'victory' : 'defeat');
           clearSave();
-          this.ui.showGameOver(event.result);
+          // La partie entre au palmarès (victoires, défaites, records) : l'écran
+          // de fin dit ce qu'elle y change.
+          this.ui.showGameOver(event.result, inscrireAuPalmares({
+            mode: this.world.modeId, difficulty: this.world.difficultyId,
+            humanIndex: this.world.humanIndex, result: event.result,
+          }));
           break;
       }
     }
@@ -1173,6 +1181,21 @@ function showStartScreen() {
   document.getElementById('start-screen').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');
   refreshResumeCard();
+  refreshPalmares();
+}
+
+/**
+ * Le palmarès du format et de la difficulté choisis, en une ligne sous le
+ * bouton Jouer. Rien tant qu'il n'y a ni victoire ni score à montrer.
+ */
+function refreshPalmares() {
+  const node = document.getElementById('palmares');
+  if (!node) return;
+  const resume = resumePalmares(lignePalmares(lirePalmares(), settings.mode, settings.difficulty));
+  node.textContent = resume
+    ? `${GAME_MODES[settings.mode].name}, ${DIFFICULTIES[settings.difficulty].name} : ${resume}`
+    : '';
+  node.classList.toggle('hidden', !resume);
 }
 
 /** Carte « reprendre » : n'apparaît que s'il y a vraiment une partie en cours. */
@@ -1290,6 +1313,7 @@ function setupStartScreen() {
       activate(modeBox, btn);
       mapBox.querySelectorAll('[data-map]').forEach(
         (b) => b.classList.toggle('active', b.dataset.map === settings.mapSize));
+      refreshPalmares();
       audio.resume(); audio.play('click');
     });
   });
@@ -1308,6 +1332,7 @@ function setupStartScreen() {
       settings.difficulty = btn.dataset.difficulty;
       storeSetup(settings);
       difficultyBox.querySelectorAll('.option').forEach((b) => b.classList.toggle('active', b === btn));
+      refreshPalmares();
       audio.resume(); audio.play('click');
     });
   });

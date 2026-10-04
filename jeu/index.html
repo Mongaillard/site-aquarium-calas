@@ -52,6 +52,7 @@
       <button id="btn-play" class="btn primary large">Jouer</button>
       <button id="btn-howto" class="btn">Comment jouer</button>
     </div>
+    <p id="palmares" class="palmares hidden"></p>
 
     <div id="howto" class="howto hidden">
       <ul>
@@ -61,7 +62,7 @@
         <li>Avec une sélection, toucher le sol / un arbre / un ennemi donne l'ordre correspondant</li>
         <li>Vos ouvriers n'abandonnent jamais leur poste tout seuls : la barre des ouvriers, en bas à gauche, montre qui fait quoi et permet de les réaffecter</li>
         <li>La partie se sauvegarde toute seule : vous pourrez la reprendre ici même</li>
-        <li>Objectif : détruire tous les bâtiments et ouvriers adverses (en mode Express, leur bâtiment principal suffit)</li>
+        <li>Objectif : ne laisser à l'adversaire ni bâtiment principal ni bâtiment militaire (en mode Express, son bâtiment principal suffit — sinon, au bout du temps, le meilleur score l'emporte)</li>
       </ul>
     </div>
     <p class="credits">Jeu web autonome — aucune donnée envoyée, fonctionne hors ligne une fois chargé.</p>
@@ -86,6 +87,13 @@
         <span id="age-label">Âge Sombre</span>
         <span class="sep">·</span>
         <span id="game-timer">0:00</span>
+        <span id="score-box" class="hidden" aria-label="Score : le vôtre, puis celui de l'adversaire">
+          <span class="sep">·</span>
+          <span class="score-icone" data-icone="score"></span>
+          <b id="score-moi">0</b>
+          <span class="sep">–</span>
+          <b id="score-adverse">0</b>
+        </span>
         <div class="age-progress hidden"><span id="age-bar"></span></div>
       </div>
     </div>
