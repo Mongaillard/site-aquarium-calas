@@ -410,6 +410,140 @@ export function restoreWorld(data) {
   return world;
 }
 
+// --- Témoin de coupure -------------------------------------------------------
+//
+// Un téléphone peut couper la page sans prévenir — à court de mémoire, ou sur
+// un geste de rechargement — et rien ne s'exécute à cet instant. On tient donc
+// à jour, pendant la partie, une petite marque (clé à part, `storage()` plus
+// bas), « fermée » à chaque sortie normale : partie finie, retour à l'accueil,
+// page masquée. Au lancement suivant, une marque restée ouverte dit que la
+// page a été coupée en pleine partie, et ce qu'elle pesait alors. Sans
+// stockage (navigation privée), rien n'est écrit et rien n'est signalé.
+
+export const TEMOIN_KEY = 'aem.temoin.v1';
+const INCIDENTS_MAX = 5;          // incidents gardés : les derniers
+const RECHARGEMENT_MS = 20000;    // quittée en pleine partie et relancée dans ce délai : la page a été rechargée
+
+/**
+ * Ce que la marque retient : l'heure, les minutes de jeu, les unités en vie,
+ * et ce que l'appelant mesure (`mo` d'images de troupes, `troupes` en mémoire,
+ * `dpr` pixels par point, page `visible` ou non).
+ */
+export function etatTemoin(world, mesures = {}) {
+  let unites = 0;
+  for (const u of world.units) if (!u.dead && !u.isAnimal) unites++;
+  return {
+    h: mesures.heure ?? Date.now(),
+    min: Math.round(world.time / 6) / 10,
+    unites,
+    mo: Math.round(mesures.mo || 0),
+    troupes: mesures.troupes || 0,
+    dpr: mesures.dpr || 1,
+    visible: mesures.visible !== false,
+  };
+}
+
+/** Le témoin rangé, `{ dernier, incidents }` ; absent ou illisible, un témoin vide. */
+export function lireTemoin(store = storage()) {
+  const vide = { dernier: null, incidents: [] };
+  if (!store) return vide;
+  try {
+    const t = JSON.parse(store.getItem(TEMOIN_KEY) || 'null');
+    if (!t || typeof t !== 'object') return vide;
+    return {
+      dernier: t.dernier && typeof t.dernier === 'object' ? t.dernier : null,
+      incidents: Array.isArray(t.incidents)
+        ? t.incidents.filter((i) => i && typeof i === 'object').slice(-INCIDENTS_MAX) : [],
+    };
+  } catch {
+    return vide;
+  }
+}
+
+function rangerTemoin(temoin, store) {
+  try {
+    store.setItem(TEMOIN_KEY, JSON.stringify(temoin));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Tient la marque à jour, ouverte (toutes les quelques secondes, et quand la page revient). */
+export function ecrireTemoin(etat, store = storage()) {
+  if (!store || !etat) return false;
+  const temoin = lireTemoin(store);
+  temoin.dernier = { ...etat, ferme: undefined };
+  return rangerTemoin(temoin, store);
+}
+
+/**
+ * Ferme la marque. `raison` : « fin » (partie terminée), « accueil » (retour
+ * au menu), « masquee » (page passée en arrière-plan) ou « quittee » (page
+ * quittée alors qu'elle était visible). La première raison l'emporte : une
+ * page rechargée est quittée PUIS masquée, et c'est « quittee » qui compte.
+ * `etat` rafraîchit les chiffres au passage.
+ */
+export function fermerTemoin(raison, etat = null, store = storage()) {
+  if (!store) return false;
+  const temoin = lireTemoin(store);
+  if (temoin.dernier ? temoin.dernier.ferme : !etat) return false;   // déjà fermée, ou rien à fermer
+  temoin.dernier = { ...(etat || temoin.dernier), ferme: raison };
+  return rangerTemoin(temoin, store);
+}
+
+/**
+ * L'incident que raconte la dernière marque, ou null. `coupure` : restée
+ * ouverte alors que la page était visible — le téléphone l'a coupée.
+ * `rechargee` : quittée en pleine partie et relancée dans la foulée — un geste
+ * « tirer pour rafraîchir », un rechargement. Une page masquée puis fermée
+ * n'est pas un incident : c'est la façon ordinaire de quitter. Pure.
+ */
+export function incidentDe(dernier, maintenant) {
+  if (!dernier) return null;
+  const genre = !dernier.ferme ? (dernier.visible ? 'coupure' : null)
+    : dernier.ferme === 'quittee' && maintenant - dernier.h < RECHARGEMENT_MS ? 'rechargee' : null;
+  if (!genre) return null;
+  const nombre = (v) => Number(v) || 0;
+  return {
+    genre, h: nombre(dernier.h), min: nombre(dernier.min), unites: nombre(dernier.unites),
+    mo: nombre(dernier.mo), troupes: nombre(dernier.troupes), dpr: nombre(dernier.dpr),
+  };
+}
+
+/**
+ * Au lancement : relève la dernière marque, puis l'efface — relancer la page
+ * deux fois ne compte pas deux incidents. Un incident rejoint la liste des
+ * cinq derniers. Rend l'incident, ou null.
+ */
+export function releverTemoin(maintenant = Date.now(), store = storage()) {
+  if (!store) return null;
+  try {
+    const temoin = lireTemoin(store);
+    if (!temoin.dernier) return null;
+    const incident = incidentDe(temoin.dernier, maintenant);
+    if (incident) temoin.incidents = [...temoin.incidents, incident].slice(-INCIDENTS_MAX);
+    temoin.dernier = null;
+    rangerTemoin(temoin, store);
+    return incident;
+  } catch {
+    return null;
+  }
+}
+
+/** « après 12 min — 180 Mo d’images, 64 unités » : où en était la partie, ce que pesait la page. */
+export function resumeIncident(incident) {
+  const duree = incident.min >= 1 ? `après ${Math.round(incident.min)} min` : 'après moins d’une minute';
+  return `${duree} — ${incident.mo} Mo d’images, ${incident.unites} unité${incident.unites > 1 ? 's' : ''}`;
+}
+
+/** La ligne de l'écran d'accueil. */
+export function phraseIncident(incident) {
+  return incident.genre === 'rechargee'
+    ? `La page a été rechargée en pleine partie, ${resumeIncident(incident)}`
+    : `La dernière partie s’est interrompue ${resumeIncident(incident)}`;
+}
+
 // --- Rangement dans le navigateur -------------------------------------------
 
 function storage() {

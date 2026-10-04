@@ -12,6 +12,7 @@ import {
   saveGame, loadSave, clearSave, restoreWorld,
   lirePalmares, lignePalmares, inscrireAuPalmares, resumePalmares,
 } from './save.js';
+import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
 import { UI, FoyersAttaque, toucherArmee } from './ui.js';
@@ -20,11 +21,14 @@ import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
 import { setStyleUnites, styleUnites, spriteDe, chargerSprites, chargerCivilisation, prevoirTroupe, etatModeles3d } from './sprites.js';
+import { memoireTroupes, entretenirMemoire, rendreVariantes } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
 import { DENSITE } from './modele3d.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 const MAX_CATCHUP = 5;
+/** Images par seconde quand rien ne bouge : menu de pause ouvert, partie finie (voir Game.imageDue). */
+const IMAGES_FIGEES = 4;
 
 const audio = new AudioEngine();
 
@@ -38,6 +42,8 @@ const STYLE_KEY = 'aem.styleUnites.v2';
 const FINESSE_KEY = 'aem.finesse.v1';
 /** Intervalle de sauvegarde automatique, en secondes réelles. */
 const AUTOSAVE_INTERVAL = 30;
+/** Intervalle du témoin de coupure (js/save.js), en secondes réelles. */
+const TEMOIN_INTERVAL = 5;
 
 function loadAutoWorkers() {
   try { return localStorage.getItem(AUTO_WORKERS_KEY) === '1'; } catch { return false; }
@@ -142,6 +148,12 @@ class Game {
     this.renderer.vitesseJeu = this.speed;
     this.accumulator = 0;
     this.saveTimer = AUTOSAVE_INTERVAL;
+    this.prochaineVeille = 0;   // voir veiller
+    this.prochainTemoin = 0;
+    this.instants = [];         // heures des dernières images dessinées en jeu (voir noterImage)
+    this.sansImage = 0;         // secondes depuis la dernière image dessinée (voir imageDue)
+    this.vueDessinee = '';      // ce que montrait la dernière image d'une partie figée
+    this.masquee = false;
     setStyleUnites(loadStyle());
     this.lastFrame = performance.now();
     // Alertes d'attaque, une par foyer ; la mini-carte lit la même liste pour ses repères.
@@ -156,15 +168,23 @@ class Game {
     if (home) this.camera.centerOn(home.x, home.y);
     this.zoomInitial = this.camera.zoom = this.zoomDeDepart();
 
-    window.addEventListener('resize', () => this.renderer.resize(), { signal: this.ecouteurs.signal });
+    // (Redimensionner vide la toile : une partie figée la redessine aussitôt.)
+    window.addEventListener('resize', () => { this.renderer.resize(); this.vueDessinee = ''; }, { signal: this.ecouteurs.signal });
     // Le téléphone peut couper l'onglet sans prévenir : on écrit avant de partir,
     // et on met la partie en pause plutôt que de la laisser tourner sans être vue.
     this.onHide = () => {
-      if (document.visibilityState !== 'hidden') return;
+      // (De retour : la marque du témoin se rouvre et l'image se redessine, sans attendre leur tour.)
+      if (document.visibilityState !== 'hidden') { this.masquee = false; this.vueDessinee = ''; this.marquer(); return; }
       this.saveNow();
+      this.fermerMarque('masquee');
+      this.masquee = true;
+      // Masquée, la page ne dessine plus : le sol en cache et les copies de
+      // l'autre camp sont rendus (ils se refont au retour, derrière le menu de
+      // pause). Une page légère en arrière-plan risque moins d'être coupée.
+      try { this.renderer.viderTroncons(); rendreVariantes(); } catch { /* jamais au prix de la partie */ }
       if (!this.paused && !this.world.gameOver) this.togglePause();
     };
-    this.onLeave = () => this.saveNow();
+    this.onLeave = () => { this.saveNow(); this.fermerMarque('quittee'); };
     document.addEventListener('visibilitychange', this.onHide);
     window.addEventListener('pagehide', this.onLeave);
     // Le conseil de départ, pour une partie neuve seulement : à la reprise,
@@ -220,6 +240,102 @@ class Game {
     this.ui.toast(this.finesse === 'legere' ? 'Image légère : deux pixels par point' : 'Image fine : tous les pixels de l’écran');
   }
 
+  // --- Mesures, mémoire et témoin de coupure ---------------------------------
+
+  /**
+   * Hors de la simulation, une fois par seconde à l'horloge réelle : le
+   * plafond de mémoire des troupes (voir entretenirMemoire, js/sprites.js),
+   * et le témoin de coupure, tenu à jour tant que la partie dure.
+   */
+  veiller(now) {
+    try { entretenirMemoire(now / 1000, this.troupesEnJeu()); } catch { /* le ménage ne doit jamais arrêter la boucle */ }
+    if (now >= this.prochainTemoin) { this.prochainTemoin = now + TEMOIN_INTERVAL * 1000; this.marquer(); }
+  }
+
+  /**
+   * Les couples [type, civilisation] qui ont une unité en vie ou en formation,
+   * dans les deux camps, vue ou non : leurs images restent en mémoire. (Une
+   * file de production porte aussi des technologies : sprites.js les ignore.)
+   */
+  troupesEnJeu() {
+    const couples = new Map();
+    for (const u of this.world.units) {
+      if (!u.dead) couples.set(`${u.type}|${u.player.civ}`, [u.type, u.player.civ]);
+    }
+    for (const b of this.world.buildings) {
+      if (b.dead) continue;
+      for (const q of b.queue) couples.set(`${q.id}|${b.player.civ}`, [q.id, b.player.civ]);
+    }
+    return [...couples.values()];
+  }
+
+  /** Ce que le témoin retient de cet instant (js/save.js). */
+  etatDuTemoin() {
+    const m = memoireTroupes();
+    return etatTemoin(this.world, {
+      mo: m.mo, troupes: m.troupes, dpr: this.renderer.dpr, visible: document.visibilityState !== 'hidden',
+    });
+  }
+
+  /** Tient la marque du témoin à jour. Rien de tout cela ne doit jamais gêner la partie. */
+  marquer() {
+    if (!this.running || this.world.gameOver) return;
+    try { ecrireTemoin(this.etatDuTemoin()); } catch { /* stockage ou mesure indisponible */ }
+  }
+
+  /** Sortie normale (« fin », « accueil », « masquee », « quittee ») : la marque se ferme. */
+  fermerMarque(raison) {
+    try { fermerTemoin(raison, this.world.gameOver ? null : this.etatDuTemoin()); } catch { /* idem */ }
+  }
+
+  /**
+   * Faut-il dessiner cette image ? En jeu, toujours. Menu de pause ouvert ou
+   * partie finie, plus rien ne bouge, et redessiner tout l'écran soixante fois
+   * par seconde vide la batterie pour rien : IMAGES_FIGEES images par seconde
+   * suffisent — et une tout de suite si ce qu'on voit change (la vue qui
+   * défile, l'écran qui tourne, la finesse, le style des troupes). Page
+   * masquée, rien : ce qu’on vient de rendre à la mémoire y reviendrait.
+   * `dtImage` : le temps que couvre l'image à dessiner.
+   */
+  imageDue(now, realDt) {
+    this.sansImage += realDt;
+    if (this.masquee && document.visibilityState === 'hidden') return false;
+    const figee = this.paused || !!this.world.gameOver;
+    if (figee) {
+      const cam = this.camera;
+      const vue = `${cam.x}|${cam.y}|${cam.zoom}|${this.canvas.width}|${this.canvas.height}|${styleUnites()}|${this.selection.length}`;
+      if (vue === this.vueDessinee && this.sansImage < 1 / IMAGES_FIGEES) return false;
+      this.vueDessinee = vue;
+    } else {
+      this.noterImage(now);
+    }
+    // (Figée : 0,2 s au plus, pour que le rendu ne prenne pas ses troupes pour des revenantes.)
+    this.dtImage = figee ? Math.min(0.2, this.sansImage) : realDt;
+    this.sansImage = 0;
+    return true;
+  }
+
+  /** Une image vient d'être dessinée en jeu : on garde les heures des cinq dernières secondes. */
+  noterImage(now) {
+    const t = this.instants;
+    // Un trou (pause, retour d'arrière-plan) : la mesure repart de zéro.
+    if (t.length && now - t[t.length - 1] > 1000) t.length = 0;
+    t.push(now);
+    while (t[0] < now - 5000) t.shift();
+  }
+
+  /**
+   * Ce que le jeu mesure de lui-même, pour la ligne « Mesures » du menu de
+   * pause : images par seconde sur les dernières secondes de jeu (0 : pas
+   * encore mesuré), mémoire et nombre des troupes cuites, pixels par point,
+   * incidents relevés par le témoin.
+   */
+  mesures() {
+    const t = this.instants, m = memoireTroupes();
+    const ips = t.length > 1 ? ((t.length - 1) * 1000) / (t[t.length - 1] - t[0]) : 0;
+    return { ips, mo: m.mo, troupes: m.troupes, dpr: this.renderer.dpr, incidents: lireTemoin().incidents };
+  }
+
   // --- Boucle ---------------------------------------------------------------
 
   loop(now) {
@@ -244,23 +360,25 @@ class Game {
       this.saveTimer -= realDt;
       if (this.saveTimer <= 0) { this.saveTimer = AUTOSAVE_INTERVAL; this.saveNow(); }
     }
+    if (now >= this.prochaineVeille) { this.prochaineVeille = now + 1000; this.veiller(now); }
 
     this.input.updateKeyboardPan(realDt);
     if (this.idleNoticeCooldown > 0) this.idleNoticeCooldown -= realDt;
     this.processEvents();
     this.pruneSelection();
+    const image = this.imageDue(now, realDt);   // partie figée : quelques images par seconde seulement
     // Le dessin se fait entre deux pas de simulation (voir World.lisser).
-    this.world.lisser(this.accumulator / DT);
+    if (image) this.world.lisser(this.accumulator / DT);
     this.renderer.sousPas = this.accumulator;   // secondes de jeu écoulées depuis le dernier pas
     try {
-      this.renderer.render(realDt);
-      this.renderer.drawMinimap();
+      if (image) this.renderer.render(this.dtImage);
+      if (image) this.renderer.drawMinimap();
     } catch (erreur) {
       // Une image ratée ne doit ni laisser les positions lissées en place, ni
       // arrêter la boucle : on le dit une fois, et la partie continue.
       if (!this.erreurDessin) { this.erreurDessin = true; console.error('Dessin interrompu :', erreur); }
     } finally {
-      this.world.delisser();
+      if (image) this.world.delisser();
     }
     this.ui.update(realDt);
     this.foyers.vieillir(realDt);
@@ -317,6 +435,7 @@ class Game {
         case 'gameOver':
           this.audio.play(event.result.victory ? 'victory' : 'defeat');
           clearSave();
+          this.fermerMarque('fin');
           // La partie entre au palmarès (victoires, défaites, records) : l'écran
           // de fin dit ce qu'elle y change.
           this.ui.showGameOver(event.result, inscrireAuPalmares({
@@ -1149,11 +1268,13 @@ class Game {
 
   destroy() {
     this.saveNow();
+    this.fermerMarque('accueil');
     document.removeEventListener('visibilitychange', this.onHide);
     window.removeEventListener('pagehide', this.onLeave);
     this.ecouteurs.abort();
     this.running = false;
     this.renderer.viderTroncons();   // le sol de cette partie ne servira plus : sa mémoire tout de suite
+    try { rendreVariantes(); } catch { /* idem */ }   // ni les copies de l'autre camp (refaites au premier dessin)
     this.ui.hideModal();
     this.ui.closeBuildMenu();
     this.ui.closeWorkerMenu();
@@ -1176,11 +1297,32 @@ const settings = {
   civAdverse: civDe(stored.civAdverse),
 };
 
+/**
+ * La dernière partie a-t-elle été coupée ? (Le témoin de coupure, js/save.js.)
+ * L'accueil le dit en une ligne discrète sous la carte de reprise, jusqu'à la
+ * prochaine partie lancée ; le menu de pause garde la trace des suivantes.
+ */
+let incidentAccueil = releverTemoin();
+
+function afficherIncident() {
+  const box = document.getElementById('resume-box');
+  let ligne = document.getElementById('ligne-temoin');
+  if (!incidentAccueil || !box) { if (ligne) ligne.remove(); return; }
+  if (!ligne) {
+    ligne = document.createElement('p');
+    ligne.id = 'ligne-temoin';
+    ligne.className = 'resume-info';
+    box.insertAdjacentElement('afterend', ligne);
+  }
+  ligne.textContent = phraseIncident(incidentAccueil);
+}
+
 function showStartScreen() {
   currentGame = null;
   document.getElementById('start-screen').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');
   refreshResumeCard();
+  afficherIncident();
   refreshPalmares();
 }
 
@@ -1247,6 +1389,7 @@ function startGame(options) {
   document.getElementById('start-screen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   audio.resume();
+  incidentAccueil = null;
   currentGame = new Game(options);
   window.__jeu = currentGame;   // pratique pour déboguer depuis la console
 }
@@ -1372,8 +1515,9 @@ chargerCivilisation(settings.civ);
 chargerCivilisation(settings.civAdverse);
 // Si la cuisson finit en pleine partie, les personnages changent sous les
 // yeux du joueur : on le lui dit, comme on lui dit si elle a échoué.
-window.addEventListener('modeles3d', () => {
+window.addEventListener('modeles3d', (ev) => {
   if (currentGame && currentGame.renderer) currentGame.renderer.cuissonVue();
+  if (ev.detail && ev.detail.retour) return;   // une troupe déchargée revient du cache : rien à annoncer
   if (!currentGame || !currentGame.running || styleUnites() !== '3d') return;
   const e = etatModeles3d();
   if (e.etat === 'pret' && e.alleges && e.alleges.length) currentGame.ui.toast(`Personnages 3D allégés faute de mémoire (${e.alleges.join(', ')})`, 'warn');

@@ -321,27 +321,89 @@ function empreinte(octets) {
   return `${h.toString(16)}-${octets.byteLength}`;
 }
 
+// L'empreinte se calcule sur le fichier entier : deux à trois mégaoctets
+// relus à chaque lancement, pour chaque troupe, alors que ses atlas sont déjà
+// dans le cache. On la retient donc (stockage local) avec ce que le serveur
+// dit du fichier sans l'envoyer — son ETag, sa date. Au lancement suivant,
+// une demande d'en-têtes suffit : s'ils n'ont pas changé, l'empreinte non
+// plus. Le moindre doute (pas d'en-têtes, hors ligne, réseau à la peine,
+// stockage refusé) ramène à la lecture du fichier, comme avant.
+const EMPREINTES_KEY = 'aem.empreintes.v1';
+const DELAI_ENTETES = 2000;         // ms d'attente des en-têtes, pas plus : le cache hors ligne, lui, sert le fichier aussitôt
+const empreintesVues = new Map();   // fichier → empreinte, tant que la page vit (une troupe déchargée revient sans rien redemander)
+
+/** Ce que le serveur dit d'un fichier — ETag (faible ou fort, c'est le même fichier) et date —, ou '' s'il n'en dit rien. */
+export function marqueFichier(entetes) {
+  const etag = (entetes.get('etag') || '').replace(/^W\//, ''), date = entetes.get('last-modified') || '';
+  return etag || date ? `${etag}|${date}` : '';
+}
+
+/** L'empreinte retenue pour ce fichier si le serveur dit qu'il n'a pas changé ; sinon null : il faut le relire. */
+async function empreinteRetenue(src) {
+  if (empreintesVues.has(src)) return empreintesVues.get(src);
+  try {
+    const connu = JSON.parse(localStorage.getItem(EMPREINTES_KEY) || '{}')[src];
+    if (!connu || !connu.marque || !connu.empreinte) return null;
+    const coupe = new AbortController();
+    const minuterie = setTimeout(() => coupe.abort(), DELAI_ENTETES);
+    let reponse;
+    try {
+      reponse = await fetch(src, { method: 'HEAD', cache: 'no-cache', signal: coupe.signal });
+    } finally {
+      clearTimeout(minuterie);
+    }
+    if (!reponse.ok || marqueFichier(reponse.headers) !== connu.marque) return null;
+    empreintesVues.set(src, connu.empreinte);
+    return connu.empreinte;
+  } catch {
+    return null;
+  }
+}
+
+/** Lit le modèle ; retient son empreinte avec ce que le serveur dit de lui. Rend `{ octets, h }`. */
+async function lireModele(m) {
+  const reponse = await fetch(m.src);
+  if (!reponse.ok) throw new Error(`${m.src} : ${reponse.status}`);
+  const octets = await reponse.arrayBuffer();
+  const h = empreinte(octets);
+  empreintesVues.set(m.src, h);
+  try {
+    const marque = marqueFichier(reponse.headers);
+    const table = JSON.parse(localStorage.getItem(EMPREINTES_KEY) || '{}');
+    if (marque) table[m.src] = { marque, empreinte: h }; else delete table[m.src];
+    localStorage.setItem(EMPREINTES_KEY, JSON.stringify(table));
+  } catch { /* stockage refusé : le fichier sera relu au prochain lancement */ }
+  return { octets, h };
+}
+
 /**
  * Les atlas d'une unité en 3D : lus dans le cache s'ils y sont, sinon cuits
  * (puis rangés). Renvoie `{ cycle, clips: { marche: { canvas, cellW, cellH,
  * ancreY, hauteurMonde, images, duree, boucle, cycle, lacher }, … } }`, ou lève une
  * erreur (pas de WebGL, fichier absent) : l'appelant garde alors
  * l'illustration dessinée. `equipe` : `{ cle, dedans(r, g, b), saturer }`, la
- * règle qui reconnaît la couleur d'équipe (voir ALPHA_EQUIPE).
+ * règle qui reconnaît la couleur d'équipe (voir ALPHA_EQUIPE). `enCache`, sur
+ * l'objet rendu, devient vrai quand ces atlas sont dans le cache : on peut
+ * alors les décharger, ils en reviendront sans recuisson (sprites.js).
  */
 export async function modeleCuit(cle, vitessePxS, equipe = null) {
   const m = MODELES[cle];
-  const reponse = await fetch(m.src);
-  if (!reponse.ok) throw new Error(`${m.src} : ${reponse.status}`);
-  const octets = await reponse.arrayBuffer();
+  // Le fichier n'est lu que s'il le faut : pour son empreinte quand elle
+  // n'est pas retenue, puis pour cuire quand le cache n'a pas ses atlas.
+  let octets = null, h = await empreinteRetenue(m.src);
+  if (!h) ({ octets, h } = await lireModele(m));
   const url = new URL(m.src, location.href);
   const reglage = Object.values(REGLAGE).join('_');
-  url.searchParams.set('cuisson', `${VERSION_CUISSON}-${empreinte(octets)}-${m.taille}-${m.tourne || 0}-${vitessePxS}-${Object.values(m.images).join('.')}-${reglage}-${equipe ? equipe.cle : ''}`);
-  const cleCache = url.href;
+  const cleDe = (e) => {
+    url.searchParams.set('cuisson', `${VERSION_CUISSON}-${e}-${m.taille}-${m.tourne || 0}-${vitessePxS}-${Object.values(m.images).join('.')}-${reglage}-${equipe ? equipe.cle : ''}`);
+    return url.href;
+  };
+  let cleCache = cleDe(h);
   try {
     const lu = await lireCache(cleCache);
-    if (lu) return lu;
+    if (lu) { lu.enCache = true; return lu; }
   } catch { /* cache illisible : on recuit */ }
+  if (!octets) { ({ octets, h } = await lireModele(m)); cleCache = cleDe(h); }
   // Un téléphone à court de mémoire graphique : trois essais, du plus beau au
   // plus léger, avant d'abandonner le modèle pour son illustration. Le
   // deuxième allège le rendu (suréchantillonnage de 2, texture lue par ses
@@ -365,7 +427,7 @@ export async function modeleCuit(cle, vitessePxS, equipe = null) {
     }
     throw derniere;
   });
-  if (!cuit.allege) rangerCache(cleCache, m.src, cuit).catch(() => { /* stockage plein ou privé : tant pis */ });
+  if (!cuit.allege) rangerCache(cleCache, m.src, cuit).then((range) => { cuit.enCache = !!range; }).catch(() => { /* stockage plein ou privé : tant pis */ });
   return cuit;
 }
 
@@ -416,6 +478,7 @@ async function rangerCache(cle, src, cuit) {
     await cache.put(`${cle}&clip=${etat}`, new Response(blob, { headers: { 'Content-Type': 'image/png' } }));
   }
   await cache.put(cle, new Response(JSON.stringify(meta), { headers: { 'Content-Type': 'application/json' } }));
+  return true;
 }
 
 /**

@@ -25,6 +25,16 @@ import { TILE, UNIT_TYPES, nomDe } from './config.js';
 import { MODELES, modeleCuit, ALPHA_EQUIPE } from './modele3d.js';
 import { PIECES_DECOR } from './decor-pieces.js';
 
+/**
+ * Plafond de mémoire des troupes cuites, en mégaoctets (voir « Mémoire des
+ * troupes cuites », plus bas). Les quatorze troupes d'un camp en pèsent 160,
+ * leurs copies pour l'autre camp autant : au-delà du plafond, une troupe qui
+ * n'a plus d'unité en jeu est déchargée, et relue du cache quand on en reforme.
+ */
+export const BUDGET_TROUPES_MO = 120;
+const REPOS_VARIANTE = 30;   // secondes sans être dessinée : la copie de l'autre camp est rendue
+const REPOS_TROUPE = 120;    // secondes sans unité en jeu : la troupe peut être déchargée
+
 /** Les images 0..n-1 dans l'ordre : une rangée déjà remontée et interpolée. */
 function suite(n) { return Array.from({ length: n }, (_, i) => i); }
 
@@ -216,6 +226,7 @@ const ATLAS = {
 
 const PAS = Math.PI / 4;
 const charges = new Map();
+let horloge = 0;   // secondes ; tenue par entretenirMemoire, elle date le dernier dessin de l'autre camp
 
 /**
  * Plusieurs styles cohabitent pour la même unité : `3d`, par défaut (les
@@ -630,19 +641,30 @@ function teinterEquipe(d, canvas) {
  */
 function variantesEquipe(d, canvas) {
   if (!d.recolorage) return { bleu: canvas, rouge: canvas };
-  let autre = null;
+  let autre = null, vu = 0;
   // Fabriqué au premier dessin, donc PENDANT le rendu : rien ne doit en sortir
   // qui arrêterait la boucle du jeu. L'échec est retenu (pas de nouvel essai
   // à chaque image).
   const faire = () => {
+    vu = horloge;
     if (!autre) {
       try { autre = teinterEquipe(d, canvas); } catch { autre = canvas; }
     }
     return autre;
   };
+  // Rend la copie de l'autre camp si elle n'a pas été dessinée depuis `avant` :
+  // elle se refera au dessin suivant. JAMAIS la toile d'origine — celle que
+  // teinterEquipe rend quand la reteinte est refusée : on l'oublie seulement,
+  // et le prochain dessin retentera.
+  const rendre = (avant = Infinity) => {
+    if (!autre || vu > avant) return;
+    if (autre !== canvas) autre.width = autre.height = 0;
+    autre = null;
+  };
+  const poids = () => (autre && autre !== canvas ? octetsDe(autre) : 0);
   return d.natif === 'bleu'
-    ? { bleu: canvas, get rouge() { return faire(); } }
-    : { rouge: canvas, get bleu() { return faire(); } };
+    ? { bleu: canvas, get rouge() { return faire(); }, rendre, poids }
+    : { rouge: canvas, get bleu() { return faire(); }, rendre, poids };
 }
 
 /**
@@ -655,12 +677,16 @@ function variantesEquipe(d, canvas) {
  */
 function chargerModele(cle) {
   const d = EN_3D[cle];
-  const entree = { def: null, pret: false };
+  // `vu` : la dernière fois qu'une unité de cette troupe était en jeu (voir entretenirMemoire).
+  const entree = { def: null, pret: false, vu: horloge };
+  const retour = decharges.has(cle);   // déchargée plus tôt : elle revient du cache
   charges.set(cle, entree);
   chargerAtlas(d.repli);
   const unite = UNIT_TYPES[d.unite];
   modeleCuit(d.modele, unite ? unite.speed * TILE : 32, regleEquipe(d))
-    .then(({ cycle, clips, allege }) => {
+    .then((cuit) => {
+      const { cycle, clips, allege } = cuit;
+      entree.cuit = cuit;   // `cuit.enCache` : ses atlas sont rangés dans le cache
       entree.allege = allege || 0;
       for (const c of Object.values(clips)) c.variantes = variantesEquipe(d, c.canvas);
       const { marche } = clips;
@@ -674,7 +700,7 @@ function chargerModele(cle) {
       };
       entree.variantes = marche.variantes;
       entree.pret = true;
-      annoncerModeles3d();
+      annoncerModeles3d(retour && !entree.allege);
     })
     .catch((erreur) => {
       entree.absent = true;
@@ -685,9 +711,13 @@ function chargerModele(cle) {
     });
 }
 
-/** Prévient le jeu qu'une cuisson vient de finir (ou d'échouer) : voir etatModeles3d. */
-function annoncerModeles3d() {
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('modeles3d'));
+/**
+ * Prévient le jeu qu'une cuisson vient de finir (ou d'échouer) : voir
+ * etatModeles3d. `retour` : ce n'est qu'une troupe déchargée qui revient du
+ * cache — rien à annoncer au joueur.
+ */
+function annoncerModeles3d(retour = false) {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('modeles3d', { detail: { retour } }));
 }
 
 /**
@@ -718,6 +748,141 @@ export function etatModeles3d() {
     return { etat: 'pret', alleges: cles.filter((c) => charges.get(c).allege).map(nom) };
   }
   return { etat: 'cuisson', faits: entrees.filter((e) => e.pret).length, total: entrees.length };
+}
+
+// ---------------------------------------------------------------------------
+// Mémoire des troupes cuites.
+//
+// Les atlas d'une troupe pèsent une dizaine de mégaoctets (largeur × hauteur
+// × 4 octets par toile), autant pour la copie de l'autre camp, et rien n'en
+// était jamais rendu tant que la page restait ouverte. C'est le premier
+// suspect quand un iPhone coupe la page : on le compte, pour le dire (témoin
+// de coupure, menu de pause), et on le borne.
+//
+// - La copie de l'autre camp est rendue quand elle n'a pas été dessinée
+//   depuis REPOS_VARIANTE secondes ; elle se refait au dessin suivant.
+// - Au-delà de BUDGET_TROUPES_MO, une troupe sans unité en jeu depuis
+//   REPOS_TROUPE secondes est déchargée ; elle revient du cache, sans
+//   recuisson, dès qu'une unité de ce type est en formation ou en jeu.
+// ---------------------------------------------------------------------------
+
+/** Troupes déchargées au moins une fois : elles reviendront du cache. */
+const decharges = new Set();
+
+function octetsDe(toile) { return toile ? toile.width * toile.height * 4 : 0; }
+
+/** Une troupe cuite en mémoire : ses atlas, et les copies de l'autre camp déjà fabriquées. */
+function poidsTroupe(entree) {
+  let octets = 0;
+  for (const c of Object.values(entree.def.clips)) octets += octetsDe(c.canvas) + (c.variantes.poids ? c.variantes.poids() : 0);
+  return octets;
+}
+
+/** Ce que pèsent les troupes cuites : `{ octets, mo, troupes }` (leur nombre en mémoire). */
+export function memoireTroupes() {
+  let octets = 0, troupes = 0;
+  for (const [cle, e] of charges) {
+    if (!EN_3D[cle] || !e.pret) continue;
+    octets += poidsTroupe(e);
+    troupes++;
+  }
+  return { octets, mo: octets / 1048576, troupes };
+}
+
+/**
+ * Les troupes à décharger pour repasser sous le budget (en octets), les plus
+ * anciennement inutiles d'abord. `troupes` : `[{ cle, octets, vu, relisible }]`,
+ * `vu` étant la dernière seconde où une de leurs unités était en jeu. On ne
+ * touche ni à une troupe en jeu (ou qui l'était il y a moins de `repos`
+ * secondes), ni à une troupe qui ne reviendrait pas du cache (`relisible`
+ * faux). Sous le budget, rien ne sort. Pure : sert aux tests sans navigateur.
+ */
+export function troupesADecharger(troupes, maintenant, budget, repos = REPOS_TROUPE) {
+  let total = 0;
+  for (const t of troupes) total += t.octets;
+  const sorties = [];
+  const candidates = troupes
+    .filter((t) => t.relisible && maintenant - t.vu >= repos)
+    .sort((a, b) => a.vu - b.vu || b.octets - a.octets || (a.cle < b.cle ? -1 : 1));
+  for (const t of candidates) {
+    if (total <= budget) break;
+    sorties.push(t.cle);
+    total -= t.octets;
+  }
+  return sorties;
+}
+
+/**
+ * Les troupes cuites dont se sert une unité de ce type dans cette
+ * civilisation : la sienne, et celle des Atlantes tant que la sienne n'est pas
+ * prête (elle la remplace : voir spriteDe).
+ */
+function clesCuites(type, civ) {
+  const propre = CLES_CIV[civ]?.[type], atlante = ALTERNATIVES[type]?.[style];
+  const cles = [];
+  if (EN_3D[propre]) cles.push(propre);
+  if (EN_3D[atlante] && !(cles.length && charges.get(propre)?.pret)) cles.push(atlante);
+  return cles;
+}
+
+/**
+ * Rend les copies de l'autre camp qui n'ont pas été dessinées depuis `avant`
+ * (seconde de l'horloge d'entretenirMemoire) — toutes, par défaut : page
+ * masquée, partie quittée. Elles se refont au dessin suivant.
+ */
+export function rendreVariantes(avant = Infinity) {
+  for (const [cle, e] of charges) {
+    if (!EN_3D[cle] || !e.pret) continue;
+    for (const c of Object.values(e.def.clips)) if (c.variantes.rendre) c.variantes.rendre(avant);
+  }
+}
+
+/**
+ * Décharge une troupe cuite : ses toiles sont vidées (Safari compte leur
+ * mémoire tant qu'elles ne le sont pas) et son entrée oubliée — spriteDe la
+ * redemandera, et elle reviendra du cache.
+ */
+function decharger(cle) {
+  const e = charges.get(cle);
+  if (!e || !e.pret) return;
+  charges.delete(cle);
+  decharges.add(cle);
+  for (const c of Object.values(e.def.clips)) {
+    if (c.variantes.rendre) c.variantes.rendre();
+    c.canvas.width = c.canvas.height = 0;
+  }
+}
+
+/**
+ * Le ménage, à appeler une fois par seconde hors du dessin. `maintenant` : des
+ * secondes d'horloge réelle. `enJeu` : les couples `[type, civilisation]` des
+ * unités en vie ou en formation, quel que soit le camp, vues ou non.
+ * 1. Leurs troupes sont marquées « en jeu » ; une troupe déchargée est relue
+ *    du cache sans attendre qu'on la dessine (le temps d'une formation suffit).
+ * 2. Les copies de l'autre camp restées sans dessin sont rendues.
+ * 3. Au-delà du budget, les troupes sans unité depuis deux minutes sortent —
+ *    sauf celles qu'il faudrait recuire : une cuisson allégée n'est jamais
+ *    rangée dans le cache, et une cuisson fraîche ne l'est qu'après coup.
+ *    Ouvrier et milicien atlantes, cuits au lancement, restent : ils servent
+ *    de repli aux autres.
+ */
+export function entretenirMemoire(maintenant, enJeu = [], budgetMo = BUDGET_TROUPES_MO) {
+  horloge = maintenant;
+  for (const [type, civ] of enJeu) {
+    const cles = clesCuites(type, civ);
+    for (const cle of cles) { const e = charges.get(cle); if (e) e.vu = maintenant; }
+    if (cles.length && !charges.has(cles[0]) && decharges.has(cles[0])) chargerAtlas(cles[0]);
+  }
+  rendreVariantes(maintenant - REPOS_VARIANTE);
+  const troupes = [];
+  for (const [cle, e] of charges) {
+    if (!EN_3D[cle] || !e.pret) continue;
+    troupes.push({
+      cle, octets: poidsTroupe(e), vu: e.vu,
+      relisible: !!(EN_3D[cle].aLaDemande && e.cuit && e.cuit.enCache && !e.allege),
+    });
+  }
+  for (const cle of troupesADecharger(troupes, maintenant, budgetMo * 1048576)) decharger(cle);
 }
 
 /** Charge un atlas donné, une seule fois. */
