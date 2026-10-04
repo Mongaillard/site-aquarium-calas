@@ -753,9 +753,16 @@ export class World {
     // bâtiment : sinon ils tombent un à un devant moins nombreux qu'eux.
     if (entity.kind === 'unit' && !entity.isAnimal && source && !source.dead
         && source.kind === 'unit' && !source.isAnimal && source.playerIndex !== entity.playerIndex) {
+      // Ceux qui tapent le même bâtiment qu'elle n'ont pas à la voir : autour
+      // d'un bâtiment de trois cases, deux soldats sur des faces opposées sont
+      // à plus de cinq cases l'un de l'autre — la vue d'un milicien — et la
+      // moitié du groupe tapait le mur pendant qu'on tuait l'autre.
+      const assiege = entity.state !== STATE.ATTACK ? null
+        : entity.reprise ? entity.reprise.batiment : entity.target;
       this.grid.forEachNear(entity.x, entity.y, VUE_MAX, (u) => {
         if (u.kind !== 'unit' || u.playerIndex !== entity.playerIndex || !u.peutRiposter(source)) return;
-        if (u === entity || dist(u.x, u.y, entity.x, entity.y) <= u.def.los * TILE) u.riposter(source);
+        if (u === entity || u.target === assiege
+            || dist(u.x, u.y, entity.x, entity.y) <= u.def.los * TILE) u.riposter(source);
       });
     }
     // Abattre son propre cochon n'est pas une attaque.
