@@ -24,6 +24,8 @@ import { DENSITE } from './modele3d.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 const MAX_CATCHUP = 5;
+/** Images par seconde quand rien ne bouge : menu de pause ouvert, partie finie (voir Game.imageDue). */
+const IMAGES_FIGEES = 4;
 
 const audio = new AudioEngine();
 
@@ -145,6 +147,9 @@ class Game {
     this.prochaineVeille = 0;   // voir veiller
     this.prochainTemoin = 0;
     this.instants = [];         // heures des dernières images dessinées en jeu (voir noterImage)
+    this.sansImage = 0;         // secondes depuis la dernière image dessinée (voir imageDue)
+    this.vueDessinee = '';      // ce que montrait la dernière image d'une partie figée
+    this.masquee = false;
     setStyleUnites(loadStyle());
     this.lastFrame = performance.now();
     this.alertCooldown = 0;
@@ -157,14 +162,16 @@ class Game {
     if (home) this.camera.centerOn(home.x, home.y);
     this.zoomInitial = this.camera.zoom = this.zoomDeDepart();
 
-    window.addEventListener('resize', () => this.renderer.resize(), { signal: this.ecouteurs.signal });
+    // (Redimensionner vide la toile : une partie figée la redessine aussitôt.)
+    window.addEventListener('resize', () => { this.renderer.resize(); this.vueDessinee = ''; }, { signal: this.ecouteurs.signal });
     // Le téléphone peut couper l'onglet sans prévenir : on écrit avant de partir,
     // et on met la partie en pause plutôt que de la laisser tourner sans être vue.
     this.onHide = () => {
-      // (De retour : la marque du témoin se rouvre tout de suite, sans attendre son tour.)
-      if (document.visibilityState !== 'hidden') { this.marquer(); return; }
+      // (De retour : la marque du témoin se rouvre et l'image se redessine, sans attendre leur tour.)
+      if (document.visibilityState !== 'hidden') { this.masquee = false; this.vueDessinee = ''; this.marquer(); return; }
       this.saveNow();
       this.fermerMarque('masquee');
+      this.masquee = true;
       // Masquée, la page ne dessine plus : le sol en cache et les copies de
       // l'autre camp sont rendus (ils se refont au retour, derrière le menu de
       // pause). Une page légère en arrière-plan risque moins d'être coupée.
@@ -275,6 +282,33 @@ class Game {
     try { fermerTemoin(raison, this.world.gameOver ? null : this.etatDuTemoin()); } catch { /* idem */ }
   }
 
+  /**
+   * Faut-il dessiner cette image ? En jeu, toujours. Menu de pause ouvert ou
+   * partie finie, plus rien ne bouge, et redessiner tout l'écran soixante fois
+   * par seconde vide la batterie pour rien : IMAGES_FIGEES images par seconde
+   * suffisent — et une tout de suite si ce qu'on voit change (la vue qui
+   * défile, l'écran qui tourne, la finesse, le style des troupes). Page
+   * masquée, rien : ce qu’on vient de rendre à la mémoire y reviendrait.
+   * `dtImage` : le temps que couvre l'image à dessiner.
+   */
+  imageDue(now, realDt) {
+    this.sansImage += realDt;
+    if (this.masquee && document.visibilityState === 'hidden') return false;
+    const figee = this.paused || !!this.world.gameOver;
+    if (figee) {
+      const cam = this.camera;
+      const vue = `${cam.x}|${cam.y}|${cam.zoom}|${this.canvas.width}|${this.canvas.height}|${styleUnites()}|${this.selection.length}`;
+      if (vue === this.vueDessinee && this.sansImage < 1 / IMAGES_FIGEES) return false;
+      this.vueDessinee = vue;
+    } else {
+      this.noterImage(now);
+    }
+    // (Figée : 0,2 s au plus, pour que le rendu ne prenne pas ses troupes pour des revenantes.)
+    this.dtImage = figee ? Math.min(0.2, this.sansImage) : realDt;
+    this.sansImage = 0;
+    return true;
+  }
+
   /** Une image vient d'être dessinée en jeu : on garde les heures des cinq dernières secondes. */
   noterImage(now) {
     const t = this.instants;
@@ -326,19 +360,19 @@ class Game {
     if (this.idleNoticeCooldown > 0) this.idleNoticeCooldown -= realDt;
     this.processEvents();
     this.pruneSelection();
+    const image = this.imageDue(now, realDt);   // partie figée : quelques images par seconde seulement
     // Le dessin se fait entre deux pas de simulation (voir World.lisser).
-    this.world.lisser(this.accumulator / DT);
+    if (image) this.world.lisser(this.accumulator / DT);
     this.renderer.sousPas = this.accumulator;   // secondes de jeu écoulées depuis le dernier pas
-    if (!this.paused && !this.world.gameOver) this.noterImage(now);
     try {
-      this.renderer.render(realDt);
-      this.renderer.drawMinimap();
+      if (image) this.renderer.render(this.dtImage);
+      if (image) this.renderer.drawMinimap();
     } catch (erreur) {
       // Une image ratée ne doit ni laisser les positions lissées en place, ni
       // arrêter la boucle : on le dit une fois, et la partie continue.
       if (!this.erreurDessin) { this.erreurDessin = true; console.error('Dessin interrompu :', erreur); }
     } finally {
-      this.world.delisser();
+      if (image) this.world.delisser();
     }
     this.ui.update(realDt);
     if (this.alertCooldown > 0) this.alertCooldown -= realDt;
