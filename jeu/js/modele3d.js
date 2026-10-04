@@ -14,8 +14,8 @@
 //
 // Règle des cases (celle de l'Atelier et de caseDirection) : case k (0 = sud,
 // 1 = sud-est, 2 = est … 7 = sud-ouest) = modèle tourné de +45°·k autour de la
-// verticale, caméra et lumière fixes. Une animation par atlas, chacun avec sa
-// propre case (l'union des emprises de toutes ses images) et la même ancre : le
+// verticale, caméra et lumière fixes. Une animation par atlas, une colonne par
+// direction (chacune à sa largeur, voir recadrer) et la même ancre partout : le
 // point entre les pieds, à la même place d'une image à l'autre — le
 // personnage tourne sur ses pieds et ne glisse jamais.
 // ---------------------------------------------------------------------------
@@ -23,9 +23,11 @@
 /**
  * Les unités en 3D. `clips` associe chaque état du jeu à une animation du
  * fichier, `images` le nombre d'images tirées de chacune : seize pour un tour
- * de marche, douze pour un coup — le rendu fond en plus chaque image dans la
- * suivante (Renderer.poserImage3D), si bien qu'un repos de six images respire
- * sans à-coup. `taille` est la hauteur à l'écran, en px monde, de la pose
+ * de marche, douze pour un coup ou un repos, treize pour une chute. Le rendu
+ * en montre UNE à la fois, la plus proche (Renderer.poserImage3D) : un geste
+ * lent a donc besoin d'assez d'images pour tenir une dizaine de poses par
+ * seconde (la cueillette dure 1,6 s : quatorze images ; les cous de l'Hydre
+ * ondulent au repos : seize). `taille` est la hauteur à l'écran, en px monde, de la pose
  * de repos vue de face — la même mesure que l'Atelier. `accessoires` : pour le
  * milicien, l'épée et le bouclier restent en main dans TOUTES les animations,
  * à la place qu'ils ont dans celle-ci (le fichier les cache pendant le coup
@@ -46,8 +48,8 @@ export const MODELES = {
       cueillir: 'recolter', construire: 'construire', porter: 'porter', bois: 'couper_bois', or: 'miner', viande: 'depecer',
     },
     images: {
-      marche: 16, repos: 6, attaque: 8, touche: 5, mort: 10,
-      cueillir: 8, construire: 8, porter: 12, bois: 10, or: 10, viande: 6,
+      marche: 16, repos: 12, attaque: 8, touche: 5, mort: 13,
+      cueillir: 14, construire: 8, porter: 12, bois: 10, or: 12, viande: 10,
     },
     boucles: ['marche', 'repos', 'cueillir', 'construire', 'porter', 'bois', 'or', 'viande'],
     // Suivent le sol plutôt que l'horloge : les pieds ne patinent pas.
@@ -59,7 +61,7 @@ export const MODELES = {
     src: 'assets/modeles/atlante.json',
     taille: 43,
     clips: { marche: 'marche_trident', repos: 'garde_trident', attaque: 'attaque_trident', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 12, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_trident',
@@ -69,7 +71,7 @@ export const MODELES = {
     src: 'assets/modeles/archer.json',
     taille: 40,
     clips: { marche: 'marche_arc', repos: 'garde_arc', attaque: 'tir_arc', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 14, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 16, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_arc',
@@ -84,7 +86,7 @@ export const MODELES = {
     src: 'assets/modeles/arbaletrier.json',
     taille: 42,
     clips: { marche: 'marche_arc', repos: 'garde_arc', attaque: 'tir_arc', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 14, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 16, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_arc',
@@ -97,7 +99,7 @@ export const MODELES = {
     src: 'assets/modeles/archer-monte.json',
     taille: 50,
     clips: { marche: 'trot', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 14, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 14, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -110,7 +112,7 @@ export const MODELES = {
     src: 'assets/modeles/hydre.json',
     taille: 66,
     clips: { marche: 'trot', repos: 'repos', attaque: 'attaque_morsure', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 16, attaque: 12, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -126,7 +128,7 @@ export const MODELES = {
     src: 'assets/modeles/cavalier.json',
     taille: 52,
     clips: { marche: 'trot', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 12, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -137,7 +139,9 @@ export const MODELES = {
     src: 'assets/modeles/belier.json',
     taille: 62,
     clips: { marche: 'marche', repos: 'repos', attaque: 'attaque', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    // Engin : au repos rien ne bouge (une seule image), et douze images suffisent
+    // à des roues qui font un tour en 0,6 s.
+    images: { marche: 12, repos: 1, attaque: 16, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -148,7 +152,7 @@ export const MODELES = {
     src: 'assets/modeles/catapulte.json',
     taille: 55,
     clips: { marche: 'marche', repos: 'repos', attaque: 'tir', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 14, touche: 5, mort: 10 },
+    images: { marche: 12, repos: 1, attaque: 16, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -159,7 +163,7 @@ export const MODELES = {
     src: 'assets/modeles/champion.json',
     taille: 46,
     clips: { marche: 'marche_epee', repos: 'garde', attaque: 'attaque_epee', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 12, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde',
@@ -169,7 +173,7 @@ export const MODELES = {
     src: 'assets/modeles/eclaireur.json',
     taille: 49,
     clips: { marche: 'course', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 12, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
@@ -180,7 +184,7 @@ export const MODELES = {
     src: 'assets/modeles/pretresse.json',
     taille: 40,
     clips: { marche: 'marche_trident', repos: 'garde_trident', attaque: 'celebrer', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 14, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_trident',
@@ -190,7 +194,7 @@ export const MODELES = {
     src: 'assets/modeles/lancier.json',
     taille: 43,
     clips: { marche: 'marche_lance', repos: 'garde_lance', attaque: 'attaque_lance', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 12, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_lance',
@@ -199,7 +203,7 @@ export const MODELES = {
     src: 'assets/modeles/milicien.json',
     taille: 42,
     clips: { marche: 'marche_epee', repos: 'garde', attaque: 'attaque_epee', touche: 'coup_recu', mort: 'mort' },
-    images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
+    images: { marche: 16, repos: 12, attaque: 12, touche: 5, mort: 13 },
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde',
@@ -207,6 +211,12 @@ export const MODELES = {
 };
 
 export const DENSITE = 2;   // px d'atlas par px monde (le style « net » de l'Atelier)
+/**
+ * Vrai si ces atlas viennent d'une cuisson allégée (chute à demi-finesse, ou
+ * tout à un pixel par pixel monde) : en cuisson fine, une case fait exactement
+ * DENSITE fois sa hauteur à l'écran.
+ */
+export const cuissonAllegee = (clips) => Object.values(clips).some((c) => c.cellH < c.hauteurMonde * DENSITE);
 // Suréchantillonnage : le rendu se fait `sur` fois plus fin que l'atlas, puis il
 // est réduit de moitié en moitié. `sur` se règle sur la finesse de la texture
 // de chaque modèle (voir finesseTexture) : 2 ou 4. (À 8, la cuisson d'une unité
@@ -271,7 +281,7 @@ const pause = () => new Promise((r) => {
 // lancement, les atlas reviennent en un instant, sans three.js. La clé porte
 // l'empreinte du fichier et la version de la cuisson — un nouveau modèle, ou
 // une caméra retouchée ici, refait la cuisson une fois.
-const VERSION_CUISSON = 7;
+const VERSION_CUISSON = 8;
 const CACHE = 'aem-modeles-3d';
 
 /** Empreinte FNV-1a du fichier : deux modèles différents, deux clés. */
@@ -308,15 +318,16 @@ export async function modeleCuit(cle, vitessePxS, equipe = null) {
   // deuxième allège le rendu (suréchantillonnage de 2, texture lue par ses
   // niveaux réduits, sans anticrénelage) et garde la chute à demi-finesse ;
   // le troisième cuit à un pixel par pixel monde — le quart de la mémoire,
-  // une troupe plus douce mais animée — et n'est pas gardé en cache : la
-  // prochaine partie retentera mieux.
+  // une troupe plus douce mais animée. Seul le premier est gardé en cache :
+  // une cuisson allégée est plus floue, la prochaine partie retentera mieux.
+  // `allege` (0, 1 ou 2) dit lequel a servi — le menu de pause le signale.
   const essais = [{}, { sur: 2, mip: true, anticrenelage: false, reduire: true }, { densite: 1, sur: 2, mip: true, anticrenelage: false }];
   const cuit = await aTourDeRole(async () => {
     let derniere = null;
     for (let i = 0; i < essais.length; i++) {
       try {
         const c = await cuireModele(cle, vitessePxS, octets, { ...essais[i], equipe });
-        c.secours = i === essais.length - 1;
+        c.allege = i;
         return c;
       } catch (erreur) {
         derniere = erreur;
@@ -325,7 +336,7 @@ export async function modeleCuit(cle, vitessePxS, equipe = null) {
     }
     throw derniere;
   });
-  if (!cuit.secours) rangerCache(cleCache, m.src, cuit).catch(() => { /* stockage plein ou privé : tant pis */ });
+  if (!cuit.allege) rangerCache(cleCache, m.src, cuit).catch(() => { /* stockage plein ou privé : tant pis */ });
   return cuit;
 }
 
@@ -344,6 +355,9 @@ async function lireCache(cle) {
   const r = await cache.match(cle);
   if (!r) return null;
   const meta = await r.json();
+  // Une cuisson allégée rangée par une ancienne version (elle l'était, sous la
+  // même clé) : on la laisse là et l'on retente la cuisson fine.
+  if (cuissonAllegee(meta.clips)) return null;
   for (const [etat, c] of Object.entries(meta.clips)) {
     const image = await cache.match(`${cle}&clip=${etat}`);
     if (!image) return null;
@@ -587,7 +601,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
       const clip = clipDe(nom);
       const n = m.images[etat];
       const boucle = m.boucles.includes(etat);
-      // Rangée = direction, colonne = image : la disposition de cadreSource.
+      // Bande de travail : rangée = direction, colonne = image (recadrer range ensuite l'atlas autrement).
       bctx.clearRect(0, 0, bande.width, bande.height);
       for (let k = 0; k < DIRECTIONS; k++) {
         pivot.rotation.y = (k * Math.PI) / 4 + tourne;
@@ -659,43 +673,63 @@ function finesseTexture(modele, textures) {
 }
 
 /**
- * Recadre une bande de travail sur l'union des emprises, ancre au milieu
- * d'une case de largeur paire, puis passe le contour et la netteté.
+ * Recadre une bande de travail et range l'atlas : une COLONNE par direction,
+ * une rangée par image. La hauteur de case est commune (l'union de toutes les
+ * images), mais chaque direction a sa largeur et sa propre ancre, mesurées sur
+ * elle seule : un corps étendu de profil ne réserve plus sa longueur aux vues
+ * de face et de dos, ni une place vide de l'autre côté de l'ancre — un tiers
+ * de mémoire en moins pour une chute, un cheval ou un engin. `colonnes[k]` =
+ * `{ x, l, ancre }` : l'abscisse de la colonne dans l'atlas, sa largeur, et
+ * la distance de son bord gauche à l'ancre (le point entre les pieds), en
+ * pixels d'atlas entiers. Puis le contour et la netteté.
  */
 function recadrer(bande, n, L, H, ancreX, ancreY, equipe, f = 1, densite = DENSITE) {
   const ctx = bande.getContext('2d', { willReadFrequently: true });
-  const largeur = L * n, hauteur = H * DIRECTIONS;   // la partie de la bande que cette animation occupe
-  const px = ctx.getImageData(0, 0, largeur, hauteur).data;
-  let gauche = Infinity, droite = -Infinity, haut = Infinity, bas = -Infinity;
-  for (let y = 0; y < hauteur; y++) {
-    const cy = y % H;
-    for (let x = 0; x < largeur; x++) {
-      if (px[(y * largeur + x) * 4 + 3] < 110) continue;
-      const cx = x % L;
-      if (cx < gauche) gauche = cx;
-      if (cx > droite) droite = cx;
-      if (cy < haut) haut = cy;
-      if (cy > bas) bas = cy;
+  const largeur = L * n;   // la partie de la bande que cette animation occupe
+  const gauche = new Array(DIRECTIONS).fill(Infinity), droite = new Array(DIRECTIONS).fill(-Infinity);
+  let haut = Infinity, bas = -Infinity;
+  // Lue direction par direction : cinq fois moins de mémoire d'un coup.
+  for (let k = 0; k < DIRECTIONS; k++) {
+    const px = ctx.getImageData(0, k * H, largeur, H).data;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < largeur; x++) {
+        if (px[(y * largeur + x) * 4 + 3] < 110) continue;
+        const cx = x % L;
+        if (cx < gauche[k]) gauche[k] = cx;
+        if (cx > droite[k]) droite[k] = cx;
+        if (y < haut) haut = y;
+        if (y > bas) bas = y;
+      }
     }
   }
-  if (!Number.isFinite(gauche)) throw new Error('modèle invisible à la caméra');
+  if (!Number.isFinite(haut)) throw new Error('modèle invisible à la caméra');
   const ax = Math.round(ancreX), ay = Math.round(ancreY);
-  // `f` : réduction de cet atlas (2 pour la chute). La case se mesure à pleine
-  // finesse, en multiples de f, puis chaque case est réduite f fois — à 2,
-  // chaque pixel est la moyenne exacte de quatre.
-  const demi = Math.max(ax - gauche, droite + 1 - ax) + MARGE * f;
-  const x0 = ax - demi, y0 = haut - MARGE * f;
-  const pleineL = 2 * demi;
-  let pleineH = bas + 1 + MARGE * f - y0;
+  // `f` : réduction de cet atlas (2 pour la chute en cuisson de secours). Tout
+  // se mesure à pleine finesse, en multiples de f, puis chaque case est
+  // réduite f fois — à 2, chaque pixel est la moyenne exacte de quatre.
+  const m = MARGE * f;
+  const y0 = haut - m;
+  let pleineH = bas + 1 + m - y0;
   pleineH += (f - (pleineH % f)) % f;
-  const cellW = pleineL / f, cellH = pleineH / f;
+  const cellH = pleineH / f;
+  const colonnes = [], x0 = [];
+  let X = 0;
+  for (let k = 0; k < DIRECTIONS; k++) {
+    // L'ancre est toujours dans la colonne (une direction vide aussi a la sienne).
+    const g = f * Math.ceil((ax - Math.min(gauche[k], ax) + m) / f);       // à gauche de l'ancre
+    const d = f * Math.ceil((Math.max(droite[k] + 1, ax) - ax + m) / f);   // à sa droite
+    x0.push(ax - g);
+    colonnes.push({ x: X, l: (g + d) / f, ancre: g / f });
+    X += (g + d) / f;
+  }
   const atlas = document.createElement('canvas');
-  atlas.width = cellW * n; atlas.height = cellH * DIRECTIONS;
+  atlas.width = X; atlas.height = cellH * n;
   const actx = atlas.getContext('2d', { willReadFrequently: true });
   if (!actx) throw new Error('mémoire graphique saturée (atlas refusé)');
   for (let k = 0; k < DIRECTIONS; k++) {
+    const c = colonnes[k];
     for (let i = 0; i < n; i++) {
-      actx.drawImage(bande, i * L + x0, k * H + y0, pleineL, pleineH, i * cellW, k * cellH, cellW, cellH);
+      actx.drawImage(bande, i * L + x0[k], k * H + y0, c.l * f, pleineH, c.x, i * cellH, c.l, cellH);
     }
   }
   netteteEtContour(actx, atlas.width, atlas.height, equipe);
@@ -708,7 +742,11 @@ function recadrer(bande, n, L, H, ancreX, ancreY, equipe, f = 1, densite = DENSI
   if (!fctx) { atlas.width = atlas.height = 0; finale.width = finale.height = 0; throw new Error('mémoire graphique saturée (atlas refusé)'); }
   fctx.drawImage(atlas, 0, 0);
   atlas.width = atlas.height = 0;
-  return { canvas: finale, cellW, cellH, ancreY: (ay - y0) / f, hauteurMonde: pleineH / densite, images: n, directions: DIRECTIONS };
+  // `cellW` : la plus large des colonnes (pour mémoire : le dessin lit `colonnes`).
+  return {
+    canvas: finale, colonnes, cellW: Math.max(...colonnes.map((c) => c.l)), cellH,
+    ancreY: (ay - y0) / f, hauteurMonde: pleineH / densite, images: n, directions: DIRECTIONS,
+  };
 }
 
 /**

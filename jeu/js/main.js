@@ -131,6 +131,8 @@ class Game {
     this.paused = false;
     this.speedId = options.speed || (options.restore && options.restore.speed) || loadSpeed();
     this.speed = speedDef(this.speedId).mult;
+    // Le rendu juge « en marche » sur la vitesse à l'écran : elle suit la vitesse de jeu.
+    this.renderer.vitesseJeu = this.speed;
     this.accumulator = 0;
     this.saveTimer = AUTOSAVE_INTERVAL;
     setStyleUnites(loadStyle());
@@ -1008,6 +1010,7 @@ class Game {
     const def = speedDef(id);
     this.speedId = def.id;
     this.speed = def.mult;
+    this.renderer.vitesseJeu = this.speed;
     this.accumulator = 0;
     storeSpeed(def.id);
     this.ui.toast(`Vitesse : ${def.name} (${def.short})`);
@@ -1219,7 +1222,8 @@ window.addEventListener('modeles3d', () => {
   if (currentGame && currentGame.renderer) currentGame.renderer.cuissonVue();
   if (!currentGame || !currentGame.running || styleUnites() !== '3d') return;
   const e = etatModeles3d();
-  if (e.etat === 'pret') currentGame.ui.toast('Tes personnages 3D sont prêts');
+  if (e.etat === 'pret' && e.alleges && e.alleges.length) currentGame.ui.toast(`Personnages 3D allégés faute de mémoire (${e.alleges.join(', ')})`, 'warn');
+  else if (e.etat === 'pret') currentGame.ui.toast('Tes personnages 3D sont prêts');
   else if (e.etat === 'absent') currentGame.ui.toast(`Personnages 3D indisponibles ici (${e.raison}) : dessins à la place`, 'warn');
 });
 

@@ -54,6 +54,8 @@ export const RESOURCE_LABELS = {
  * icône — le jeu ne dépend d'aucune image pour fonctionner.
  */
 export const PORTRAITS = {
+  villager: 'assets/portrait-villageois.webp',
+  archer: 'assets/portrait-archer.webp',
   militia: 'assets/portrait-milicien.webp',
   hydra: 'assets/portrait-hydre.webp',
   priest: 'assets/portrait-pretresse.webp',

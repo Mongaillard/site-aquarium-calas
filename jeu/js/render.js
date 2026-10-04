@@ -330,11 +330,16 @@ export class Renderer {
     if (c.attente > 0) { if (--c.attente === 0) c.souillee = false; return; }
     if (dt >= 0.2) { c.souillee = true; return; }
     c.n++; c.duree += dt;
-    if (c.n < 120) return;
+    // (La fenêtre témoin est courte : pendant qu'elle dure, toute l'image est plus douce.)
+    if (c.n < (c.temoin ? 40 : 120)) return;
     const moyenne = c.duree / c.n;
     const ecartee = c.souillee || etatModeles3d().etat === 'cuisson';
     c.n = 0; c.duree = 0; c.souillee = false;
-    if (ecartee) { c.suite = 0; return; }
+    if (ecartee) {
+      // Un témoin écarté (une troupe se cuisait) ne laisse pas la toile réduite.
+      if (c.temoin) { this.dpr = c.haut; this.resize(); c.temoin = 0; c.attente = 12; }
+      c.suite = 0; return;
+    }
     if (c.temoin) {
       if (moyenne < c.temoin * 0.8) {
         c.fige = true;
@@ -356,7 +361,7 @@ export class Renderer {
     if (c.suite >= 2) {
       c.temoin = moyenne; c.haut = this.dpr;
       this.dpr = 2; this.resize();
-      c.attente = 20;   // le temps que le sol se recuise à l'autre niveau
+      c.attente = 12;   // le temps que le sol se recuise à l'autre niveau
     }
   }
 
@@ -371,6 +376,7 @@ export class Renderer {
     this.suivreEffets();
     this.majParticules(this.dt);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.globalAlpha = 1;   // un dessin interrompu à l'image d'avant ne voile pas celle-ci
     ctx.fillStyle = '#1b2430';
     ctx.fillRect(0, 0, this.width, this.height);
 
@@ -1388,8 +1394,19 @@ export class Renderer {
       // donnerait deux rythmes superposés.
       const anime = (sprite.def.images || 1) > 1;
       this.dessinerSprite(u, sprite, anime ? u.x : x, anime ? u.y : y, anim);
-      if (u.isVillager && u.carry.amount > 0.5) this.dessinerCharge(u, x, y, r);
-      if (u.hp < u.maxHp) this.drawHealthBar(u.x, u.y - r * 2.6, r * 1.7, u.hp / u.maxHp);
+      // Une troupe cuite est deux fois plus haute que les anciennes : la
+      // pastille de charge et la barre de vie lui barraient le torse. Elles
+      // passent au-dessus de sa tête, sans le balancement de la marche codée.
+      let sommet = null;
+      if (sprite.def.cuit3d) {
+        const c = sprite.def.clips.repos;
+        sommet = u.y + r * 0.45 - c.hauteurMonde * (c.ancreY / c.cellH);
+      }
+      if (u.isVillager && u.carry.amount > 0.5) {
+        if (sommet === null) this.dessinerCharge(u, x, y, r);
+        else this.dessinerCharge(u, this.calerX(u.x), this.calerY(sommet) + 2 + r * 1.1, r);
+      }
+      if (u.hp < u.maxHp) this.drawHealthBar(u.x, sommet === null ? u.y - r * 2.6 : sommet - 5, r * 1.7, u.hp / u.maxHp);
       this.eclatsDeTravail(u, x, y, r);
       return;
     }
@@ -1598,7 +1615,7 @@ export class Renderer {
   dessinerModele3D(u, sprite, x, y, anim) {
     const { clips } = sprite.def;
     // `image` est une position dans l'animation, fraction d'image comprise :
-    // poserImage3D fond l'image entière dans la suivante.
+    // poserImage3D en dessine l'image la plus proche.
     let clip = null, image = 0, angle = u.facing;
     const cible = this.cibleDe(u);
     const versCible = () => (cible ? Math.atan2(cible.y - u.y, cible.x - u.x) : u.facing);
@@ -1649,7 +1666,39 @@ export class Renderer {
       }
     }
     this.dessinerSocle(u, x, y);
-    this.poserImage3D(clip, u.playerIndex, caseDirection(angle, 8), image, x, y + u.radius * 0.45);
+    this.poserImage3D(clip, u.playerIndex, this.vueDe(u, angle), image, x, y + u.radius * 0.45);
+  }
+
+  /**
+   * La vue (0 à 7) sous laquelle montrer une troupe dont le cap est `angle`.
+   * Le cap de la simulation est recalculé vingt fois par seconde, poussée des
+   * voisines comprise, sans lissage : près de la limite entre deux vues, une
+   * troupe en groupe sautait de l'une à l'autre à chaque pas — deux
+   * silhouettes à 45° d'écart que l'œil fondait en une image double. On
+   * lisse donc le cap AFFICHÉ (un dixième de seconde), et l'on ne change de
+   * vue que s'il a franchi la limite d'une dizaine de degrés. Une troupe
+   * restée hors champ repart de son cap du moment.
+   */
+  vueDe(u, angle) {
+    const c = Math.cos(angle), s = Math.sin(angle);
+    const vue = u._vue3d;
+    if (!vue || this.horloge - vue.t > 0.25) {
+      const k = caseDirection(angle, 8);
+      u._vue3d = { x: c, y: s, k, t: this.horloge };
+      return k;
+    }
+    const a = 1 - Math.exp(-Math.max(0, this.horloge - vue.t) / 0.09);
+    vue.x += (c - vue.x) * a; vue.y += (s - vue.y) * a; vue.t = this.horloge;
+    // Demi-tour : la moyenne de deux caps opposés ne pointe nulle part.
+    const lisse = Math.hypot(vue.x, vue.y) > 0.2 ? Math.atan2(vue.y, vue.x) : angle;
+    let k = caseDirection(lisse, 8);
+    if (k !== vue.k) {
+      const centre = Math.PI / 2 - vue.k * (Math.PI / 4);
+      const ecart = Math.abs(Math.atan2(Math.sin(lisse - centre), Math.cos(lisse - centre)));
+      if (ecart < Math.PI / 8 + 0.16) k = vue.k;
+    }
+    vue.k = k;
+    return k;
   }
 
   /** L'abscisse (l'ordonnée) monde la plus proche qui tombe sur un pixel entier de la toile. */
@@ -1664,40 +1713,40 @@ export class Renderer {
 
   /**
    * Une image d'un atlas cuit, posée par sa ligne des pieds en (x, sol).
-   * `image` porte une fraction : l'image entière est dessinée, puis la
-   * suivante par-dessus, opaque à hauteur de cette fraction. Douze images
-   * par seconde deviennent un mouvement continu — sans une image de plus en
-   * mémoire. Une boucle enchaîne sa dernière image sur la première ; un
-   * geste (coup, chute) s'arrête sur la dernière.
+   * `image` porte une fraction ; on dessine UNE image, la plus proche. (Un
+   * temps, la suivante était fondue par-dessus : le personnage était alors
+   * en permanence la superposition de deux poses — bras et jambes dédoublés
+   * en marche, contour adouci même au repos. Sur un téléphone, ce voile se
+   * voyait plus que le pas d'une image à l'autre.) Une boucle enchaîne sa
+   * dernière image sur la première ; un geste (coup, chute) s'arrête sur la
+   * dernière.
    */
   poserImage3D(clip, joueur, k, image, x, sol) {
-    const { cellW, cellH, ancreY, hauteurMonde, images } = clip;
-    const h = hauteurMonde, w = (cellW / cellH) * h;
+    const { cellH, ancreY, hauteurMonde, images, colonnes } = clip;
+    // (e vaut exactement un demi en cuisson normale : deux pixels d'atlas par pixel monde.)
+    const h = hauteurMonde, e = h / cellH;
     const source = joueur === 0 ? clip.variantes.bleu : clip.variantes.rouge;
     const ctx = this.ctx;
     // Cinq directions cuites : nord-ouest, ouest et sud-ouest sont le miroir
-    // du nord-est, de l'est et du sud-est (la case est centrée sur l'ancre).
+    // du nord-est, de l'est et du sud-est, retournées autour de l'ancre.
     const miroir = k >= (clip.directions || 8);
     if (miroir) k = 8 - k;
-    // Posé sur un pixel entier de la toile : au zoom de départ une case d'atlas
-    // couvre exactement ses pixels d'écran, et rien n'est rééchantillonné.
-    const dx = this.calerX(x - w / 2), dy = this.calerY(sol - h * (ancreY / cellH));
-    let i = Math.floor(image), part = image - i;
+    // L'atlas a une colonne par direction, chacune à sa largeur (voir
+    // recadrer). C'est l'ANCRE qu'on pose sur un pixel entier de la toile :
+    // au zoom de départ une case d'atlas couvre exactement ses pixels d'écran,
+    // rien n'est rééchantillonné, et les pieds ne bougent pas quand la troupe
+    // change de direction.
+    const col = colonnes[k];
+    const axe = this.calerX(x);
+    const dx = axe - col.ancre * e, dy = this.calerY(sol - h * (ancreY / cellH));
+    let i = Math.round(image);
     if (clip.boucle) i = ((i % images) + images) % images;
-    else if (i >= images - 1) { i = images - 1; part = 0; } else if (i < 0) { i = 0; part = 0; }
+    else i = clamp(i, 0, images - 1);
     if (miroir) {
-      // Retourné autour de l'axe de la case, lui-même posé sur un pixel entier.
-      const axe = dx + w / 2;
       ctx.save();
       ctx.translate(axe, 0); ctx.scale(-1, 1); ctx.translate(-axe, 0);
     }
-    ctx.drawImage(source, i * cellW, k * cellH, cellW, cellH, dx, dy, w, h);
-    if (part >= 0.04) {
-      const opacite = ctx.globalAlpha;
-      ctx.globalAlpha = opacite * part;
-      ctx.drawImage(source, ((i + 1) % images) * cellW, k * cellH, cellW, cellH, dx, dy, w, h);
-      ctx.globalAlpha = opacite;
-    }
+    ctx.drawImage(source, col.x, i * cellH, col.l, cellH, dx, dy, col.l * e, h);
     if (miroir) ctx.restore();
   }
 
@@ -1794,11 +1843,16 @@ export class Renderer {
 
   drawHealthBar(cx, y, width, ratio) {
     const ctx = this.ctx;
-    const h = 3.5;
+    // Calée sur les pixels de la toile, comme les troupes : des bords francs,
+    // qui ne glissent pas au sous-pixel sur un personnage posé au pixel.
+    const e = this.versToile.echelle;
+    const entier = (v) => Math.max(1, Math.round(v * e)) / e;
+    const l = entier(width), h = entier(3.5);
+    const x0 = this.calerX(cx - l / 2), y0 = this.calerY(y);
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(cx - width / 2, y, width, h);
+    ctx.fillRect(x0, y0, l, h);
     ctx.fillStyle = ratio > 0.55 ? '#63c363' : ratio > 0.28 ? '#e0b93c' : '#d9534f';
-    ctx.fillRect(cx - width / 2, y, width * clamp(ratio, 0, 1), h);
+    ctx.fillRect(x0, y0, Math.round(l * clamp(ratio, 0, 1) * e) / e, h);
   }
 
   drawProjectiles() {
@@ -1857,6 +1911,11 @@ export class Renderer {
    */
   unitAnim(u) {
     const dt = this.dt || 1 / 60;
+    // Une troupe qui n'a pas été dessinée depuis un moment (hors champ, sous le
+    // brouillard, à l'abri) repart de sa position du moment : sinon tout le
+    // trajet fait sans nous compte pour une seule image, et elle pédale sur place.
+    if (u._animT === undefined || this.horloge - u._animT > 0.3) { u._ax = u.x; u._ay = u.y; u._vitesse = 0; u._avance = false; }
+    u._animT = this.horloge;
     const px = u._ax === undefined ? u.x : u._ax;
     const py = u._ay === undefined ? u.y : u._ay;
     const pas = Math.hypot(u.x - px, u.y - py);
@@ -1869,7 +1928,16 @@ export class Renderer {
     // personnages. La moyenne glissante rend le pas régulier, et l'amplitude
     // s'éteint d'elle-même quand l'unité ralentit.
     const instantanee = pas / dt;
-    u._vitesse = (u._vitesse || 0) * 0.86 + instantanee * 0.14;
+    // (Lissage en temps, non en images : le même à trente images par seconde.)
+    u._vitesse = (u._vitesse || 0) + (instantanee - (u._vitesse || 0)) * (1 - Math.exp(-dt / 0.11));
+    // En marche au-delà de 13 px/s, à l'arrêt en deçà de 4 : une troupe arrêtée
+    // que ses voisines repoussent (jusqu'à 12 px/s) ne passe plus du repos à
+    // la marche et retour plusieurs fois par seconde — deux poses, parfois
+    // deux directions, qui se mélangeaient à l'œil. L'engin le plus lent
+    // avance à 17 px/s. (Vitesses de jeu ; à l'écran, elles suivent la vitesse
+    // de la partie — Tranquille ×0,75, Blitz ×2.)
+    const allure = this.vitesseJeu || 1;
+    u._avance = u._vitesse > (u._avance ? 4 : 13) * allure;
     const force = clamp(u._vitesse / (u.def.speed * TILE * 0.5), 0, 1);
     const foulee = Math.max(2.5, u.radius * 0.5);
     u._walk = ((u._walk || 0) + (u._vitesse * dt) / foulee) % (Math.PI * 2);
@@ -1888,7 +1956,7 @@ export class Renderer {
       // modèle 3D joue son attaque entière, plus longue que la fente.
       depuisCoup: u.attackCooldown > 0 && ecoule >= 0 ? ecoule : -1,
       distance: u._distance,
-      avance: u._vitesse > 3,
+      avance: u._avance,
     };
   }
 

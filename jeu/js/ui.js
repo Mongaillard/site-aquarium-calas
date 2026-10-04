@@ -663,10 +663,26 @@ export class UI {
     const e = etatModeles3d();
     const texte = {
       cuisson: 'Tes personnages 3D se préparent (au premier lancement seulement) : les dessins servent en attendant.',
-      pret: 'Tes personnages 3D sont prêts.',
+      pret: e.alleges && e.alleges.length
+        ? `Tes personnages 3D sont prêts, mais allégés faute de mémoire (${e.alleges.join(', ')}) : ils paraissent plus flous. Ferme les autres onglets puis relance le jeu.`
+        : 'Tes personnages 3D sont prêts, à pleine finesse.',
       absent: `Tes personnages 3D n’ont pas pu se préparer sur cet appareil (${e.raison}) : les dessins les remplacent.`,
     }[e.etat];
     return texte ? `<p class="hint">${texte}</p>` : '';
+  }
+
+  /** La finesse réellement affichée : celle de l'écran, ou réduite (réglage, garde-fou de cadence). */
+  texteFinesse() {
+    const r = this.game.renderer;
+    const ecran = Math.min(window.devicePixelRatio || 1, 3);
+    if (r.dpr >= ecran) return `Affichée : ${r.dpr} pixels par point, toute la finesse de cet écran.`;
+    // `fige` dit seulement « on ne surveille plus » : il est vrai aussi pour le
+    // réglage « Légère » et pour « ?dpr= ». La cause se lit donc d'abord ailleurs.
+    const cause = r.dprForce ? ' — imposée par « ?dpr= » dans l’adresse.'
+      : this.game.finesse === 'legere' ? ' — c’est ton réglage « Légère ».'
+      : r.cadence && r.cadence.fige ? ' — réduite automatiquement, le jeu ralentissait.'
+      : '.';
+    return `Affichée : ${r.dpr} pixels par point au lieu de ${ecran}${cause}`;
   }
 
   toast(message, kind = 'info') {
@@ -737,6 +753,7 @@ export class UI {
       ${this.texteModeles3d()}
       <h3 class="modal-sub">Finesse de l’image</h3>
       <div class="options row">${finesses}</div>
+      <p class="hint" data-role="finesse-reelle">${this.texteFinesse()}</p>
       <div class="modal-actions">
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="help">Comment jouer</button>
@@ -759,6 +776,7 @@ export class UI {
       btn.addEventListener('click', () => {
         this.game.setFinesse(btn.dataset.finesse);
         modal.querySelectorAll('[data-finesse]').forEach((b) => b.classList.toggle('active', b === btn));
+        modal.querySelector('[data-role="finesse-reelle"]').textContent = this.texteFinesse();
       }, this.ecoute());
     });
     modal.querySelector('[data-act="resume"]').addEventListener('click', () => this.game.togglePause(), this.ecoute());

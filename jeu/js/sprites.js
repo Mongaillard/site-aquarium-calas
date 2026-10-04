@@ -273,12 +273,11 @@ let style = '3d';
  * seule la fenêtre des bleus francs bascule, comme pour l'illustration.
  */
 const EN_3D = {
-  // L'écharpe du modèle est un bleu marine terne (saturation 0,18 à 0,30,
-  // mesurée sur l'atlas cuit) : le seuil descend à 0,14. Peau, cuir, chemise
-  // sont orangés ou crème, le fer des outils presque gris (saturation < 0,06).
+  // Écharpe et braies bleu roi basculent ; la tunique blanche, la peau, le
+  // cuir et l'or restent, comme le fer des outils (presque gris).
   villagerAtelier: {
     modele: 'villager', unite: 'villager', repli: 'villager', natif: 'bleu',
-    recolorage: { teinte: [195, 255], vers: 0, satMin: 0.14, saturer: 2.3 },
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
   // Cuit à la demande, la première fois qu'un Atlante paraît : pas de planche
   // dessinée pour patienter (il est dessiné au code le temps de la cuisson),
@@ -289,12 +288,12 @@ const EN_3D = {
     recolorage: { teinte: [205, 255], vers: 0, satMin: 0.45 },
   },
   // Cuit à la demande, comme l'Atlante : dessiné au code le temps de la
-  // cuisson. Tunique bleu roi, pans bleu canard (teinte 195 à 210°) et
-  // pantalon marine (saturation 0,2 à 0,3) basculent ; peau, cuir, or et bois
-  // de l'arc (teinte < 45°) restent.
+  // cuisson. Capuche et tunique bleu roi, pan turquoise (teinte 180 à 200°) :
+  // tout le bleu bascule ; le pantalon blanc, la peau, le cuir, l'or et le
+  // bois de l'arc (teinte < 45°) restent.
   archerAtelier: {
     modele: 'archer', unite: 'archer', repli: null, natif: 'bleu', aLaDemande: true,
-    recolorage: { teinte: [190, 255], vers: 0, satMin: 0.2 },
+    recolorage: { teinte: [178, 255], vers: 0, satMin: 0.32 },
   },
   // Cuite à la demande, à la première Hydre invoquée. Corps turquoise (teinte
   // 180 à 200°), crinières et nageoires bleu franc (200 à 240°) : tout bascule,
@@ -594,9 +593,11 @@ function variantesEquipe(d, canvas) {
 
 /**
  * Cuit un modèle 3D, une seule fois. Chaque animation devient un atlas à part
- * (sa case, son ancre), recoloré pour l'autre camp comme une illustration. La
- * fiche de la marche reste au premier niveau : ce qui ne connaît que la marche
- * (cadreSource, imageDeMarche) la lit comme n'importe quel atlas.
+ * (ses colonnes par direction, son ancre : voir recadrer dans modele3d.js),
+ * recoloré pour l'autre camp comme une illustration. La fiche de la marche
+ * reste au premier niveau pour ce qui ne demande que « animé ou non » et la
+ * hauteur ; SEUL Renderer.poserImage3D sait lire ces atlas — cadreSource et
+ * imageDeMarche valent pour les planches dessinées, pas pour eux.
  */
 function chargerModele(cle) {
   const d = EN_3D[cle];
@@ -605,7 +606,8 @@ function chargerModele(cle) {
   chargerAtlas(d.repli);
   const unite = UNIT_TYPES[d.unite];
   modeleCuit(d.modele, unite ? unite.speed * TILE : 32, regleEquipe(d))
-    .then(({ cycle, clips }) => {
+    .then(({ cycle, clips, allege }) => {
+      entree.allege = allege || 0;
       for (const c of Object.values(clips)) c.variantes = variantesEquipe(d, c.canvas);
       const { marche } = clips;
       // `poses` : les gestes de travail sous les noms de Renderer.poseDe.
@@ -643,15 +645,19 @@ function annoncerModeles3d() {
 export function etatModeles3d() {
   const cles = Object.values(ALTERNATIVES).map((a) => a['3d']).filter((c) => EN_3D[c])
     .filter((c) => !EN_3D[c].aLaDemande || charges.has(c));
+  const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte', crossbowman: 'arbalétrier', horseArcher: 'archer monté' };
   const entrees = cles.map((c) => charges.get(c));
   if (entrees.some((e) => !e)) return { etat: 'attente' };
   const echecs = cles.filter((c) => charges.get(c).absent);
   if (echecs.length) {
     // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
-    const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte', crossbowman: 'arbalétrier', horseArcher: 'archer monté' };
     return { etat: 'absent', raison: echecs.map((c) => `${noms[EN_3D[c].unite] || EN_3D[c].unite} : ${charges.get(c).raison}`).join(' ; ') };
   }
-  if (entrees.every((e) => e.pret)) return { etat: 'pret' };
+  // `alleges` : les troupes cuites faute de mieux à finesse réduite (mémoire
+  // graphique insuffisante) — elles paraissent plus floues que les autres.
+  if (entrees.every((e) => e.pret)) {
+    return { etat: 'pret', alleges: cles.filter((c) => charges.get(c).allege).map((c) => noms[EN_3D[c].unite] || EN_3D[c].unite) };
+  }
   return { etat: 'cuisson', faits: entrees.filter((e) => e.pret).length, total: entrees.length };
 }
 

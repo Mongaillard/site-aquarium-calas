@@ -503,9 +503,24 @@ images ne paraît ni saccadé, ni flou, ni terne :
   (`World.lisser`, `js/game.js`). Ils glissent au lieu d'avancer par à-coups ;
   la simulation, elle, ne voit rien (les vraies positions sont remises
   aussitôt). Coups, impacts et chutes avancent eux aussi entre deux pas.
-- *Images fondues* — seize images pour un tour de marche, douze pour un coup,
-  et chaque image se fond dans la suivante (`Renderer.poserImage3D`) : le
-  mouvement est continu sans une image de plus en mémoire.
+- *Une image à la fois, et assez d'images* — seize images pour un tour de
+  marche, douze pour un coup ou un repos, treize pour une chute, et le rendu
+  dessine la plus proche (`Renderer.poserImage3D`). Un temps, chaque image se
+  fondait dans la suivante : le mouvement était continu, mais le personnage
+  était en permanence la superposition de deux poses — membres dédoublés,
+  contour voilé, même au repos. Sur un téléphone, ce voile se voyait plus que
+  le pas d'une image à l'autre. Les gestes lents ont donc reçu plus d'images
+  (cueillette quatorze, cous de l'Hydre au repos seize), les engins à l'arrêt
+  une seule.
+- *Une vue qui ne tremble pas* — le cap de la simulation est recalculé vingt
+  fois par seconde, poussée des voisines comprise : près de la limite entre
+  deux vues, une troupe en groupe sautait de l'une à l'autre à chaque pas, et
+  l'œil fondait les deux silhouettes. Le cap affiché est lissé sur un dixième
+  de seconde et ne change de vue qu'après avoir franchi la limite d'une
+  dizaine de degrés (`Renderer.vueDe`) ; de même, une troupe arrêtée que ses
+  voisines repoussent ne repasse plus à la marche (`unitAnim`). La barre de
+  vie et la pastille de charge sont posées au-dessus de la tête, au pixel, et
+  non plus en travers du torse.
 - *Une texture lue proprement* — la texture d'un modèle de l'Atelier est un
   atlas en miettes : des centaines d'îlots serrés, la peau à côté du bronze à
   côté du bleu. Un personnage de quatre-vingts pixels la lit huit fois trop
@@ -532,22 +547,30 @@ images ne paraît ni saccadé, ni flou, ni terne :
 - *Garde-fou de cadence* — par fenêtres de cent vingt images
   (`Renderer.surveillerCadence`) : deux fenêtres de suite sous quarante-cinq
   images par seconde, et la toile passe à deux pixels par point pour une
-  fenêtre témoin. Nettement plus rapide : on y reste, le zoom de départ se
+  fenêtre témoin (quarante images : pendant qu'elle dure, toute l'image est
+  plus douce). Nettement plus rapide : on y reste, le zoom de départ se
   recale à 0,5. Pas mieux (un téléphone en économie d'énergie tourne à trente
   images par seconde quoi qu'on dessine) : on remonte à trois, et on ne
   réessaiera que si le jeu ralentit nettement. Le menu de
   pause offre aussi le choix à la main, « Finesse de l'image : Fine /
-  Légère », retenu d'une partie à l'autre ; `?dpr=2` dans l'adresse l'impose
-  pour un essai.
+  Légère », retenu d'une partie à l'autre, et dit la finesse réellement
+  affichée ; `?dpr=2` dans l'adresse l'impose pour un essai.
 - *Cinq directions, trois en miroir* — sud, sud-est, est, nord-est et nord
   sont cuites ; nord-ouest, ouest et sud-ouest sont leur miroir, comme dans
   Age of Empires (un soldat tourné vers l'ouest tient donc son arme de la
-  main gauche). Les atlas des quatorze troupes d'un camp pèsent 210 Mo,
-  contre 372 en huit directions. Si la mémoire graphique manque quand même,
-  la cuisson retente plus léger — la chute à demi-finesse, puis toute la
-  troupe à un pixel par pixel monde — avant de rendre la main à
-  l'illustration ; le sol, lui, passe au niveau grossier puis à des tuiles de
-  couleur — jamais un écran noir.
+  main gauche).
+- *Une colonne par direction* — dans l'atlas d'une animation, chaque
+  direction a sa colonne, à sa largeur, avec sa propre ancre (`recadrer`,
+  `js/modele3d.js`) : un corps étendu de profil ne réserve plus sa longueur
+  aux vues de face et de dos, ni une place vide de l'autre côté de ses pieds.
+  Les atlas des quatorze troupes d'un camp pèsent 159 Mo — ils en pesaient
+  201 avec une case commune et moins d'images, 372 en huit directions. Si la
+  mémoire graphique manque quand même, la cuisson retente plus léger — la
+  chute à demi-finesse, puis toute la troupe à un pixel par pixel monde —
+  avant de rendre la main à l'illustration ; une cuisson allégée n'est pas
+  gardée d'une partie à l'autre, et le menu de pause la signale. Le sol, lui,
+  passe au niveau grossier puis à des tuiles de couleur — jamais un écran
+  noir.
 - *Couleur d'équipe* — reconnue à la cuisson, avant l'étalonnage, et marquée
   dans l'opacité du pixel (liseré compris) ; l'acier clair d'une lame n'en fait
   pas partie. L'atlas de l'autre camp ne se fabrique qu'à la première unité de

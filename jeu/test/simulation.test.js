@@ -1438,6 +1438,37 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
 }
 
 // ---------------------------------------------------------------------------
+// Modèles 3D : chaque état du jeu a son animation dans le fichier, et assez
+// d'images pour être montré une image à la fois (le rendu ne fond plus une
+// image dans la suivante : sous cinq poses par seconde, un geste hache).
+// ---------------------------------------------------------------------------
+{
+  const { MODELES, cuissonAllegee } = await import('../js/modele3d.js');
+  const sansAnimation = [], malComptes = [], haches = [];
+  for (const [cle, m] of Object.entries(MODELES)) {
+    const g = JSON.parse(readFileSync(new URL(`../${m.src}`, import.meta.url), 'utf8'));
+    const durees = new Map(g.animations.map((a) => [a.name, Math.max(...a.samplers.map((e) => g.accessors[e.input].max[0]))]));
+    for (const [etat, nom] of Object.entries(m.clips)) {
+      if (!durees.has(nom)) { sansAnimation.push(`${cle}.${etat} → ${nom}`); continue; }
+      const n = m.images[etat];
+      // Seize au plus : la bande de travail de la cuisson fait max(images) cases de large.
+      if (!Number.isInteger(n) || n < 1 || n > 16) { malComptes.push(`${cle}.${etat} = ${n}`); continue; }
+      const boucle = m.boucles.includes(etat);
+      const cadence = boucle ? n / durees.get(nom) : (n - 1) / durees.get(nom);
+      if (n > 1 && cadence < 4.9) haches.push(`${cle}.${etat} : ${cadence.toFixed(1)} images/s`);
+    }
+    for (const etat of [...m.boucles, ...m.parDistance]) if (!m.clips[etat]) sansAnimation.push(`${cle} : « ${etat} » sans animation`);
+  }
+  check('modèles 3D : chaque état a son animation dans le fichier', sansAnimation.length === 0, sansAnimation.join(' ; ') || `${Object.keys(MODELES).length} unités`);
+  check('modèles 3D : de 1 à 16 images par animation', malComptes.length === 0, malComptes.join(' ; '));
+  check('modèles 3D : aucune animation sous cinq poses par seconde', haches.length === 0, haches.join(' ; '));
+  check('cuisson allégée reconnue à sa finesse (chute à demi-finesse, ou tout à un pixel par pixel monde)',
+    cuissonAllegee({ marche: { cellH: 97, hauteurMonde: 48.5 }, mort: { cellH: 66, hauteurMonde: 66 } })
+      && cuissonAllegee({ marche: { cellH: 49, hauteurMonde: 49 } })
+      && !cuissonAllegee({ marche: { cellH: 97, hauteurMonde: 48.5 }, mort: { cellH: 132, hauteurMonde: 66 } }));
+}
+
+// ---------------------------------------------------------------------------
 // Unités figées (septembre, second passage) : villageois plantés devant un
 // dépôt, soldats immobiles, cloche sans effet. Chaque cause a son test, écrit
 // à partir de la partie ou du script qui l'a montrée.
