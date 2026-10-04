@@ -11,7 +11,7 @@ import { World } from './game.js';
 import { saveGame, loadSave, clearSave, restoreWorld } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
-import { UI } from './ui.js';
+import { UI, FoyersAttaque, toucherArmee } from './ui.js';
 import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
@@ -140,7 +140,9 @@ class Game {
     this.saveTimer = AUTOSAVE_INTERVAL;
     setStyleUnites(loadStyle());
     this.lastFrame = performance.now();
-    this.alertCooldown = 0;
+    // Alertes d'attaque, une par foyer ; la mini-carte lit la même liste pour ses repères.
+    this.foyers = new FoyersAttaque();
+    this.renderer.alertes = this.foyers.liste;
     this.idleNoticeCooldown = 0;
     this.running = true;
     this.world.players[this.world.humanIndex].autoWorkers = loadAutoWorkers();
@@ -257,7 +259,7 @@ class Game {
       this.world.delisser();
     }
     this.ui.update(realDt);
-    if (this.alertCooldown > 0) this.alertCooldown -= realDt;
+    this.foyers.vieillir(realDt);
     requestAnimationFrame(this.loop);
   }
 
@@ -299,10 +301,11 @@ class Game {
           }
           break;
         case 'underAttack':
-          if (this.alertCooldown <= 0) {
-            this.alertCooldown = 12;
+          // L'alerte dit où : son message se touche (voirAttaque) et l'endroit
+          // pulse sur la mini-carte. Une par foyer, pour ne pas inonder.
+          if (this.foyers.signaler(event.x, event.y)) {
             this.audio.play('alert');
-            this.ui.toast('Vous êtes attaqué !', 'error');
+            this.ui.toast('Vous êtes attaqué ! Touchez pour voir où', 'error', () => this.voirAttaque());
             this.lastAttackPoint = { x: event.x, y: event.y };
             this.vibrate([18, 60, 18]);
           }
@@ -582,6 +585,46 @@ class Game {
   filterSelection(type) {
     const filtered = this.selection.filter((e) => e.type === type);
     if (filtered.length) this.setSelection(filtered);
+  }
+
+  /** Plus aucun ordre en attente d'un appui (attaque, abri, ralliement) : sa consigne s'efface avec lui. */
+  desarmer() {
+    if (!this.attackMoveArmed && !this.rallyArmed && !this.garrisonArmed) return;
+    this.attackMoveArmed = false; this.rallyArmed = false; this.garrisonArmed = false;
+    this.ui.setBuildHint('');
+  }
+
+  /**
+   * La croix du panneau : tout lâcher d'un doigt. Sans elle, une sélection ne
+   * se quittait qu'au clavier, et le moindre appui raté partait en ordre. La
+   * pose en cours et l'ordre armé partent avec : après la croix, plus rien en main.
+   */
+  lacherSelection() {
+    if (this.buildMode) this.cancelBuild();
+    this.desarmer();
+    this.setSelection([]);
+  }
+
+  /**
+   * Pastille « Armée » : un toucher prend TOUTE l'armée, où qu'elle soit sur
+   * la carte — la vue ne bouge pas, pour donner l'ordre là où l'on regarde ;
+   * un second toucher (elle est déjà en main) amène la vue sur elle.
+   */
+  selectArmy() {
+    const geste = toucherArmee(this.world, this.world.humanIndex, this.selection);
+    if (!geste) { this.ui.toast('Aucun soldat pour l’instant'); this.audio.play('error'); return; }
+    if (geste.voir) {
+      this.camera.centerOn(geste.voir.x, geste.voir.y);
+    } else {
+      this.desarmer();
+      this.setSelection(geste.prendre || [geste.abri]);
+      if (geste.abri) {
+        // Toute l'armée est à l'abri : on montre l'abri, son bouton « Libérer » est là.
+        this.camera.centerOn(geste.abri.x, geste.abri.y);
+        this.ui.toast('Vos soldats sont à l’abri : « Libérer » les fait sortir');
+      }
+    }
+    this.audio.play('select');
   }
 
   /** Applique une attitude à toute la sélection. */
@@ -938,6 +981,12 @@ class Game {
     const tc = this.world.buildings.find(
       (b) => !b.dead && b.playerIndex === this.world.humanIndex && b.type === 'towncenter');
     if (tc) { this.camera.centerOn(tc.x, tc.y); this.setSelection([tc]); }
+  }
+
+  /** L'alerte d'attaque touchée : la vue va au dernier endroit où l'on a été frappé. */
+  voirAttaque() {
+    const lieu = this.lastAttackPoint;
+    if (lieu) this.camera.centerOn(lieu.x, lieu.y);
   }
 
   minimapJump(nx, ny) {

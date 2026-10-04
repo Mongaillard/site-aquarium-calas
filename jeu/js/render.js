@@ -223,6 +223,7 @@ export class Renderer {
     this.cadence = { n: 0, duree: 0, suite: 0, temoin: 0, haut: 0, attente: 0, echecs: 0, souillee: false, fige: this.dprForce > 0 };
     this.ghost = null;
     this.selectionBox = null;
+    this.alertes = [];           // foyers d'attaque à signaler sur la mini-carte (posés par Game)
     this.showGrid = false;
     this.frame = 0;
     // Particules décoratives : elles vivent dans le rendu, jamais dans la
@@ -2195,6 +2196,33 @@ export class Renderer {
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(cam.x / TILE * scale - halfW, cam.y / TILE * scale - halfH, halfW * 2, halfH * 2);
+    this.reperesAlerte(ctx, scale);
+  }
+
+  /**
+   * Alerte d'attaque : un repère rouge qui pulse sur la mini-carte là où l'on
+   * est frappé, le temps de le trouver des yeux (`repere`, en secondes ; voir
+   * FoyersAttaque, js/ui.js). Par-dessus tout le reste, cadre de la vue compris.
+   */
+  reperesAlerte(ctx, scale) {
+    for (const a of this.alertes) {
+      if (a.repere <= 0) continue;
+      const x = a.x / TILE * scale, y = a.y / TILE * scale;
+      const t = 1 - (a.repere % 1);          // une onde par seconde, qui s'élargit en s'effaçant
+      ctx.strokeStyle = `rgba(255,59,48,${1 - t})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, 5 + t * 13, 0, Math.PI * 2);
+      ctx.stroke();
+      // Le point lui-même, cerclé de blanc : ceux de l'adversaire sont rouges aussi.
+      ctx.fillStyle = '#ff3b30';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
   }
 
   roundRect(x, y, w, h, r) {
