@@ -20,9 +20,18 @@ const ARMY_COMPOSITION = [
   ['militia'],
   ['archer', 'spearman', 'archer'],
   // Âge des Châteaux : la caserne reprend du service (Champion), l'atelier alterne
-  // bélier et catapulte.
-  ['knight', 'archer', 'champion', 'knight', 'ram', 'catapult'],
+  // bélier et catapulte, le Temple donne deux Prêtresses puis des Hydres.
+  ['knight', 'archer', 'crossbowman', 'horseArcher', 'champion', 'knight', 'ram', 'catapult', 'priest', 'hydra'],
 ];
+/** Au-delà, une soigneuse de plus ne sert à rien : elles ne se battent pas. */
+const PRETRESSES_MAX = 2;
+/**
+ * Les unités chères ne sortent jamais si les fantassins boivent l'or au fur et
+ * à mesure : l'IA en « commande » une à la fois et met son prix de côté. Tant
+ * qu'elle n'a pas autant d'Hydres, puis autant d'engins de siège.
+ */
+const HYDRES_VOULUES = 2;
+const ENGINS_VOULUS = 2;
 
 export class AIPlayer {
   constructor(world, playerIndex, difficulty) {
@@ -199,6 +208,10 @@ export class AIPlayer {
     if (inProgress.length >= 2) { this.assignBuilders(inProgress); return; }
 
     const plan = this.nextBuilding();
+    // Un bâtiment voulu mais trop cher : les soldats attendront qu'il soit payé
+    // (voir manageMilitary). Sans cela l'armée boit tout l'or, et ni le Temple
+    // ni une seconde tour ne sortent jamais de terre.
+    this.projet = plan && !canAfford(player.resources, BUILDING_TYPES[plan].cost) ? plan : null;
     if (plan && canAfford(player.resources, BUILDING_TYPES[plan].cost)) {
       const spot = this.findSpot(plan);
       if (spot) {
@@ -239,6 +252,7 @@ export class AIPlayer {
     }
     if (player.age >= 2) {
       if (!this.has('siege')) return 'siege';
+      if (!this.has('temple')) return 'temple';
       if (this.countFarms() < 8) return 'farm';
       if (!this.has('towncenter', 2) && player.resources.wood > 400) return 'towncenter';
       if (!this.has('tower', 2)) return 'tower';
@@ -400,15 +414,34 @@ export class AIPlayer {
     const player = this.player;
     const roster = ARMY_COMPOSITION[Math.min(player.age, ARMY_COMPOSITION.length - 1)];
 
+    // Ce qu'on met de côté avant de former un soldat de plus : le bâtiment
+    // voulu, et le prix d'une Hydre tant que le Temple n'en a pas donné assez.
+    const menace = this.world.time < this.defendUntil;
+    // (À l'Âge des Châteaux seulement : avant, le bois doit d'abord aller aux
+    // fermes, sinon le passage d'âge prend deux minutes de retard.)
+    const projet = !menace && this.projet && player.age >= 2 ? BUILDING_TYPES[this.projet].cost : null;
+    const commande = this.commande();
+    const pourCommande = !menace && commande ? UNIT_TYPES[commande.type].cost : null;
+
     // Production militaire dans tous les bâtiments disponibles.
     for (const b of this.completed) {
       if (!b.def.trains || b.type === 'towncenter') continue;
       if (b.queue.length >= 2) continue;
       if (player.pop >= player.popCap) break;
-      const options = b.def.trains.filter((t) => roster.includes(t) && UNIT_TYPES[t].age <= player.age);
+      let options = b.def.trains.filter((t) => roster.includes(t) && UNIT_TYPES[t].age <= player.age);
+      // Une Prêtresse soigne une armée qui existe : pas avant quatre soldats,
+      // jamais plus de deux (celles en formation comprises).
+      if (options.includes('priest')) {
+        const soigneuses = this.army.filter((u) => u.def.heal).length + b.queue.filter((q) => q.id === 'priest').length;
+        if (soigneuses >= PRETRESSES_MAX || this.army.length < 4) options = options.filter((t) => t !== 'priest');
+      }
       if (options.length === 0) continue;
-      const pick = options[this.compositionIndex % options.length];
+      let pick = options[this.compositionIndex % options.length];
       this.compositionIndex++;
+      // Le bâtiment de la commande ne forme qu'elle : c'est pour elle qu'on économise.
+      const commandee = commande && commande.batiment === b;
+      if (commandee) pick = commande.type;
+      else if (b.type === 'temple') pick = options.includes('priest') ? 'priest' : options[0];
       // On garde une réserve de ressources pour l'économie au début.
       const reserve = player.age === 0 ? 120 : 60;
       const def = UNIT_TYPES[pick];
@@ -424,7 +457,9 @@ export class AIPlayer {
         && (this.savingForAge || this.army.length >= armyFloor)
         ? this.ageTarget.cost : null;
       const affordable = Object.keys(def.cost).every((k) => {
-        const keep = (k === 'wood' ? reserve : 0) + (saving && saving[k] ? saving[k] : 0);
+        const keep = (k === 'wood' ? reserve : 0) + (saving && saving[k] ? saving[k] : 0)
+          + (projet && projet[k] ? projet[k] : 0)
+          + (pourCommande && !commandee && pourCommande[k] ? pourCommande[k] : 0);
         return player.resources[k] >= def.cost[k] + keep;
       });
       if (affordable) this.world.trainUnit(b, pick);
@@ -478,7 +513,11 @@ export class AIPlayer {
         // explicitement : une attaque-déplacement s'égare sur les villageois et
         // la partie n'aboutit jamais à son objectif.
         if (this.world.mode.victory === 'towncenter' && target.kind === 'building') {
-          for (const u of this.army) u.attackEntity(target);
+          // (Une soigneuse ne « frappe » pas un bâtiment : elle suit la troupe.)
+          for (const u of this.army) {
+            if (u.def.heal) u.moveTo(target.x, target.y + TILE * 3, true);
+            else u.attackEntity(target);
+          }
         } else {
           this.world.formationMove(this.army, target.x, target.y, true);
         }
@@ -499,6 +538,28 @@ export class AIPlayer {
         }
       }
     }
+  }
+
+  /**
+   * L'unité chère que l'IA veut ensuite, et le bâtiment qui la forme : une
+   * Hydre tant qu'elle en a moins de deux, puis un engin de siège (catapulte
+   * et bélier en alternance) tant qu'elle en a moins de deux. Celles en
+   * formation comptent déjà.
+   */
+  commande() {
+    const age = this.player.age;
+    const enFile = (b, types) => b.queue.filter((q) => types.includes(q.id)).length;
+    const temple = this.completed.find((b) => b.type === 'temple');
+    if (temple && age >= UNIT_TYPES.hydra.age) {
+      const hydres = this.army.filter((u) => u.type === 'hydra').length + enFile(temple, ['hydra']);
+      if (hydres < HYDRES_VOULUES) return { type: 'hydra', batiment: temple };
+    }
+    const atelier = this.completed.find((b) => b.type === 'siege');
+    if (atelier && age >= UNIT_TYPES.ram.age) {
+      const engins = this.army.filter((u) => u.def.class === 'siege').length + enFile(atelier, ['ram', 'catapult']);
+      if (engins < ENGINS_VOULUS) return { type: engins % 2 === 0 ? 'catapult' : 'ram', batiment: atelier };
+    }
+    return null;
   }
 
   /** Ennemi présent dans la base (à moins de treize cases d'un de ses bâtiments) ? */

@@ -61,6 +61,8 @@ export const PORTRAITS = {
   spearman: 'assets/portrait-lancier.webp',
   champion: 'assets/portrait-champion.webp',
   scout: 'assets/portrait-eclaireur.webp',
+  catapult: 'assets/portrait-catapulte.webp',
+  ram: 'assets/portrait-belier.webp',
 };
 
 export const RESOURCE_ICONS = { food: 'food', wood: 'wood', gold: 'gold' };
@@ -126,6 +128,29 @@ export const UNIT_TYPES = {
     from: 'archery', age: 1,
     desc: 'Tire à distance. Fragile au corps à corps.',
   },
+  // L'Arbalétrier : un carreau lourd, lent à recharger, qui perce les armures —
+  // la réponse de l'Archerie à l'infanterie lourde.
+  crossbowman: {
+    id: 'crossbowman', name: 'Arbalétrier', icon: 'archer', class: 'archer',
+    cost: { wood: 40, gold: 60 }, trainTime: 22, hp: 40, speed: 0.95,
+    attack: 9, attackType: 'pierce', range: 6, attackSpeed: 3.2,
+    bonus: { infantry: 3 },
+    meleeArmor: 0, pierceArmor: 1, los: 7, radius: 9,
+    projectile: true,
+    from: 'archery', age: 2,
+    desc: 'Un carreau lourd, de plus loin que l’archer : il perce l’armure de l’infanterie. Lent à recharger.',
+  },
+  // L'Archer monté : la portée d'un archer, les jambes d'un cheval. Il harcèle
+  // et s'esquive ; les lanciers le fauchent comme toute cavalerie.
+  horseArcher: {
+    id: 'horseArcher', name: 'Archer monté', icon: 'archer', class: 'cavalry',
+    cost: { wood: 50, gold: 70 }, trainTime: 26, hp: 60, speed: 1.45,
+    attack: 5, attackType: 'pierce', range: 4.5, attackSpeed: 2.0,
+    meleeArmor: 0, pierceArmor: 1, los: 7, radius: 11,
+    projectile: true,
+    from: 'archery', age: 2,
+    desc: 'Archer à cheval : rapide, il tire puis s’esquive — idéal pour harceler. Craint les lanciers.',
+  },
   scout: {
     id: 'scout', name: 'Éclaireur', icon: 'scout', class: 'cavalry',
     cost: { food: 80 }, trainTime: 20, hp: 45, speed: 1.75,
@@ -187,7 +212,7 @@ export const UNIT_TYPES = {
   // qui blesse tout ce qui s'y trouve à l'arrivée dans un rayon de `splash`
   // cases. Une troupe qui bouge l'esquive ; un bâtiment, jamais.
   catapult: {
-    id: 'catapult', name: 'Catapulte', icon: 'siege', class: 'siege',
+    id: 'catapult', name: 'Catapulte', icon: 'catapult', class: 'siege',
     cost: { wood: 180, gold: 110 }, trainTime: 30, hp: 70, speed: 0.55,
     attack: 26, attackType: 'melee', range: 7, attackSpeed: 5.0,
     bonus: { building: 34 },
@@ -271,8 +296,8 @@ export const BUILDING_TYPES = {
   archery: {
     id: 'archery', name: 'Archerie', icon: 'archery', fem: true,
     cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
-    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['archer'], age: 1,
-    desc: 'Forme les archers.',
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['archer', 'crossbowman', 'horseArcher'], age: 1,
+    desc: 'Forme les tireurs : archers, puis arbalétriers et archers montés à l’Âge des Châteaux.',
   },
   stable: {
     id: 'stable', name: 'Écurie', icon: 'stable', fem: true,

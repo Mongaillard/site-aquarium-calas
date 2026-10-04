@@ -52,6 +52,8 @@ const ASSETS = [
   './assets/portrait-lancier.webp',
   './assets/portrait-champion.webp',
   './assets/portrait-eclaireur.webp',
+  './assets/portrait-catapulte.webp',
+  './assets/portrait-belier.webp',
   './assets/heros.webp',
   './assets/milicien-marche.webp',
   './assets/villageois.webp',

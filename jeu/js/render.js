@@ -1509,7 +1509,7 @@ export class Renderer {
     }
     if (!clip) {
       if (u.state === STATE.ATTACK && cible) angle = versCible();
-      const recu = this.world.time - u.lastHitAt;
+      const recu = this.world.time + (this.sousPas || 0) - u.lastHitAt;
       if (recu >= 0 && recu < clips.touche.duree) {
         clip = clips.touche;
         image = positionImage(clip, recu);
@@ -1565,7 +1565,7 @@ export class Renderer {
       const sprite = spriteDe(fx.type);
       if (!sprite || !sprite.def.cuit3d) continue;
       const clip = sprite.def.clips.mort;
-      const ecoule = fx.max - fx.life;
+      const ecoule = fx.max - fx.life + (this.sousPas || 0);
       const image = positionImage(clip, ecoule);
       ctx.globalAlpha = Math.min(1, fx.life / 1.5);
       this.poserImage3D(clip, fx.joueur, caseDirection(fx.facing, 8), image, fx.x, fx.y + (UNIT_TYPES[fx.type]?.radius || 9) * 0.45);
@@ -1730,7 +1730,9 @@ export class Renderer {
     u._distance = (u._distance || 0) + u._vitesse * dt;
 
     const cadence = u.def.attackSpeed || 2;
-    const ecoule = cadence - u.attackCooldown;
+    // Le rechargement n'avance qu'à chaque pas de simulation : on y ajoute le
+    // temps écoulé depuis (`sousPas`), sinon le coup se joue à vingt images par seconde.
+    const ecoule = cadence - u.attackCooldown + (u.attackCooldown > 0 ? this.sousPas || 0 : 0);
     const enCoup = u.attackCooldown > 0 && ecoule >= 0 && ecoule < cadence * 0.34;
     return {
       marche: Math.sin(u._walk) * force,

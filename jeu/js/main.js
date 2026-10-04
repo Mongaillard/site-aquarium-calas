@@ -178,6 +178,7 @@ class Game {
     this.pruneSelection();
     // Le dessin se fait entre deux pas de simulation (voir World.lisser).
     this.world.lisser(this.accumulator / DT);
+    this.renderer.sousPas = this.accumulator;   // secondes de jeu écoulées depuis le dernier pas
     this.renderer.render(realDt);
     this.renderer.drawMinimap();
     this.world.delisser();

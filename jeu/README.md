@@ -258,14 +258,19 @@ inactif, `H` pour revenir au Centre-Ville.
 - **3 ressources** : nourriture (buissons à baies, fermes, chasse au cerf, cochons), bois (forêts), or (filons).
 - **3 âges** : Âge Sombre → Âge Féodal → Âge des Châteaux, chacun débloquant
   bâtiments, unités et technologies.
-- **12 unités** : villageois, milicien, lancier, Atlante, Champion, archer, éclaireur,
-  cavalier, bélier, Catapulte, Prêtresse et Hydre. Chaque unité a des bonus contre
+- **14 unités** : villageois, milicien, lancier, Atlante, Champion, archer,
+  Arbalétrier, Archer monté, éclaireur, cavalier, bélier, Catapulte, Prêtresse
+  et Hydre. Chaque unité a des bonus contre
   une catégorie (le lancier mange la cavalerie, le cavalier fond sur les archers,
   le bélier démolit les bâtiments).
   - La **Prêtresse** (Temple, Âge Féodal) ne se bat pas : elle soigne d'elle-même
     l'allié blessé le plus mal en point à sa portée (8 points de vie toutes les
     2 s). Toucher une unité blessée avec une Prêtresse en main l'y envoie.
   - Le **Champion** (caserne, Âge des Châteaux) : infanterie lourde.
+  - L'**Arbalétrier** (archerie, Âge des Châteaux) : un carreau lourd, de plus
+    loin que l'archer, qui perce l'armure de l'infanterie ; lent à recharger.
+  - L'**Archer monté** (archerie, Âge des Châteaux) : la portée d'un archer sur
+    un cheval — il harcèle et s'esquive ; les lanciers le fauchent.
   - La **Catapulte** (atelier de siège, Âge des Châteaux) lance un boulet sur un
     point : dégâts de zone à l'arrivée, bonus contre les bâtiments. Une troupe
     en mouvement l'esquive.
@@ -298,6 +303,13 @@ lance des vagues d'assaut de plus en plus grosses. Première offensive typique :
 9 à 11 minutes en Normal (7 min 30 s à 13 min en Facile, 8 min 45 s à
 10 min 30 s en Difficile) ; en Express, dès la deuxième minute. L'IA ne pose
 jamais un bâtiment qui murerait un des siens ni qui couperait un passage.
+
+À l'Âge des Châteaux elle bâtit aussi un Temple et forme toutes les troupes du
+jeu. Les unités chères ne sortiraient jamais si les fantassins buvaient l'or au
+fur et à mesure : elle en « commande » donc une à la fois et met son prix de
+côté — une Hydre tant qu'elle en a moins de deux, puis un engin de siège
+(catapulte et bélier en alternance), et deux Prêtresses au plus pour soigner
+l'armée. Attaquée chez elle, elle lâche l'épargne et forme ce qu'elle peut.
 
 ## Architecture
 

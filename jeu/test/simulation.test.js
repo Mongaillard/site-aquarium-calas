@@ -2002,6 +2002,62 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
 }
 
 // ---------------------------------------------------------------------------
+// Les tireurs de l'Âge des Châteaux : Arbalétrier et Archer monté.
+// ---------------------------------------------------------------------------
+{
+  console.log('\n— Arbalétrier et Archer monté —');
+  const w = new World({ seed: 9, mapSize: 'medium', difficulty: 'normal' });
+  w.ais = [];
+  const p = w.players[0];
+  p.resources = { food: 5000, wood: 5000, gold: 5000 };
+  w.players[1].age = 2;
+  const c0 = centreDe(w);
+  const archerie = w.spawnBuilding(0, 'archery', c0.tx + 6, c0.ty, true);
+  p.age = 1;
+  const tropTot = w.canTrain(archerie, 'crossbowman').ok || w.canTrain(archerie, 'horseArcher').ok;
+  p.age = 2;
+  check('Arbalétrier et Archer monté se forment à l’Archerie, à l’Âge des Châteaux',
+    !tropTot && w.canTrain(archerie, 'crossbowman').ok && w.canTrain(archerie, 'horseArcher').ok);
+
+  // Un coin dégagé, loin des deux bases.
+  let c = null;
+  for (let ty = 8; ty < w.map.h - 8 && !c; ty += 3) for (let tx = 8; tx < w.map.w - 8 && !c; tx += 3) {
+    if (w.map.startPositions.some((b) => Math.hypot(tx - b.tx, ty - b.ty) < 18)) continue;
+    let ok = true;
+    for (let dy = -6; dy <= 6 && ok; dy++) for (let dx = -6; dx <= 6 && ok; dx++) if (!w.map.isOpenTile(tx + dx, ty + dy)) ok = false;
+    if (ok) c = { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
+  }
+  // Le carreau : 9 + 3 contre l'infanterie, moins l'armure perforante du Champion (2).
+  const arbaletrier = w.spawnUnit(0, 'crossbowman', c.x - TILE * 2.5, c.y);
+  const champion = w.spawnUnit(1, 'champion', c.x + TILE * 2.5, c.y);
+  champion.stance = 'passive'; arbaletrier.stance = 'standGround';
+  arbaletrier.attackEntity(champion);
+  advance(w, 6, () => champion.hp < champion.maxHp);
+  const carreau = champion.maxHp - champion.hp;
+  check('un carreau perce l’armure du Champion', carreau === 9 + 3 - 2, `${carreau} points de dégâts à 5 cases`);
+  champion.hp = 0; w.killEntity ? w.killEntity(champion) : (champion.dead = true);
+  arbaletrier.dead = true;
+  w.units = w.units.filter((u) => !u.dead);
+
+  // L'Archer monté tire de loin, court plus vite qu'un fantassin, et le lancier le fauche.
+  const monte = w.spawnUnit(0, 'horseArcher', c.x - TILE * 2, c.y + TILE * 3);
+  const cible = w.spawnUnit(1, 'militia', c.x + TILE * 2, c.y + TILE * 3);
+  cible.stance = 'passive'; monte.stance = 'standGround';
+  monte.attackEntity(cible);
+  advance(w, 5, () => cible.hp < cible.maxHp);
+  const distance = dist(monte.x, monte.y, cible.x, cible.y) / TILE;
+  check('l’Archer monté touche à distance, sans bouger', cible.hp < cible.maxHp && distance > 3.5, `à ${distance.toFixed(1)} cases`);
+  check('il court plus vite qu’un fantassin, moins qu’un éclaireur',
+    monte.def.speed > champion.def.speed && monte.def.speed < w.spawnUnit(0, 'scout', c.x, c.y - TILE * 4).def.speed);
+  const lancier = w.spawnUnit(1, 'spearman', monte.x + TILE * 0.8, monte.y);
+  const avant = monte.hp;
+  monte.stance = 'passive';
+  lancier.attackEntity(monte);
+  advance(w, 4, () => monte.hp < avant);
+  check('un lancier le fauche comme toute cavalerie', avant - monte.hp >= 4 + 10 - monte.def.meleeArmor, `${avant - monte.hp} points en un coup`);
+}
+
+// ---------------------------------------------------------------------------
 // Affichage lissé : entre deux pas de simulation, sans rien changer au jeu.
 // ---------------------------------------------------------------------------
 {
@@ -2021,9 +2077,9 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     && Math.abs(milieu.x - (avant.x + apres.x) / 2) < 1e-9 && Math.abs(milieu.y - (avant.y + apres.y) / 2) < 1e-9,
     `pas de ${pas.toFixed(2)} px`);
   check('le dessin fini, la vraie position est remise', u.x === apres.x && u.y === apres.y);
-  const empreinteAvant = JSON.stringify(serializeWorld(w));
+  const empreinteAvant = empreinte(w);
   w.lisser(0.3); w.delisser();
-  check('lisser puis délisser ne change rien à la partie', JSON.stringify(serializeWorld(w)) === empreinteAvant);
+  check('lisser puis délisser ne change rien à la partie', empreinte(w) === empreinteAvant);
 }
 
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : '❌ ' + failures + ' test(s) en échec'}`);
