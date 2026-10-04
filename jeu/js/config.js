@@ -73,10 +73,17 @@ export const RESOURCE_ICONS = { food: 'food', wood: 'wood', gold: 'gold' };
 
 // --- Âges -------------------------------------------------------------------
 
+// Un âge se mérite : son prix, et `requis` — des bâtiments TERMINÉS de l'âge en
+// cours : tous ceux de `types`, ou `nombre` d'entre eux, au choix, quand il est
+// donné (voir World.conditionAge). Sans cela il n'y avait qu'une ouverture :
+// tout le monde à la nourriture, et le stock de départ de l'Express payait
+// l'Âge des Châteaux à la première seconde.
 export const AGES = [
   { id: 0, name: 'Âge Sombre', short: 'I' },
-  { id: 1, name: 'Âge Féodal', short: 'II', cost: { food: 300 }, time: 40 },
-  { id: 2, name: 'Âge des Châteaux', short: 'III', cost: { food: 500, gold: 150 }, time: 55 },
+  { id: 1, name: 'Âge Féodal', short: 'II', cost: { food: 400 }, time: 40,
+    requis: { types: ['barracks', 'mill'] } },
+  { id: 2, name: 'Âge des Châteaux', short: 'III', cost: { food: 600, gold: 200 }, time: 55,
+    requis: { types: ['archery', 'stable', 'blacksmith', 'temple'], nombre: 2 } },
 ];
 
 // --- Unités -----------------------------------------------------------------
@@ -138,7 +145,7 @@ export const UNIT_TYPES = {
     id: 'crossbowman', name: 'Arbalétrier', icon: 'crossbowman', class: 'archer',
     cost: { wood: 40, gold: 60 }, trainTime: 22, hp: 40, speed: 0.95,
     attack: 9, attackType: 'pierce', range: 6, attackSpeed: 3.2,
-    bonus: { infantry: 3 },
+    bonus: { infantry: 8 },
     meleeArmor: 0, pierceArmor: 1, los: 7, radius: 9,
     projectile: true,
     from: 'archery', age: 2,
@@ -176,7 +183,7 @@ export const UNIT_TYPES = {
     id: 'champion', name: 'Champion', icon: 'champion', class: 'infantry',
     cost: { food: 70, gold: 50 }, trainTime: 22, hp: 85, speed: 0.95,
     attack: 9, attackType: 'melee', range: 0.8, attackSpeed: 1.8,
-    meleeArmor: 3, pierceArmor: 2, los: 5, radius: 10,
+    meleeArmor: 2, pierceArmor: 2, los: 5, radius: 10,
     from: 'barracks', age: 2,
     desc: 'Infanterie lourde en armure complète : tient la ligne là où le milicien plie.',
   },
@@ -191,15 +198,19 @@ export const UNIT_TYPES = {
   },
   // La créature de l'Atelier 3D : sept têtes sur trois cous, invoquée au
   // Temple. Lente à venir et chère, elle vaut une escouade — et en occupe la
-  // place : trois de population (`pop`, 1 pour toute autre unité).
+  // place : trois de population (`pop`, 1 pour toute autre unité). Ses trois
+  // cous mordent chacun leur ennemi : `morsures` troupes par coup, sa cible et
+  // ses voisines devant elle (voir World.morsuresVoisines). Chaque morsure est
+  // plus faible que son ancienne morsure unique (14), le bonus contre les
+  // bâtiments compense : un mur, lui, n'est mordu qu'une fois.
   hydra: {
     id: 'hydra', name: 'Hydre', icon: 'hydra', class: 'monster',
     cost: { food: 200, gold: 200 }, trainTime: 45, hp: 280, speed: 0.9,
-    attack: 14, attackType: 'melee', range: 1.3, attackSpeed: 2.0,
-    bonus: { building: 6 },
+    attack: 11, attackType: 'melee', range: 1.3, attackSpeed: 2.0, morsures: 3,
+    bonus: { building: 9 },
     meleeArmor: 2, pierceArmor: 2, los: 6, radius: 16, pop: 3,
     from: 'temple', age: 2,
-    desc: 'Monstre à sept têtes invoqué au Temple : encaisse et mord comme une escouade. Occupe 3 places de population.',
+    desc: 'Monstre à sept têtes invoqué au Temple : encaisse comme une escouade et mord jusqu’à trois ennemis à la fois. Occupe 3 places de population.',
   },
   // La Prêtresse ne se bat pas : elle soigne. Son « coup » est un soin — même
   // portée, même cadence que l'attaque d'une autre unité, mais sa cible est un
@@ -214,16 +225,17 @@ export const UNIT_TYPES = {
   },
   // La Catapulte : un boulet lancé sur un POINT (là où se tenait la cible),
   // qui blesse tout ce qui s'y trouve à l'arrivée dans un rayon de `splash`
-  // cases. Une troupe qui bouge l'esquive ; un bâtiment, jamais.
+  // cases — ses propres troupes comprises (voir World.impactDeZone). Une
+  // troupe qui bouge l'esquive ; un bâtiment, jamais.
   catapult: {
     id: 'catapult', name: 'Catapulte', icon: 'catapult', class: 'siege',
     cost: { wood: 180, gold: 110 }, trainTime: 30, hp: 70, speed: 0.55,
     attack: 26, attackType: 'melee', range: 7, attackSpeed: 5.0,
     bonus: { building: 34 },
     meleeArmor: 0, pierceArmor: 6, los: 8, radius: 13,
-    projectile: true, splash: 1.1,
+    projectile: true, splash: 0.8,
     from: 'siege', age: 2,
-    desc: 'Lance des boulets de loin : dégâts de zone, redoutable contre les bâtiments et les troupes serrées. Lente, sans défense au corps à corps.',
+    desc: 'Lance des boulets de loin : dégâts de zone, redoutable contre les bâtiments et les troupes à l’arrêt. Une troupe en marche l’esquive, et le boulet blesse aussi vos hommes. Lente, sans défense au corps à corps.',
   },
   // Les animaux vivent sur la carte : ni produits, ni comptés dans la
   // population, sans camp (voir Animal, entities.js). `food` est ce que rend

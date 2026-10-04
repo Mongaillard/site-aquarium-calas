@@ -7,7 +7,7 @@
 import {
   TILE, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
   START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, GAME_MODES, DEFAULT_MODE,
-  DEFAULT_CIV, civDe, nomDe,
+  DEFAULT_CIV, civDe, nomDe, ficheDe,
 } from './config.js';
 import { GameMap, BLOCK } from './map.js';
 import { PathFinder } from './pathfinding.js';
@@ -641,13 +641,42 @@ export class World {
       target.takeDamage(damage, attacker);
       this.effects.push({ kind: 'hit', x: target.x, y: target.y - 6, life: 0.25, max: 0.25 });
       this.pushEvent({ type: 'melee', x: attacker.x, y: attacker.y, player: attacker.playerIndex });
+      if (attacker.def.morsures > 1) this.morsuresVoisines(attacker, target);
     }
   }
 
   /**
-   * Le boulet d'une catapulte touche le sol : tout ce qui n'est pas du camp
-   * du tireur, dans son rayon, encaisse le coup (calculé pour chacun : armure
-   * et bonus contre les bâtiments compris). Les bêtes sauvages sont épargnées.
+   * Les autres têtes de l'Hydre : à chaque morsure, les troupes ennemies les
+   * plus proches d'elle — à portée de cou, et devant elle : du côté de sa
+   * cible, pas dans son dos — sont mordues aussi, jusqu'à `morsures` ennemis
+   * en tout (chacun avec son armure). Ni hasard ni tir ami ; les bâtiments et
+   * les bêtes ne comptent pas.
+   */
+  morsuresVoisines(hydre, cible) {
+    const portee = hydre.rangePx() + hydre.radius;
+    const ax = cible.x - hydre.x, ay = cible.y - hydre.y;
+    const voisins = [];
+    this.grid.forEachNear(hydre.x, hydre.y, portee + TILE, (e) => {
+      if (e === cible || e.dead || e.garrisonedIn || e.kind !== 'unit' || e.isAnimal) return;
+      if (e.playerIndex === hydre.playerIndex) return;
+      const d = e.edgeDistanceTo(hydre.x, hydre.y);
+      if (d > portee || (e.x - hydre.x) * ax + (e.y - hydre.y) * ay < 0) return;
+      voisins.push({ e, d });
+    });
+    // Les plus proches d'abord ; à distance égale, l'ordre de naissance tranche.
+    voisins.sort((a, b) => a.d - b.d || a.e.id - b.e.id);
+    for (const { e } of voisins.slice(0, hydre.def.morsures - 1)) {
+      e.takeDamage(computeDamage(hydre.def, hydre.player, e), hydre);
+      this.effects.push({ kind: 'hit', x: e.x, y: e.y - 6, life: 0.25, max: 0.25 });
+    }
+  }
+
+  /**
+   * Le boulet d'une catapulte touche le sol : tout ce qui se trouve dans son
+   * rayon encaisse le coup (calculé pour chacun : armure et bonus contre les
+   * bâtiments compris) — les troupes du camp du tireur aussi : on ne tire pas
+   * dans une mêlée où l'on a des hommes. Sont épargnés la catapulte elle-même,
+   * les bâtiments et les bêtes de son camp, et les bêtes sauvages.
    */
   impactDeZone(pr) {
     const rayon = pr.splash * TILE;
@@ -655,11 +684,27 @@ export class World {
     const def = tireur.def, joueur = this.players[tireur.playerIndex] || this.gaia;
     const touches = [];
     this.grid.forEachNear(pr.x, pr.y, rayon + TILE * 2, (e) => {
-      if (e.dead || e.garrisonedIn || e.playerIndex === tireur.playerIndex) return;
+      if (e.dead || e.garrisonedIn || e === tireur) return;
+      if (e.playerIndex === tireur.playerIndex && (e.kind !== 'unit' || e.isAnimal)) return;
       if (e.isAnimal && e.playerIndex < 0) return;
       if (e.edgeDistanceTo(pr.x, pr.y) <= rayon) touches.push(e);
     });
-    for (const e of touches) e.takeDamage(def ? computeDamage(def, joueur, e) : pr.damage, tireur);
+    let amis = 0;
+    for (const e of touches) {
+      const degats = def ? computeDamage(def, joueur, e) : pr.damage;
+      if (e.playerIndex !== tireur.playerIndex) { e.takeDamage(degats, tireur); continue; }
+      // Tir ami : la troupe encaisse sans passer par onDamaged — ni riposte
+      // contre sa propre catapulte, ni alerte d'attaque, ni victoire comptée.
+      amis++;
+      e.hp -= degats;
+      e.lastHitAt = this.time;
+      if (e.hp <= 0) { e.hp = 0; this.killEntity(e, null); }
+    }
+    // Le joueur l'apprend en clair, sans être harcelé : une fois par demi-minute.
+    if (amis > 0 && tireur.playerIndex === this.humanIndex && this.time >= (this.avisTirAmi || 0)) {
+      this.avisTirAmi = this.time + 30;
+      this.pushEvent({ type: 'notice', text: `Votre ${nomDe(tireur.type, joueur.civ)} a touché vos propres troupes.` });
+    }
     this.effects.push({ kind: 'impact', x: pr.x, y: pr.y, rayon, life: 0.5, max: 0.5 });
     this.pushEvent({ type: 'melee', x: pr.x, y: pr.y, player: tireur.playerIndex });
   }
@@ -953,12 +998,52 @@ export class World {
 
   // --- Âges -----------------------------------------------------------------
 
+  /**
+   * Les bâtiments que l'âge suivant exige (`requis`, dans AGES) et que le
+   * joueur n'a pas encore TERMINÉS : il lui en manque `manque`, à prendre
+   * parmi `types`. `ok` quand il ne manque rien.
+   */
+  conditionAge(player) {
+    const requis = (AGES[player.age + 1] || {}).requis;
+    if (!requis) return { ok: true, manque: 0, types: [] };
+    const types = requis.types.filter((type) => !this.buildings.some(
+      (b) => !b.dead && b.complete && b.playerIndex === player.index && b.type === type));
+    const manque = Math.max(0, (requis.nombre || requis.types.length) - (requis.types.length - types.length));
+    return { ok: manque === 0, manque, types };
+  }
+
+  /**
+   * La condition dite au joueur, avec les noms de sa civilisation : « Il faut
+   * une Caserne et un Moulin », « Il faut encore un bâtiment parmi : … ». Un
+   * chantier ouvert compte comme acquis — il reste à le finir, et on le dit.
+   * Chaîne vide si la condition est remplie.
+   */
+  raisonAge(player) {
+    const c = this.conditionAge(player);
+    if (c.ok) return '';
+    const nom = (type) => nomDe(type, player.civ);
+    const enChantier = (type) => this.buildings.some(
+      (b) => !b.dead && b.playerIndex === player.index && b.type === type);
+    const chantiers = c.types.filter(enChantier), aPoser = c.types.filter((type) => !enChantier(type));
+    const reste = c.manque - chantiers.length;
+    if (reste <= 0) return `Chantier à terminer d’abord : ${chantiers.map(nom).join(', ')}`;
+    if (reste < aPoser.length) {
+      return `Il faut ${reste > 1 ? `${reste} bâtiments` : 'encore un bâtiment'} parmi : ${aPoser.map(nom).join(', ')}`;
+    }
+    const avecArticle = aPoser.map((type) => `${ficheDe(type, player.civ).fem ? 'une' : 'un'} ${nom(type)}`);
+    const dernier = avecArticle.pop();
+    return `Il faut ${avecArticle.length ? `${avecArticle.join(', ')} et ` : ''}${dernier}`;
+  }
+
   canAdvanceAge(building) {
     const player = this.players[building.playerIndex];
     const next = AGES[player.age + 1];
     if (!next) return { ok: false, reason: 'Âge maximal atteint' };
     if (player.ageProgress) return { ok: false, reason: 'Passage déjà en cours' };
     if (!building.complete || building.type !== 'towncenter') return { ok: false, reason: 'Centre-Ville requis' };
+    // Les bâtiments exigés d'abord : le message dit lesquels. Le prix ensuite.
+    const raison = this.raisonAge(player);
+    if (raison) return { ok: false, reason: raison };
     if (!canAfford(player.resources, next.cost)) return { ok: false, reason: 'Ressources insuffisantes' };
     return { ok: true };
   }

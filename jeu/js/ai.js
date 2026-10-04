@@ -236,6 +236,10 @@ export class AIPlayer {
     if (!this.has('mill') && this.villagers.length >= 6) return 'mill';
     if (!this.has('barracks') && this.villagers.length >= 8) return 'barracks';
     if (!this.has('miningcamp') && this.villagers.length >= 9) return 'miningcamp';
+    // L'âge visé exige des bâtiments (`requis`, dans AGES) : ils passent avant
+    // les fermes, sinon son prix dort en réserve sans pouvoir être dépensé.
+    const requis = this.ageTarget && this.batimentPourAge();
+    if (requis) return requis;
     // Les fermes stabilisent la nourriture bien avant l'Âge Féodal : les
     // buissons s'épuisent et les villageois marchent de plus en plus loin.
     // On en veut d'autant plus qu'on a des bras et du bois qui dort.
@@ -265,6 +269,13 @@ export class AIPlayer {
   }
 
   countFarms() { return this.counts.farm || 0; }
+
+  /** Le prochain bâtiment à poser pour mériter l'âge suivant (ses chantiers ouverts comptent déjà), ou null. */
+  batimentPourAge() {
+    const c = this.world.conditionAge(this.player);
+    const aPoser = c.types.filter((type) => !this.has(type));
+    return c.manque > c.types.length - aPoser.length && aPoser.length > 0 ? aPoser[0] : null;
+  }
 
   pickBuilders(site, count) {
     // Un villageois à l'abri ne bouge pas : l'affecter ferait croire le
@@ -399,9 +410,14 @@ export class AIPlayer {
     }
     const forge = this.completed.find((b) => b.type === 'blacksmith');
     if (!forge || forge.queue.length > 0) return;
+    // Le prix de l'âge visé n'est pas à dépenser à la Forge : ses recherches se
+    // font avec le surplus, ou pendant le passage. Sans cela, chaque fois que
+    // la nourriture montait, une technologie la mangeait à deux doigts du but.
+    // (La Brouette, elle, se rembourse en récolte : elle n'attend pas.)
+    const pourAge = this.ageTarget ? this.ageTarget.cost.food || 0 : 0;
     for (const tech of ['forging', 'fletching', 'scaleArmor']) {
       if (player.techs.has(tech)) continue;
-      if (this.world.canResearch(forge, tech).ok && player.resources.food > 250) {
+      if (this.world.canResearch(forge, tech).ok && player.resources.food > 250 + pourAge) {
         this.world.researchTech(forge, tech);
         break;
       }
@@ -418,8 +434,11 @@ export class AIPlayer {
     // voulu, et le prix d'une Hydre tant que le Temple n'en a pas donné assez.
     const menace = this.world.time < this.defendUntil;
     // (À l'Âge des Châteaux seulement : avant, le bois doit d'abord aller aux
-    // fermes, sinon le passage d'âge prend deux minutes de retard.)
-    const projet = !menace && this.projet && player.age >= 2 ? BUILDING_TYPES[this.projet].cost : null;
+    // fermes, sinon le passage d'âge prend deux minutes de retard. Sauf pour le
+    // bâtiment qu'exige l'âge visé : lanciers et archers buvaient son bois, et
+    // le prix de l'âge dormait en réserve jusqu'à la fin de la partie.)
+    const exige = !!this.projet && !!this.ageTarget && this.projet === this.batimentPourAge();
+    const projet = !menace && this.projet && (player.age >= 2 || exige) ? BUILDING_TYPES[this.projet].cost : null;
     const commande = this.commande();
     const pourCommande = !menace && commande ? UNIT_TYPES[commande.type].cost : null;
 

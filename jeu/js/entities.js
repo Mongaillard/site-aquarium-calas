@@ -1589,10 +1589,13 @@ export class Projectile {
     this.startY = this.y;
     this.travel = 0;
     this.totalDist = Math.max(1, dist(this.x, this.y, target.x, target.y));
-    // Un boulet (`splash`, en cases) vise le SOL où se tenait la cible, plus
-    // lentement qu'une flèche, et y frappe tout ce qui s'y trouve à l'arrivée.
+    // Un boulet (`splash`, en cases) vise le SOL où se tenait la cible, bien
+    // plus lentement qu'une flèche, et y frappe tout ce qui s'y trouve à
+    // l'arrivée. À quatre cases par seconde, tiré de cinq cases ou plus, il
+    // laisse à un fantassin en marche le temps de sortir de la zone (à 6,5,
+    // seul un cheval au galop l'esquivait).
     this.splash = (source.def && source.def.splash) || 0;
-    if (this.splash) { this.sol = { x: target.x, y: target.y }; this.speed = 6.5 * TILE; }
+    if (this.splash) { this.sol = { x: target.x, y: target.y }; this.speed = 4 * TILE; }
   }
 
   update(dt) {
