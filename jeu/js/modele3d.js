@@ -245,7 +245,9 @@ const LUMIERE = [-0.55, 0.75, 0.45];   // repère caméra : en haut à gauche, u
 // Cadre de travail autour de l'ancre, en mètres : assez large pour un mort
 // étendu de tout son long et une épée levée. Chaque atlas est ensuite recadré
 // sur l'union de ses images.
-const CADRE = { gauche: 2.1, droite: 2.1, haut: 2.5, bas: 1.3 };
+// (2,7 m en haut : le bras de la catapulte en fin de course monte à 2,6 m ;
+// 1,5 m en bas : le trident d'un Atlante qui tombe descend à 1,43 m.)
+const CADRE = { gauche: 2.1, droite: 2.1, haut: 2.7, bas: 1.5 };
 const MARGE = 2;            // px d'atlas autour de l'emprise (le contour y loge)
 /**
  * Lumières (× π : l'éclairage physique de three.js) et étalonnage des couleurs.

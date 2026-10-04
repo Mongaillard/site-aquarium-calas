@@ -1689,8 +1689,11 @@ export class Renderer {
     }
     const a = 1 - Math.exp(-Math.max(0, this.horloge - vue.t) / 0.09);
     vue.x += (c - vue.x) * a; vue.y += (s - vue.y) * a; vue.t = this.horloge;
-    // Demi-tour : la moyenne de deux caps opposés ne pointe nulle part.
-    const lisse = Math.hypot(vue.x, vue.y) > 0.2 ? Math.atan2(vue.y, vue.x) : angle;
+    // Demi-tour : la moyenne de deux caps opposés ne pointe nulle part. On
+    // repart alors du cap du moment — sans quoi le lissage, en se relevant,
+    // repassait par une diagonale déjà quittée.
+    if (Math.hypot(vue.x, vue.y) <= 0.2) { vue.x = c; vue.y = s; }
+    const lisse = Math.atan2(vue.y, vue.x);
     let k = caseDirection(lisse, 8);
     if (k !== vue.k) {
       const centre = Math.PI / 2 - vue.k * (Math.PI / 4);
@@ -1764,7 +1767,8 @@ export class Renderer {
       const ecoule = fx.max - fx.life + (this.sousPas || 0);
       const image = positionImage(clip, ecoule);
       ctx.globalAlpha = Math.min(1, fx.life / 1.5);
-      this.poserImage3D(clip, fx.joueur, caseDirection(fx.facing, 8), image, fx.x, fx.y + (UNIT_TYPES[fx.type]?.radius || 9) * 0.45);
+      // Le corps tombe dans la vue où la troupe était montrée (voir vueDe), pas un quart de tour à côté.
+      this.poserImage3D(clip, fx.joueur, fx.vue >= 0 ? fx.vue : caseDirection(fx.facing, 8), image, fx.x, fx.y + (UNIT_TYPES[fx.type]?.radius || 9) * 0.45);
       ctx.globalAlpha = 1;
     }
   }

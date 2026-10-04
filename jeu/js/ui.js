@@ -675,14 +675,16 @@ export class UI {
   texteFinesse() {
     const r = this.game.renderer;
     const ecran = Math.min(window.devicePixelRatio || 1, 3);
-    if (r.dpr >= ecran) return `Affichée : ${r.dpr} pixels par point, toute la finesse de cet écran.`;
+    const n = (v) => String(Math.round(v * 100) / 100).replace('.', ',');
+    const px = (v) => `${n(v)} pixel${v >= 2 ? 's' : ''} par point`;
+    if (r.dpr >= ecran) return `Affichée : ${px(r.dpr)}, toute la finesse de cet écran.`;
     // `fige` dit seulement « on ne surveille plus » : il est vrai aussi pour le
     // réglage « Légère » et pour « ?dpr= ». La cause se lit donc d'abord ailleurs.
     const cause = r.dprForce ? ' — imposée par « ?dpr= » dans l’adresse.'
       : this.game.finesse === 'legere' ? ' — c’est ton réglage « Légère ».'
       : r.cadence && r.cadence.fige ? ' — réduite automatiquement, le jeu ralentissait.'
       : '.';
-    return `Affichée : ${r.dpr} pixels par point au lieu de ${ecran}${cause}`;
+    return `Affichée : ${px(r.dpr)} au lieu de ${n(ecran)}${cause}`;
   }
 
   toast(message, kind = 'info') {

@@ -707,6 +707,8 @@ export class World {
       if (!entity.isAnimal) {
         this.effects.push({
           kind: 'cadavre', x: entity.x, y: entity.y, type: entity.type, facing: entity.facing,
+          // La vue sous laquelle le rendu montrait la troupe (état d'affichage seul ; -1 sans rendu).
+          vue: entity._vue3d ? entity._vue3d.k : -1,
           joueur: entity.playerIndex, life: 6, max: 6,
         });
       }
