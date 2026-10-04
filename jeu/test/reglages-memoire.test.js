@@ -4,11 +4,12 @@
 // fausses toiles (des dimensions, sans un seul pixel).
 // Lancement : node jeu/test/reglages-memoire.test.js
 
+import { readFileSync } from 'node:fs';
 import { World } from '../js/game.js';
 import { TICKS_PER_SECOND } from '../js/config.js';
 import {
   TEMOIN_KEY, etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, incidentDe, releverTemoin,
-  resumeIncident, phraseIncident,
+  incidentNonLu, marquerIncidentsLus, resumeIncident, phraseIncident,
 } from '../js/save.js';
 
 const DT = 1 / TICKS_PER_SECOND;
@@ -134,6 +135,68 @@ console.log('--- Témoin de coupure ---');
     check('la liste garde les cinq derniers incidents', incidents.length === 5 && incidents[0].unites === 2 && incidents[4].unites === 6,
       incidents.map((i) => i.unites).join(','));
     check('le résumé d’un incident se lit seul', resumeIncident(incidents[4]) === 'après 12 min — 180 Mo d’images, 6 unités', resumeIncident(incidents[4]));
+  }
+
+  // La ligne de l'accueil tient jusqu'à la prochaine partie lancée, pas le temps d'un seul chargement.
+  {
+    const s = fauxStockage();
+    const accueil = (maintenant) => releverTemoin(maintenant, s) || incidentNonLu(s);   // ce que fait js/main.js au chargement
+    check('aucun incident : rien à redire, rien à marquer, rien d’écrit',
+      incidentNonLu(s) === null && marquerIncidentsLus(s) === false && s.getItem(TEMOIN_KEY) === null);
+    ecrireTemoin(etat(T0), s);
+    const premier = accueil(T0 + 2000);
+    const second = accueil(T0 + 60_000);     // la page est relancée avant que personne ait lu la ligne
+    check('page relancée une seconde fois avant d’être lue : l’accueil redit la coupure',
+      !!premier && !!second && phraseIncident(second) === phraseIncident(premier)
+        && phraseIncident(second) === 'La dernière partie s’est interrompue après 12 min — 180 Mo d’images, 64 unités',
+      second ? phraseIncident(second) : 'aucune ligne');
+    check('… et une troisième fois, le lendemain, sans la compter deux fois',
+      !!accueil(T0 + 86_400_000) && lireTemoin(s).incidents.length === 1);
+    check('une partie est lancée : l’accueil ne la redit plus', marquerIncidentsLus(s) === true && incidentNonLu(s) === null && accueil(T0 + 86_500_000) === null);
+    check('… mais elle reste dans la liste, pour le menu de pause',
+      lireTemoin(s).incidents.length === 1 && resumeIncident(lireTemoin(s).incidents[0]) === 'après 12 min — 180 Mo d’images, 64 unités');
+    check('rien de neuf à marquer : aucune écriture de plus', marquerIncidentsLus(s) === false);
+    // La partie lancée tient sa marque, puis se ferme proprement : toujours rien à redire.
+    ecrireTemoin(etat(T0 + 86_600_000), s);
+    fermerTemoin('accueil', null, s);
+    check('partie suivante quittée normalement : toujours rien à l’accueil', accueil(T0 + 86_700_000) === null && lireTemoin(s).incidents.length === 1);
+    // Une nouvelle coupure se dit à son tour, et tient elle aussi.
+    ecrireTemoin(etat(T0 + 90_000_000, { unites: 7 }), s);
+    const suivante = accueil(T0 + 90_050_000);
+    check('une nouvelle coupure se dit à son tour, et tient au chargement suivant',
+      !!suivante && suivante.unites === 7 && (accueil(T0 + 90_100_000) || {}).unites === 7 && lireTemoin(s).incidents.length === 2,
+      JSON.stringify(lireTemoin(s).incidents.map((i) => [i.unites, !!i.lu])));
+    // Un rechargement en pleine partie tient de la même façon.
+    marquerIncidentsLus(s);
+    ecrireTemoin(etat(T0 + 95_000_000), s);
+    fermerTemoin('quittee', etat(T0 + 95_001_000, { min: 3, unites: 12, mo: 60 }), s);
+    const recharge = [accueil(T0 + 95_004_000), accueil(T0 + 95_900_000)];
+    check('un rechargement en pleine partie se redit lui aussi au chargement suivant',
+      recharge.every((i) => i && phraseIncident(i) === 'La page a été rechargée en pleine partie, après 3 min — 60 Mo d’images, 12 unités'),
+      recharge.map((i) => i && i.genre).join(', '));
+    // Une liste rangée avant ce champ (sans « lu ») : son dernier incident se dit une fois, sans erreur.
+    const ancien = fauxStockage();
+    ancien.setItem(TEMOIN_KEY, '{"dernier":null,"incidents":[{"genre":"coupure","h":1,"min":2,"mo":5,"unites":3,"troupes":1,"dpr":2}]}');
+    check('incident rangé sans le champ « lu » : dit à l’accueil, puis marqué',
+      (incidentNonLu(ancien) || {}).mo === 5 && marquerIncidentsLus(ancien) === true && incidentNonLu(ancien) === null);
+    // Stockage refusé ou plein : aucune erreur ; plein, la ligne reviendra simplement au chargement suivant.
+    const refus = { getItem() { throw new Error('refusé'); }, setItem() { throw new Error('refusé'); }, removeItem() { throw new Error('refusé'); } };
+    let erreur = null, rendus = null;
+    try { rendus = [incidentNonLu(refus), marquerIncidentsLus(refus), incidentNonLu(null), marquerIncidentsLus(null)]; } catch (e) { erreur = e; }
+    check('stockage refusé ou absent : rien à redire, rien ne casse',
+      !erreur && rendus[0] === null && rendus[1] === false && rendus[2] === null && rendus[3] === false, erreur ? erreur.message : JSON.stringify(rendus));
+    const plein = fauxStockage();
+    ecrireTemoin(etat(T0), plein);
+    releverTemoin(T0 + 2000, plein);
+    plein.setItem = () => { throw new Error('quota'); };
+    check('stockage plein au lancement d’une partie : pas d’erreur, la ligne reviendra', marquerIncidentsLus(plein) === false && !!incidentNonLu(plein));
+    // Le câblage de js/main.js, qui ne se charge pas sous Node : c'est là qu'était le défaut.
+    const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+    const lancer = main.slice(main.indexOf('function startGame('), main.indexOf('function setupStartScreen('));
+    check('js/main.js : à l’accueil, la marque relevée ou, à défaut, le dernier incident non lu',
+      /let incidentAccueil = releverTemoin\(\) \|\| incidentNonLu\(\);/.test(main));
+    check('js/main.js : lancer une partie marque les incidents lus, avant de créer la partie',
+      /marquerIncidentsLus\(\)[\s\S]*new Game\(/.test(lancer), lancer.slice(0, 80));
   }
 
   // Stockage refusé, plein ou abîmé : aucun effet, aucune erreur.

@@ -531,6 +531,27 @@ export function releverTemoin(maintenant = Date.now(), store = storage()) {
   }
 }
 
+/**
+ * L'incident que l'accueil doit encore dire : le dernier de la liste, tant
+ * qu'aucune partie n'a été lancée depuis (`lu`). La marque ne se relève qu'une
+ * fois : sans cette trace, la ligne ne tiendrait qu'un chargement, et une page
+ * relancée avant d'avoir été lue ne dirait plus rien de la coupure.
+ */
+export function incidentNonLu(store = storage()) {
+  const { incidents } = lireTemoin(store);
+  const dernier = incidents[incidents.length - 1];
+  return dernier && !dernier.lu ? dernier : null;
+}
+
+/** Une partie est lancée : l'accueil n'a plus à redire les incidents relevés jusque-là. */
+export function marquerIncidentsLus(store = storage()) {
+  if (!store) return false;
+  const temoin = lireTemoin(store);
+  if (temoin.incidents.every((i) => i.lu)) return false;   // rien de neuf : on n'écrit pas
+  for (const i of temoin.incidents) i.lu = true;
+  return rangerTemoin(temoin, store);
+}
+
 /** « après 12 min — 180 Mo d’images, 64 unités » : où en était la partie, ce que pesait la page. */
 export function resumeIncident(incident) {
   const duree = incident.min >= 1 ? `après ${Math.round(incident.min)} min` : 'après moins d’une minute';
