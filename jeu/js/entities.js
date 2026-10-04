@@ -52,6 +52,10 @@ const PORTEE_GENEE = TILE * 1.6;
  */
 export function villagerTask(unit) {
   if (!unit || !unit.isVillager) return null;
+  // À l'abri, ou en train d'y courir : ni au travail, ni disponible. Compté
+  // « sans affectation », il allumait le voyant des inactifs et les boutons +
+  // le choisissaient — l'ordre était pris, personne ne sortait.
+  if (unit.garrisonedIn || unit.state === STATE.GARRISON) return 'abri';
   // L'état prime : un villageois à l'arrêt peut conserver la mémoire de son
   // ancien gisement, et le compter comme actif le rendrait invisible.
   if (unit.state === STATE.IDLE) return 'idle';
@@ -216,7 +220,24 @@ export class Unit extends Entity {
 
   // --- Ordres --------------------------------------------------------------
 
+  /**
+   * Tout ordre commence ici. À l'abri, une unité n'en prend aucun (false) :
+   * elle ne sortirait pas, et l'ordre serait oublié à la sortie. Sinon elle
+   * retrouve sa vitesse propre — le pas du groupe ne vaut que pour la marche
+   * qui l'a posé ; gardé, il ralentissait pour de bon l'ouvrier envoyé au
+   * bois avant d'être arrivé — et elle oublie le poste noté au son de la
+   * cloche : le second coup ne la renverra pas à un travail que le joueur
+   * lui a fait quitter.
+   */
+  prendOrdre() {
+    if (this.garrisonedIn) return false;
+    this.groupSpeed = 0;
+    this.posteAvantAbri = null;
+    return true;
+  }
+
   stop() {
+    if (!this.prendOrdre()) return;
     this.state = STATE.IDLE;
     this.path = null;
     this.target = null;
@@ -247,6 +268,7 @@ export class Unit extends Entity {
   }
 
   moveTo(x, y, aggressive = false) {
+    if (!this.prendOrdre()) return;
     this.target = null;
     this.resourceTile = null;
     this.pendingJob = null;   // un ordre plus récent que « je livre, puis… »
@@ -267,6 +289,7 @@ export class Unit extends Entity {
    */
   attackEntity(target, auto = false) {
     if (!target || target.dead) return;
+    if (!auto && !this.prendOrdre()) return;
     // Un nouvel engagement oublie le ralliement d'un combat précédent : seul un
     // déplacement interrompu en pose un (updateMove, juste après cet appel).
     // Sinon, une cible abattue bien plus tard renverrait l'unité vers une
@@ -302,6 +325,7 @@ export class Unit extends Entity {
     const map = this.world.map;
     let res = map.resourceAt(tx, ty);
     if (!res || !this.isVillager) return;
+    if (!this.prendOrdre()) return;
     // Case cernée (arbre au milieu d'un bois) : personne ne peut venir la
     // travailler. On reporte l'ordre sur le gisement exploitable le plus
     // proche, plutôt que d'envoyer le villageois attendre devant.
@@ -375,6 +399,7 @@ export class Unit extends Entity {
 
   gatherFarm(farm) {
     if (!this.isVillager || !farm || farm.dead) return;
+    if (!this.prendOrdre()) return;
     if (this.deliverBeforeJob({ kind: 'farm', farm, resType: 'food' })) return;
     this.buildQueue.length = 0;
     if (this.carry.type && this.carry.type !== 'food') this.carry = { type: null, amount: 0 };
@@ -393,6 +418,7 @@ export class Unit extends Entity {
    */
   buildAt(building, queue = false) {
     if (!this.isVillager || !building || building.dead) return;
+    if (!this.prendOrdre()) return;
     if (queue && this.state === STATE.BUILD && this.target && !this.target.dead
         && this.target !== building) {
       if (!this.buildQueue.includes(building)) this.buildQueue.push(building);
@@ -405,6 +431,19 @@ export class Unit extends Entity {
     this.blockedTime = 0;   // voir garrisonAt
     this.state = STATE.BUILD;
     this.requestPathToEntity(building);
+  }
+
+  /**
+   * Le chantier s'achève abîmé (voir World.onBuildingCompleted) : même suite
+   * que pour un chantier achevé intact dans updateBuild — la file des
+   * chantiers, la ferme à cultiver, sinon on attend les ordres.
+   */
+  chantierAcheve(site) {
+    this.target = null;
+    this.state = STATE.IDLE;
+    if (this.nextQueuedBuild()) return;
+    if (site.type === 'farm') this.gatherFarm(site);
+    else this.world.notifyIdleWorker(this);
   }
 
   /** Passe au chantier suivant de la file. Renvoie false si elle est vide. */
@@ -942,6 +981,9 @@ export class Unit extends Entity {
   /** Ordre « va t'abriter » : l'unité rejoint le bâtiment puis y entre. */
   garrisonAt(building) {
     if (!building || !building.canGarrison(this)) return false;
+    const poste = this.posteAvantAbri;   // changer d'abri ne fait pas quitter l'alerte
+    if (!this.prendOrdre()) return false;
+    this.posteAvantAbri = poste;
     this.buildQueue.length = 0;
     this.target = building;
     this.resourceTile = null;
@@ -993,7 +1035,9 @@ export class Unit extends Entity {
   }
 
   enterGarrison(building) {
+    const poste = this.posteAvantAbri;   // stop() l'efface, comme tout ordre
     this.stop();
+    this.posteAvantAbri = poste;
     this.garrisonedIn = building;
     this.selected = false;
     this.path = null;
@@ -1451,12 +1495,16 @@ export class Building extends Entity {
   addBuildProgress(dt) {
     if (this.complete) return;
     this.unreachable = false;
+    // Les coups reçus restent : le marteau AJOUTE des points de vie, il ne
+    // ramène pas le chantier à ce que son avancement « devrait » valoir.
+    // Avant, chaque coup était effacé au coup de marteau suivant — une
+    // caserne attaquée par huit miliciens se terminait à 797/800.
+    const du = (p) => this.maxHp * (0.05 + 0.95 * clamp(p / this.def.buildTime, 0, 1));
+    const ecart = this.hp - du(this.buildProgress);   // négatif : les dégâts reçus
     this.buildProgress += dt * this.buildEfficiency();
-    const ratio = clamp(this.buildProgress / this.def.buildTime, 0, 1);
-    this.hp = Math.max(this.hp, this.maxHp * (0.05 + 0.95 * ratio));
+    this.hp = Math.min(this.maxHp, du(this.buildProgress) + ecart);
     if (this.buildProgress >= this.def.buildTime) {
       this.complete = true;
-      this.hp = this.maxHp;
       this.world.onBuildingCompleted(this);
     }
   }

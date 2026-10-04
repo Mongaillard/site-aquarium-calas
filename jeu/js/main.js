@@ -598,14 +598,17 @@ class Game {
   ringTownBell() {
     const result = this.world.ringTownBell(this.world.humanIndex);
     if (result.sheltered > 0) {
-      this.ui.toast(`${result.sheltered} ${this.ouvrier(result.sheltered)} à l'abri`, 'warn');
+      // Abris pleins : on dit combien restent dehors, au lieu de les compter à l'abri.
+      const reste = result.sansPlace > 0 ? ` — ${result.sansPlace} sans place` : '';
+      this.ui.toast(`${result.sheltered} ${this.ouvrier(result.sheltered)} à l'abri${reste}`, 'warn');
       this.audio.play('alert');
       this.vibrate([12, 40, 12]);
     } else if (result.released > 0) {
       this.ui.toast(`${result.released} ${this.ouvrier(result.released)} ${result.released > 1 ? 'retournent' : 'retourne'} au travail`);
       this.audio.play('order');
     } else {
-      this.ui.toast('Aucun abri disponible', 'error');
+      this.ui.toast(result.sansPlace > 0 ? 'Abris pleins'
+        : result.abris > 0 ? `Aucun ${this.ouvrier()} à abriter` : 'Aucun abri disponible', 'error');
       this.audio.play('error');
     }
     this.ui.refreshSelection(true);
@@ -707,7 +710,8 @@ class Game {
   pickNearestVillagers(tx, ty, count) {
     const x = tx * TILE, y = ty * TILE;
     return this.world.units
-      .filter((u) => !u.dead && u.playerIndex === this.world.humanIndex && u.isVillager)
+      .filter((u) => !u.dead && u.playerIndex === this.world.humanIndex && u.isVillager
+        && villagerTask(u) !== 'abri')   // à l'abri, il ne viendrait pas bâtir
       .sort((a, b) => dist2(a.x, a.y, x, y) - dist2(b.x, b.y, x, y))
       .slice(0, count);
   }
@@ -751,8 +755,13 @@ class Game {
       return;
     }
     this.demolitionArmee = null;
-    this.world.killEntity(building, null, false);
-    this.ui.toast(`${ficheDe(building.type, building.player.civ).name} détruit`);
+    // Les occupants sortent, la file payée est rendue (voir World.raserBatiment).
+    const { sortis, rembourse } = this.world.raserBatiment(building);
+    const fiche = ficheDe(building.type, building.player.civ);
+    const suites = [];
+    if (sortis > 0) suites.push(`${sortis} unité(s) sortie(s)`);
+    if (rembourse) suites.push('file remboursée');
+    this.ui.toast(`${fiche.name} détruit${fiche.fem ? 'e' : ''}${suites.length ? ' — ' + suites.join(', ') : ''}`);
     this.setSelection([]);
   }
 
@@ -921,7 +930,8 @@ class Game {
 
   idleVillagers() {
     return this.world.units.filter(
-      (u) => !u.dead && u.playerIndex === this.world.humanIndex && u.isVillager && u.state === 'idle');
+      (u) => !u.dead && u.playerIndex === this.world.humanIndex && u.isVillager && u.state === 'idle'
+        && !u.garrisonedIn);   // à l'abri, il n'attend pas d'ordres
   }
 
   focusIdleVillager() {
@@ -949,6 +959,7 @@ class Game {
     const mine = this.selection.filter((e) => e.playerIndex === this.world.humanIndex);
     for (const e of mine) {
       if (e.kind === 'building' && !e.complete) this.world.cancelConstruction(e);
+      else if (e.kind === 'building') this.world.raserBatiment(e);
       else this.world.killEntity(e, null, false);
     }
     this.setSelection([]);

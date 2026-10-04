@@ -152,7 +152,7 @@ export class AIPlayer {
 
   jobOf(v) {
     const task = villagerTask(v);
-    return task === 'idle' || task === 'move' ? null : task;
+    return task === 'idle' || task === 'move' || task === 'abri' ? null : task;
   }
 
   mostNeeded(jobs, ratios, total) {
