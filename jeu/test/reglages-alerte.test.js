@@ -161,33 +161,44 @@ console.log('=== Réglages « alerte » ===');
     minimapCtx: toile, minimapCanvas: { width: 160, height: 160 }, minimapTerrain: {}, minimapDirty: false,
     fogCanvas: {}, alertes: [],
   });
-  const dessiner = () => { traces.length = 0; rendu.drawMinimap(); return traces.filter((c) => c.nom === 'arc'); };
-
-  check('sans alerte, la mini-carte ne porte aucun repère', dessiner().length === 0 && traces.some((c) => c.nom === 'strokeRect'));
-
-  const foyers = new FoyersAttaque();
-  rendu.alertes = foyers.liste;
+  // Le lieu de l'alerte, et ce qui est tracé exactement là : d'autres repères
+  // pourront vivre sur la mini-carte sans fausser ces contrôles.
   const lieu = { x: 20.5 * TILE, y: 40.5 * TILE }, echelle = 160 / w.map.w;
-  foyers.signaler(lieu.x, lieu.y);
-  foyers.vieillir(0.25);
-  const tot = dessiner();
-  check('une alerte trace son repère au lieu de l’attaque',
-    tot.length === 2 && tot.every((c) => Math.abs(c.args[0] - 20.5 * echelle) < 1e-9 && Math.abs(c.args[1] - 40.5 * echelle) < 1e-9),
-    tot.length ? `(${tot[0].args[0].toFixed(1)}, ${tot[0].args[1].toFixed(1)}) sur 160` : 'rien de tracé');
-  check('le repère est rouge : une onde et un point',
-    tot.length === 2 && /^rgba\(255,59,48,/.test(tot[0].trait) && tot[1].fond === '#ff3b30', tot.map((c) => c.trait).join(' · '));
-  const cadre = traces.findIndex((c) => c.nom === 'strokeRect'), premier = traces.findIndex((c) => c.nom === 'arc');
-  check('il est tracé par-dessus le cadre de la vue', cadre >= 0 && premier > cadre);
+  const ici = (c) => c.nom === 'arc' && Math.abs(c.args[0] - 20.5 * echelle) < 1e-9 && Math.abs(c.args[1] - 40.5 * echelle) < 1e-9;
+  const dessiner = () => { traces.length = 0; rendu.drawMinimap(); return traces.filter(ici); };
+  // (Rayon et opacité de l'onde ; rien de tracé : le contrôle échoue, sans planter.)
+  const onde = (arcs) => (arcs.length === 2
+    ? { rayon: arcs[0].args[2], opacite: Number((String(arcs[0].trait).match(/,([\d.]+)\)$/) || [0, NaN])[1]) }
+    : { rayon: NaN, opacite: NaN });
 
-  foyers.vieillir(0.5);
-  const tard = dessiner();
-  const opacite = (c) => Number(c.trait.match(/,([\d.]+)\)$/)[1]);
-  check('il pulse : l’onde s’élargit et s’efface',
-    tard.length === 2 && tard[0].args[2] > tot[0].args[2] + 5 && opacite(tard[0]) < opacite(tot[0]) - 0.3,
-    `rayon ${tot[0].args[2].toFixed(1)} → ${tard[0].args[2].toFixed(1)}, opacité ${opacite(tot[0]).toFixed(2)} → ${opacite(tard[0]).toFixed(2)}`);
+  try {
+    const rouge = (c) => /^rgba\(255,59,48,/.test(String(c.trait)) || c.fond === '#ff3b30';
+    check('sans alerte, la mini-carte ne porte aucun repère',
+      dessiner().length === 0 && !traces.some((c) => c.nom === 'arc' && rouge(c)) && traces.some((c) => c.nom === 'strokeRect'));
 
-  foyers.vieillir(5.5);
-  check('six secondes plus tard, le repère a disparu', dessiner().length === 0 && foyers.liste.length === 1);
+    const foyers = new FoyersAttaque();
+    rendu.alertes = foyers.liste;
+    foyers.signaler(lieu.x, lieu.y);
+    foyers.vieillir(0.25);
+    const tot = dessiner();
+    check('une alerte trace son repère au lieu de l’attaque', tot.length === 2,
+      tot.length ? `(${tot[0].args[0].toFixed(1)}, ${tot[0].args[1].toFixed(1)}) sur 160` : 'rien de tracé à cet endroit');
+    check('le repère est rouge : une onde et un point',
+      tot.length === 2 && /^rgba\(255,59,48,/.test(tot[0].trait) && tot[1].fond === '#ff3b30', tot.map((c) => c.trait).join(' · '));
+    const cadre = traces.findIndex((c) => c.nom === 'strokeRect');
+    check('il est tracé par-dessus le cadre de la vue', cadre >= 0 && tot.length === 2 && traces.indexOf(tot[0]) > cadre);
+
+    foyers.vieillir(0.5);
+    const avant = onde(tot), apres = onde(dessiner());
+    check('il pulse : l’onde s’élargit et s’efface',
+      apres.rayon > avant.rayon + 5 && apres.opacite < avant.opacite - 0.3,
+      `rayon ${avant.rayon.toFixed(1)} → ${apres.rayon.toFixed(1)}, opacité ${avant.opacite.toFixed(2)} → ${apres.opacite.toFixed(2)}`);
+
+    foyers.vieillir(5.5);
+    check('six secondes plus tard, le repère a disparu', dessiner().length === 0 && foyers.liste.length === 1);
+  } catch (erreur) {
+    check('la mini-carte se dessine sur la toile factice', false, erreur.message);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -197,11 +208,15 @@ console.log('=== Réglages « alerte » ===');
   console.log('\n— La pastille « Armée » —');
   const w = bac();
   const tc = palais(w);
-  const depart = armeeDe(w, 0);
-  check('au départ, l’armée, c’est l’éclaireur', depart.length === 1 && depart[0].type === 'scout', depart.map((u) => u.type).join(', '));
+  // (Les comptes partent de l'armée de départ, quelle qu'elle soit : aujourd'hui, un éclaireur.)
+  const depart = armeeDe(w, 0), n0 = depart.length;
+  check('au départ, l’armée, c’est ce qui n’est pas ouvrier : l’éclaireur',
+    depart.some((u) => u.type === 'scout') && depart.every((u) => !u.isVillager && !u.isAnimal)
+      && n0 === w.units.filter((u) => u.playerIndex === 0 && u.type !== 'villager').length,
+    depart.map((u) => u.type).join(', '));
 
   const pres = [0, 1, 2].map((i) => w.spawnUnit(0, 'militia', tc.x + TILE * (4 + i), tc.y + TILE * 5));
-  const loin = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => w.spawnUnit(0, i % 2 ? 'archer' : 'spearman',
+  const loin = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => w.spawnUnit(0, i % 2 ? 'archer' : 'spearman',
     tc.x + TILE * (30 + (i % 4)), tc.y - TILE * (30 + (i >> 2))));
   const pretresse = w.spawnUnit(0, 'priest', tc.x + TILE * 4, tc.y + TILE * 6);
   w.spawnUnit(0, 'villager', tc.x + TILE * 5, tc.y + TILE * 6);
@@ -209,28 +224,28 @@ console.log('=== Réglages « alerte » ===');
   w.spawnUnit(1, 'militia', tc.x + TILE * 8, tc.y + TILE * 8);
   const armee = armeeDe(w, 0);
   check('l’armée compte tous les soldats, pas les ouvriers, ni les animaux, ni l’adversaire',
-    armee.length === 13 && armee.every((u) => u.playerIndex === 0 && !u.isVillager && !u.isAnimal)
+    armee.length === n0 + 16 && armee.every((u) => u.playerIndex === 0 && !u.isVillager && !u.isAnimal)
       && [...pres, ...loin, pretresse].every((u) => armee.includes(u)),
     `${armee.length} soldats pour ${w.units.filter((u) => u.playerIndex === 0).length} unités du joueur`);
 
   // Premier toucher : toute l'armée, où qu'elle soit — quelle que soit la sélection d'avant.
   const premier = toucherArmee(w, 0, [pres[0]]);
   check('un toucher prend toute l’armée, où qu’elle soit sur la carte',
-    !!premier && !!premier.prendre && premier.prendre.length === 13 && loin.every((u) => premier.prendre.includes(u)) && !premier.voir);
+    !!premier && !!premier.prendre && premier.prendre.length === n0 + 16 && loin.every((u) => premier.prendre.includes(u)) && !premier.voir);
   // Second toucher : elle est en main, la vue va sur le gros de la troupe.
   const second = toucherArmee(w, 0, premier.prendre.slice());
   check('un second toucher, armée déjà en main, amène la vue sur elle',
     !!second && !!second.voir && !second.prendre && armee.includes(second.voir));
-  check('… sur le gros de la troupe (huit au loin contre cinq au village)', !!second.voir && loin.includes(second.voir),
-    second.voir ? second.voir.type : '');
+  check('… sur le gros de la troupe (douze au loin, une poignée au village)', !!second && !!second.voir && loin.includes(second.voir),
+    second && second.voir ? second.voir.type : '');
   // Un soldat de plus : l'armée n'est plus toute en main, le toucher la reprend.
   const recrue = w.spawnUnit(0, 'militia', tc.x + TILE * 5, tc.y + TILE * 7);
   const troisieme = toucherArmee(w, 0, premier.prendre.slice());
   check('une recrue arrive : le toucher reprend toute l’armée, elle comprise',
-    !!troisieme.prendre && troisieme.prendre.length === 14 && troisieme.prendre.includes(recrue));
+    !!troisieme && !!troisieme.prendre && troisieme.prendre.length === n0 + 17 && troisieme.prendre.includes(recrue));
   // Un mort ne compte plus.
   w.killEntity(recrue, null, true);
-  check('un soldat tombé ne compte plus', armeeDe(w, 0).length === 13 && !armeeDe(w, 0).includes(recrue));
+  check('un soldat tombé ne compte plus', armeeDe(w, 0).length === n0 + 16 && !armeeDe(w, 0).includes(recrue));
 
   // Le cœur d'une armée : jamais un point en rase campagne.
   const A = { x: 0, y: 0 }, B = { x: 1000, y: 0 };
@@ -332,9 +347,11 @@ console.log('=== Réglages « alerte » ===');
   };
   try {
     w.spawnUnit(0, 'militia', palais(w).x + TILE * 4, palais(w).y + TILE * 4);
+    const soldats = armeeDe(w, 0).length;
     barre.refreshWorkerBar();
     check('la pastille affiche le nombre de soldats',
-      barre.nodes.armee.textContent === '2' && !barre.nodes.btnArmee.classes.has('vide'), `« ${barre.nodes.armee.textContent} »`);
+      soldats >= 1 && barre.nodes.armee.textContent === String(soldats) && !barre.nodes.btnArmee.classes.has('vide'),
+      `« ${barre.nodes.armee.textContent} » pour ${soldats} soldat(s)`);
     for (const u of armeeDe(w, 0)) w.killEntity(u, null, true);
     barre.refreshWorkerBar();
     check('sans soldat elle affiche 0 et se grise',
@@ -346,11 +363,12 @@ console.log('=== Réglages « alerte » ===');
   // --- La croix « lâcher » n'existe qu'avec une sélection ---
   const w3 = bac();
   const panneau = Object.create(UI.prototype);
-  const partie = {
+  // (Ce que le panneau demande à la partie ; toute autre méthode répond sans rien faire.)
+  const partie = new Proxy({
     selection: [], world: w3, civ: w3.players[0].civ, audio: { play() {} },
     attackMoveArmed: false, garrisonArmed: false, rallyArmed: false,
     ouvrier: () => 'villageois', demolitionEnAttente: () => false, hasSpareWorker: () => true,
-  };
+  }, { get: (o, k) => (k in o ? o[k] : (typeof k === 'symbol' ? undefined : () => {})) });
   Object.assign(panneau, {
     game: partie, world: w3, selectionSignature: '', commandsSignature: '',
     nodes: { selection: faux(), commands: faux(), lacher: faux(), bottombar: faux() },
