@@ -705,7 +705,7 @@ function recadrer(bande, n, L, H, ancreX, ancreY, equipe, f = 1, densite = DENSI
   const finale = document.createElement('canvas');
   finale.width = atlas.width; finale.height = atlas.height;
   const fctx = finale.getContext('2d');
-  if (!fctx) throw new Error('mémoire graphique saturée (atlas refusé)');
+  if (!fctx) { atlas.width = atlas.height = 0; finale.width = finale.height = 0; throw new Error('mémoire graphique saturée (atlas refusé)'); }
   fctx.drawImage(atlas, 0, 0);
   atlas.width = atlas.height = 0;
   return { canvas: finale, cellW, cellH, ancreY: (ay - y0) / f, hauteurMonde: pleineH / densite, images: n, directions: DIRECTIONS };

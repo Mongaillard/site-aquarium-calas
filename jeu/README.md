@@ -534,8 +534,8 @@ images ne paraît ni saccadé, ni flou, ni terne :
   images par seconde, et la toile passe à deux pixels par point pour une
   fenêtre témoin. Nettement plus rapide : on y reste, le zoom de départ se
   recale à 0,5. Pas mieux (un téléphone en économie d'énergie tourne à trente
-  images par seconde quoi qu'on dessine) : on remonte à trois, pour de bon si
-  les deux cadences sont les mêmes. Le menu de
+  images par seconde quoi qu'on dessine) : on remonte à trois, et on ne
+  réessaiera que si le jeu ralentit nettement. Le menu de
   pause offre aussi le choix à la main, « Finesse de l'image : Fine /
   Légère », retenu d'une partie à l'autre ; `?dpr=2` dans l'adresse l'impose
   pour un essai.

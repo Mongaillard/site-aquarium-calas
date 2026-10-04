@@ -317,9 +317,8 @@ export class Renderer {
    * pesait : on y reste pour la partie, et le zoom de départ se recale
    * (surToileReduite). Sinon — un téléphone en économie d'énergie tourne à
    * trente images par seconde quoi qu'on dessine — on remonte à trois et on
-   * y reste pour la partie si les deux cadences sont les mêmes ; si le témoin
-   * était un peu plus rapide sans l'être assez, on ne réessaiera que si le jeu
-   * ralentit encore d'un cinquième. Une fenêtre où un modèle se cuisait, ou
+   * ne réessaiera que si le jeu ralentit encore d'un cinquième par rapport à
+   * cette mesure. Une fenêtre où un modèle se cuisait, ou
    * qui contient un retour d'arrière-plan, est écartée. Rien n'est retenu
    * d'une partie à l'autre.
    */
@@ -342,12 +341,11 @@ export class Renderer {
         if (this.surToileReduite) this.surToileReduite();
       } else {
         this.dpr = c.haut; this.resize();
-        // Même cadence à deux et à trois pixels par point (à un dixième près) :
-        // ce n'est pas la toile qui la borne — économie d'énergie, écran à
-        // trente images par seconde. On reste à trois pour la partie, sans
-        // plus jamais réessayer. Sinon on ne réessaiera que si le jeu ralentit
-        // nettement par rapport à cette mesure-là.
-        if (Math.abs(moyenne - c.temoin) < c.temoin * 0.1) c.fige = true;
+        // La toile réduite n'a rien gagné : ce n'est pas elle qui borne la
+        // cadence (économie d'énergie, écran à trente images par seconde).
+        // On retient la cadence mesurée à trois pixels par point, et on ne
+        // réessaiera que si le jeu devient nettement plus lent qu'elle — le
+        // garde-fou reste armé, sans retomber dans le flou à intervalles.
         c.seuil = c.temoin * 1.2;
         c.attente = 1800 * 2 ** c.echecs; c.echecs++;
       }
@@ -514,6 +512,8 @@ export class Renderer {
 
   /** Rend la mémoire des tronçons de sol en cache (tous, ou ceux d'un niveau : « 0: », « 1: »). */
   viderTroncons(prefixe = '') {
+    // Le tampon de travail aussi (tamponTroncon le recrée à la demande).
+    if (this.tampon) { this.tampon.width = this.tampon.height = 0; this.tampon = null; }
     if (!this.troncons) return;
     for (const [cle, toile] of [...this.troncons]) {
       if (!cle.startsWith(prefixe)) continue;
@@ -549,12 +549,23 @@ export class Renderer {
    * monde, y sont les mêmes que chez le voisin.
    */
   rendreTroncon(cx, cy, echelle, nappes) {
+    const toile = { c: null };
+    try {
+      return this.peindreTroncon(cx, cy, echelle, nappes, toile);
+    } catch (erreur) {
+      if (toile.c) toile.c.width = toile.c.height = 0;   // à moitié peinte : sa mémoire tout de suite
+      throw erreur;
+    }
+  }
+
+  peindreTroncon(cx, cy, echelle, nappes, toile) {
     const taille = TRONCON * TILE, r = RECOUVREMENT;
     const X0 = cx * taille - r, Y0 = cy * taille - r, cote = taille + 2 * r;
     const canvas = document.createElement('canvas');
+    toile.c = canvas;
     canvas.width = cote * echelle; canvas.height = cote * echelle;
     const ctx = canvas.getContext('2d');
-    if (!ctx) { canvas.width = canvas.height = 0; throw new Error('mémoire graphique saturée (tronçon de sol refusé)'); }
+    if (!ctx) throw new Error('mémoire graphique saturée (tronçon de sol refusé)');
     ctx.setTransform(echelle, 0, 0, echelle, -X0 * echelle, -Y0 * echelle);
 
     const { presents, masques, etendues, rivage } = this.couverturesTroncon(X0, Y0, cote);
