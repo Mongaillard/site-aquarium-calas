@@ -278,7 +278,8 @@ inactif, `H` pour revenir au Centre-Ville.
 
 - **3 ressources** : nourriture (buissons à baies, fermes, chasse au cerf, cochons), bois (forêts), or (filons).
 - **3 âges** : Âge Sombre → Âge Féodal → Âge des Châteaux, chacun débloquant
-  bâtiments, unités et technologies.
+  bâtiments, unités et technologies — et chacun demandant des bâtiments
+  terminés en plus de son prix.
 - **14 unités** : villageois, milicien, lancier, Atlante, Champion, archer,
   Arbalétrier, Archer monté, éclaireur, cavalier, bélier, Catapulte, Prêtresse
   et Hydre. Chaque unité a des bonus contre
@@ -293,11 +294,11 @@ inactif, `H` pour revenir au Centre-Ville.
   - L'**Archer monté** (archerie, Âge des Châteaux) : la portée d'un archer sur
     un cheval — il harcèle et s'esquive ; les lanciers le fauchent.
   - La **Catapulte** (atelier de siège, Âge des Châteaux) lance un boulet sur un
-    point : dégâts de zone à l'arrivée, bonus contre les bâtiments. Une troupe
-    en mouvement l'esquive.
+    point : dégâts de zone à l'arrivée, bonus contre les bâtiments. Un soldat
+    ou un rang en marche l'esquive, et le boulet blesse aussi son propre camp.
   - L'**Hydre**, monstre à sept têtes, s'invoque au Temple à l'Âge des Châteaux
-    (200 de nourriture, 200 d'or) : elle encaisse et mord comme une escouade, et
-    occupe trois places de population.
+    (200 de nourriture, 200 d'or) : elle encaisse comme une escouade, mord
+    jusqu'à trois ennemis par coup, et occupe trois places de population.
 - **13 bâtiments** : Centre-Ville, maisons, moulin, camps de dépôt, fermes,
   caserne, archerie, écurie, atelier de siège, forge, Temple de l'Hydre (dès
   l'Âge Féodal), tour de guet.
@@ -308,8 +309,9 @@ inactif, `H` pour revenir au Centre-Ville.
   déplacement de groupe au rythme du plus lent (voir plus bas).
 - **Affectation manuelle des ouvriers** : barre de répartition permanente et
   panneau d'affectation (voir plus haut).
-- **Victoire** : détruire tous les bâtiments adverses et leurs villageois — ou,
-  en mode Express, leur dernier Centre-Ville.
+- **Victoire** : en Classique, l'adversaire est vaincu quand il n'a plus ni
+  Centre-Ville ni bâtiment militaire ; en Express, quand son dernier
+  Centre-Ville tombe — sinon au score, qui compte le combat.
 - **Sauvegarde automatique** et reprise, **vitesse de jeu** réglable, **formats
   de partie** (voir plus haut).
 
@@ -331,6 +333,162 @@ fur et à mesure : elle en « commande » donc une à la fois et met son prix de
 côté — une Hydre tant qu'elle en a moins de deux, puis un engin de siège
 (catapulte et bélier en alternance), et deux Prêtresses au plus pour soigner
 l'armée. Attaquée chez elle, elle lâche l'épargne et forme ce qu'elle peut.
+
+## Les réglages d'octobre 2026
+
+Dix relecteurs ont joué le jeu sans écran et l'ont noté (4 à 6,5 sur 10 selon
+le thème). Leur avis commun : le prochain gain ne viendrait pas d'une troupe de
+plus, mais d'une vingtaine de petits réglages. Les voici, par thème ; chacun a
+son fichier de vérifications, et `npm test` les lance tous.
+
+**Alerte d'attaque, armée et sélection au doigt.** Quand vous êtes attaqué, le
+message « Vous êtes attaqué ! Touchez pour voir où » reste six secondes :
+touchez-le, la vue va sur le lieu de l'attaque, et pendant ces six secondes un
+repère rouge pulse au même endroit sur la mini-carte. Il y a une alerte par
+foyer d'attaque : douze secondes de silence autour d'une alerte, mais une
+attaque ailleurs sur la carte (à plus de seize cases) a la sienne, trois
+secondes au moins après la précédente — un raid sur le village n'est plus masqué
+par un combat au loin. Au bout de la barre des ouvriers, la pastille **Armée**
+(une épée et le nombre de soldats, c'est-à-dire tout ce qui n'est ni ouvrier ni
+animal) prend toute l'armée d'un toucher, où qu'elle soit, sans bouger la vue ;
+un second toucher amène la vue sur le gros de la troupe. Elle est grisée sans
+soldat, et montre l'abri si toute l'armée s'y trouve. Enfin, dès qu'une
+sélection existe, une **croix** en haut à droite du panneau du bas la lâche —
+avec la pose en cours et l'ordre armé : un appui raté ne devient plus un ordre
+(au clavier, c'est toujours `Échap`). La logique de ces trois réglages vit sans
+DOM dans `js/ui.js` (`FoyersAttaque`, `armeeDe`, `toucherArmee`) et se vérifie
+sous Node : `node test/reglages-alerte.test.js`, 46 vérifications.
+
+**Des ordres qui obéissent.** Un appui au sol est un ordre de marche, suivi
+jusqu'au bout quelle que soit l'attitude : c'est le geste pour sortir ses
+troupes d'un combat, et l'attitude ne reprend ses droits qu'à l'arrivée. Seul
+**Attaquer ici** engage ce que la troupe croise en chemin. Un soldat occupé sur
+un bâtiment ne se laisse plus tuer dans le dos : frappé par une troupe ennemie,
+il se retourne contre elle, et avec lui tous ceux qui attaquent le même bâtiment
+— même postés sur la face opposée, hors de sa vue — ainsi que les camarades qui
+le voient ; tous reprennent le bâtiment une fois la menace écartée. La riposte
+n'a pas lieu en *Position tenue* ni en *Sans attaque*, ni pour les engins de
+siège ; la poursuite reste bornée par l'attitude, comptée depuis l'endroit où
+l'unité s'est retournée, et la règle vaut aussi pour l'adversaire. Enfin, on
+**répare** et on **soigne** au doigt : des ouvriers en main, toucher un de ses
+bâtiments achevés et abîmés lance la réparation ; des Prêtresses seules en main,
+toucher un allié blessé lance le soin, y compris en pleine mêlée, où le blessé
+passe avant l'ennemi collé à lui. Le double tap sélectionne toujours. Mesuré
+dans le moteur : six miliciens en mêlée reculent de 7,9 cases en huit secondes
+sans perte (0,7 case et un mort auparavant) ; cinq miliciens sur une maison
+attaqués par trois gagnent en perdant un homme (ils mouraient tous) ; six
+miliciens répartis autour d'un Centre-Ville attaqués par quatre gagnent à quatre
+survivants. Ces règles ont leurs vérifications dans
+`test/reglages-ordres.test.js` (`node test/reglages-ordres.test.js`), qui joue
+aussi le vrai toucher de `js/main.js` sur un faux écran.
+
+**Les règles de bord, refermées (octobre).** La cloche ne regarde que les
+villageois. Tant qu'un villageois dehors peut être abrité, elle abrite : elle
+répartit sur tous les abris en comptant les places déjà promises (une tour
+pleine, les autres vont au Centre-Ville), n'envoie que ceux qui auront une place
+et dit combien restent dehors ; ceux formés pendant l'alerte sont appelés au
+coup suivant sans faire sortir les autres. Quand plus personne dehors ne peut
+l'être, le coup suivant lève l'alerte et ne renvoie au travail que ceux qu'elle
+a appelés, chacun à son poste — ni les soldats abrités, ni un villageois mis à
+l'abri à la main, qui sort par « Libérer ». Un villageois appelé dont l'abri
+tombe ou se remplit court au suivant, ou reprend son poste s'il n'y a plus de
+place ; « Libérer » lève l'alerte aussi bien que la cloche. Un autre ordre donné
+pendant l'alerte fait oublier le poste noté. Une unité à l'abri ne prend aucun
+ordre, ne compte ni dans une formation ni dans le pas d'un groupe, et les
+villageois abrités ne sont ni comptés « sans affectation » ni choisis par les
+boutons + (le panneau des ouvriers indique « n à l'abri »). Un chantier garde
+les coups reçus : le marteau ajoute des points de vie, il ne les recalcule pas ;
+achevé abîmé, il libère ses bâtisseurs — réparer est un autre ordre. Le pas du
+groupe tombe à chaque nouvel ordre. Raser un de ses bâtiments
+(`World.raserBatiment`) fait sortir les occupants vivants et rend la file, une
+recherche et un passage d'âge en cours ; détruit par l'ennemi, un bâtiment
+emporte toujours sa garnison, et un passage d'âge s'arrête si son Centre-Ville
+tombe. Une file pleine refuse aussi une technologie, on ne bâtit pas sur une
+carcasse, et une fondation n'éclaire que ses abords. Ces règles ont leur fichier
+de tests, `node test/reglages-bugs.test.js` (60 vérifications, dont deux parties
+bombardées d'ordres au hasard).
+
+**Score, fin de partie et palmarès.** En Express, le score ne récompense plus la
+seule récolte : il additionne *la moitié des ressources récoltées*, *le prix des
+troupes en vie et des bâtiments achevés*, et *deux fois le prix de ce que l'on a
+abattu chez l'adversaire* (troupes, bâtiments, garnison comprise). Un soldat
+perdu coûte donc son prix à son camp et le rapporte deux fois à l'autre : sur
+huit parties IA contre IA, la récolte pèse 15 à 33 % du score (contre 78 à 85 %
+avant) et le camp qui perd le plus de soldats ne gagne plus. Le score des deux
+camps s'affiche pendant la partie, à côté du compte à rebours, et l'écran de fin
+en donne le détail (`World.detailScore`, `js/game.js`). En Classique, la
+conquête n'exige plus de raser la dernière ferme : un camp est vaincu quand il
+n'a plus **ni Centre-Ville ni bâtiment militaire** (caserne, archerie, écurie,
+atelier de siège, temple — tout ce qui forme des troupes), achevé ou en chantier
+; le joueur qui perd son dernier Centre-Ville en est averti, et l'écran de fin
+dit pourquoi la partie s'arrête. Le joueur ne peut plus se faire perdre par
+mégarde : « Détruire » (et la touche `Suppr`, qui demande désormais deux appuis
+pour un bâtiment) prévient en rouge quand le bâtiment visé est le dernier qui
+tient le camp en jeu, et « Annuler » fait de même pour le dernier chantier
+(`World.destructionFatale` dit la règle d'avance). Entre deux IA de niveaux
+inégaux, 11 parties sur 12 se terminent avant 40 minutes ; entre deux IA de même
+niveau, aucune ne perce l'autre, et la règle n'y change rien. Enfin un
+**palmarès** garde la trace des parties finies, par format et par difficulté :
+victoires, défaites, meilleur temps de victoire, meilleur score Express. Il vit
+dans `localStorage` sous la clé `aem.palmares.v1`, à part de la partie en cours
+(`js/save.js`) ; l'écran de fin annonce « Nouveau record ! » avec le précédent,
+et l'accueil le rappelle d'une ligne sous le bouton Jouer. Un abandon dans la
+première minute ne compte pas. Vérifications : `node
+test/reglages-score.test.js` (106).
+
+**Des âges qui se méritent, et plus d'armée qui gagne contre tout.** Passer
+d'âge demande désormais des bâtiments terminés en plus de son prix : une Caserne
+et un Moulin puis 400 de nourriture pour l'Âge Féodal ; deux bâtiments
+différents parmi l'Archerie, l'Écurie, la Forge et le Temple, puis 600 de
+nourriture et 200 d'or, pour l'Âge des Châteaux (`requis` dans `AGES`,
+`World.conditionAge`). Le bouton grisé dit ce qui manque quand on le touche («
+Il faut une Caserne et un Moulin »), et en Express le stock de départ ne paie
+plus l'Âge des Châteaux à la première seconde. L'IA bâtit ce que l'âge exige
+avant ses fermes. Côté combat, le Champion perd un point d'armure de mêlée et le
+carreau de l'Arbalétrier perce l'infanterie (+8) : à coût égal l'Arbalétrier et
+le Cavalier battent le Champion, qui bat toujours lanciers, miliciens et
+Atlantes. Le boulet de la Catapulte vole à 4 cases par seconde sur une zone de
+0,8 case — un soldat isolé ou un rang en marche, visé de cinq cases ou plus,
+l'esquive ; une colonne profonde prend le boulet sur ses rangs arrière — et il
+blesse aussi les troupes de son camp prises dans l'explosion
+(`World.impactDeZone`). L'Hydre mord jusqu'à trois ennemis par coup, sa cible et
+les deux plus proches devant elle (`morsures`, `World.morsuresVoisines`) : une
+Hydre bat trois Champions, trois Hydres tiennent tête à dix Champions ou neuf
+Cavaliers. Ces règles ont leurs vérifications, duels à coût égal compris : `node
+test/reglages-equilibre.test.js` (65 vérifications).
+
+**Mémoire, mesures et batterie.** Les troupes en 3D pèsent lourd (environ 160 Mo
+d'atlas pour les quatorze troupes d'un camp, autant pour leurs copies rouges),
+et un iPhone coupe une page trop lourde. Le jeu se mesure donc lui-même et borne
+ce qu'il garde. Un **témoin de coupure** (`js/save.js`, clé `aem.temoin.v1`)
+tient à jour toutes les cinq secondes une petite marque — heure, minutes de jeu,
+unités, Mo d'images de troupes, pixels par point, page visible — et la ferme à
+chaque sortie normale (partie finie, retour à l'accueil, page masquée ou
+quittée). Au lancement suivant, une marque restée ouverte donne une ligne sous
+la carte de reprise (« La dernière partie s'est interrompue après 12 min — 180
+Mo d'images, 64 unités ») ; une page quittée en pleine partie et relancée
+aussitôt est dite « rechargée ». La marque n'est relevée qu'une fois, mais la
+ligne tient jusqu'à la prochaine partie lancée, même si la page est rechargée
+entre-temps : l'incident reste « non lu » (`incidentNonLu`) tant que `startGame`
+ne l'a pas marqué (`marquerIncidentsLus`). Les cinq derniers incidents sont
+gardés, et le menu de pause rappelle le dernier, lu ou non, dans sa ligne
+**Mesures** : images par seconde des dernières secondes de jeu, Mo d'images de
+troupes, troupes en mémoire, pixels par point. Le **plafond de mémoire**
+(`js/sprites.js`, `entretenirMemoire`, appelé une fois par seconde) rend la
+copie rouge d'une troupe après trente secondes sans dessin (elle se refait au
+dessin suivant, jamais la toile d'origine) ; au-delà de `BUDGET_TROUPES_MO`
+(120), une troupe sans unité en vie ni en formation depuis deux minutes est
+déchargée et relue du cache dès qu'on en reforme — jamais une cuisson allégée,
+ni une cuisson pas encore rangée dans le cache, ni l'ouvrier et le milicien
+atlantes, qui servent de repli. Page masquée ou partie quittée, le sol en cache
+et les copies rouges sont rendus tout de suite. **Batterie** : menu de pause
+ouvert ou partie finie, la carte n'est redessinée que quatre fois par seconde
+(`IMAGES_FIGEES`, `js/main.js`), et aussitôt si la vue, l'écran, la finesse ou
+le style changent. Enfin l'empreinte de chaque modèle 3D est retenue d'un
+lancement à l'autre (`aem.empreintes.v1`) avec l'ETag et la date que le serveur
+annonce : une demande d'en-têtes remplace le téléchargement de 2 à 3 Mo, et au
+moindre doute le fichier est relu comme avant. Tests : `node
+test/reglages-memoire.test.js` (94 vérifications).
 
 ## Architecture
 
