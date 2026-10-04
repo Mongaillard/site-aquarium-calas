@@ -364,6 +364,11 @@ essai('raser un Centre-Ville occupé et en production', () => {
   joueur.age = 1;
   joueur.resources = { food: 3000, wood: 3000, gold: 3000 };
   const tc = centre(w);
+  // L'Âge des Châteaux se mérite : deux bâtiments parmi quatre (réglages « équilibre »).
+  for (const [type, loin] of [['archery', 8], ['stable', 13]]) {
+    const p = emplacement(w, type, loin);
+    w.spawnBuilding(0, type, p.tx, p.ty, true);
+  }
   const archers = [0, 1, 2].map((i) => w.spawnUnit(0, 'archer', tc.x + TILE * (3 + i), tc.y + TILE * 3));
   for (const a of archers) tc.addToGarrison(a);
   for (let i = 0; i < 3; i++) w.trainUnit(tc, 'villager');
