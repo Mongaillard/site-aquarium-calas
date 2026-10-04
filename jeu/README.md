@@ -534,19 +534,20 @@ images ne paraît ni saccadé, ni flou, ni terne :
   images par seconde, et la toile passe à deux pixels par point pour une
   fenêtre témoin. Nettement plus rapide : on y reste, le zoom de départ se
   recale à 0,5. Pas mieux (un téléphone en économie d'énergie tourne à trente
-  images par seconde quoi qu'on dessine) : on remonte à trois. Le menu de
+  images par seconde quoi qu'on dessine) : on remonte à trois, pour de bon si
+  les deux cadences sont les mêmes. Le menu de
   pause offre aussi le choix à la main, « Finesse de l'image : Fine /
   Légère », retenu d'une partie à l'autre ; `?dpr=2` dans l'adresse l'impose
   pour un essai.
 - *Cinq directions, trois en miroir* — sud, sud-est, est, nord-est et nord
   sont cuites ; nord-ouest, ouest et sud-ouest sont leur miroir, comme dans
   Age of Empires (un soldat tourné vers l'ouest tient donc son arme de la
-  main gauche). Avec la chute gardée à demi-finesse (elle est la plus large
-  des animations, et le corps s'efface), les atlas des quatorze troupes d'un
-  camp pèsent 174 Mo, contre 372 en huit directions. Si la mémoire graphique
-  manque quand même, la cuisson retente plus léger, jusqu'à un pixel par
-  pixel monde, avant de rendre la main à l'illustration ; le sol, lui, passe
-  au niveau grossier puis à des tuiles de couleur — jamais un écran noir.
+  main gauche). Les atlas des quatorze troupes d'un camp pèsent 210 Mo,
+  contre 372 en huit directions. Si la mémoire graphique manque quand même,
+  la cuisson retente plus léger — la chute à demi-finesse, puis toute la
+  troupe à un pixel par pixel monde — avant de rendre la main à
+  l'illustration ; le sol, lui, passe au niveau grossier puis à des tuiles de
+  couleur — jamais un écran noir.
 - *Couleur d'équipe* — reconnue à la cuisson, avant l'étalonnage, et marquée
   dans l'opacité du pixel (liseré compris) ; l'acier clair d'une lame n'en fait
   pas partie. L'atlas de l'autre camp ne se fabrique qu'à la première unité de

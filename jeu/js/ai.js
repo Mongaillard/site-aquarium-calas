@@ -463,7 +463,7 @@ export class AIPlayer {
         return player.resources[k] >= def.cost[k] + keep;
       });
       // La commande part : le chrono de patience repart pour la suivante.
-      if (affordable && this.world.trainUnit(b, pick) && commandee) this.commandeDepuis = this.world.time;
+      if (affordable && this.world.trainUnit(b, pick) && commandee) { this.commandeDepuis = this.world.time; this.commandeAvance = 0; }
     }
 
     const threat = this.findThreat();
@@ -552,14 +552,19 @@ export class AIPlayer {
     const c = this.commandeVoulue();
     if (!c) { this.commandeType = null; return null; }
     // Une commande qui n'aboutit pas (plus d'or sur la carte, économie à
-    // genoux) ne doit pas geler le reste de l'armée : après quatre minutes
-    // d'attente — le temps de réunir 200 d'or même à un or par seconde —, on
-    // la laisse de côté une minute, puis on réessaie.
+    // genoux) ne doit pas geler le reste de l'armée. La patience se compte
+    // depuis le dernier PROGRÈS de la cagnotte : tant que l'or rentre, même
+    // lentement, on attend ; quatre minutes sans avancer d'un vingtième du
+    // prix, et la commande est laissée de côté une minute, puis réessayée.
     const t = this.world.time;
-    if (this.commandeType !== c.type) { this.commandeType = c.type; this.commandeDepuis = t; }
+    if (this.commandeType !== c.type) { this.commandeType = c.type; this.commandeDepuis = t; this.commandeAvance = 0; }
+    const prix = UNIT_TYPES[c.type].cost, reserve = this.player.resources;
+    let avance = 1;
+    for (const k of Object.keys(prix)) avance = Math.min(avance, prix[k] > 0 ? reserve[k] / prix[k] : 1);
     const attente = t - this.commandeDepuis;
+    if (attente <= 240 && avance > (this.commandeAvance || 0) + 0.05) { this.commandeAvance = avance; this.commandeDepuis = t; }
     if (attente > 240) {
-      if (attente > 300) this.commandeDepuis = t;
+      if (attente > 300) { this.commandeDepuis = t; this.commandeAvance = 0; }
       return null;
     }
     return c;

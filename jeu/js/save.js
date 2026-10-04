@@ -138,7 +138,7 @@ function serializeAI(ai) {
     badSpots: [...ai.badSpots], wantFarm: !!ai.wantFarm,
     // Réserve pour le bâtiment voulu et commande d'unité chère en cours (voir ai.js).
     projet: ai.projet || null,
-    commandeType: ai.commandeType || null, commandeDepuis: ai.commandeDepuis || 0,
+    commandeType: ai.commandeType || null, commandeDepuis: ai.commandeDepuis || 0, commandeAvance: ai.commandeAvance || 0,
   };
 }
 
@@ -387,6 +387,7 @@ export function restoreWorld(data) {
     ai.projet = saved.projet || null;
     ai.commandeType = saved.commandeType || null;
     ai.commandeDepuis = saved.commandeDepuis || 0;
+    ai.commandeAvance = saved.commandeAvance || 0;
   }
 
   // 6. Terrain découvert, population, état dérivé.

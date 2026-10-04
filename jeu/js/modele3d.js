@@ -95,7 +95,7 @@ export const MODELES = {
   // devant, par-dessus l'encolure (`lacher` : l'instant où la flèche part).
   horseArcher: {
     src: 'assets/modeles/archer-monte.json',
-    taille: 56,
+    taille: 50,
     clips: { marche: 'trot', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
     images: { marche: 16, repos: 6, attaque: 14, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
@@ -118,12 +118,13 @@ export const MODELES = {
   // Le Cavalier lourd : un cheval caparaçonné (squelette « quatre pattes » de
   // l'Atelier) et son chevalier, dont le bras droit porte l'épée. Sa marche du
   // jeu est le trot. `taille` compte la longueur du cheval vue de face en
-  // plongée (1,75 m × cos + 1,65 m × sin de l'angle de la caméra) : à 58, le
-  // cavalier est à peine plus grand que nature à côté d'un fantassin (un
-  // dixième). À l'échelle d'origine (78), il écrasait tout le reste.
+  // plongée — de la tête du cavalier aux sabots de devant, environ 1,8 m pour
+  // un modèle haut de 1,75 m. À 52, cheval et cavalier font de profil 47 px de
+  // haut et 56 de long, à côté d'un fantassin de 42 : une demi-tête de plus.
+  // À l'échelle d'origine (78), il en faisait 70 sur 85 et écrasait tout.
   knight: {
     src: 'assets/modeles/cavalier.json',
-    taille: 58,
+    taille: 52,
     clips: { marche: 'trot', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
     images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
@@ -166,7 +167,7 @@ export const MODELES = {
   // L'Éclaireur : cheval léger, lance couchée ; il va au galop.
   scout: {
     src: 'assets/modeles/eclaireur.json',
-    taille: 55,
+    taille: 49,
     clips: { marche: 'course', repos: 'repos', attaque: 'attaque_cavalier', touche: 'coup_recu', mort: 'mort' },
     images: { marche: 16, repos: 6, attaque: 12, touche: 5, mort: 10 },
     boucles: ['marche', 'repos'],
@@ -221,10 +222,11 @@ const SUR_MAX = 4;
  */
 export const DIRECTIONS = 5;
 /**
- * Animations gardées à demi-finesse : la chute. Elle est la plus large de
- * toutes (un corps étendu), elle ne dure qu'une seconde et le corps s'efface —
- * un quart de sa surface suffit, et c'est un quart de la mémoire d'une troupe
- * qui est rendu.
+ * Animations gardées à demi-finesse QUAND LA MÉMOIRE MANQUE (cuisson de
+ * secours) : la chute. Elle est la plus large de toutes (un corps étendu) et
+ * pèse près d'un quart d'une troupe. En temps normal elle reste à pleine
+ * finesse : le corps reste quatre à cinq secondes à terre, et il paraissait
+ * flou à côté des troupes nettes.
  */
 const REDUCTION = { mort: 2 };
 const LINEAIRE = 1006;      // THREE.LinearFilter (absent du paquet réduit)
@@ -269,7 +271,7 @@ const pause = () => new Promise((r) => {
 // lancement, les atlas reviennent en un instant, sans three.js. La clé porte
 // l'empreinte du fichier et la version de la cuisson — un nouveau modèle, ou
 // une caméra retouchée ici, refait la cuisson une fois.
-const VERSION_CUISSON = 6;
+const VERSION_CUISSON = 7;
 const CACHE = 'aem-modeles-3d';
 
 /** Empreinte FNV-1a du fichier : deux modèles différents, deux clés. */
@@ -303,11 +305,12 @@ export async function modeleCuit(cle, vitessePxS, equipe = null) {
   } catch { /* cache illisible : on recuit */ }
   // Un téléphone à court de mémoire graphique : trois essais, du plus beau au
   // plus léger, avant d'abandonner le modèle pour son illustration. Le
-  // deuxième n'allège que le rendu (suréchantillonnage de 2, texture lue par
-  // ses niveaux réduits, sans anticrénelage) ; le troisième cuit à un pixel
-  // par pixel monde — le quart de la mémoire, une troupe plus douce mais
-  // animée — et n'est pas gardé en cache : la prochaine partie retentera mieux.
-  const essais = [{}, { sur: 2, mip: true, anticrenelage: false }, { densite: 1, sur: 2, mip: true, anticrenelage: false }];
+  // deuxième allège le rendu (suréchantillonnage de 2, texture lue par ses
+  // niveaux réduits, sans anticrénelage) et garde la chute à demi-finesse ;
+  // le troisième cuit à un pixel par pixel monde — le quart de la mémoire,
+  // une troupe plus douce mais animée — et n'est pas gardé en cache : la
+  // prochaine partie retentera mieux.
+  const essais = [{}, { sur: 2, mip: true, anticrenelage: false, reduire: true }, { densite: 1, sur: 2, mip: true, anticrenelage: false }];
   const cuit = await aTourDeRole(async () => {
     let derniere = null;
     for (let i = 0; i < essais.length; i++) {
@@ -421,7 +424,8 @@ function gltfSansAdresses(octets) {
  * `sur` : suréchantillonnage du rendu (0 : choisi sur la finesse de la texture) ;
  * `mip` : lire la texture par ses niveaux réduits (cuisson de secours) ;
  * `anticrenelage` : celui de WebGL ; `densite` : pixels d'atlas par pixel
- * monde (DENSITE, ou 1 pour la cuisson de dernier secours).
+ * monde (DENSITE, ou 1 pour la cuisson de dernier secours) ; `reduire` :
+ * garder à demi-finesse les animations de REDUCTION (cuisson de secours).
  *
  * LA TEXTURE NE SE LIT PAS PAR SES NIVEAUX RÉDUITS. La texture d'un modèle de
  * l'Atelier est un atlas en miettes — des centaines d'îlots serrés, la peau à
@@ -433,7 +437,7 @@ function gltfSansAdresses(octets) {
  * c'est le RENDU qu'on moyenne — des points voisins sur le personnage, plus
  * sur la planche de texture.
  */
-export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = false, anticrenelage = true, equipe = null, densite = DENSITE } = {}) {
+export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = false, anticrenelage = true, equipe = null, densite = DENSITE, reduire = false } = {}) {
   const m = MODELES[cle];
   const THREE = await import('./vendor/three-jeu.min.js');
   const { glb, images, cartes } = gltfSansAdresses(octets);
@@ -539,42 +543,46 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
   const travailH = Math.ceil((CADRE.haut + CADRE.bas) * pxParM);
   const ancreX = CADRE.gauche * pxParM, ancreY = CADRE.haut * pxParM;
 
-  // Finesse du rendu : celle de la texture, au plus proche parmi 2, 4 et 8.
+  // Finesse du rendu : celle de la texture, 4 si elle dépasse trois texels par pixel, 2 sinon.
   const texels = finesseTexture(modele, textures);
   if (!sur) sur = texels / pxParM > 2.8 ? SUR_MAX : 2;
-  const toile = document.createElement('canvas');
-  toile.width = travailL * sur; toile.height = travailH * sur;
-  // (À quatre fois ou plus, la moyenne du rendu fait déjà l'anticrénelage.)
-  const rendu = new THREE.WebGLRenderer({ canvas: toile, alpha: true, antialias: anticrenelage && sur < 4, preserveDrawingBuffer: true });
-  // Les toiles de la réduction : chaque passage de moitié moyenne quatre pixels, exactement.
-  const moities = [];
-  for (let f = sur / 2; f >= 2; f /= 2) {
-    const c = document.createElement('canvas');
-    c.width = travailL * f; c.height = travailH * f;
-    const x = c.getContext('2d');
-    if (!x) throw new Error('mémoire graphique saturée (toile de réduction refusée)');
-    moities.push({ c, x });
-  }
-  const gl = rendu.getContext();
-  rendu.setPixelRatio(1);
-  rendu.setClearColor(0x000000, 0);
-  rendu.outputColorSpace = THREE.SRGBColorSpace;
-  rendu.toneMapping = THREE.NoToneMapping;
   const camera = new THREE.OrthographicCamera(
     -CADRE.gauche, CADRE.droite, CADRE.haut, -CADRE.bas, 0.1, 50);
   camera.position.copy(versCamera).multiplyScalar(20);
   camera.up.copy(hautCamera);
   camera.lookAt(0, 0, 0);
 
+  // Tout ce qui s'alloue ici est rendu dans le `finally`, que la cuisson
+  // réussisse ou non : un essai raté ne doit pas laisser sa mémoire à l'essai
+  // de secours qui le suit (Safari compte les toiles tant qu'elles ne sont
+  // pas vidées).
   const clips = {};
-  // Une seule bande de travail pour toutes les animations, rendue à la fin :
-  // Safari compte la mémoire des toiles tant qu'elles ne sont pas libérées.
-  const bande = document.createElement('canvas');
-  bande.width = travailL * Math.max(...Object.values(m.images)); bande.height = travailH * DIRECTIONS;
-  const bctx = bande.getContext('2d', { willReadFrequently: true });
-  if (!bctx) throw new Error('mémoire graphique saturée (toile de travail refusée)');
-  bctx.imageSmoothingQuality = 'high';
+  const moities = [];
+  let toile = null, rendu = null, bande = null, reussi = false;
   try {
+    toile = document.createElement('canvas');
+    toile.width = travailL * sur; toile.height = travailH * sur;
+    // (À quatre fois, la moyenne du rendu fait déjà l'anticrénelage.)
+    rendu = new THREE.WebGLRenderer({ canvas: toile, alpha: true, antialias: anticrenelage && sur < 4, preserveDrawingBuffer: true });
+    // Les toiles de la réduction : chaque passage de moitié moyenne quatre pixels, exactement.
+    for (let f = sur / 2; f >= 2; f /= 2) {
+      const c = document.createElement('canvas');
+      c.width = travailL * f; c.height = travailH * f;
+      const x = c.getContext('2d');
+      moities.push({ c, x });
+      if (!x) throw new Error('mémoire graphique saturée (toile de réduction refusée)');
+    }
+    const gl = rendu.getContext();
+    rendu.setPixelRatio(1);
+    rendu.setClearColor(0x000000, 0);
+    rendu.outputColorSpace = THREE.SRGBColorSpace;
+    rendu.toneMapping = THREE.NoToneMapping;
+    // Une seule bande de travail pour toutes les animations.
+    bande = document.createElement('canvas');
+    bande.width = travailL * Math.max(...Object.values(m.images)); bande.height = travailH * DIRECTIONS;
+    const bctx = bande.getContext('2d', { willReadFrequently: true });
+    if (!bctx) throw new Error('mémoire graphique saturée (toile de travail refusée)');
+    bctx.imageSmoothingQuality = 'high';
     for (const [etat, nom] of Object.entries(m.clips)) {
       const clip = clipDe(nom);
       const n = m.images[etat];
@@ -599,7 +607,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
         await pause();   // rendre la main : le menu reste fluide pendant la cuisson
       }
       clips[etat] = recadrer(bande, n, travailL, travailH, ancreX, ancreY, equipe,
-        densite < DENSITE ? 1 : (REDUCTION[etat] || 1), densite);
+        densite < DENSITE || !reduire ? 1 : (REDUCTION[etat] || 1), densite);
       clips[etat].duree = clip.duration;
       clips[etat].boucle = boucle;
       if (etat === 'attaque' && m.lacher != null) clips[etat].lacher = m.lacher;
@@ -607,13 +615,17 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
       // pendant sa durée à la vitesse de l'unité : les pieds ne patinent pas.
       if (m.parDistance.includes(etat)) clips[etat].cycle = Math.max(8, Math.round((vitessePxS || 32) * clip.duration));
     }
+    reussi = true;
   } finally {
     melangeur.stopAllAction();
-    rendu.dispose();
-    rendu.forceContextLoss();
-    bande.width = bande.height = 0;   // libère la mémoire tout de suite (Safari)
-    toile.width = toile.height = 0;
+    if (rendu) { rendu.dispose(); rendu.forceContextLoss(); }
+    if (bande) bande.width = bande.height = 0;
+    if (toile) toile.width = toile.height = 0;
     for (const { c } of moities) c.width = c.height = 0;
+    // Les textures sont dans la carte graphique (ou ne serviront plus) : leurs toiles aussi.
+    for (const t of textures) { t.dispose(); if (t.image) t.image.width = t.image.height = 0; }
+    // Cuisson ratée en route : les atlas déjà produits ne serviront pas.
+    if (!reussi) for (const c of Object.values(clips)) if (c.canvas) c.canvas.width = c.canvas.height = 0;
   }
   return { cycle: clips.marche.cycle, clips };
 }

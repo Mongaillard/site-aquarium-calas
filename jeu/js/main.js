@@ -1042,6 +1042,7 @@ class Game {
     window.removeEventListener('pagehide', this.onLeave);
     this.ecouteurs.abort();
     this.running = false;
+    this.renderer.viderTroncons();   // le sol de cette partie ne servira plus : sa mémoire tout de suite
     this.ui.hideModal();
     this.ui.closeBuildMenu();
     this.ui.closeWorkerMenu();

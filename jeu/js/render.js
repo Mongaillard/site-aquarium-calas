@@ -317,15 +317,19 @@ export class Renderer {
    * pesait : on y reste pour la partie, et le zoom de départ se recale
    * (surToileReduite). Sinon — un téléphone en économie d'énergie tourne à
    * trente images par seconde quoi qu'on dessine — on remonte à trois et on
-   * attend de plus en plus longtemps avant de réessayer. Une fenêtre où un
-   * modèle se cuisait, ou qui contient un retour d'arrière-plan, est écartée.
-   * Rien n'est retenu d'une partie à l'autre.
+   * y reste pour la partie si les deux cadences sont les mêmes ; si le témoin
+   * était un peu plus rapide sans l'être assez, on ne réessaiera que si le jeu
+   * ralentit encore d'un cinquième. Une fenêtre où un modèle se cuisait, ou
+   * qui contient un retour d'arrière-plan, est écartée. Rien n'est retenu
+   * d'une partie à l'autre.
    */
   surveillerCadence(dt) {
     const c = this.cadence;
     if (c.fige || (this.dpr <= 2 && !c.temoin)) return;
+    // L'attente d'abord : l'à-coup du sol qui se recuit après un changement de
+    // toile ne doit pas souiller la fenêtre qui suit.
+    if (c.attente > 0) { if (--c.attente === 0) c.souillee = false; return; }
     if (dt >= 0.2) { c.souillee = true; return; }
-    if (c.attente > 0) { c.attente--; return; }
     c.n++; c.duree += dt;
     if (c.n < 120) return;
     const moyenne = c.duree / c.n;
@@ -338,12 +342,19 @@ export class Renderer {
         if (this.surToileReduite) this.surToileReduite();
       } else {
         this.dpr = c.haut; this.resize();
+        // Même cadence à deux et à trois pixels par point (à un dixième près) :
+        // ce n'est pas la toile qui la borne — économie d'énergie, écran à
+        // trente images par seconde. On reste à trois pour la partie, sans
+        // plus jamais réessayer. Sinon on ne réessaiera que si le jeu ralentit
+        // nettement par rapport à cette mesure-là.
+        if (Math.abs(moyenne - c.temoin) < c.temoin * 0.1) c.fige = true;
+        c.seuil = c.temoin * 1.2;
         c.attente = 1800 * 2 ** c.echecs; c.echecs++;
       }
       c.temoin = 0; c.suite = 0;
       return;
     }
-    c.suite = moyenne > 1 / 45 ? c.suite + 1 : 0;
+    c.suite = moyenne > Math.max(1 / 45, c.seuil || 0) ? c.suite + 1 : 0;
     if (c.suite >= 2) {
       c.temoin = moyenne; c.haut = this.dpr;
       this.dpr = 2; this.resize();
@@ -428,12 +439,12 @@ export class Renderer {
     if (decorPret !== this.decorCuit) { this.decorCuit = decorPret; this.troncons.clear(); }
     this.oublierTronconsModifies();
     const zoom = this.camera.zoom;
-    // Le niveau du tronçon se compte en pixels de toile : à trois pixels par
-    // point, le niveau fin (2 px par pixel monde) sert dès le zoom 0,5 — sinon
-    // le sol serait étiré deux fois. Et la nappe est celle DU NIVEAU, pas celle
+    // Le niveau fin (2 px par pixel monde) sert dès le zoom 0,75, comme
+    // toujours — et dès 0,5 sur une toile à trois pixels par point, sinon le
+    // sol y serait étiré deux fois. Et la nappe est celle DU NIVEAU, pas celle
     // du zoom : un tronçon fin peint avec la nappe demi-taille coûterait quatre
     // fois la mémoire pour une herbe aussi floue.
-    const niveau = (this.solFinRefuse || zoom * this.dpr < 1.5) ? 1 : 0;
+    const niveau = (this.solFinRefuse || zoom < Math.min(0.75, 1.5 / this.dpr)) ? 1 : 0;
     const nappes = this.nappesPour(niveau === 0 ? 1 : 0.5);
     if (!nappes) { this.drawTerrainTuiles(view); return; }
 
@@ -472,7 +483,9 @@ export class Renderer {
     // abandonné pour la partie ; si même le grossier manque, des tuiles de
     // couleur, sans aucune toile — jamais un écran noir.
     if (manque) {
-      if (niveau === 0) this.solFinRefuse = true;
+      // Les tronçons fins déjà cuits ne serviront plus : leur mémoire est
+      // rendue tout de suite, c'est elle qui permet au niveau grossier de passer.
+      if (niveau === 0) { this.solFinRefuse = true; this.viderTroncons('0:'); }
       this.drawTerrainTuiles(view);
     }
   }
@@ -497,6 +510,16 @@ export class Renderer {
       }
     }
     modifies.clear();
+  }
+
+  /** Rend la mémoire des tronçons de sol en cache (tous, ou ceux d'un niveau : « 0: », « 1: »). */
+  viderTroncons(prefixe = '') {
+    if (!this.troncons) return;
+    for (const [cle, toile] of [...this.troncons]) {
+      if (!cle.startsWith(prefixe)) continue;
+      if (toile) toile.width = toile.height = 0;
+      this.troncons.delete(cle);
+    }
   }
 
   /** Le tronçon (cx, cy) au niveau demandé, rendu à la première demande. */
@@ -531,7 +554,7 @@ export class Renderer {
     const canvas = document.createElement('canvas');
     canvas.width = cote * echelle; canvas.height = cote * echelle;
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('mémoire graphique saturée (tronçon de sol refusé)');
+    if (!ctx) { canvas.width = canvas.height = 0; throw new Error('mémoire graphique saturée (tronçon de sol refusé)'); }
     ctx.setTransform(echelle, 0, 0, echelle, -X0 * echelle, -Y0 * echelle);
 
     const { presents, masques, etendues, rivage } = this.couverturesTroncon(X0, Y0, cote);
