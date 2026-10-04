@@ -309,7 +309,9 @@ function empreinte(octets) {
  * ancreY, hauteurMonde, images, duree, boucle, cycle, lacher }, … } }`, ou lève une
  * erreur (pas de WebGL, fichier absent) : l'appelant garde alors
  * l'illustration dessinée. `equipe` : `{ cle, dedans(r, g, b), saturer }`, la
- * règle qui reconnaît la couleur d'équipe (voir ALPHA_EQUIPE).
+ * règle qui reconnaît la couleur d'équipe (voir ALPHA_EQUIPE). `enCache`, sur
+ * l'objet rendu, devient vrai quand ces atlas sont dans le cache : on peut
+ * alors les décharger, ils en reviendront sans recuisson (sprites.js).
  */
 export async function modeleCuit(cle, vitessePxS, equipe = null) {
   const m = MODELES[cle];
@@ -322,7 +324,7 @@ export async function modeleCuit(cle, vitessePxS, equipe = null) {
   const cleCache = url.href;
   try {
     const lu = await lireCache(cleCache);
-    if (lu) return lu;
+    if (lu) { lu.enCache = true; return lu; }
   } catch { /* cache illisible : on recuit */ }
   // Un téléphone à court de mémoire graphique : trois essais, du plus beau au
   // plus léger, avant d'abandonner le modèle pour son illustration. Le
@@ -347,7 +349,7 @@ export async function modeleCuit(cle, vitessePxS, equipe = null) {
     }
     throw derniere;
   });
-  if (!cuit.allege) rangerCache(cleCache, m.src, cuit).catch(() => { /* stockage plein ou privé : tant pis */ });
+  if (!cuit.allege) rangerCache(cleCache, m.src, cuit).then((range) => { cuit.enCache = !!range; }).catch(() => { /* stockage plein ou privé : tant pis */ });
   return cuit;
 }
 
@@ -398,6 +400,7 @@ async function rangerCache(cle, src, cuit) {
     await cache.put(`${cle}&clip=${etat}`, new Response(blob, { headers: { 'Content-Type': 'image/png' } }));
   }
   await cache.put(cle, new Response(JSON.stringify(meta), { headers: { 'Content-Type': 'application/json' } }));
+  return true;
 }
 
 /**

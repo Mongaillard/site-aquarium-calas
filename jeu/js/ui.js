@@ -12,6 +12,7 @@ import {
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
 import { iconeSVG, ICONES_LICENCE } from './icones.js';
 import { STYLES, etatModeles3d, portraitAdverse } from './sprites.js';
+import { resumeIncident } from './save.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -691,6 +692,30 @@ export class UI {
     return `Affichée : ${px(r.dpr)} au lieu de ${n(ecran)}${cause}`;
   }
 
+  /**
+   * Ce que le jeu mesure de lui-même, à lire sur le téléphone : la cadence des
+   * dernières secondes de jeu, ce que pèsent en mémoire les images des troupes,
+   * la finesse — et la dernière coupure relevée par le témoin (js/save.js).
+   * Une mesure qui échoue ne doit pas empêcher le menu de s'ouvrir.
+   */
+  texteMesures() {
+    try {
+      const m = this.game.mesures();
+      const n = (v) => String(Math.round(v * 100) / 100).replace('.', ',');
+      const cadence = m.ips ? `${Math.round(m.ips)} images par seconde` : 'cadence pas encore mesurée';
+      const mesures = `Mesures : ${cadence} · ${Math.round(m.mo)} Mo d’images de troupes`
+        + ` (${m.troupes} troupe${m.troupes > 1 ? 's' : ''} en mémoire) · ${n(m.dpr)} pixel${m.dpr >= 2 ? 's' : ''} par point.`;
+      const dernier = m.incidents[m.incidents.length - 1];
+      if (!dernier) return mesures;
+      const quand = new Date(dernier.h).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const titre = dernier.genre === 'rechargee' ? 'Dernier rechargement en pleine partie' : 'Dernière coupure relevée';
+      const total = m.incidents.length > 1 ? ` (${m.incidents.length} incidents en tout)` : '';
+      return `${mesures} ${titre} : le ${quand}, ${resumeIncident(dernier)}${total}.`;
+    } catch {
+      return '';
+    }
+  }
+
   toast(message, kind = 'info') {
     // Message identique déjà affiché : on incrémente plutôt que d'empiler.
     const last = this.nodes.alerts.lastElementChild;
@@ -760,6 +785,7 @@ export class UI {
       <h3 class="modal-sub">Finesse de l’image</h3>
       <div class="options row">${finesses}</div>
       <p class="hint" data-role="finesse-reelle">${this.texteFinesse()}</p>
+      <p class="hint" data-role="mesures">${this.texteMesures()}</p>
       <div class="modal-actions">
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="help">Comment jouer</button>
@@ -783,6 +809,7 @@ export class UI {
         this.game.setFinesse(btn.dataset.finesse);
         modal.querySelectorAll('[data-finesse]').forEach((b) => b.classList.toggle('active', b === btn));
         modal.querySelector('[data-role="finesse-reelle"]').textContent = this.texteFinesse();
+        modal.querySelector('[data-role="mesures"]').textContent = this.texteMesures();
       }, this.ecoute());
     });
     modal.querySelector('[data-act="resume"]').addEventListener('click', () => this.game.togglePause(), this.ecoute());
