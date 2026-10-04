@@ -885,6 +885,7 @@ export class World {
       return { ok: false, reason: 'Déjà en cours' };
     }
     if (tech.age > player.age) return { ok: false, reason: 'Âge requis : ' + AGES[tech.age].name };
+    if (building.queue.length >= 8) return { ok: false, reason: 'File d’attente pleine' };
     if (!canAfford(player.resources, tech.cost)) return { ok: false, reason: 'Ressources insuffisantes' };
     return { ok: true };
   }
@@ -978,6 +979,16 @@ export class World {
 
   updateAgeProgress(player, dt) {
     if (!player.ageProgress) return;
+    // Le Centre-Ville qui portait le passage est tombé : il s'arrête là, perdu
+    // comme la file d'un bâtiment détruit. Avant, l'âge arrivait quand même.
+    const porteur = player.ageProgress.building;
+    if (porteur && porteur.dead) {
+      player.ageProgress = null;
+      if (player.index === this.humanIndex) {
+        this.pushEvent({ type: 'notice', text: `Passage d’âge interrompu : votre ${nomDe('towncenter', player.civ)} est tombé.` });
+      }
+      return;
+    }
     player.ageProgress.timeLeft -= dt;
     if (player.ageProgress.timeLeft > 0) return;
     player.ageProgress = null;
@@ -1003,6 +1014,8 @@ export class World {
         if (!this.map.inBounds(x, y)) return false;
         const i = this.map.idx(x, y);
         if (this.map.blocked[i] !== 0) return false;
+        // Une carcasse ne bloque pas sa case : elle finissait sous le bâtiment.
+        if (this.map.resources.has(i)) return false;
         if (!ignoreFog && playerIndex === this.humanIndex && !this.fog.explored[i]) return false;
       }
     }
@@ -1027,6 +1040,30 @@ export class World {
       }
     }
     return false;
+  }
+
+  /**
+   * Rase un bâtiment sur ordre de son propriétaire : les occupants sortent
+   * vivants, et ce qui était payé d'avance est rendu — la file, une recherche,
+   * un passage d'âge en cours. Avant, « Détruire » tuait la garnison et
+   * emportait la file sans rien rendre, quand annuler un chantier rend tout.
+   * (Détruit par l'ennemi, le bâtiment emporte toujours sa garnison.)
+   * @returns {{sortis: number, rembourse: boolean}}
+   */
+  raserBatiment(building) {
+    if (!building || building.dead) return { sortis: 0, rembourse: false };
+    const sortis = building.releaseGarrison().length;
+    const player = this.players[building.playerIndex];
+    let rembourse = building.queue.length > 0;
+    while (building.queue.length > 0) this.cancelProduction(building, building.queue.length - 1);
+    if (player && player.ageProgress && player.ageProgress.building === building) {
+      const cost = AGES[player.age + 1].cost;
+      for (const key in cost) player.resources[key] += cost[key];
+      player.ageProgress = null;
+      rembourse = true;
+    }
+    this.killEntity(building, null, false);
+    return { sortis, rembourse };
   }
 
   /** Annule un chantier non terminé et rembourse sa mise. */
@@ -1074,6 +1111,14 @@ export class World {
     this.recomputePopulation();
     this.map.dirty = true;
     this.pushEvent({ type: 'built', building, player: building.playerIndex });
+    // Achevé sous les coups, il reste abîmé : ses bâtisseurs ont fini quand
+    // même. Sans cela ils enchaînaient d'eux-mêmes sur la réparation, et les
+    // coups reçus pendant le chantier s'effaçaient encore — un peu plus tard.
+    if (building.hp < building.maxHp) {
+      for (const u of this.units) {
+        if (!u.dead && u.state === STATE.BUILD && u.target === building) u.chantierAcheve(building);
+      }
+    }
   }
 
   // --- Ordres du joueur -----------------------------------------------------
@@ -1357,46 +1402,74 @@ export class World {
   /**
    * Cloche du village : tous les villageois courent s'abriter. Un second coup
    * les renvoie au travail — ils reprennent leur poste, pas n'importe lequel.
+   * Elle ne regarde que les villageois, et ne fait sortir que ceux qu'elle a
+   * abrités : ni les soldats, ni un villageois mis à l'abri à la main.
+   * @returns {{sheltered: number, released: number, sansPlace: number, abris: number}}
+   *   `sansPlace` : les villageois laissés dehors, abris pleins.
    */
   ringTownBell(playerIndex) {
     const shelters = this.buildings.filter(
       (b) => !b.dead && b.complete && b.playerIndex === playerIndex && b.def.garrison);
-    if (shelters.length === 0) return { sheltered: 0, released: 0 };
+    const bilan = { sheltered: 0, released: 0, sansPlace: 0, abris: shelters.length };
+    if (shelters.length === 0) return bilan;
 
-    // Ceux que la cloche a envoyés et qui courent encore vers l'abri — ou qui
-    // y ont renoncé, abri injoignable, et attendent sur place : le second
-    // coup les concerne aussi.
-    const enRoute = this.units.filter(
-      (u) => !u.dead && u.playerIndex === playerIndex && u.isVillager && !u.garrisonedIn
-        && (u.state === STATE.GARRISON || u.state === STATE.IDLE) && u.posteAvantAbri);
-    const occupied = shelters.reduce((sum, b) => sum + b.garrison.length, 0);
-    if (occupied > 0 || enRoute.length > 0) {
-      let released = 0;
-      // En sortant, chacun reprend le poste qu'il a quitté (voir leaveGarrison).
-      for (const b of shelters) released += this.releaseGarrison(b).length;
-      for (const u of enRoute) {
-        u.target = null; u.path = null; u.state = STATE.IDLE;
-        u.reprendrePoste();
-        released++;
+    // Ceux que la cloche a appelés portent le poste qu'ils ont quitté : à
+    // l'abri, encore en route, ou arrêtés devant un abri injoignable. Tant
+    // qu'il y en a, c'est le second coup. (Avant, des soldats abrités
+    // suffisaient à en faire un : la cloche les sortait, sans abriter personne.)
+    const villagers = this.units.filter((u) => !u.dead && u.playerIndex === playerIndex && u.isVillager);
+    const appeles = [];
+    for (const u of villagers) {
+      if (!u.posteAvantAbri) continue;
+      if (u.garrisonedIn || u.state === STATE.GARRISON || u.state === STATE.IDLE) appeles.push(u);
+      // Occupé à autre chose (une riposte, un poste périmé dans une ancienne
+      // sauvegarde) : la cloche ne le concerne plus.
+      else u.posteAvantAbri = null;
+    }
+    if (appeles.length > 0) {
+      for (const u of appeles) {
+        const abri = u.garrisonedIn;
+        if (abri) {
+          // En sortant, chacun reprend le poste qu'il a quitté (voir leaveGarrison).
+          const k = abri.garrison.indexOf(u);
+          if (k >= 0) abri.garrison.splice(k, 1);
+          u.leaveGarrison();
+        } else {
+          u.target = null; u.path = null; u.state = STATE.IDLE;
+          u.reprendrePoste();
+        }
       }
-      return { sheltered: 0, released };
+      bilan.released = appeles.length;
+      return bilan;
     }
 
-    let sheltered = 0;
-    const villagers = this.units.filter(
-      (u) => !u.dead && u.playerIndex === playerIndex && u.isVillager && !u.garrisonedIn);
-    for (const v of villagers) {
-      let best = null, bestD = Infinity;
-      for (const b of shelters) {
-        if (!b.canGarrison(v)) continue;
-        const d = dist2(v.x, v.y, b.x, b.y);
-        if (d < bestD) { bestD = d; best = b; }
-      }
-      if (!best) break;
+    // Les places de chaque abri, celles déjà promises à qui y court déduites :
+    // sans ce compte, sept villageois partaient vers une tour de cinq places
+    // et deux restaient plantés devant, le Centre-Ville vide à neuf cases.
+    const places = new Map(shelters.map((b) => [b, b.def.garrison.capacity - b.garrison.length]));
+    for (const u of this.units) {
+      if (!u.dead && u.state === STATE.GARRISON && places.has(u.target)) places.set(u.target, places.get(u.target) - 1);
+    }
+    const dehors = villagers.filter((u) => !u.garrisonedIn && u.state !== STATE.GARRISON);
+    // Chacun va au plus proche abri qui a encore une place : les trajets les
+    // plus courts sont servis d'abord.
+    const trajets = [];
+    for (const v of dehors) {
+      for (const b of shelters) if (b.canGarrison(v)) trajets.push({ v, b, d: dist2(v.x, v.y, b.x, b.y) });
+    }
+    trajets.sort((p, q) => p.d - q.d);
+    const partis = new Set();
+    for (const { v, b } of trajets) {
+      if (partis.has(v) || places.get(b) <= 0) continue;
       const poste = v.posteCourant();
-      if (v.garrisonAt(best)) { v.posteAvantAbri = poste; sheltered++; }
+      if (!v.garrisonAt(b)) continue;
+      v.posteAvantAbri = poste;
+      places.set(b, places.get(b) - 1);
+      partis.add(v);
     }
-    return { sheltered, released: 0 };
+    bilan.sheltered = partis.size;
+    bilan.sansPlace = dehors.length - partis.size;
+    return bilan;
   }
 
   setStance(units, stanceId) {
@@ -1419,7 +1492,10 @@ export class World {
     const { w, h } = this.map;
     for (const e of this.entities) {
       if (e.dead || e.garrisonedIn || e.playerIndex !== this.humanIndex) continue;
-      const radius = Math.round((e.def.los || 4) + (e.kind === 'building' ? e.size / 2 : 0));
+      // Une fondation ne voit que ses abords : posée au loin puis annulée
+      // (tout est rendu), elle explorait la carte sans rien coûter.
+      const vue = e.kind === 'building' && !e.complete ? 1 : (e.def.los || 4);
+      const radius = Math.round(vue + (e.kind === 'building' ? e.size / 2 : 0));
       const cx = Math.floor(e.x / TILE), cy = Math.floor(e.y / TILE);
       const r2 = radius * radius;
       for (let y = cy - radius; y <= cy + radius; y++) {

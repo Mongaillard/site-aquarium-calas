@@ -248,8 +248,13 @@ export class UI {
       if (node.take) node.take.disabled = count === 0;
       if (node.give) node.give.disabled = !!row.noSource;
     }
-    const moving = stats.move || 0;
-    this.workerMoving.textContent = moving > 0 ? `${moving} en déplacement` : '';
+    // Ceux qui sont à l'abri (ou y courent) ne sont à aucun poste : on les
+    // nomme ici, au lieu de les compter « sans affectation ».
+    const moving = stats.move || 0, abrites = stats.abri || 0;
+    this.workerMoving.textContent = [
+      moving > 0 ? `${moving} en déplacement` : '',
+      abrites > 0 ? `${abrites} à l’abri` : '',
+    ].filter(Boolean).join(' · ');
   }
 
   /** La barre des ouvriers se cale au-dessus du panneau du bas, dont la hauteur varie. */

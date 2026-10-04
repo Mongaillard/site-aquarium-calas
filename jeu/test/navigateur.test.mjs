@@ -1340,17 +1340,27 @@ check('le refuge désigné reçoit les unités', garrisoned.ordered >= 1,
 check('les occupants sont bien entrés', garrisoned.inside >= 1, garrisoned.inside + ' à l’intérieur');
 check('le Centre-Ville occupé tire', garrisoned.arrows >= 1, garrisoned.arrows + ' flèche(s)');
 
-// Cloche du village depuis le panneau du Centre-Ville
+// Cloche du village depuis le panneau du Centre-Ville : elle appelle les
+// villageois restés dehors sans faire sortir ceux qu'on vient d'abriter à la
+// main, et son second coup ne renvoie que ceux qu'elle a appelés.
 const bell = await page.evaluate(() => {
   const g = window.__jeu;
   const tc = g.world.buildings.find((b) => b.playerIndex === 0 && b.type === 'towncenter');
   g.setSelection([tc]);
   const before = tc.garrison.length;
-  g.ringTownBell();           // premier coup : libère (des unités sont déjà dedans)
-  return { before, after: tc.garrison.length };
+  const villageois = () => g.world.units.filter((u) => u.playerIndex === 0 && u.isVillager && !u.dead);
+  const dehors = villageois().filter((u) => !u.garrisonedIn && u.state !== 'garrison').length;
+  g.ringTownBell();           // premier coup : ceux qui sont dehors courent s'abriter
+  const appeles = villageois().filter((u) => u.posteAvantAbri).length, pendant = tc.garrison.length;
+  g.ringTownBell();           // second coup : ils retournent à leur poste
+  const rappeles = villageois().filter((u) => u.posteAvantAbri).length, apres = tc.garrison.length;
+  g.world.releaseGarrison(tc);   // les abrités à la main sortent par « Libérer »
+  return { before, dehors, appeles, pendant, rappeles, apres, after: tc.garrison.length };
 });
-check('la cloche libère la garnison', bell.after < bell.before || bell.before === 0,
-  `${bell.before} → ${bell.after}`);
+check('la cloche appelle les villageois dehors et ne libère que ceux-là',
+  (bell.appeles > 0 || bell.dehors === 0) && bell.appeles <= bell.dehors && bell.pendant === bell.before
+    && bell.rappeles === 0 && bell.apres === bell.before && bell.after === 0,
+  JSON.stringify(bell));
 
 // Des soldats qui touchent un abri allié s'y réfugient directement.
 const soldierShelter = await page.evaluate(() => {
