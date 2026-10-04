@@ -1305,7 +1305,8 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     const e = w.spawnUnit(1, 'villager', s.x + TILE * 3, s.y);
     e.stance = 'passive';
     const B = { x: s.x + TILE * 12, y: s.y };
-    s.moveTo(B.x, B.y);
+    // « Attaquer ici » : un simple ordre de marche ne s'interrompt plus pour se battre.
+    s.moveTo(B.x, B.y, true);
     advance(w, 1);
     const engage = !!s.rallyAfterFight;
     const spot = w.map.findOpenTile(a.tx - 6, a.ty + 6, 10);

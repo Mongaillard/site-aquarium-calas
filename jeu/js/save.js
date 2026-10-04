@@ -91,6 +91,8 @@ function serializeUnit(u) {
     stuckTime: u.stuckTime, blockedTime: u.blockedTime,
     autoTarget: u.autoTarget, groupSpeed: u.groupSpeed,
     rallyAfterFight: point(u.rallyAfterFight),
+    // Bâtiment délaissé le temps d'une riposte : par numéro, comme la cible.
+    reprise: u.reprise ? { ...u.reprise, batiment: refId(u.reprise.batiment) } : null,
     garrisonedIn: refId(u.garrisonedIn),
     // Poste quitté au son de la cloche : une ferme ou un chantier, par numéro.
     posteAvantAbri: u.posteAvantAbri
@@ -341,6 +343,9 @@ export function restoreWorld(data) {
         entity.pendingJob = job.farm === null && saved.pendingJob.farm ? null : job;
       }
       entity.garrisonedIn = cible(saved.garrisonedIn);
+      // (Champ absent des sauvegardes plus anciennes : pas de riposte en cours.)
+      const delaisse = saved.reprise ? cible(saved.reprise.batiment) : null;
+      entity.reprise = delaisse ? { ...saved.reprise, batiment: delaisse } : null;
       if (saved.posteAvantAbri) {
         entity.posteAvantAbri = {
           ...saved.posteAvantAbri, farm: cible(saved.posteAvantAbri.farm), site: cible(saved.posteAvantAbri.site),
