@@ -218,6 +218,24 @@ MODELES.solVillager = { ...MODELES.villager, src: 'assets/modeles/sol-fellah.jso
 MODELES.solMilitia = { ...MODELES.militia, src: 'assets/modeles/sol-garde.json' };
 MODELES.solSpearman = { ...MODELES.spearman, src: 'assets/modeles/sol-lancier.json' };
 MODELES.solArcher = { ...MODELES.archer, src: 'assets/modeles/sol-archer.json' };
+// Le Chacal dressé tient le rôle de l'éclaireur : un animal seul (pack « Loup » de
+// l'Atelier), qui court et mord. `taille` compte sa longueur vue de face, comme
+// pour une monture : à 22, de profil, il est long de 36 px et arrive à la
+// taille d'un homme (à 33 il était aussi long qu'un cheval).
+MODELES.solScout = {
+  ...MODELES.scout, src: 'assets/modeles/sol-chacal.json', taille: 22,
+  clips: { marche: 'course', repos: 'repos', attaque: 'attaque_morsure', touche: 'coup_recu', mort: 'mort' },
+};
+// Le Méhariste (cavalerie lourde) : un dromadaire au trot, le sabre au poing.
+// (48 et non 52 : le cavalier est assis plus haut que sur un cheval.)
+MODELES.solKnight = { ...MODELES.knight, src: 'assets/modeles/sol-mehariste.json', taille: 48 };
+// Le Garde masqué (l'élite) : les gestes du Champion sous un masque de chacal.
+MODELES.solChampion = { ...MODELES.champion, src: 'assets/modeles/sol-elite.json' };
+// Le Prêtre du Soleil : les gestes de la Prêtresse, un sceptre solaire à la place du trident.
+MODELES.solPriest = { ...MODELES.priest, src: 'assets/modeles/sol-pretre.json' };
+// Les engins : ceux des Atlantes, en bois blond (mêmes formes, mêmes animations).
+MODELES.solRam = { ...MODELES.ram, src: 'assets/modeles/sol-belier.json' };
+MODELES.solCatapult = { ...MODELES.catapult, src: 'assets/modeles/sol-catapulte.json' };
 
 export const DENSITE = 2;   // px d'atlas par px monde (le style « net » de l'Atelier)
 /**

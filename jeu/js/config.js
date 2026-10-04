@@ -466,6 +466,10 @@ export const CIVILISATIONS = {
     noms: {
       villager: { name: 'Fellah' },
       militia: { name: 'Garde' },
+      scout: { name: 'Chacal dressé', pluriel: 'Chacals dressés' },
+      knight: { name: 'Méhariste' },
+      champion: { name: 'Garde masqué', pluriel: 'Gardes masqués' },
+      priest: { name: 'Prêtre du Soleil', pluriel: 'Prêtres du Soleil' },
       triton: { name: 'Mercenaire atlante', pluriel: 'Mercenaires atlantes' },
       towncenter: { name: 'Palais du Soleil', desc: 'Forme les fellahs, stocke les ressources et permet de passer à l’âge suivant.' },
       mill: { name: 'Grenier' },
@@ -482,6 +486,12 @@ export const CIVILISATIONS = {
       militia: 'assets/portrait-sol-garde.webp',
       spearman: 'assets/portrait-sol-lancier.webp',
       archer: 'assets/portrait-sol-archer.webp',
+      scout: 'assets/portrait-sol-chacal.webp',
+      knight: 'assets/portrait-sol-mehariste.webp',
+      champion: 'assets/portrait-sol-elite.webp',
+      priest: 'assets/portrait-sol-pretre.webp',
+      ram: 'assets/portrait-sol-belier.webp',
+      catapult: 'assets/portrait-sol-catapulte.webp',
     },
   },
 };

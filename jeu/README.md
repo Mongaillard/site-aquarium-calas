@@ -33,9 +33,15 @@ bleus, tridents) et les **Solariens** (peuple du désert : grès ocre, toits en
 terrasse, disques solaires). À ce stade, les règles sont les mêmes pour les
 deux — coûts, points de vie, IA — : une civilisation change ce que l'on voit et
 ce que l'interface nomme. Les Solariens ont leurs treize bâtiments (Palais du
-Soleil, Cour des Gardes, Grenier à dômes, Temple du Soleil…) et quatre troupes
-à eux, le Fellah (l'ouvrier), le Garde à coiffe rayée, le Lancier et l'Archer ;
-leurs autres troupes gardent pour l'instant l'allure atlante. La civilisation
+Soleil, Cour des Gardes, Grenier à dômes, Temple du Soleil…) et dix troupes
+à eux : le Fellah (l'ouvrier), le Garde à coiffe rayée, le Lancier, l'Archer,
+le Chacal dressé (leur éclaireur), le Méhariste sur son dromadaire (leur
+cavalerie lourde), le Garde masqué à tête de chacal (leur élite), le Prêtre du
+Soleil et son sceptre, et les deux engins en bois blond cerclé de bronze doré.
+L'arbalétrier, l'archer monté et l'Hydre gardent pour l'instant l'allure
+atlante. Seuls l'ouvrier et l'éclaireur sont préparés au lancement ; le modèle
+d'une autre troupe se prépare quand on la commande (`prevoirTroupe`,
+`js/sprites.js`), pour ne pas cuire dix modèles avant la première minute. La civilisation
 est un champ du joueur (`player.civ`, voir `CIVILISATIONS` dans `js/config.js`),
 gardé par la sauvegarde ; l'image d'un type se cherche par `spriteDe(type, civ)`
 (`IMAGES_CIV`, `js/sprites.js`) avec repli sur l'image atlante, son nom par

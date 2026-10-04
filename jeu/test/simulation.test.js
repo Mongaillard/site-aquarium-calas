@@ -872,7 +872,8 @@ function empreinte(world) {
     nomDe('triton', 'solarien', 2) === 'Mercenaires atlantes' && nomDe('triton', 'atlante', 2) === 'Atlantes'
     && nomDe('horseArcher', 'atlante', 2) === 'Archers montés' && nomDe('militia', 'solarien', 2) === 'Gardes'
     && portraitDe('militia', 'solarien') === 'assets/portrait-sol-garde.webp' && portraitDe('militia', 'atlante') === 'assets/portrait-milicien.webp'
-    && portraitDe('knight', 'solarien') === 'assets/portrait-cavalier.webp' && portraitDe('deer', 'solarien') === null);
+    && portraitDe('knight', 'solarien') === 'assets/portrait-sol-mehariste.webp' && nomDe('scout', 'solarien', 2) === 'Chacals dressés'
+    && portraitDe('crossbowman', 'solarien') === 'assets/portrait-arbaletrier.webp' && portraitDe('deer', 'solarien') === null);
 }
 
 {
@@ -1471,9 +1472,9 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     const sol = Object.keys(BUILDING_TYPES).map((t) => ficheCiv(t, 'solarien')).filter(Boolean);
     check('Solariens : les 13 bâtiments ont leur image, gardée hors ligne',
       sol.length === 13 && sol.every((f) => f.src.startsWith('assets/solariens/') && cache.has(f.src)), `${sol.length}/13`);
-    check('Solariens : ouvrier, garde, lancier et archer ont leur modèle',
-      ['villager', 'militia', 'spearman', 'archer'].every((t) => ficheCiv(t, 'solarien')),
-      ['villager', 'militia', 'spearman', 'archer'].filter((t) => !ficheCiv(t, 'solarien')).join(', '));
+    const troupesSol = ['villager', 'militia', 'spearman', 'archer', 'scout', 'knight', 'champion', 'priest', 'ram', 'catapult'];
+    check('Solariens : dix troupes ont leur modèle (ouvrier, garde, lancier, archer, chacal, méhariste, garde masqué, prêtre, engins)',
+      troupesSol.every((t) => ficheCiv(t, 'solarien')), troupesSol.filter((t) => !ficheCiv(t, 'solarien')).join(', '));
     check('Atlantes : aucune image propre à chercher (ce sont les images communes)',
       Object.keys(BUILDING_TYPES).every((t) => ficheCiv(t, 'atlante') === null) && ficheCiv('pig', 'solarien') === null);
   }

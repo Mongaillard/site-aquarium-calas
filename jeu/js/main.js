@@ -16,7 +16,7 @@ import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
-import { setStyleUnites, styleUnites, spriteDe, chargerSprites, chargerCivilisation, etatModeles3d } from './sprites.js';
+import { setStyleUnites, styleUnites, spriteDe, chargerSprites, chargerCivilisation, prevoirTroupe, etatModeles3d } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
 import { DENSITE } from './modele3d.js';
 
@@ -756,7 +756,10 @@ class Game {
     this.setSelection([]);
   }
 
-  trainUnit(building, unitType) { this.world.trainUnit(building, unitType); }
+  trainUnit(building, unitType) {
+    this.world.trainUnit(building, unitType);
+    prevoirTroupe(unitType, building.player.civ);   // son modèle se cuit pendant la formation
+  }
   researchTech(building, techId) { this.world.researchTech(building, techId); }
   advanceAge(building) {
     if (this.world.advanceAge(building)) this.ui.toast('Passage à l’âge suivant lancé…', 'good');

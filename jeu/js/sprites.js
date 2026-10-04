@@ -379,7 +379,11 @@ const IMAGES_CIV = {
       farm: 'assets/solariens/ferme.webp',
       tower: 'assets/solariens/tour-guet.webp',
     },
-    unites: { villager: 'solVillager', militia: 'solMilitia', spearman: 'solSpearman', archer: 'solArcher' },
+    unites: {
+      villager: 'solVillager', militia: 'solMilitia', spearman: 'solSpearman', archer: 'solArcher',
+      scout: 'solScout', knight: 'solKnight', champion: 'solChampion', priest: 'solPriest',
+      ram: 'solRam', catapult: 'solCatapult',
+    },
   },
 };
 /** civ → type → clé d'atlas. Table fixe : aucune chaîne fabriquée à chaque image dessinée. */
@@ -826,18 +830,31 @@ export function textureSol(cle, zoom = 1) {
 }
 
 /**
- * Les images propres à une civilisation en jeu : ses bâtiments, puis ses
- * troupes — l'ouvrier d'abord, à l'écran dès la première image ; les autres
- * se cuisent derrière lui, pendant que le joueur s'installe, pour qu'un Garde
- * ne sorte pas de sa caserne sous l'allure atlante le temps de sa cuisson.
- * Sans effet pour les Atlantes ou une valeur inconnue.
+ * Les images propres à une civilisation en jeu : ses bâtiments, et les troupes
+ * présentes dès la première image (l'ouvrier, l'éclaireur). Les autres se
+ * cuisent quand on les commande (prevoirTroupe) ou à leur première apparition :
+ * dix modèles cuits d'avance pèseraient une centaine de mégaoctets pour des
+ * troupes que la partie ne verra peut-être jamais. Sans effet pour les
+ * Atlantes ou une valeur inconnue.
  */
+const DES_LE_DEPART = ['villager', 'scout'];
 export function chargerCivilisation(civ) {
   const cles = CLES_CIV[civ];
   if (!cles || typeof document === 'undefined') return;
-  const types = Object.keys(cles);
-  for (const type of types) if (ATLAS[cles[type]]) chargerAtlas(cles[type]);
-  for (const type of ['villager', ...types]) if (EN_3D[cles[type]]) chargerAtlas(cles[type]);
+  for (const type of Object.keys(cles)) if (ATLAS[cles[type]]) chargerAtlas(cles[type]);
+  for (const type of DES_LE_DEPART) if (EN_3D[cles[type]]) chargerAtlas(cles[type]);
+}
+
+/**
+ * Une troupe vient d'être commandée : son modèle se cuit pendant sa formation,
+ * et elle sort de son bâtiment sous sa vraie allure.
+ */
+export function prevoirTroupe(type, civ) {
+  if (typeof document === 'undefined') return;
+  const propre = CLES_CIV[civ]?.[type];
+  if (propre) { chargerAtlas(propre); return; }
+  const alt = ALTERNATIVES[type];
+  if (alt && EN_3D[alt[style]]) chargerAtlas(alt[style]);
 }
 
 /**
