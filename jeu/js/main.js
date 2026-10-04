@@ -9,7 +9,7 @@ import {
 } from './config.js';
 import { World } from './game.js';
 import { saveGame, loadSave, clearSave, restoreWorld } from './save.js';
-import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, phraseIncident } from './save.js';
+import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
 import { UI } from './ui.js';
@@ -1211,9 +1211,10 @@ const settings = {
 /**
  * La dernière partie a-t-elle été coupée ? (Le témoin de coupure, js/save.js.)
  * L'accueil le dit en une ligne discrète sous la carte de reprise, jusqu'à la
- * prochaine partie lancée ; le menu de pause garde la trace des suivantes.
+ * prochaine partie lancée — même si la page est relancée entre-temps, d'où
+ * l'incident « non lu » ; le menu de pause garde la trace des suivantes.
  */
-let incidentAccueil = releverTemoin();
+let incidentAccueil = releverTemoin() || incidentNonLu();
 
 function afficherIncident() {
   const box = document.getElementById('resume-box');
@@ -1286,6 +1287,7 @@ function startGame(options) {
   document.getElementById('hud').classList.remove('hidden');
   audio.resume();
   incidentAccueil = null;
+  try { marquerIncidentsLus(); } catch { /* stockage indisponible */ }
   currentGame = new Game(options);
   window.__jeu = currentGame;   // pratique pour déboguer depuis la console
 }
