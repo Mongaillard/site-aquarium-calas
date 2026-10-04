@@ -178,6 +178,7 @@ export class Unit extends Entity {
     this.blockedTime = 0;   // temps passé sans pouvoir atteindre sa cible
     this.fleeUntil = 0;     // mise à l'abri en cours (piloté par l'IA)
     this.rallyAfterFight = null;  // destination d'un déplacement interrompu par un combat
+    this.reprise = null;          // bâtiment délaissé le temps d'une riposte : { batiment, auto, x, y }
     this.posteAvantAbri = null;   // poste quitté au son de la cloche, repris en sortant
     this.spawnTime = world.time;
   }
@@ -200,7 +201,8 @@ export class Unit extends Entity {
     if (!STANCES[id] || this.stance === id) return;
     this.stance = id;
     this.guardPoint = { x: this.x, y: this.y };
-    if (id === 'passive' && this.autoTarget) { this.target = null; this.state = STATE.IDLE; }
+    // (En pleine riposte, on retourne au bâtiment que le joueur avait désigné.)
+    if (id === 'passive' && this.autoTarget && !this.reprendreBatiment()) { this.target = null; this.state = STATE.IDLE; }
     if (id === 'standGround') { this.path = null; this.destination = null; }
   }
 
@@ -272,6 +274,7 @@ export class Unit extends Entity {
     // Sinon, une cible abattue bien plus tard renverrait l'unité vers une
     // destination abandonnée depuis longtemps.
     this.rallyAfterFight = null;
+    this.reprise = null;   // et le bâtiment délaissé d'une riposte (voir riposter)
     this.target = target;
     this.resourceTile = null;
     this.destination = null;
@@ -281,6 +284,56 @@ export class Unit extends Entity {
     this.state = STATE.ATTACK;
     if (this.stance === 'standGround' && auto) { this.path = null; return; }
     this.requestPathToEntity(target);
+  }
+
+  /**
+   * Occupée sur un bâtiment, et libre de s'en détourner pour rendre les coups
+   * à cet assaillant ? Ni en « position tenue » ni « sans attaque » ; un engin
+   * de siège reste à son mur — contre une troupe, il ne vaut rien. Et
+   * l'assaillant doit être à sa portée ou dans son rayon de poursuite : se
+   * retourner pour renoncer aussitôt ferait perdre un coup à chaque flèche.
+   */
+  peutRiposter(assaillant) {
+    return !this.dead && this.state === STATE.ATTACK && !!this.target && this.target.kind === 'building'
+      && this.stance !== 'passive' && this.stance !== 'standGround'
+      && !this.def.heal && this.def.class !== 'siege'
+      && dist(this.x, this.y, assaillant.x, assaillant.y)
+        <= Math.max(this.stanceDef.chase * TILE, this.rangePx() + this.radius + assaillant.radius);
+  }
+
+  /**
+   * Se retourne contre l'assaillant et met le bâtiment de côté : on y revient
+   * la menace écartée (voir reprendreBatiment). Sans cela, un soldat occupé
+   * sur un mur se laissait tuer dans le dos. C'est une cible prise
+   * d'initiative : la poursuite reste bornée par l'attitude, comptée depuis
+   * l'endroit où l'unité s'est retournée.
+   */
+  riposter(assaillant) {
+    const reprise = this.reprise
+      || { batiment: this.target, auto: this.autoTarget, x: this.x, y: this.y };
+    const rally = this.rallyAfterFight;
+    this.attackEntity(assaillant, true);
+    if (this.target !== assaillant) return;
+    this.reprise = reprise;
+    this.rallyAfterFight = rally;   // la marche interrompue avant le bâtiment reste due
+  }
+
+  /**
+   * Riposte finie ou abandonnée : l'unité reprend le bâtiment délaissé, s'il
+   * tient encore, comme elle l'attaquait — ordre du joueur ou cible prise
+   * d'elle-même (« sans attaque » ne reprend que l'ordre du joueur).
+   * @returns {boolean} vrai si elle y retourne.
+   */
+  reprendreBatiment() {
+    const reprise = this.reprise;
+    this.reprise = null;
+    // (Hors combat, un ordre donné depuis a fait oublier le bâtiment.)
+    if (!reprise || reprise.batiment.dead || this.state !== STATE.ATTACK) return false;
+    if (reprise.auto && this.stance === 'passive') return false;
+    const rally = this.rallyAfterFight;
+    this.attackEntity(reprise.batiment, reprise.auto);
+    this.rallyAfterFight = rally;
+    return true;
   }
 
   /** Rejoint son poste après un engagement. */
@@ -294,7 +347,9 @@ export class Unit extends Entity {
       return;
     }
     this.destination = { x: guard.x, y: guard.y };
-    this.state = STATE.MOVE;
+    // Ce retour-là n'est pas un ordre de marche : une unité agressive engage
+    // encore ce qu'elle croise en regagnant son poste (voir updateMove).
+    this.state = this.stance === 'aggressive' ? STATE.ATTACK_MOVE : STATE.MOVE;
     this.requestPathTo(guard.x, guard.y);
   }
 
@@ -561,9 +616,12 @@ export class Unit extends Entity {
   }
 
   updateMove(dt, aggressive) {
-    // En déplacement offensif on engage ce qui se présente ; en déplacement
-    // simple, seule une attitude agressive fait sortir du rang.
-    if (aggressive || this.stance === 'aggressive') {
+    // En déplacement offensif (« Attaquer ici ») on engage ce qui se présente.
+    // Un ordre de marche, lui, se suit jusqu'au bout quelle que soit
+    // l'attitude : au doigt, toucher le sol est le seul moyen de sortir ses
+    // troupes d'un combat, et une unité agressive y retournait au premier pas.
+    // L'attitude reprend ses droits à l'arrivée (updateIdle).
+    if (aggressive) {
       const dest = this.destination;
       if (this.tryAcquireTarget(dt)) {
         this.rallyAfterFight = dest;
@@ -580,10 +638,20 @@ export class Unit extends Entity {
 
   updateAttack(dt) {
     const target = this.target;
+    // Le bâtiment délaissé est tombé entre-temps : il n'y a plus rien à reprendre.
+    if (this.reprise && this.reprise.batiment.dead) this.reprise = null;
     // Une soigneuse a fini quand son patient est guéri (ou n'est plus des siens).
     const gueri = this.def.heal && target && (target.hp >= target.maxHp || target.playerIndex !== this.playerIndex);
     if (!target || target.dead || target.garrisonedIn || gueri) {
       this.target = null;
+      // Riposte finie : au prochain assaillant s'il en reste, sinon on
+      // retourne au bâtiment délaissé.
+      if (this.reprise) {
+        const suivant = this.stance === 'passive' || this.stance === 'standGround' ? null
+          : this.world.findAssaillantNear(this, this.def.los * TILE * 0.8);
+        if (suivant && this.withinChaseLimit(suivant)) { this.riposter(suivant); return; }
+        if (this.reprendreBatiment()) return;
+      }
       const rally = this.rallyAfterFight;
       this.rallyAfterFight = null;
       if (rally) { this.moveTo(rally.x, rally.y, true); return; }
@@ -605,6 +673,8 @@ export class Unit extends Entity {
     // Poursuite bornée : une cible prise d'initiative n'entraîne jamais
     // l'unité au-delà de ce que son attitude autorise.
     if (d > reach && this.autoTarget) {
+      // Une riposte qui entraînerait trop loin : on retourne au bâtiment, pas au poste.
+      if (this.reprise && (this.stance === 'standGround' || !this.withinChaseLimit(target)) && this.reprendreBatiment()) return;
       if (this.stance === 'standGround') { this.target = null; this.state = STATE.IDLE; return; }
       if (!this.withinChaseLimit(target)) { this.returnToGuard(); return; }
     }
@@ -644,7 +714,8 @@ export class Unit extends Entity {
   withinChaseLimit(target) {
     const limit = this.stanceDef.chase;
     if (limit <= 0) return false;
-    const guard = this.guardPoint;
+    // En riposte, le poste est l'endroit où l'unité s'est retournée.
+    const guard = this.reprise || this.guardPoint;
     if (!guard) return true;
     return dist(target.x, target.y, guard.x, guard.y) <= limit * TILE;
   }

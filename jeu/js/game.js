@@ -17,6 +17,8 @@ import { AIPlayer } from './ai.js';
 
 const PATHS_PER_TICK = 10;
 const FOG_INTERVAL = 0.25;
+/** La plus longue vue d'une troupe, en pixels : rayon où chercher qui voit un camarade frappé. */
+const VUE_MAX = Math.max(...Object.values(UNIT_TYPES).map((d) => d.los || 0)) * TILE;
 
 function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
   return {
@@ -492,6 +494,22 @@ export class World {
   }
 
   /**
+   * La troupe ennemie la plus proche, dans le rayon, qui s'en prend aux nôtres
+   * (unités ou bâtiments) : un ouvrier au travail ou un soldat qui passe n'en
+   * est pas une. Sert à enchaîner les ripostes sans courir après tout le monde.
+   */
+  findAssaillantNear(entity, radius) {
+    let best = null, bestD = Infinity;
+    this.grid.forEachNear(entity.x, entity.y, radius, (other) => {
+      if (other.dead || other.kind !== 'unit' || other.isAnimal || other.playerIndex === entity.playerIndex) return;
+      if (other.state !== STATE.ATTACK || !other.target || other.target.playerIndex !== entity.playerIndex) return;
+      const d = dist(entity.x, entity.y, other.x, other.y);
+      if (d <= radius && d < bestD) { bestD = d; best = other; }
+    });
+    return best;
+  }
+
+  /**
    * @param {Set<number>} [exclude] entrepôts que CETTE unité n'a pas réussi à
    *   rejoindre. On n'utilise plus de drapeau global : l'échec d'un villageois
    *   ne doit pas priver tous les autres de leur dépôt.
@@ -675,6 +693,17 @@ export class World {
     } else if (entity.kind === 'unit' && entity.isVillager && source && !source.dead
         && source.kind === 'unit' && source.isVillager && entity.state === STATE.IDLE) {
       entity.attackEntity(source, true);
+    }
+    // Occupés sur un bâtiment, les soldats ne regardaient plus autour d'eux :
+    // on les tuait dans le dos. Frappée par une troupe ennemie, l'unité se
+    // retourne — et avec elle ses camarades qui la voient, eux aussi sur un
+    // bâtiment : sinon ils tombent un à un devant moins nombreux qu'eux.
+    if (entity.kind === 'unit' && !entity.isAnimal && source && !source.dead
+        && source.kind === 'unit' && !source.isAnimal && source.playerIndex !== entity.playerIndex) {
+      this.grid.forEachNear(entity.x, entity.y, VUE_MAX, (u) => {
+        if (u.kind !== 'unit' || u.playerIndex !== entity.playerIndex || !u.peutRiposter(source)) return;
+        if (u === entity || dist(u.x, u.y, entity.x, entity.y) <= u.def.los * TILE) u.riposter(source);
+      });
     }
     // Abattre son propre cochon n'est pas une attaque.
     const abattage = entity.isAnimal && source && source.playerIndex === entity.playerIndex;
@@ -1091,7 +1120,10 @@ export class World {
     // Un animal ne se vise qu'en le touchant vraiment : avec la tolérance du
     // doigt, un cerf qui passe transformerait chaque ordre de marche en chasse.
     const sansBeteFrolee = (e) => (e && e.isAnimal && this.hitTest(e, worldX, worldY, 0) < 0 ? null : e);
-    const target = sansBeteFrolee(this.enemyAt(worldX, worldY, playerIndex, tolerance))
+    // `options.cible` : l'interface a déjà reconnu ce qui est sous le doigt (un
+    // des siens à réparer ou à soigner) — on ne le redevine pas d'après le point.
+    const target = options.cible
+      || sansBeteFrolee(this.enemyAt(worldX, worldY, playerIndex, tolerance))
       || sansBeteFrolee(this.entityAt(worldX, worldY, null, tolerance));
     const res = this.resourceNear(worldX, worldY);
 
@@ -1157,6 +1189,24 @@ export class World {
     }
     this.formationMove(units, worldX, worldY, options.aggressive);
     return { kind: 'move' };
+  }
+
+  /**
+   * Toucher un des siens, des unités en main : est-ce un ordre ? Des ouvriers
+   * et un bâtiment achevé mais abîmé : 'repair'. Des soigneuses seules et un
+   * allié blessé : 'heal'. Sinon null — l'appui sélectionne, comme toujours.
+   * Sans cette règle, réparer et soigner n'existaient qu'au clic droit : au
+   * doigt, un Centre-Ville entamé ne remontait jamais. (Une ferme reste un
+   * poste de récolte ; un groupe mêlé à une soigneuse garde l'appui pour
+   * choisir une de ses troupes dans la mêlée.)
+   */
+  ordreSurAllie(units, entity) {
+    if (!entity || entity.dead || !units || units.length === 0) return null;
+    if (entity.playerIndex !== units[0].playerIndex || entity.hp >= entity.maxHp) return null;
+    if (entity.kind === 'building') {
+      return entity.complete && entity.type !== 'farm' && units.some((u) => u.isVillager) ? 'repair' : null;
+    }
+    return !entity.isAnimal && units.every((u) => u.def.heal) && units.some((u) => u !== entity) ? 'heal' : null;
   }
 
   /** Cases exploitables d'un type donné autour d'un point. */

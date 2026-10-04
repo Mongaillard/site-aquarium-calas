@@ -131,6 +131,7 @@ class Game {
     this.rallyArmed = false;
     this.demolitionArmee = null;   // « Détruire » touché une fois : { id, jusqua } (voir demolish)
     this.garrisonArmed = false;
+    this.gestesDits = new Set();   // gestes déjà expliqués d'un message dans cette partie (voir tapAt)
     this.paused = false;
     this.speedId = options.speed || (options.restore && options.restore.speed) || loadSpeed();
     this.speed = speedDef(this.speedId).mult;
@@ -437,6 +438,22 @@ class Game {
         this.issueOrder(p.x, p.y);
         return;
       }
+      // Réparer et soigner au doigt : des ouvriers en main et un bâtiment
+      // abîmé, des soigneuses et un allié blessé (voir World.ordreSurAllie).
+      // Ces ordres n'existaient qu'au clic droit : l'appui sélectionnait, et un
+      // bâtiment entamé ne remontait jamais. Le double appui sélectionne
+      // toujours, comme pour un chantier — on le dit la première fois.
+      const ordre = isDouble ? null : this.world.ordreSurAllie(ownUnits, entity);
+      if (ordre) {
+        this.issueOrder(entity.x, entity.y, entity);
+        if (!this.gestesDits.has(ordre)) {
+          this.gestesDits.add(ordre);
+          this.ui.toast(ordre === 'repair'
+            ? 'Double tap sur le bâtiment pour le sélectionner'
+            : 'Soin lancé — double tap sur l’unité pour la sélectionner');
+        }
+        return;
+      }
       if (isDouble && entity.kind === 'unit') {
         this.selectSameTypeOnScreen(entity);
       } else {
@@ -511,11 +528,12 @@ class Game {
     return clamp(16 / this.camera.zoom, 10, 40);
   }
 
-  issueOrder(worldX, worldY) {
+  /** @param cible l'entité déjà reconnue sous le doigt, quand l'ordre la vise elle (réparer, soigner). */
+  issueOrder(worldX, worldY, cible = null) {
     const units = this.selection.filter(
       (e) => e.kind === 'unit' && e.playerIndex === this.world.humanIndex);
     if (units.length === 0) return;
-    const result = this.world.commandUnits(units, worldX, worldY, { tolerance: this.tapTolerance() });
+    const result = this.world.commandUnits(units, worldX, worldY, { tolerance: this.tapTolerance(), cible });
     // Retour explicite : sur un petit écran, on ne voit pas d'un coup d'œil
     // que le groupe s'est étalé sur plusieurs arbres.
     if (result && result.kind === 'gather' && result.workers > 1) {

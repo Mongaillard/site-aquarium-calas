@@ -799,7 +799,8 @@ export class UI {
         <li><b>Glisser</b> : déplacer la vue · <b>pincer</b> : zoomer</li>
         <li><b>Toucher</b> une unité : la sélectionner · <b>double tap</b> : toutes les unités du même type visibles</li>
         <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
-        <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant</li>
+        <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant. Un appui au sol se suit jusqu'au bout, même en plein combat : c'est le geste pour replier vos troupes</li>
+        <li><b>Réparer</b> : des ${this.game.ouvrier(2)} sélectionnés, touchez un de vos bâtiments abîmés. <b>Soigner</b> : une ${nomDe('priest', this.game.civ)} sélectionnée, touchez un allié blessé. (Double tap pour sélectionner à la place.)</li>
         <li><b>${ic('chantier')} Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les ${this.game.ouvrier(2)} sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant</li>
         <li><b>Affecter quelqu'un à un chantier</b> : touchez un ${this.game.ouvrier()}, puis touchez le chantier — le même geste que pour l'envoyer au bois ou à la nourriture. La ligne <b>${ic('chantier')} Chantiers</b> de la barre <b>${ic('ouvriers')} Ouvriers</b> fait pareil avec ses <b>+ / −</b>, et un chantier sélectionné a son bouton <b>${ic('ouvriers')} +1 ouvrier</b>. (Double tap sur un chantier pour le sélectionner sans y envoyer personne.)</li>
         <li>Les ${this.game.ouvrier(2)} récoltent ${ic('food')} nourriture, ${ic('wood')} bois et ${ic('gold')} or ; il faut des <b>maisons</b> pour agrandir la population</li>
