@@ -1350,6 +1350,10 @@ export class World {
 
   /** Déplacement de groupe : les unités visent des points répartis autour de la cible. */
   formationMove(units, x, y, aggressive) {
+    // Une unité à l'abri ne prend pas l'ordre (la sélection peut encore la
+    // contenir) : elle n'a ni place dans la formation ni pas du groupe — elle
+    // le gardait, et sortait au pas du bélier.
+    units = units.filter((u) => !u.garrisonedIn);
     if (units.length === 1) { units[0].groupSpeed = 0; units[0].moveTo(x, y, aggressive); return; }
     // Le groupe avance au rythme du plus lent : l'armée arrive ensemble.
     let slowest = Infinity;
@@ -1396,27 +1400,44 @@ export class World {
     if (released.length && building.playerIndex === this.humanIndex) {
       this.pushEvent({ type: 'notice', text: `${released.length} unité(s) sortie(s)` });
     }
+    // « Libérer » lève l'alerte aussi bien que la cloche : plus aucun villageois
+    // à l'abri ni en route sur son appel, ceux qui s'étaient arrêtés devant un
+    // abri injoignable reprennent leur poste. Laissés là, leur poste noté
+    // faisait de l'alerte suivante un « retour au travail », personne à l'abri.
+    const appeles = this.units.filter((u) => !u.dead && u.playerIndex === building.playerIndex && u.posteAvantAbri);
+    if (!appeles.some((u) => u.garrisonedIn || u.state === STATE.GARRISON)) {
+      for (const u of appeles) {
+        if (u.state === STATE.IDLE) u.reprendrePoste();
+        else u.posteAvantAbri = null;
+      }
+    }
     return released;
   }
 
+  /** Les abris d'un joueur : ses bâtiments achevés qui accueillent une garnison. */
+  abrisDe(playerIndex) {
+    return this.buildings.filter(
+      (b) => !b.dead && b.complete && b.playerIndex === playerIndex && b.def.garrison);
+  }
+
   /**
-   * Cloche du village : tous les villageois courent s'abriter. Un second coup
-   * les renvoie au travail — ils reprennent leur poste, pas n'importe lequel.
+   * Cloche du village : les villageois restés dehors courent s'abriter. Quand
+   * plus aucun ne peut l'être, le coup suivant renvoie au travail ceux qu'elle
+   * a appelés — ils reprennent leur poste, pas n'importe lequel.
    * Elle ne regarde que les villageois, et ne fait sortir que ceux qu'elle a
    * abrités : ni les soldats, ni un villageois mis à l'abri à la main.
    * @returns {{sheltered: number, released: number, sansPlace: number, abris: number}}
    *   `sansPlace` : les villageois laissés dehors, abris pleins.
    */
   ringTownBell(playerIndex) {
-    const shelters = this.buildings.filter(
-      (b) => !b.dead && b.complete && b.playerIndex === playerIndex && b.def.garrison);
+    const shelters = this.abrisDe(playerIndex);
     const bilan = { sheltered: 0, released: 0, sansPlace: 0, abris: shelters.length };
     if (shelters.length === 0) return bilan;
 
     // Ceux que la cloche a appelés portent le poste qu'ils ont quitté : à
-    // l'abri, encore en route, ou arrêtés devant un abri injoignable. Tant
-    // qu'il y en a, c'est le second coup. (Avant, des soldats abrités
-    // suffisaient à en faire un : la cloche les sortait, sans abriter personne.)
+    // l'abri, encore en route, ou arrêtés devant un abri injoignable.
+    // (Avant, des soldats abrités suffisaient à faire un second coup : la
+    // cloche les sortait, sans abriter personne.)
     const villagers = this.units.filter((u) => !u.dead && u.playerIndex === playerIndex && u.isVillager);
     const appeles = [];
     for (const u of villagers) {
@@ -1426,23 +1447,40 @@ export class World {
       // sauvegarde) : la cloche ne le concerne plus.
       else u.posteAvantAbri = null;
     }
-    if (appeles.length > 0) {
-      for (const u of appeles) {
-        const abri = u.garrisonedIn;
-        if (abri) {
-          // En sortant, chacun reprend le poste qu'il a quitté (voir leaveGarrison).
-          const k = abri.garrison.indexOf(u);
-          if (k >= 0) abri.garrison.splice(k, 1);
-          u.leaveGarrison();
-        } else {
-          u.target = null; u.path = null; u.state = STATE.IDLE;
-          u.reprendrePoste();
-        }
-      }
-      bilan.released = appeles.length;
+    // Tant qu'un villageois dehors peut être abrité, la cloche abrite : formé
+    // pendant l'alerte ou envoyé ailleurs entre-temps, il ne fait pas sortir
+    // tout le village sous l'attaque. Abris pleins, il ne bloque pas le
+    // retour au travail des autres.
+    const dehors = villagers.filter((u) => !u.garrisonedIn && u.state !== STATE.GARRISON && !u.posteAvantAbri);
+    const partis = this.envoyerAuxAbris(playerIndex, dehors);
+    if (partis > 0 || appeles.length === 0) {
+      bilan.sheltered = partis;
+      bilan.sansPlace = dehors.length - partis;
       return bilan;
     }
+    for (const u of appeles) {
+      const abri = u.garrisonedIn;
+      if (abri) {
+        // En sortant, chacun reprend le poste qu'il a quitté (voir leaveGarrison).
+        const k = abri.garrison.indexOf(u);
+        if (k >= 0) abri.garrison.splice(k, 1);
+        u.leaveGarrison();
+      } else {
+        u.target = null; u.path = null; u.state = STATE.IDLE;
+        u.reprendrePoste();
+      }
+    }
+    bilan.released = appeles.length;
+    return bilan;
+  }
 
+  /**
+   * Envoie chacun de ces villageois au plus proche abri qui a encore une
+   * place, le poste qu'il quitte noté pour le retour.
+   * @returns {number} ceux qui sont partis ; les autres n'ont pas de place.
+   */
+  envoyerAuxAbris(playerIndex, villageois) {
+    const shelters = this.abrisDe(playerIndex);
     // Les places de chaque abri, celles déjà promises à qui y court déduites :
     // sans ce compte, sept villageois partaient vers une tour de cinq places
     // et deux restaient plantés devant, le Centre-Ville vide à neuf cases.
@@ -1450,26 +1488,24 @@ export class World {
     for (const u of this.units) {
       if (!u.dead && u.state === STATE.GARRISON && places.has(u.target)) places.set(u.target, places.get(u.target) - 1);
     }
-    const dehors = villagers.filter((u) => !u.garrisonedIn && u.state !== STATE.GARRISON);
     // Chacun va au plus proche abri qui a encore une place : les trajets les
     // plus courts sont servis d'abord.
     const trajets = [];
-    for (const v of dehors) {
+    for (const v of villageois) {
       for (const b of shelters) if (b.canGarrison(v)) trajets.push({ v, b, d: dist2(v.x, v.y, b.x, b.y) });
     }
     trajets.sort((p, q) => p.d - q.d);
     const partis = new Set();
     for (const { v, b } of trajets) {
       if (partis.has(v) || places.get(b) <= 0) continue;
-      const poste = v.posteCourant();
+      // Rappelé en route vers un abri tombé, il garde le poste du premier appel.
+      const poste = v.posteAvantAbri || v.posteCourant();
       if (!v.garrisonAt(b)) continue;
       v.posteAvantAbri = poste;
       places.set(b, places.get(b) - 1);
       partis.add(v);
     }
-    bilan.sheltered = partis.size;
-    bilan.sansPlace = dehors.length - partis.size;
-    return bilan;
+    return partis.size;
   }
 
   setStance(units, stanceId) {

@@ -1001,6 +1001,10 @@ export class Unit extends Entity {
     if (!shelter || shelter.dead || !shelter.canGarrison(this)) {
       this.target = null;
       this.state = STATE.IDLE;
+      // Appelé par la cloche, son abri tombé ou rempli avant lui : il court au
+      // suivant, ou reprend son poste s'il n'y a plus de place nulle part.
+      // Arrêté là, il restait dehors à côté d'un Centre-Ville à moitié vide.
+      if (this.posteAvantAbri && !this.world.envoyerAuxAbris(this.playerIndex, [this])) this.reprendrePoste();
       return;
     }
     if (shelter.edgeDistanceTo(this.x, this.y) <= TILE * 1.2) {

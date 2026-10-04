@@ -10,6 +10,7 @@ import { TICKS_PER_SECOND, TILE, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, DIFFIC
 import { STATE, villagerTask } from '../js/entities.js';
 import { serializeWorld, restoreWorld } from '../js/save.js';
 import { RNG } from '../js/utils.js';
+import { BLOCK } from '../js/map.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 let failures = 0;
@@ -144,12 +145,13 @@ essai('cloche, abri trop petit', () => {
     restes.length === 3 && restes.every((v) => v.state === STATE.GATHER || v.state === STATE.RETURN),
     restes.map((v) => v.state).join(','));
   const r2 = w.ringTownBell(0);
-  check('cloche : le second coup libère quand même (des villageois restés dehors ne le bloquent pas)',
+  check('cloche, abris pleins : le coup suivant lève l’alerte (ceux qui n’ont pas de place ne le bloquent pas)',
     r2.released === 15 && r2.sheltered === 0 && tc.garrison.length === 0, `${r2.released} libérés`);
 });
 
-// Un autre ordre pendant l'alerte : le poste noté à la cloche est oublié.
-// Avant : à l'alerte suivante, « 1 villageois retourne au travail » et
+// Un autre ordre pendant l'alerte : le poste noté à la cloche est oublié, et
+// le villageois est de nouveau dehors — la cloche le rappelle sans toucher aux
+// autres. Avant : à l'alerte suivante, « 1 villageois retourne au travail » et
 // personne à l'abri — il fallait sonner deux fois.
 essai('cloche, ordre pendant l’alerte', () => {
   const w = monde(24);
@@ -160,13 +162,134 @@ essai('cloche, ordre pendant l’alerte', () => {
   const loin = w.map.findOpenTile(tc.tx + 1, tc.ty + 12, 8);
   v.moveTo(loin.tx * TILE + TILE / 2, loin.ty * TILE + TILE / 2);   // le joueur l'envoie ailleurs
   pas(w, 0.5);
-  const r2 = w.ringTownBell(0);                                     // fin de l'alerte
-  check('un ordre donné pendant l’alerte sort le villageois de la cloche : le second coup le laisse faire',
-    r2.released === vs.length - 1 && v.state === STATE.MOVE, `${r2.released} libérés, lui : ${v.state}`);
-  pas(w, 60, () => v.state === STATE.IDLE);
-  const r3 = w.ringTownBell(0);                                     // nouvelle alerte
+  check('un ordre donné pendant l’alerte fait oublier le poste noté à la cloche',
+    !v.posteAvantAbri && v.state === STATE.MOVE, `lui : ${v.state}`);
+  const r2 = w.ringTownBell(0);                                     // il est dehors : la cloche le rappelle
+  check('un villageois dehors, des places : la cloche l’abrite sans faire sortir les autres',
+    r2.sheltered === 1 && r2.released === 0 && v.state === STATE.GARRISON
+    && vs.every((u) => u.garrisonedIn || u.state === STATE.GARRISON),
+    `${r2.sheltered} abrité, ${r2.released} libérés, lui : ${v.state}`);
+  pas(w, 40, () => dehors(w).length === 0);
+  const r3 = w.ringTownBell(0);                                     // fin de l'alerte
+  pas(w, 1);
+  check('fin de l’alerte : les autres reprennent leur poste, lui n’est pas ramené à l’ancien',
+    r3.released === vs.length && v.state === STATE.IDLE && vs.every((u) => u === v || u.state === STATE.GATHER),
+    `${r3.released} libérés, lui : ${v.state}, les autres : ${vs.filter((u) => u !== v).map((u) => u.state).join(',')}`);
+  const r4 = w.ringTownBell(0);                                     // nouvelle alerte
   check('à l’alerte suivante, la cloche abrite tout le monde du premier coup',
-    r3.sheltered === vs.length && r3.released === 0, `${r3.sheltered} abrités, ${r3.released} libérés`);
+    r4.sheltered === vs.length && r4.released === 0, `${r4.sheltered} abrités, ${r4.released} libérés`);
+});
+
+// Des villageois formés pendant l'alerte (le Centre-Ville continue de
+// produire) : la cloche abrite tant qu'un villageois dehors a une place.
+// Avant : « 4 villageois retournent au travail », tout le village dehors.
+essai('cloche, villageois formés pendant l’alerte', () => {
+  const w = monde(21);
+  const tc = centre(w);
+  const vs = auBois(w);
+  w.players[0].resources.food = 1000;
+  w.ringTownBell(0);
+  pas(w, 30, () => dehors(w).length === 0);
+  for (let i = 0; i < 3; i++) w.trainUnit(tc, 'villager');
+  pas(w, 90, () => villageois(w).length === vs.length + 3);
+  const neufs = dehors(w).length;
+  const r = w.ringTownBell(0);
+  check('des villageois formés pendant l’alerte : la cloche les abrite, les autres restent à l’abri',
+    neufs === 3 && r.sheltered === 3 && r.released === 0 && vs.every((v) => v.garrisonedIn === tc),
+    `${neufs} dehors, ${r.sheltered} abrités, ${r.released} libérés, ${tc.garrison.length} à l’intérieur`);
+  pas(w, 30, () => dehors(w).length === 0);
+  const r2 = w.ringTownBell(0);
+  check('plus personne dehors : le coup suivant lève l’alerte pour tous',
+    r2.released === vs.length + 3 && r2.sheltered === 0 && tc.garrison.length === 0, `${r2.released} libérés`);
+});
+
+// L'abri visé tombe (ou se remplit) pendant la course : ceux qui y couraient
+// vont au suivant, le poste noté au premier appel gardé. Avant : arrêtés
+// dehors, huit places libres au Centre-Ville, et le coup suivant faisait
+// sortir tout le monde.
+essai('cloche, l’abri visé tombe', () => {
+  for (const cas of ['abattue', 'remplie']) {
+    const w = monde(52);
+    w.players[0].age = 1;
+    const tc = centre(w);
+    const p = emplacement(w, 'tower', 10);
+    const tour = w.spawnBuilding(0, 'tower', p.tx, p.ty, true);
+    auBois(w);
+    const arbre = arbrePres(w, tour.x, tour.y);
+    const voisins = [0, 1].map((i) => w.spawnUnit(0, 'villager', tour.x + TILE * (i - 1), tour.y + TILE * 2.5));
+    w.spreadGatherOrder(voisins, arbre.tx, arbre.ty, 'wood');
+    pas(w, 12, () => voisins.every((v) => v.state === STATE.GATHER && !v.path));
+    const vs = villageois(w);
+    w.ringTownBell(0);
+    const versLaTour = vs.filter((v) => v.target === tour).length;
+    if (cas === 'abattue') w.killEntity(tour, null, false);
+    else for (let i = 0; i < 5; i++) tour.addToGarrison(w.spawnUnit(0, 'archer', tour.x, tour.y + TILE * 2));
+    pas(w, 60, () => vs.every((v) => v.garrisonedIn || v.state !== STATE.GARRISON));
+    check(`cloche, la tour visée ${cas} pendant la course : ses villageois vont au Centre-Ville`,
+      versLaTour > 0 && vs.every((v) => v.garrisonedIn === tc),
+      `${versLaTour} couraient à la tour ; ${tc.garrison.length} au Centre-Ville, ${dehors(w).length} dehors (${dehors(w).map((v) => v.state).join(',')})`);
+    const r = w.ringTownBell(0);
+    pas(w, 1);
+    check(`tour ${cas} : à la fin de l’alerte, chacun reprend le poste noté au premier appel`,
+      r.released === vs.length && vs.every((v) => !v.garrisonedIn && v.state === STATE.GATHER),
+      `${r.released} libérés : ${vs.map((v) => v.state).join(',')}`);
+  }
+  // Plus aucun abri où aller : ils reprennent leur poste, sans poste noté sur
+  // le dos — plantés là, ils faisaient de l'alerte suivante un « second coup ».
+  const w = monde(53);
+  w.players[0].age = 1;
+  const tc = centre(w);
+  const p = emplacement(w, 'tower', 4);
+  const tour = w.spawnBuilding(0, 'tower', p.tx, p.ty, true);
+  for (let i = 0; i < 15; i++) tc.addToGarrison(w.spawnUnit(0, 'archer', tc.x, tc.y + TILE * 3));
+  const vs = auBois(w);
+  const r1 = w.ringTownBell(0);
+  w.killEntity(tour, null, false);
+  pas(w, 3);
+  check('cloche, l’abri visé tombe et les autres sont pleins : les villageois reprennent leur poste',
+    r1.sheltered === vs.length && vs.every((v) => !v.posteAvantAbri && (v.state === STATE.GATHER || v.state === STATE.RETURN)),
+    `${r1.sheltered} appelés ; ${vs.map((v) => `${v.state}${v.posteAvantAbri ? '+poste' : ''}`).join(',')}`);
+  const r2 = w.ringTownBell(0);
+  check('et la cloche dit « Abris pleins » sans renvoyer personne',
+    r2.sheltered === 0 && r2.released === 0 && r2.sansPlace === vs.length, JSON.stringify(r2));
+});
+
+// L'alerte levée par « Libérer » plutôt que par la cloche : ceux qu'elle avait
+// appelés et qui se sont arrêtés devant un abri injoignable reprennent leur
+// poste aussi. Avant : ils gardaient leur poste noté, et l'alerte suivante
+// commençait par « n villageois retournent au travail », personne à l'abri.
+essai('cloche, alerte levée par « Libérer »', () => {
+  const w = monde(52);
+  w.players[0].age = 1;
+  const tc = centre(w);
+  const p = emplacement(w, 'tower', 10);
+  const tour = w.spawnBuilding(0, 'tower', p.tx, p.ty, true);
+  auBois(w);
+  const arbre = arbrePres(w, tour.x, tour.y);
+  const voisins = [0, 1].map((i) => w.spawnUnit(0, 'villager', tour.x + TILE * (i - 1), tour.y + TILE * 2.5));
+  w.spreadGatherOrder(voisins, arbre.tx, arbre.ty, 'wood');
+  pas(w, 12, () => voisins.every((v) => v.state === STATE.GATHER && !v.path));
+  const vs = villageois(w);
+  // Un mur de deux cases autour du Centre-Ville : on ne peut plus y entrer.
+  for (let y = tc.ty - 2; y <= tc.ty + tc.size + 1; y++) {
+    for (let x = tc.tx - 2; x <= tc.tx + tc.size + 1; x++) {
+      const dedans = x >= tc.tx && x < tc.tx + tc.size && y >= tc.ty && y < tc.ty + tc.size;
+      if (!dedans) w.map.block(x, y, BLOCK.TERRAIN);
+    }
+  }
+  w.ringTownBell(0);
+  pas(w, 60, () => vs.every((v) => v.garrisonedIn || v.state === STATE.IDLE));
+  const plantes = dehors(w).filter((v) => v.posteAvantAbri && v.state === STATE.IDLE);
+  const dansLaTour = tour.garrison.length;
+  w.releaseGarrison(tour);                                          // bouton « Libérer »
+  pas(w, 1);
+  check('« Libérer » lève l’alerte : ceux qui s’étaient arrêtés devant un abri injoignable reprennent leur poste',
+    plantes.length > 0 && dansLaTour > 0 && vs.every((v) => !v.posteAvantAbri)
+    && plantes.every((v) => v.state === STATE.GATHER || v.state === STATE.RETURN),
+    `${dansLaTour} dans la tour, ${plantes.length} arrêtés dehors : ${plantes.map((v) => `${v.state}${v.posteAvantAbri ? '+poste' : ''}`).join(',')}`);
+  const r = w.ringTownBell(0);                                      // nouvelle alerte
+  check('l’alerte suivante abrite du premier coup',
+    r.sheltered === vs.length && r.released === 0, `${r.sheltered} abrités, ${r.released} libérés`);
 });
 
 // La cloche ne libère que ce qu'elle a abrité : un villageois mis à l'abri à
@@ -352,6 +475,27 @@ essai('pas de groupe', () => {
       enGroupe < propre * 0.7 && v.groupSpeed === 0 && Math.abs(v.speedPx() - propre) < 0.01,
       `${enGroupe.toFixed(1)} px/s en groupe, ${v.speedPx().toFixed(1)} après (${propre.toFixed(1)} à lui)`);
   });
+});
+
+// Une sélection qui contient encore des unités entrées à l'abri, plus un
+// bélier dehors : l'ordre de marche ne concerne que le bélier. Avant, les
+// abrités recevaient quand même le pas du groupe et sortaient au pas du bélier.
+essai('pas de groupe, unités à l’abri', () => {
+  const w = monde(41);
+  const tc = centre(w);
+  const miliciens = [0, 1, 2].map((i) => w.spawnUnit(0, 'militia', tc.x + TILE * (3 + i), tc.y + TILE * 3));
+  const belier = w.spawnUnit(0, 'ram', tc.x + TILE * 3, tc.y + TILE * 4);
+  for (const m of miliciens) tc.addToGarrison(m);
+  const but = { x: tc.x + TILE * 10, y: tc.y + TILE * 8 };
+  w.commandUnits([...miliciens, belier], but.x, but.y);
+  w.releaseGarrison(tc);
+  const propre = UNIT_TYPES.militia.speed * TILE;
+  check('un ordre de groupe ne pose pas le pas du groupe sur les unités à l’abri',
+    miliciens.every((m) => m.groupSpeed === 0 && Math.abs(m.speedPx() - propre) < 0.01),
+    `${miliciens.map((m) => m.speedPx().toFixed(1)).join(', ')} px/s à la sortie (${propre.toFixed(1)} à eux)`);
+  check('et celle qui est dehors va au point visé, sans place gardée pour les abritées',
+    belier.state === STATE.MOVE && Math.hypot(belier.destination.x - but.x, belier.destination.y - but.y) < 1,
+    `bélier : ${belier.state}, à ${belier.destination ? Math.hypot(belier.destination.x - but.x, belier.destination.y - but.y).toFixed(0) : '?'} px du point`);
 });
 
 // ---------------------------------------------------------------------------
@@ -595,9 +739,10 @@ essai('parties bombardées d’ordres', () => {
       for (const u of w.units) if (!u.dead && !u.isAnimal) pop[u.playerIndex] += u.def.pop || 1;
       w.players.forEach((p, i) => { if (p.pop !== pop[i]) note(`population ${p.pop} pour ${pop[i]} comptés`); });
     }
-    // Un dernier « second coup » : plus personne ne garde de poste noté.
+    // Fin de l'alerte — un coup de plus s'il restait quelqu'un à abriter :
+    // plus personne ne garde de poste noté.
     if (!w.gameOver && w.units.some((u) => u.playerIndex === 0 && u.posteAvantAbri)) {
-      w.ringTownBell(0);
+      if (w.ringTownBell(0).sheltered > 0) w.ringTownBell(0);
       pas(w, 2);
       const restes = w.units.filter((u) => u.playerIndex === 0 && u.posteAvantAbri).length;
       if (restes) note(`${restes} poste(s) encore notés après le second coup`);
