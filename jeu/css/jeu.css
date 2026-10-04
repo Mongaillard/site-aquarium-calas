@@ -314,6 +314,9 @@ ul.help a { color: var(--gold); }
 .toast.error { border-left-color: var(--error); }
 .toast.leaving { opacity: 0; transform: translateX(-8px); transition: .35s; }
 .toast-count { opacity: .7; font-variant-numeric: tabular-nums; }
+/* L'alerte d'attaque se touche pour aller voir : elle seule arrête le doigt. */
+.toast.touchable { pointer-events: auto; cursor: pointer; }
+.toast.touchable:active { transform: scale(.98); }
 @keyframes toast-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
 
 #build-hint {
@@ -377,6 +380,21 @@ ul.help a { color: var(--gold); }
   animation: pulse 1.6s ease-in-out infinite;
 }
 @keyframes pulse { 50% { opacity: .72; } }
+
+/* La pastille « Armée », au bout de la barre : grisée sans soldat. Avec elle
+   la barre porte sept boutons : marges et écarts resserrés, pour qu'elle
+   tienne dans la largeur d'un téléphone. */
+#worker-bar { gap: 4px; }
+#worker-bar > * { padding-left: 7px; padding-right: 7px; }
+.worker-chip.armee.vide { opacity: .45; }
+/* 44 px sous le doigt, pour elle comme pour l'alerte d'attaque — ses voisines
+   s'étirent à sa hauteur, et la consigne de pose remonte d'autant. Sauf
+   téléphone couché, où tout reste bas pour laisser la carte visible. */
+@media (orientation: portrait), (min-height: 481px) {
+  #btn-armee { min-height: 44px; }
+  #build-hint { bottom: calc(var(--bottom-height, 126px) + 54px + var(--safe-bottom)); }
+  .toast.touchable { padding-top: 13px; padding-bottom: 13px; }
+}
 
 /* --- Panneau d'affectation ------------------------------------------------- */
 
@@ -445,6 +463,19 @@ ul.help a { color: var(--gold); }
   min-height: 46px;
 }
 #selection-panel .hint { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+
+/* La croix « lâcher » : toujours au même endroit, en haut à droite du panneau
+   du bas, qui lui laisse sa place. */
+#btn-lacher {
+  position: absolute;
+  top: 8px;
+  right: calc(8px + var(--safe-right));
+  width: 44px; height: 44px;
+}
+#btn-lacher:not(.hidden) + #selection-panel { padding-right: 50px; flex-wrap: wrap; row-gap: 6px; }
+/* La place de la croix manquerait au nom d'un bâtiment : sa file de production
+   passe à la ligne dès qu'elle ne tient plus à côté de lui. */
+#btn-lacher:not(.hidden) + #selection-panel .info { min-width: 120px; }
 
 .portrait {
   width: 46px; height: 46px;

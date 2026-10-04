@@ -9,6 +9,7 @@ import {
   AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES, GAME_SPEEDS,
   ficheDe, nomDe, portraitDe,
 } from './config.js';
+import { TILE } from './config.js';
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
 import { iconeSVG, ICONES_LICENCE } from './icones.js';
 import { STYLES, etatModeles3d, portraitAdverse } from './sprites.js';
@@ -40,6 +41,88 @@ function teinterPortrait(img, type) {
   else img.addEventListener('load', poser, { once: true });
 }
 
+// --- Alerte d'attaque et armée : la logique, sans DOM (vérifiée sous node) ---
+
+/** Au-delà de cette distance d'une alerte encore chaude, c'est une autre attaque : à peu près un écran. */
+const RAYON_FOYER = 16 * TILE;
+/** Secondes pendant lesquelles un foyer annoncé ne redit rien (le délai d'avant, mais par foyer). */
+const SILENCE_FOYER = 12;
+/** Secondes pendant lesquelles son repère pulse sur la mini-carte — et son message reste à toucher. */
+export const DUREE_REPERE = 6;
+/** Secondes entre deux alertes, tous foyers confondus : deux attaques à la fois ne sonnent pas en chœur. */
+const ECART_ALERTES = 3;
+
+/**
+ * Alertes d'attaque : une par FOYER. Un seul délai pour toute la carte faisait
+ * taire douze secondes le raid sur le village pendant que l'armée se battait
+ * au loin. Chaque alerte garde donc son lieu : les coups reçus autour d'elle
+ * ne redisent rien tant qu'elle est chaude, une attaque ailleurs a droit à la
+ * sienne. `liste` sert aussi à la mini-carte (Renderer.drawMinimap).
+ */
+export class FoyersAttaque {
+  constructor() {
+    this.liste = [];     // { x, y, repere, silence } : secondes qu'il reste à chacun
+    this.attente = 0;    // secondes avant qu'une autre alerte puisse sonner
+  }
+
+  /** Un coup reçu en (x, y) : vrai s'il ouvre un foyer, donc s'il faut l'annoncer. */
+  signaler(x, y) {
+    if (this.attente > 0) return false;
+    if (this.liste.some((f) => Math.hypot(f.x - x, f.y - y) < RAYON_FOYER)) return false;
+    this.liste.push({ x, y, repere: DUREE_REPERE, silence: SILENCE_FOYER });
+    this.attente = ECART_ALERTES;
+    return true;
+  }
+
+  /** Le temps passe, en secondes réelles : un foyer refroidi pourra de nouveau alerter. */
+  vieillir(dt) {
+    if (this.attente > 0) this.attente -= dt;
+    for (let i = this.liste.length - 1; i >= 0; i--) {
+      const f = this.liste[i];
+      f.repere -= dt;
+      f.silence -= dt;
+      if (f.silence <= 0) this.liste.splice(i, 1);   // sur place : le rendu tient la même liste
+    }
+  }
+}
+
+/** L'armée d'un joueur : toutes ses unités qui ne sont ni des ouvriers ni des animaux, abritées comprises. */
+export function armeeDe(world, joueur) {
+  return world.units.filter((u) => !u.dead && u.playerIndex === joueur && !u.isVillager && !u.isAnimal);
+}
+
+/**
+ * Où poser la vue pour voir une armée : sur le soldat le plus proche de son
+ * centre. Le centre lui-même tombe en rase campagne dès que l'armée est en
+ * deux groupes ; le soldat qui en est le plus près est dans le plus gros.
+ */
+export function coeurDe(unites) {
+  if (unites.length === 0) return null;
+  let cx = 0, cy = 0;
+  for (const u of unites) { cx += u.x; cy += u.y; }
+  cx /= unites.length; cy /= unites.length;
+  let coeur = unites[0];
+  for (const u of unites) {
+    if (Math.hypot(u.x - cx, u.y - cy) < Math.hypot(coeur.x - cx, coeur.y - cy)) coeur = u;
+  }
+  return coeur;
+}
+
+/**
+ * Un toucher sur la pastille « Armée » : que faire ? Prendre toute l'armée en
+ * main, où qu'elle soit (`prendre`) ; si elle y est déjà, y amener la vue
+ * (`voir`) ; si elle est tout entière à l'abri, montrer l'abri (`abri`) : on
+ * ne commande pas une troupe abritée. Null sans un seul soldat.
+ */
+export function toucherArmee(world, joueur, selection) {
+  const armee = armeeDe(world, joueur);
+  if (armee.length === 0) return null;
+  const dehors = armee.filter((u) => !u.garrisonedIn);
+  if (dehors.length === 0) return { abri: armee[0].garrisonedIn };
+  const enMain = selection.length === dehors.length && dehors.every((u) => selection.includes(u));
+  return enMain ? { voir: coeurDe(dehors) } : { prendre: dehors };
+}
+
 export class UI {
   constructor(game) {
     this.game = game;
@@ -57,6 +140,7 @@ export class UI {
         build: el('wk-build'), idle: el('wk-idle'),
       },
       bottombar: el('bottombar'),
+      armee: el('wk-armee'), btnArmee: el('btn-armee'), lacher: el('btn-lacher'),
       minimap: el('minimap'), hud: el('hud'),
     };
     this.lastValues = {};
@@ -94,6 +178,13 @@ export class UI {
         else this.game.selectWorkerGroup(task);
       }, opts);
     });
+    // Pastille « Armée » : toute l'armée d'un toucher ; déjà en main, la vue va sur elle.
+    this.nodes.btnArmee.addEventListener('click', () => this.game.selectArmy(), opts);
+    // La croix du panneau : lâcher la sélection au doigt (au clavier, c'est Échap).
+    this.nodes.lacher.addEventListener('click', () => {
+      this.game.audio.play('click');
+      this.game.lacherSelection();
+    }, opts);
     this.nodes.autoWorkers.addEventListener('change', (e) => {
       this.game.setAutoWorkers(e.target.checked);
       this.renderWorkerRows();
@@ -162,6 +253,10 @@ export class UI {
     }
     this.nodes.workerBar.querySelector('[data-task="idle"]')
       .classList.toggle('has-idle', (stats.idle || 0) > 0);
+    // L'armée, au bout de la barre : grisée tant qu'il n'y a pas un soldat.
+    const soldats = armeeDe(this.world, this.world.humanIndex).length;
+    this.setText('wkarmee', this.nodes.armee, String(soldats));
+    this.nodes.btnArmee.classList.toggle('vide', soldats === 0);
   }
 
   openWorkerMenu() {
@@ -318,6 +413,10 @@ export class UI {
     const signature = this.signature(selection);
     const commands = selection.length > 0 ? this.commandSignature(selection) : 'none';
     if (!force && signature === this.selectionSignature && commands === this.commandsSignature) return;
+    // La croix « lâcher » n'a de sens qu'avec quelque chose en main. Elle vit
+    // hors du panneau, qui est reconstruit sans cesse : sous le doigt, un
+    // bouton recréé perd l'appui.
+    this.nodes.lacher.classList.toggle('hidden', selection.length === 0);
 
     if (selection.length === 0) {
       if (this.selectionSignature !== 'none' || force) {
@@ -696,7 +795,7 @@ export class UI {
     return `Affichée : ${px(r.dpr)} au lieu de ${n(ecran)}${cause}`;
   }
 
-  toast(message, kind = 'info') {
+  toast(message, kind = 'info', action = null) {
     // Message identique déjà affiché : on incrémente plutôt que d'empiler.
     const last = this.nodes.alerts.lastElementChild;
     if (last && last.dataset.message === message && !last.classList.contains('leaving')) {
@@ -709,11 +808,18 @@ export class UI {
     node.className = `toast ${kind}`;
     node.dataset.message = message;
     node.textContent = message;
+    // Un message qui mène quelque part (l'alerte d'attaque) : il se touche, et
+    // reste affiché le temps qu'on y porte le doigt.
+    if (action) {
+      node.classList.add('touchable');
+      node.setAttribute('role', 'button');
+      node.addEventListener('click', () => { node.remove(); action(); }, this.ecoute());
+    }
     this.nodes.alerts.appendChild(node);
     setTimeout(() => {
       node.classList.add('leaving');
       setTimeout(() => node.remove(), 400);
-    }, 2600);
+    }, action ? DUREE_REPERE * 1000 : 2600);
     while (this.nodes.alerts.children.length > 4) this.nodes.alerts.firstChild.remove();
   }
 
@@ -804,6 +910,8 @@ export class UI {
         <li><b>Glisser</b> : déplacer la vue · <b>pincer</b> : zoomer</li>
         <li><b>Toucher</b> une unité : la sélectionner · <b>double tap</b> : toutes les unités du même type visibles</li>
         <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
+        <li><b>${ic('forging')} Armée</b>, au bout de la barre des ouvriers : un toucher prend tous vos soldats, où qu'ils soient ; un second amène la vue sur eux. La <b>${ic('fermer')} croix</b> du panneau lâche la sélection</li>
+        <li><b>« Vous êtes attaqué ! »</b> : touchez le message pour aller voir ; l'endroit pulse en rouge sur la mini-carte</li>
         <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant. Un appui au sol se suit jusqu'au bout, même en plein combat : c'est le geste pour replier vos troupes</li>
         <li><b>Réparer</b> : des ${this.game.ouvrier(2)} sélectionnés, touchez un de vos bâtiments abîmés. <b>Soigner</b> : une ${nomDe('priest', this.game.civ)} sélectionnée, touchez un allié blessé. (Double tap pour sélectionner à la place.)</li>
         <li><b>${ic('chantier')} Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les ${this.game.ouvrier(2)} sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant</li>
