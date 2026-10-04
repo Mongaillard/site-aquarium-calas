@@ -5,6 +5,7 @@
 import {
   TILE, TICKS_PER_SECOND, AGES, DIFFICULTIES, MAP_SIZES, BUILDING_TYPES,
   GAME_MODES, DEFAULT_MODE, GAME_SPEEDS, DEFAULT_SPEED,
+  CIVILISATIONS, civDe, ficheDe, nomDe,
 } from './config.js';
 import { World } from './game.js';
 import { saveGame, loadSave, clearSave, restoreWorld } from './save.js';
@@ -15,7 +16,7 @@ import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
-import { setStyleUnites, styleUnites, spriteDe, chargerSprites, etatModeles3d } from './sprites.js';
+import { setStyleUnites, styleUnites, spriteDe, chargerSprites, chargerCivilisation, etatModeles3d } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
 import { DENSITE } from './modele3d.js';
 
@@ -106,6 +107,8 @@ class Game {
     // Reprise d'une partie interrompue : le monde vient de la sauvegarde.
     const repris = options.restore ? restoreWorld(options.restore) : null;
     this.world = repris || new World(options);
+    // Les images propres à chaque camp (partie neuve ou reprise) ; sans effet pour les Atlantes.
+    for (const p of this.world.players) chargerCivilisation(p.civ);
     this.canvas = document.getElementById('game');
     // Tous les écouteurs posés sur le DOM partagé (canvas, boutons du HUD,
     // clavier, fenêtre) : une partie terminée les retire d'un coup, sinon elle
@@ -160,7 +163,7 @@ class Game {
     window.addEventListener('pagehide', this.onLeave);
     // Le conseil de départ, pour une partie neuve seulement : à la reprise,
     // les villageois travaillent déjà.
-    if (!repris) this.ui.toast('Affectez vos villageois : touchez-les, puis touchez un arbre, un buisson ou un filon.');
+    if (!repris) this.ui.toast(`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
   }
@@ -265,7 +268,8 @@ class Game {
         case 'built':
           if (event.building.playerIndex === this.world.humanIndex) {
             this.audio.play('built');
-            this.ui.toast(`${event.building.def.name} terminé${event.building.def.fem ? 'e' : ''}`);
+            const f = ficheDe(event.building.type, event.building.player.civ);
+            this.ui.toast(`${f.name} terminé${f.fem ? 'e' : ''}`);
           }
           break;
         case 'trained': if (mine) this.audio.play('trained'); break;
@@ -279,8 +283,8 @@ class Game {
             this.idleNoticeCooldown = 15;
             const count = this.idleVillagers().length;
             this.ui.toast(count > 1
-              ? `${count} villageois attendent vos ordres`
-              : 'Un villageois attend vos ordres', 'warn');
+              ? `${count} ${this.ouvrier(count)} attendent vos ordres`
+              : `Un ${this.ouvrier()} attend vos ordres`, 'warn');
           }
           break;
         case 'tech':
@@ -370,7 +374,7 @@ class Game {
           this.vibrate(10);
         }
       } else {
-        this.ui.toast('Touchez un Centre-Ville ou une tour', 'error');
+        this.ui.toast(`Touchez un ${nomDe('towncenter', this.civ)} ou une tour`, 'error');
         this.audio.play('error');
       }
       this.ui.refreshSelection(true);
@@ -472,7 +476,7 @@ class Game {
     for (const b of this.world.buildings) {
       if (b.dead || (playerIndex !== null && b.playerIndex !== playerIndex)) continue;
       if (meilleur && b.ty < meilleur.ty) continue;   // peint avant : recouvert
-      const s = spriteDe(b.type);
+      const s = spriteDe(b.type, b.player.civ);
       if (!s) continue;
       const { cellW, cellH, largeurMonde, sol } = s.def;
       const dw = largeurMonde, dh = (cellH / cellW) * dw;
@@ -496,7 +500,7 @@ class Game {
     if (trouve && trouve.kind === 'unit') return trouve;
     const illustre = this.batimentIllustreSous(p.x, p.y, playerIndex);
     if (!illustre) return trouve;
-    if (!trouve || trouve.kind !== 'building' || spriteDe(trouve.type)) return illustre;
+    if (!trouve || trouve.kind !== 'building' || spriteDe(trouve.type, trouve.player.civ)) return illustre;
     // Un bâtiment plat sous le doigt : il gagne s'il est peint après l'illustré.
     const apres = trouve.ty > illustre.ty
       || (trouve.ty === illustre.ty && this.world.buildings.indexOf(trouve) > this.world.buildings.indexOf(illustre));
@@ -518,8 +522,8 @@ class Game {
       const lieux = { wood: 'arbres', gold: 'filons', food: 'sources de nourriture' };
       const type = result.res ? result.res.type : 'food';
       this.ui.toast(result.spread > 1
-        ? `${result.workers} villageois répartis sur ${result.spread} ${lieux[type]}`
-        : `${result.workers} villageois envoyés récolter`);
+        ? `${result.workers} ${this.ouvrier(result.workers)} répartis sur ${result.spread} ${lieux[type]}`
+        : `${result.workers} ${this.ouvrier(result.workers)} envoyé${result.workers > 1 ? 's' : ''} récolter`);
     }
     // Un chantier ne montre pas tout de suite qu'il a reçu du renfort : on le dit.
     if (result && (result.kind === 'build' || result.kind === 'repair') && result.workers > 0) {
@@ -572,7 +576,7 @@ class Game {
       && u.playerIndex === entity.playerIndex && u.type === entity.type
       && u.x >= view.left && u.x <= view.right && u.y >= view.top && u.y <= view.bottom);
     this.setSelection(same.length ? same : [entity]);
-    this.ui.toast(`${same.length} ${entity.def.name}${same.length > 1 ? 's' : ''}`);
+    this.ui.toast(`${same.length} ${nomDe(entity.type, entity.player.civ, same.length)}`);
   }
 
   filterSelection(type) {
@@ -594,11 +598,11 @@ class Game {
   ringTownBell() {
     const result = this.world.ringTownBell(this.world.humanIndex);
     if (result.sheltered > 0) {
-      this.ui.toast(`${result.sheltered} villageois à l'abri`, 'warn');
+      this.ui.toast(`${result.sheltered} ${this.ouvrier(result.sheltered)} à l'abri`, 'warn');
       this.audio.play('alert');
       this.vibrate([12, 40, 12]);
     } else if (result.released > 0) {
-      this.ui.toast(`${result.released} villageois retournent au travail`);
+      this.ui.toast(`${result.released} ${this.ouvrier(result.released)} ${result.released > 1 ? 'retournent' : 'retourne'} au travail`);
       this.audio.play('order');
     } else {
       this.ui.toast('Aucun abri disponible', 'error');
@@ -640,7 +644,7 @@ class Game {
     this.garrisonArmed = !this.garrisonArmed;
     this.attackMoveArmed = false;
     this.rallyArmed = false;
-    this.ui.setBuildHint(this.garrisonArmed ? 'Touchez le Centre-Ville ou la tour où s’abriter' : '');
+    this.ui.setBuildHint(this.garrisonArmed ? `Touchez le ${nomDe('towncenter', this.civ)} ou la tour où s’abriter` : '');
     this.ui.refreshSelection(true);
   }
 
@@ -651,7 +655,7 @@ class Game {
   startBuildMode(type) {
     this.buildMode = { type, tx: 0, ty: 0, valid: false };
     this.ui.closeBuildMenu();
-    this.ui.setBuildHint(`${BUILDING_TYPES[type].name} : touchez l'emplacement (2 doigts pour déplacer la vue)`);
+    this.ui.setBuildHint(`${ficheDe(type, this.civ).name} : touchez l'emplacement (2 doigts pour déplacer la vue)`);
     const center = this.camera.screenToWorld(this.camera.viewWidth / 2, this.camera.viewHeight / 2);
     this.updateGhostWorld(center.x, center.y);
   }
@@ -690,11 +694,12 @@ class Game {
     if (site) {
       this.audio.play('place');
       this.vibrate(14);
-      const nom = BUILDING_TYPES[type].name;
+      const fiche = ficheDe(type, this.civ);
+      const nom = fiche.name;
       const ouvriers = `${crew.length} ouvrier${crew.length > 1 ? 's' : ''}`;
       this.ui.toast(dejaOccupes === crew.length && crew.length > 0
-        ? `${nom} ajouté${BUILDING_TYPES[type].fem ? 'e' : ''} à la file — ${ouvriers}`
-        : `${nom} lancé${BUILDING_TYPES[type].fem ? 'e' : ''} — ${ouvriers}`);
+        ? `${nom} ajouté${fiche.fem ? 'e' : ''} à la file — ${ouvriers}`
+        : `${nom} lancé${fiche.fem ? 'e' : ''} — ${ouvriers}`);
       this.cancelBuild();
     }
   }
@@ -740,14 +745,14 @@ class Game {
         && !w.buildings.some((b) => b !== building && !b.dead && b.complete
           && b.type === 'towncenter' && b.playerIndex === building.playerIndex);
       this.ui.toast(dernier
-        ? 'Votre dernier Centre-Ville : le détruire, c’est perdre la partie. Touchez « Confirmer » pour le raser.'
-        : `Touchez « Confirmer » pour raser : ${building.def.name}.`, dernier ? 'error' : 'info');
+        ? `Votre dernier ${nomDe('towncenter', this.civ)} : le détruire, c’est perdre la partie. Touchez « Confirmer » pour le raser.`
+        : `Touchez « Confirmer » pour raser : ${ficheDe(building.type, building.player.civ).name}.`, dernier ? 'error' : 'info');
       this.ui.refreshSelection(true);
       return;
     }
     this.demolitionArmee = null;
     this.world.killEntity(building, null, false);
-    this.ui.toast(`${building.def.name} détruit`);
+    this.ui.toast(`${ficheDe(building.type, building.player.civ).name} détruit`);
     this.setSelection([]);
   }
 
@@ -782,7 +787,7 @@ class Game {
 
   selectWorkerGroup(task) {
     const group = this.villagersWithTask(task);
-    if (group.length === 0) { this.ui.toast('Aucun villageois à ce poste'); return; }
+    if (group.length === 0) { this.ui.toast(`Aucun ${this.ouvrier()} à ce poste`); return; }
     this.setSelection(group);
     this.camera.centerOn(group[0].x, group[0].y);
     this.audio.play('select');
@@ -803,7 +808,7 @@ class Game {
         .sort((a, b) => stats[b] - stats[a])[0];
       if (from) pool = this.villagersWithTask(from);
     }
-    if (pool.length === 0) { this.ui.toast('Aucun villageois disponible'); this.audio.play('error'); return null; }
+    if (pool.length === 0) { this.ui.toast(`Aucun ${this.ouvrier()} disponible`); this.audio.play('error'); return null; }
     return pool;
   }
 
@@ -866,7 +871,7 @@ class Game {
       }
     }
     if (!best || !this.world.assignBuilder(best, sites)) {
-      this.ui.toast('Aucun villageois ne peut rejoindre le chantier', 'warn');
+      this.ui.toast(`Aucun ${this.ouvrier()} ne peut rejoindre le chantier`, 'warn');
       this.audio.play('error');
       return false;
     }
@@ -898,12 +903,18 @@ class Game {
 
   autoWorkers() { return this.world.players[this.world.humanIndex].autoWorkers; }
 
+  /** La civilisation du joueur : celle des menus et des messages qui lui parlent. */
+  get civ() { return this.world.players[this.world.humanIndex].civ; }
+
+  /** « villageois » ou « fellah(s) », pour les messages. */
+  ouvrier(n = 1) { return nomDe('villager', this.civ, n).toLowerCase(); }
+
   setAutoWorkers(on) {
     this.world.players[this.world.humanIndex].autoWorkers = !!on;
     saveAutoWorkers(!!on);
     this.ui.toast(on
       ? 'Réaffectation automatique activée'
-      : 'Réaffectation manuelle : vos villageois attendront vos ordres');
+      : `Réaffectation manuelle : vos ${this.ouvrier(2)} attendront vos ordres`);
   }
 
   // --- Confort --------------------------------------------------------------
@@ -915,7 +926,7 @@ class Game {
 
   focusIdleVillager() {
     const idle = this.idleVillagers();
-    if (idle.length === 0) { this.ui.toast('Aucun villageois inactif'); return; }
+    if (idle.length === 0) { this.ui.toast(`Aucun ${this.ouvrier()} inactif`); return; }
     this.idleIndex = ((this.idleIndex || 0) + 1) % idle.length;
     const villager = idle[this.idleIndex];
     this.setSelection([villager]);
@@ -1031,7 +1042,15 @@ class Game {
   restart() {
     this.destroy();
     clearSave();
-    startGame({ ...this.options, restore: null, seed: Math.floor(Math.random() * 1e9) });
+    // Après une reprise, `options` ne porte que la sauvegarde : on relit le
+    // format, la carte et les civilisations sur la partie qui s'achève.
+    const w = this.world;
+    startGame({
+      ...this.options, restore: null,
+      mode: w.modeId, difficulty: w.difficultyId, mapSize: w.mapSizeId,
+      civs: w.players.map((p) => p.civ), speed: this.speedId,
+      seed: Math.floor(Math.random() * 1e9),
+    });
   }
 
   quitToMenu() {
@@ -1064,6 +1083,8 @@ const settings = {
   difficulty: DIFFICULTIES[stored.difficulty] ? stored.difficulty : 'normal',
   mapSize: MAP_SIZES[stored.mapSize] ? stored.mapSize : GAME_MODES[DEFAULT_MODE].mapSize,
   speed: loadSpeed(),
+  civ: civDe(stored.civ),
+  civAdverse: civDe(stored.civAdverse),
 };
 
 function showStartScreen() {
@@ -1090,6 +1111,8 @@ function refreshResumeCard() {
   const mode = GAME_MODES[save.mode] || GAME_MODES[DEFAULT_MODE];
   const player = save.players[save.humanIndex || 0];
   const age = AGES[player ? player.age : 0];
+  const civs = save.players.map((p) => CIVILISATIONS[civDe(p && p.civ)].name);
+  const moi = save.humanIndex || 0;
   box.classList.remove('hidden');
   // Sur un format chronométré, ce qui compte c'est le temps qu'il reste.
   const chrono = mode.timeLimit
@@ -1097,7 +1120,7 @@ function refreshResumeCard() {
     : formatClock(save.time);
   box.innerHTML = `
     <button id="btn-resume" class="btn primary large">Reprendre la partie</button>
-    <p class="resume-info">${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
+    <p class="resume-info">${civs[moi]} contre ${civs[1 - moi]} · ${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
       · ${DIFFICULTIES[save.difficulty] ? DIFFICULTIES[save.difficulty].name : ''}</p>
     <button id="btn-drop-save" class="btn ghost small">Abandonner cette partie</button>`;
   document.getElementById('btn-resume').addEventListener('click', () => {
@@ -1156,6 +1179,27 @@ function setupStartScreen() {
   const activate = (box, btn) => box.querySelectorAll('.option').forEach(
     (b) => b.classList.toggle('active', b === btn));
 
+  // Civilisations : la sienne, puis celle de l'adversaire (mêmes règles, autres images, autres noms).
+  const choixCiv = (idBoite, cle) => {
+    const box = document.getElementById(idBoite);
+    box.innerHTML = Object.values(CIVILISATIONS).map((c) => `
+    <button class="option compact ${c.id === settings[cle] ? 'active' : ''}" data-civ="${c.id}">
+      <span class="option-name">${c.name}</span>
+      <span class="option-desc">${c.desc}</span>
+    </button>`).join('');
+    box.querySelectorAll('[data-civ]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        settings[cle] = btn.dataset.civ;
+        storeSetup(settings);
+        activate(box, btn);
+        chargerCivilisation(settings[cle]);   // ses images arrivent pendant que le joueur finit de choisir
+        audio.resume(); audio.play('click');
+      });
+    });
+  };
+  choixCiv('civ-options', 'civ');
+  choixCiv('civ-adverse-options', 'civAdverse');
+
   modeBox.querySelectorAll('[data-mode]').forEach((btn) => {
     btn.addEventListener('click', () => {
       settings.mode = btn.dataset.mode;
@@ -1202,6 +1246,7 @@ function setupStartScreen() {
     clearSave();
     startGame({
       mode: settings.mode, difficulty: settings.difficulty, mapSize: settings.mapSize,
+      civs: [settings.civ, settings.civAdverse],   // indice = numéro du joueur
       speed: settings.speed, seed: Math.floor(Math.random() * 1e9),
     });
   });
@@ -1216,6 +1261,9 @@ showStartScreen();
 // que le joueur choisit sa partie : elles sont prêtes quand elle commence.
 setStyleUnites(loadStyle());
 chargerSprites();
+// (Après : villageois et milicien atlantes, qui servent de repli, se cuisent d'abord.)
+chargerCivilisation(settings.civ);
+chargerCivilisation(settings.civAdverse);
 // Si la cuisson finit en pleine partie, les personnages changent sous les
 // yeux du joueur : on le lui dit, comme on lui dit si elle a échoué.
 window.addEventListener('modeles3d', () => {

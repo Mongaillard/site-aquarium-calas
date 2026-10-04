@@ -210,6 +210,15 @@ export const MODELES = {
   },
 };
 
+// Les Solariens : mêmes animations et mêmes réglages que le modèle atlante du
+// même rôle — seul le fichier change (ajouter `taille` ou `lacher` ici s'ils
+// diffèrent). N'inscrire une ligne qu'une fois le fichier livré ET listé dans
+// sw.js : sprites.js (IMAGES_CIV) ignore un modèle absent de cette table.
+MODELES.solVillager = { ...MODELES.villager, src: 'assets/modeles/sol-fellah.json' };
+MODELES.solMilitia = { ...MODELES.militia, src: 'assets/modeles/sol-garde.json' };
+MODELES.solSpearman = { ...MODELES.spearman, src: 'assets/modeles/sol-lancier.json' };
+MODELES.solArcher = { ...MODELES.archer, src: 'assets/modeles/sol-archer.json' };
+
 export const DENSITE = 2;   // px d'atlas par px monde (le style « net » de l'Atelier)
 /**
  * Vrai si ces atlas viennent d'une cuisson allégée (chute à demi-finesse, ou

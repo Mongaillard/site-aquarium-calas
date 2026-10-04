@@ -134,6 +134,7 @@ html, body {
 .options { display: grid; gap: 8px; }
 .options.row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .options.row:has(> :nth-child(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.options.duo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* Quatre choix sur un écran de 360 px : « Tranquille » imposait sa largeur,
    et « Blitz ×2 » sortait de l'écran. Deux par ligne. */
 @media (max-width: 380px) {

@@ -1102,7 +1102,7 @@ export class Renderer {
     let def = null;
     for (const e of list) {
       if (e.kind !== 'unit') continue;
-      const sprite = spriteDe(e.type);
+      const sprite = spriteDe(e.type, e.player.civ);
       if (!sprite || !sprite.def.modele3d) continue;
       def = sprite.def;
       unites.push(e);
@@ -1140,7 +1140,7 @@ export class Renderer {
     const x = b.tx * TILE, y = b.ty * TILE;
     const height = b.size === 3 ? 26 : 18;
 
-    const sprite = spriteDe(b.type);
+    const sprite = spriteDe(b.type, b.player.civ);
     if (sprite) {
       const haut = this.dessinerBatimentSprite(b, sprite, w, x, y);
       this.decorerBatiment(b, w, x, y, color, haut);
@@ -1370,7 +1370,7 @@ export class Renderer {
     }
 
     // Le bélier dessiné au code ne sert plus qu'en attendant son modèle 3D (ou sans WebGL).
-    if (u.type === 'ram' && !spriteDe('ram')) {
+    if (u.type === 'ram' && !spriteDe('ram', u.player.civ)) {
       ctx.fillStyle = '#6b4a2a';
       ctx.save();
       ctx.translate(x, y - 2);
@@ -1388,7 +1388,7 @@ export class Renderer {
     // Illustration de personnage, si cette unité en a une. Elle remplace le
     // corps dessiné au code, mais pas le reste : ombre, cercle de sélection,
     // barre de vie et particules valent pour tout le monde.
-    const sprite = spriteDe(u.type);
+    const sprite = spriteDe(u.type, u.player.civ);
     if (sprite) {
       // Une marche dessinée a son propre balancement : y ajouter le nôtre
       // donnerait deux rythmes superposés.
@@ -1761,7 +1761,7 @@ export class Renderer {
     const ctx = this.ctx;
     for (const fx of this.world.effects) {
       if (fx.kind !== 'cadavre' || !this.world.isVisible(fx.x, fx.y)) continue;
-      const sprite = spriteDe(fx.type);
+      const sprite = spriteDe(fx.type, this.world.players[fx.joueur]?.civ);
       if (!sprite || !sprite.def.cuit3d) continue;
       const clip = sprite.def.clips.mort;
       const ecoule = fx.max - fx.life + (this.sousPas || 0);

@@ -147,7 +147,7 @@ export const UNIT_TYPES = {
   // L'Archer monté : la portée d'un archer, les jambes d'un cheval. Il harcèle
   // et s'esquive ; les lanciers le fauchent comme toute cavalerie.
   horseArcher: {
-    id: 'horseArcher', name: 'Archer monté', icon: 'horseArcher', class: 'cavalry',
+    id: 'horseArcher', name: 'Archer monté', pluriel: 'Archers montés', icon: 'horseArcher', class: 'cavalry',
     cost: { wood: 50, gold: 70 }, trainTime: 26, hp: 60, speed: 1.45,
     attack: 5, attackType: 'pierce', range: 4.5, attackSpeed: 2.0,
     meleeArmor: 0, pierceArmor: 1, los: 7, radius: 11,
@@ -392,7 +392,7 @@ export const DEFAULT_SPEED = 'normal';
 export const GAME_MODES = {
   express: {
     id: 'express', name: 'Express', icon: 'modeExpress',
-    desc: '10 min chrono · départ Féodal · raser le Centre-Ville adverse, sinon le meilleur score',
+    desc: '10 min chrono · départ Féodal · raser le bâtiment principal adverse, sinon le meilleur score',
     mapSize: 'small', startAge: 1, popMax: 40, villagers: 7,
     // Sept villageois et un éclaireur saturent déjà le Centre-Ville : sans cette
     // marge, la partie démarre bloquée, à devoir bâtir une maison avant tout.
@@ -447,6 +447,66 @@ export const PLAYER_COLORS = [
   { main: '#3b82f6', light: '#93c5fd', dark: '#1d4ed8', name: 'Bleu' },
   { main: '#ef4444', light: '#fca5a5', dark: '#b91c1c', name: 'Rouge' },
 ];
+
+// --- Civilisations ------------------------------------------------------------
+
+export const DEFAULT_CIV = 'atlante';
+/**
+ * Les civilisations. Mêmes règles pour toutes à ce stade (coûts, points de
+ * vie, IA) : une civilisation change ce que l'on VOIT — bâtiments et troupes
+ * (voir IMAGES_CIV dans sprites.js) — et ce que l'interface affiche. `noms`
+ * surcharge le nom, le genre (`fem`) et la description d'un type ;
+ * `portraits` surcharge PORTRAITS. Tout type absent garde le nom et le
+ * portrait atlantes.
+ */
+export const CIVILISATIONS = {
+  atlante: { id: 'atlante', name: 'Atlantes', desc: 'Peuple de la mer', noms: {}, portraits: {} },
+  solarien: {
+    id: 'solarien', name: 'Solariens', desc: 'Peuple du désert',
+    noms: {
+      villager: { name: 'Fellah' },
+      militia: { name: 'Garde' },
+      triton: { name: 'Mercenaire atlante', pluriel: 'Mercenaires atlantes' },
+      towncenter: { name: 'Palais du Soleil', desc: 'Forme les fellahs, stocke les ressources et permet de passer à l’âge suivant.' },
+      mill: { name: 'Grenier' },
+      barracks: { name: 'Cour des Gardes' },               // féminin, comme Caserne
+      archery: { name: 'Champ de tir', fem: false },       // Archerie était féminin
+      stable: { name: 'Enclos des montures', fem: false }, // Écurie était féminin
+      siege: { name: 'Atelier des engins' },
+      blacksmith: { name: 'Fonderie' },                    // féminin, comme Forge
+      temple: { name: 'Temple du Soleil' },
+    },
+    // type → portrait, seulement une fois le fichier livré (et listé dans sw.js).
+    portraits: {
+      villager: 'assets/portrait-sol-fellah.webp',
+      militia: 'assets/portrait-sol-garde.webp',
+      spearman: 'assets/portrait-sol-lancier.webp',
+      archer: 'assets/portrait-sol-archer.webp',
+    },
+  },
+};
+
+/** L'identifiant d'une civilisation connue, sinon celle par défaut (réglage ou sauvegarde abîmés). */
+export function civDe(id) {
+  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(CIVILISATIONS, id) ? id : DEFAULT_CIV;
+}
+/** Ce que l'interface affiche d'un type. Ne remplace JAMAIS entity.def : les règles s'y lisent. */
+export function ficheDe(type, civ) {
+  const def = entityDef(type);
+  const propre = CIVILISATIONS[civDe(civ)].noms[type];
+  // (Un nom surchargé n'hérite pas du pluriel du nom atlante.)
+  return propre ? { ...def, pluriel: undefined, ...propre } : def;
+}
+/** Nom accordé au nombre : « Fellah », « 3 Fellahs », « 3 Villageois ». */
+export function nomDe(type, civ, n = 1) {
+  const { name, pluriel } = ficheDe(type, civ);
+  if (n <= 1) return name;
+  return pluriel || (/[sxz]$/.test(name) ? name : `${name}s`);   // nom composé : son pluriel est écrit (`pluriel`)
+}
+/** Le portrait d'un type dans cette civilisation, à défaut celui des Atlantes, ou null. */
+export function portraitDe(type, civ) {
+  return CIVILISATIONS[civDe(civ)].portraits[type] || PORTRAITS[type] || null;
+}
 
 // Quantité de ressource contenue par case de terrain.
 export const RESOURCE_TILE_AMOUNT = {

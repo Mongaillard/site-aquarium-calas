@@ -21,7 +21,7 @@ const batiment = (src, cellW, cellH, largeurMonde) => ({
   recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
 });
 
-import { TILE, UNIT_TYPES } from './config.js';
+import { TILE, UNIT_TYPES, nomDe } from './config.js';
 import { MODELES, modeleCuit, ALPHA_EQUIPE } from './modele3d.js';
 import { PIECES_DECOR } from './decor-pieces.js';
 
@@ -355,6 +355,54 @@ const EN_3D = {
   },
 };
 
+/**
+ * Ce qu'une civilisation a en propre ; tout type absent garde l'image des
+ * Atlantes. Bâtiments : même emprise, même ligne de sol et même règle de
+ * couleur d'équipe que le bâtiment atlante du même rôle — seule l'image change
+ * (chemins en toutes lettres : le test hors ligne les lit). Unités : type →
+ * clé de MODELES (mêmes animations que le modèle atlante du même rôle).
+ */
+const IMAGES_CIV = {
+  solarien: {
+    batiments: {
+      towncenter: 'assets/solariens/centre-ville.webp',
+      barracks: 'assets/solariens/caserne.webp',
+      archery: 'assets/solariens/archerie.webp',
+      stable: 'assets/solariens/ecurie.webp',
+      siege: 'assets/solariens/atelier-siege.webp',
+      blacksmith: 'assets/solariens/forge.webp',
+      temple: 'assets/solariens/temple.webp',
+      house: 'assets/solariens/maison.webp',
+      mill: 'assets/solariens/moulin.webp',
+      lumbercamp: 'assets/solariens/camp-bucherons.webp',
+      miningcamp: 'assets/solariens/camp-mineurs.webp',
+      farm: 'assets/solariens/ferme.webp',
+      tower: 'assets/solariens/tour-guet.webp',
+    },
+    unites: { villager: 'solVillager', militia: 'solMilitia', spearman: 'solSpearman', archer: 'solArcher' },
+  },
+};
+/** civ → type → clé d'atlas. Table fixe : aucune chaîne fabriquée à chaque image dessinée. */
+const CLES_CIV = {};
+for (const [civ, c] of Object.entries(IMAGES_CIV)) {
+  const cles = CLES_CIV[civ] = {};
+  for (const [type, src] of Object.entries(c.batiments)) {
+    cles[type] = `${type}@${civ}`;
+    // La taille de case est lue sur l'image à son chargement (une seule case : l'image entière).
+    ATLAS[cles[type]] = { ...ATLAS[type], src, civ, cellW: 0, cellH: 0 };
+  }
+  for (const [type, modele] of Object.entries(c.unites)) {
+    if (!MODELES[modele]) continue;   // modèle pas encore livré : la troupe garde le modèle atlante
+    cles[type] = `${type}@${civ}`;
+    EN_3D[cles[type]] = { ...EN_3D[ALTERNATIVES[type]['3d']], modele, civ, repli: null, aLaDemande: true };
+  }
+}
+/** La fiche propre à cette civilisation pour ce type, ou null (image atlante). Pure : sert aux tests sans navigateur. */
+export function ficheCiv(type, civ) {
+  const cle = CLES_CIV[civ]?.[type];
+  return cle ? (ATLAS[cle] || EN_3D[cle]) : null;
+}
+
 export function styleUnites() { return style; }
 
 /**
@@ -486,7 +534,9 @@ export function recolorer(def, image, l, h) {
  */
 const portraitsAdverses = new Map();
 export function portraitAdverse(type, image) {
-  if (portraitsAdverses.has(type)) return portraitsAdverses.get(type);
+  // Une toile par IMAGE : le portrait d'une autre civilisation a la sienne.
+  const cle = image.getAttribute('src') || type;
+  if (portraitsAdverses.has(cle)) return portraitsAdverses.get(cle);
   const alt = ALTERNATIVES[type];
   const d = alt && EN_3D[alt['3d']];
   let toile = null;
@@ -496,7 +546,7 @@ export function portraitAdverse(type, image) {
       toile.getContext('2d').getImageData(0, 0, 1, 1);   // illisible : rotationTeinte l'a rendue sans la teinter
     } catch { toile = null; }
   }
-  portraitsAdverses.set(type, toile);
+  portraitsAdverses.set(cle, toile);
   return toile;
 }
 
@@ -643,20 +693,25 @@ function annoncerModeles3d() {
  * introuvable…).
  */
 export function etatModeles3d() {
-  const cles = Object.values(ALTERNATIVES).map((a) => a['3d']).filter((c) => EN_3D[c])
+  // (Les modèles des Atlantes dans leur ordre habituel, puis ceux, cuits à la demande, des autres civilisations.)
+  const cles = [...Object.values(ALTERNATIVES).map((a) => a['3d']).filter((c) => EN_3D[c]), ...Object.keys(EN_3D).filter((c) => EN_3D[c].civ)]
     .filter((c) => !EN_3D[c].aLaDemande || charges.has(c));
   const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte', crossbowman: 'arbalétrier', horseArcher: 'archer monté' };
+  // « ouvrier », « fellah solarien » : le modèle d'une autre civilisation porte le nom qu'elle lui donne.
+  const nom = (c) => (EN_3D[c].civ
+    ? `${nomDe(EN_3D[c].unite, EN_3D[c].civ).toLowerCase()} ${EN_3D[c].civ}`
+    : noms[EN_3D[c].unite] || EN_3D[c].unite);
   const entrees = cles.map((c) => charges.get(c));
   if (entrees.some((e) => !e)) return { etat: 'attente' };
   const echecs = cles.filter((c) => charges.get(c).absent);
   if (echecs.length) {
     // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
-    return { etat: 'absent', raison: echecs.map((c) => `${noms[EN_3D[c].unite] || EN_3D[c].unite} : ${charges.get(c).raison}`).join(' ; ') };
+    return { etat: 'absent', raison: echecs.map((c) => `${nom(c)} : ${charges.get(c).raison}`).join(' ; ') };
   }
   // `alleges` : les troupes cuites faute de mieux à finesse réduite (mémoire
   // graphique insuffisante) — elles paraissent plus floues que les autres.
   if (entrees.every((e) => e.pret)) {
-    return { etat: 'pret', alleges: cles.filter((c) => charges.get(c).allege).map((c) => noms[EN_3D[c].unite] || EN_3D[c].unite) };
+    return { etat: 'pret', alleges: cles.filter((c) => charges.get(c).allege).map(nom) };
   }
   return { etat: 'cuisson', faits: entrees.filter((e) => e.pret).length, total: entrees.length };
 }
@@ -675,6 +730,7 @@ function chargerAtlas(cle) {
   image.decoding = 'async';
   image.onload = () => {
     const l = image.width, h = image.height;
+    if (!def.cellW) { def.cellW = l; def.cellH = h; }   // bâtiment d'une civilisation : une seule case, l'image entière
     const autre = recolorer(def, image, l, h);
     entree.variantes = def.natif === 'bleu'
       ? { bleu: image, rouge: autre }
@@ -693,6 +749,7 @@ export function chargerSprites() {
   if (typeof document === 'undefined') return;
   const variantes = new Set(Object.values(ALTERNATIVES).flatMap((a) => Object.values(a)));
   for (const cle of Object.keys(ATLAS)) {
+    if (ATLAS[cle].civ) continue;   // images d'une civilisation : chargerCivilisation
     if (!variantes.has(cle) || ALTERNATIVES[cle]) chargerAtlas(cle);
   }
   for (const alt of Object.values(ALTERNATIVES)) if (!EN_3D[alt[style]]?.aLaDemande) chargerAtlas(alt[style]);
@@ -768,13 +825,44 @@ export function textureSol(cle, zoom = 1) {
   return e.niveaux[zoom < 0.7 ? 1 : 0];
 }
 
-/** Sprite prêt à dessiner pour ce type d'unité, ou null. */
-export function spriteDe(type) {
+/**
+ * Les images propres à une civilisation en jeu : ses bâtiments, puis ses
+ * troupes — l'ouvrier d'abord, à l'écran dès la première image ; les autres
+ * se cuisent derrière lui, pendant que le joueur s'installe, pour qu'un Garde
+ * ne sorte pas de sa caserne sous l'allure atlante le temps de sa cuisson.
+ * Sans effet pour les Atlantes ou une valeur inconnue.
+ */
+export function chargerCivilisation(civ) {
+  const cles = CLES_CIV[civ];
+  if (!cles || typeof document === 'undefined') return;
+  const types = Object.keys(cles);
+  for (const type of types) if (ATLAS[cles[type]]) chargerAtlas(cles[type]);
+  for (const type of ['villager', ...types]) if (EN_3D[cles[type]]) chargerAtlas(cles[type]);
+}
+
+/**
+ * Sprite prêt à dessiner pour ce type dans cette civilisation — à défaut celui
+ * des Atlantes —, ou null. Sans civilisation (décor, gibier, nature) : l'image
+ * commune.
+ */
+export function spriteDe(type, civ) {
+  const propre = CLES_CIV[civ]?.[type];
+  if (propre) {
+    let e = charges.get(propre);
+    if (e && e.pret) return e;
+    if (!e) { chargerAtlas(propre); e = charges.get(propre); }
+    // En route : l'image atlante si elle est déjà là, sans la faire cuire pour rien.
+    if (e && !e.absent) return spriteAtlante(type, false);
+  }
+  return spriteAtlante(type, true);   // pas d'image propre, fichier manquant, pas de WebGL
+}
+
+function spriteAtlante(type, demander) {
   const alt = ALTERNATIVES[type];
   const cle = alt ? alt[style] : type;
   const e = charges.get(cle);
   if (e && e.pret) return e;
-  if (!e && EN_3D[cle]?.aLaDemande) chargerAtlas(cle);   // premier Atlante à l'écran
+  if (demander && !e && EN_3D[cle]?.aLaDemande) chargerAtlas(cle);   // premier Atlante à l'écran
   // Un modèle 3D encore en cuisson (ou impossible à cuire) : son illustration.
   const repli = EN_3D[cle] && charges.get(EN_3D[cle].repli);
   return repli && repli.pret ? repli : null;

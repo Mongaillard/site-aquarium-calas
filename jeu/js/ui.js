@@ -6,7 +6,8 @@
 // ---------------------------------------------------------------------------
 
 import {
-  AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES, GAME_SPEEDS, PORTRAITS,
+  AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES, GAME_SPEEDS,
+  ficheDe, nomDe, portraitDe,
 } from './config.js';
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
 import { iconeSVG, ICONES_LICENCE } from './icones.js';
@@ -339,12 +340,15 @@ export class UI {
 
     if (selection.length === 1) {
       const def = first.def;
+      // L'affichage suit la civilisation du PROPRIÉTAIRE (ennemi compris) ; les règles restent lues sur def.
+      const fiche = ficheDe(first.type, first.player.civ);
+      const portrait = portraitDe(first.type, first.player.civ);
       const rows = [];
       if (first.kind === 'unit' && first.isAnimal) {
         rows.push(`${ic('food')} ${def.food} de nourriture`);
         rows.push(first.playerIndex < 0
-          ? (def.capturable ? 'sauvage — approchez un villageois' : 'gibier — envoyez des villageois')
-          : 'capturé — un villageois l’abat');
+          ? (def.capturable ? `sauvage — approchez un ${this.game.ouvrier()}` : `gibier — envoyez des ${this.game.ouvrier(2)}`)
+          : `capturé — un ${this.game.ouvrier()} l’abat`);
       } else if (first.kind === 'unit') {
         rows.push(def.heal
           ? `${ic('pointsDeVie')} +${def.heal} · ${ic('defensive')} ${first.meleeArmor()}/${first.pierceArmor()}`
@@ -369,18 +373,18 @@ export class UI {
           const ouvriers = this.world.buildersOn(first);
           rows.push(ouvriers > 0
             ? `${ic('ouvriers')} ${ouvriers} ouvrier${ouvriers > 1 ? 's' : ''}`
-            : `${ic('ouvriers')} aucun ouvrier — touchez le chantier avec des villageois`);
+            : `${ic('ouvriers')} aucun ouvrier — touchez le chantier avec des ${this.game.ouvrier(2)}`);
         }
       }
       node.innerHTML = `
-        <div class="portrait${PORTRAITS[first.type] ? ' illustre' : ''}" style="--team:${first.player.color.main}">${
-          PORTRAITS[first.type]
+        <div class="portrait${portrait ? ' illustre' : ''}" style="--team:${first.player.color.main}">${
+          portrait
             // Un portrait peint est bleu : l'adversaire le porte en rouge —
             // voir teinterPortrait, plutôt qu'une seconde image à télécharger.
-            ? `<img src="${PORTRAITS[first.type]}" alt="" class="${mine ? '' : 'ennemi'}">`
+            ? `<img src="${portrait}" alt="" class="${mine ? '' : 'ennemi'}">`
             : iconeSVG(def.icon, 30)}</div>
         <div class="info">
-          <div class="name">${def.name}${mine ? '' : first.isAnimal && first.playerIndex < 0 ? ' <span class="enemy">(sauvage)</span>' : ' <span class="enemy">(ennemi)</span>'}</div>
+          <div class="name">${fiche.name}${mine ? '' : first.isAnimal && first.playerIndex < 0 ? ' <span class="enemy">(sauvage)</span>' : ' <span class="enemy">(ennemi)</span>'}</div>
           <div class="hp"><span style="width:${Math.round((first.hp / first.maxHp) * 100)}%"></span></div>
           <div class="stats">${ic('pointsDeVie')} ${Math.ceil(first.hp)}/${first.maxHp} · ${rows.join(' · ')}</div>
         </div>`;
@@ -481,7 +485,7 @@ export class UI {
         buttons.push({
           icon: 'ouvriers', label: '+1 ouvrier',
           check: () => (this.game.hasSpareWorker()
-            ? { ok: true } : { ok: false, reason: 'Aucun villageois disponible' }),
+            ? { ok: true } : { ok: false, reason: `Aucun ${this.game.ouvrier()} disponible` }),
           action: () => this.game.reinforceSite(b),
         });
         buttons.push({ icon: 'annuler', label: 'Annuler', action: () => this.game.cancelConstruction(b) });
@@ -490,7 +494,7 @@ export class UI {
         for (const unitType of def.trains || []) {
           const u = UNIT_TYPES[unitType];
           buttons.push({
-            icon: u.icon, label: u.name, cost: costLabel(u.cost), time: u.trainTime,
+            icon: u.icon, label: nomDe(unitType, this.game.civ), cost: costLabel(u.cost), time: u.trainTime,
             check: () => this.world.canTrain(b, unitType),
             action: () => this.game.trainUnit(b, unitType),
           });
@@ -602,7 +606,7 @@ export class UI {
     const player = this.world.players[this.world.humanIndex];
     if (def.requires && !this.world.buildings.some(
       (b) => b.playerIndex === player.index && b.type === def.requires && b.complete && !b.dead)) {
-      return `Nécessite : ${BUILDING_TYPES[def.requires].name}`;
+      return `Nécessite : ${nomDe(def.requires, this.game.civ)}`;
     }
     if (def.limit && this.world.buildings.filter(
       (b) => b.playerIndex === player.index && b.type === def.id && !b.dead).length >= def.limit) {
@@ -624,14 +628,14 @@ export class UI {
     const player = this.world.players[this.world.humanIndex];
     const list = el('build-list');
     const available = Object.values(BUILDING_TYPES).filter((def) => (def.age || 0) <= player.age);
-    list.innerHTML = available.map((def) => `<button class="build-card" data-type="${def.id}">
+    list.innerHTML = available.map((def) => { const f = ficheDe(def.id, this.game.civ); return `<button class="build-card" data-type="${def.id}">
         <span class="bc-icon">${iconeSVG(def.icon, 26)}</span>
         <span class="bc-body">
-          <span class="bc-name">${def.name}</span>
-          <span class="bc-desc">${def.desc}</span>
+          <span class="bc-name">${f.name}</span>
+          <span class="bc-desc">${f.desc}</span>
         </span>
         <span class="bc-cost">${costLabel(def.cost)}</span>
-      </button>`).join('');
+      </button>`; }).join('');
     poserIconesDeCout(list);
     this.refreshBuildMenu();
     // Les cartes restent dans le DOM après la partie : l'écouteur part avec elle.
@@ -788,6 +792,7 @@ export class UI {
   }
 
   showHelp() {
+    const civAdverse = this.world.players[1 - this.world.humanIndex].civ;
     const modal = this.showModal(`
       <h2>Comment jouer</h2>
       <ul class="help">
@@ -795,16 +800,16 @@ export class UI {
         <li><b>Toucher</b> une unité : la sélectionner · <b>double tap</b> : toutes les unités du même type visibles</li>
         <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
         <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant</li>
-        <li><b>${ic('chantier')} Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les villageois sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant</li>
-        <li><b>Affecter quelqu'un à un chantier</b> : touchez un villageois, puis touchez le chantier — le même geste que pour l'envoyer au bois ou à la nourriture. La ligne <b>${ic('chantier')} Chantiers</b> de la barre <b>${ic('ouvriers')} Ouvriers</b> fait pareil avec ses <b>+ / −</b>, et un chantier sélectionné a son bouton <b>${ic('ouvriers')} +1 ouvrier</b>. (Double tap sur un chantier pour le sélectionner sans y envoyer personne.)</li>
-        <li>Les villageois récoltent ${ic('food')} nourriture, ${ic('wood')} bois et ${ic('gold')} or ; il faut des <b>maisons</b> pour agrandir la population</li>
+        <li><b>${ic('chantier')} Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les ${this.game.ouvrier(2)} sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant</li>
+        <li><b>Affecter quelqu'un à un chantier</b> : touchez un ${this.game.ouvrier()}, puis touchez le chantier — le même geste que pour l'envoyer au bois ou à la nourriture. La ligne <b>${ic('chantier')} Chantiers</b> de la barre <b>${ic('ouvriers')} Ouvriers</b> fait pareil avec ses <b>+ / −</b>, et un chantier sélectionné a son bouton <b>${ic('ouvriers')} +1 ouvrier</b>. (Double tap sur un chantier pour le sélectionner sans y envoyer personne.)</li>
+        <li>Les ${this.game.ouvrier(2)} récoltent ${ic('food')} nourriture, ${ic('wood')} bois et ${ic('gold')} or ; il faut des <b>maisons</b> pour agrandir la population</li>
         <li><b>Attitudes</b> (unité sélectionnée) : ${ic('aggressive')} agressif poursuit loin, ${ic('defensive')} défensif revient à son poste, ${ic('standGround')} position tenue ne bouge pas, ${ic('passive')} sans attaque ignore l'ennemi</li>
-        <li><b>Garnison</b> : des soldats sélectionnés s'abritent d'un appui sur votre Centre-Ville ou une tour ; des villageois, par le bouton <b>${ic('garrison')} Abriter</b> puis l'abri. Les occupants s'y soignent et chacun ajoute une flèche. La <b>${ic('cloche')} cloche</b> y envoie tous les villageois d'un coup ; un second coup renvoie chacun à son poste</li>
-        <li><b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le villageois rapporte son chargement puis attend vos ordres. La barre <b>${ic('ouvriers')} Ouvriers</b> montre qui fait quoi et permet de réaffecter d'un doigt</li>
-        <li>Passez les <b>âges</b> depuis le Centre-Ville pour débloquer de nouvelles unités</li>
+        <li><b>Garnison</b> : des soldats sélectionnés s'abritent d'un appui sur votre ${nomDe('towncenter', this.game.civ)} ou une tour ; des ${this.game.ouvrier(2)}, par le bouton <b>${ic('garrison')} Abriter</b> puis l'abri. Les occupants s'y soignent et chacun ajoute une flèche. La <b>${ic('cloche')} cloche</b> y envoie tous les ${this.game.ouvrier(2)} d'un coup ; un second coup renvoie chacun à son poste</li>
+        <li><b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le ${this.game.ouvrier()} rapporte son chargement puis attend vos ordres. La barre <b>${ic('ouvriers')} Ouvriers</b> montre qui fait quoi et permet de réaffecter d'un doigt</li>
+        <li>Passez les <b>âges</b> depuis le ${nomDe('towncenter', this.game.civ)} pour débloquer de nouvelles unités</li>
         <li><b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil</li>
         <li><b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>Reprendre</b></li>
-        <li><b>Objectif</b> : détruire tous les bâtiments adverses et leurs villageois — en mode ${ic('modeExpress')} Express, leur dernier Centre-Ville suffit</li>
+        <li><b>Objectif</b> : détruire tous les bâtiments adverses et leurs ${nomDe('villager', civAdverse, 2).toLowerCase()} — en mode ${ic('modeExpress')} Express, leur dernier ${nomDe('towncenter', civAdverse)} suffit</li>
       </ul>
       <div class="modal-actions"><button class="btn primary" data-act="close">J'ai compris</button></div>`, { wide: true });
     modal.querySelector('[data-act="close"]').addEventListener('click', () => {
@@ -826,7 +831,7 @@ export class UI {
           <small class="credits-auteurs">${l.auteurs.join(' · ')}</small></li>
         <li><b>Illustrations</b> (personnages, bâtiments, arbres, décor, textures de sol et
           d'eau) — générées par l'auteur du jeu, puis découpées et détourées pour le jeu.</li>
-        <li><b>Chevalier, villageois, archer, lancier, Atlante, Champion, Arbalétrier, Archer monté, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse et Hydre 3D</b> — modèles et animations de l'auteur du
+        <li><b>Chevalier, villageois, archer, lancier, Atlante, Champion, Arbalétrier, Archer monté, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse et Hydre 3D ; Fellah, Garde, Lancier et Archer solariens</b> — modèles et animations de l'auteur du
           jeu, faits dans son Atelier 3D ; icônes du trident, de l'Hydre et du Temple dessinées pour le jeu ; cuits par
           <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (licence MIT).</li>
         <li><b>Chevalier 3D d'essai</b> (styles « 3D précalculée » et « 3D en direct ») — KayKit Adventurers, par
@@ -866,7 +871,8 @@ export class UI {
           <td><b>${exact(result.scores[player.index])}</b></td>
           <td><b>${exact(result.scores[enemy.index])}</b></td></tr>` : ''}
       </table>`;
-    const illustration = egalite ? ''
+    // (Le héros debout et le héros à terre sont des chevaliers atlantes : pas d'illustration pour une autre civilisation, en attendant la sienne.)
+    const illustration = egalite || player.civ !== 'atlante' ? ''
       : `<img class="fin-illustration${result.victory ? '' : ' tombe'}"
              src="assets/${result.victory ? 'heros' : 'defaite'}.webp" alt="" decoding="async">`;
     const modal = this.showModal(`

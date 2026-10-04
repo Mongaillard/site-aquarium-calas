@@ -7,6 +7,7 @@
 import {
   TILE, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
   START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, GAME_MODES, DEFAULT_MODE,
+  DEFAULT_CIV, civDe, nomDe,
 } from './config.js';
 import { GameMap, BLOCK } from './map.js';
 import { PathFinder } from './pathfinding.js';
@@ -17,9 +18,11 @@ import { AIPlayer } from './ai.js';
 const PATHS_PER_TICK = 10;
 const FOG_INTERVAL = 0.25;
 
-function makePlayer(index, name, isAI) {
+function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
   return {
     index, name, isAI,
+    // La civilisation : ce que l'on voit et ce que l'interface nomme (voir CIVILISATIONS).
+    civ,
     // Réaffectation automatique des villageois quand un gisement s'épuise.
     // Toujours active pour l'IA ; côté joueur c'est un choix, désactivé par
     // défaut : les ouvriers sont affectés à la main.
@@ -71,9 +74,10 @@ export class World {
     this.popWarnCooldown = 0;
     this.humanIndex = 0;
 
+    const civs = Array.isArray(options.civs) ? options.civs : [];
     this.players = [
-      makePlayer(0, options.playerName || 'Vous', false),
-      makePlayer(1, 'Adversaire', true),
+      makePlayer(0, options.playerName || 'Vous', false, civDe(civs[0])),
+      makePlayer(1, 'Adversaire', true, civDe(civs[1])),
     ];
     this.players[1].mods.gatherRate = this.difficulty.gatherBonus;
     // « La nature » : le camp des animaux sauvages, qui n'est pas un joueur.
@@ -168,7 +172,7 @@ export class World {
 
   onAnimalCaptured(animal) {
     if (animal.playerIndex === this.humanIndex) {
-      this.pushEvent({ type: 'notice', text: 'Cochon capturé : menez-le au village, un villageois l’abattra.' });
+      this.pushEvent({ type: 'notice', text: `Cochon capturé : menez-le au village, un ${nomDe('villager', this.players[this.humanIndex].civ).toLowerCase()} l’abattra.` });
     }
   }
 

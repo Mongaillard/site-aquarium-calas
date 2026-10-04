@@ -5,7 +5,8 @@
 import { World } from '../js/game.js';
 import { AIPlayer } from '../js/ai.js';
 import { serializeWorld, restoreWorld } from '../js/save.js';
-import { DIFFICULTIES, TICKS_PER_SECOND, TILE } from '../js/config.js';
+import { DIFFICULTIES, TICKS_PER_SECOND, TILE, BUILDING_TYPES, nomDe, ficheDe, portraitDe } from '../js/config.js';
+import { ficheCiv } from '../js/sprites.js';
 import { formatTime, dist, RNG } from '../js/utils.js';
 import { STATE, Projectile } from '../js/entities.js';
 import { readFileSync, existsSync } from 'node:fs';
@@ -843,6 +844,38 @@ function empreinte(world) {
 }
 
 {
+  // Civilisations : un champ sur le joueur, gardé par la sauvegarde, sans effet sur les règles.
+  const w = new World({ seed: 808, mapSize: 'small', difficulty: 'normal', civs: ['solarien', 'atlante'] });
+  check('civilisations : chaque camp porte la sienne', w.players[0].civ === 'solarien' && w.players[1].civ === 'atlante');
+  check('civilisations : Atlantes par défaut, et pour une valeur inconnue',
+    new World({ seed: 808, mapSize: 'small' }).players.every((p) => p.civ === 'atlante')
+    && new World({ seed: 808, mapSize: 'small', civs: ['martien', 'constructor'] }).players.every((p) => p.civ === 'atlante'));
+  const instantane = JSON.parse(JSON.stringify(serializeWorld(w)));
+  const repris = restoreWorld(instantane);
+  check('civilisations : conservées par la sauvegarde, sans changer de version',
+    !!repris && repris.players[0].civ === 'solarien' && repris.players[1].civ === 'atlante' && instantane.version === 1);
+  for (const p of instantane.players) delete p.civ;
+  const vieux = restoreWorld(instantane);
+  check('civilisations : une ancienne sauvegarde se recharge en Atlantes', !!vieux && vieux.players.every((p) => p.civ === 'atlante'));
+  const jouer = (civs) => {
+    const m = new World({ seed: 808, mapSize: 'small', difficulty: 'normal', civs });
+    m.players[0].autoWorkers = true; m.ais.push(new AIPlayer(m, 0, DIFFICULTIES.normal));
+    advance(m, 60);
+    return empreinte(m);
+  };
+  check('civilisations : mêmes règles, la partie se joue à l’identique', jouer(['solarien', 'solarien']) === jouer(['atlante', 'atlante']));
+  check('civilisations : les noms suivent le camp, les règles non',
+    nomDe('villager', 'solarien') === 'Fellah' && nomDe('villager', 'solarien', 3) === 'Fellahs' && nomDe('villager', 'atlante', 3) === 'Villageois'
+    && nomDe('towncenter', 'solarien') === 'Palais du Soleil' && ficheDe('archery', 'solarien').fem === false
+    && ficheDe('towncenter', 'solarien').hp === BUILDING_TYPES.towncenter.hp && BUILDING_TYPES.towncenter.name === 'Centre-Ville');
+  check('civilisations : pluriels des noms composés et portraits propres',
+    nomDe('triton', 'solarien', 2) === 'Mercenaires atlantes' && nomDe('triton', 'atlante', 2) === 'Atlantes'
+    && nomDe('horseArcher', 'atlante', 2) === 'Archers montés' && nomDe('militia', 'solarien', 2) === 'Gardes'
+    && portraitDe('militia', 'solarien') === 'assets/portrait-sol-garde.webp' && portraitDe('militia', 'atlante') === 'assets/portrait-milicien.webp'
+    && portraitDe('knight', 'solarien') === 'assets/portrait-cavalier.webp' && portraitDe('deer', 'solarien') === null);
+}
+
+{
   // Une sauvegarde ne doit contenir aucune référence d'entité. Un poste différé
   // (« je livre mon bois, puis je vais à cette ferme ») en contenait une : la
   // structure devenait circulaire, l'écriture échouait, et la partie n'était
@@ -1420,7 +1453,7 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
     }
     const images = new Set();
     for (const f of ['index.html', 'css/jeu.css', 'manifest.webmanifest', ...modules]) {
-      for (const [, img] of lire(f).matchAll(/((?:assets|icons)\/[\w-]+\.(?:webp|png|jpg|svg))/g)) images.add(img);
+      for (const [, img] of lire(f).matchAll(/((?:assets|icons)\/(?:[\w-]+\/)*[\w-]+\.(?:webp|png|jpg|svg))/g)) images.add(img);
     }
     const manquants = [...modules, 'index.html', 'css/jeu.css', 'manifest.webmanifest', ...images].filter((f) => !cache.has(f));
     check('hors ligne : le cache garde tous les modules, la feuille de style et les images', manquants.length === 0,
@@ -1434,6 +1467,15 @@ check('parties reproductibles à graine égale', fingerprint(runA.world) === fin
       absents.join(', ') || `${cache.size} fichiers en cache, ${modeles3d.size} modèles`);
     const horsCache = [...modeles3d].filter((f) => !cache.has(f));
     check('chaque modèle 3D est gardé hors ligne', horsCache.length === 0, horsCache.join(', '));
+    // Les Solariens : treize bâtiments et quatre troupes à eux, tous livrés.
+    const sol = Object.keys(BUILDING_TYPES).map((t) => ficheCiv(t, 'solarien')).filter(Boolean);
+    check('Solariens : les 13 bâtiments ont leur image, gardée hors ligne',
+      sol.length === 13 && sol.every((f) => f.src.startsWith('assets/solariens/') && cache.has(f.src)), `${sol.length}/13`);
+    check('Solariens : ouvrier, garde, lancier et archer ont leur modèle',
+      ['villager', 'militia', 'spearman', 'archer'].every((t) => ficheCiv(t, 'solarien')),
+      ['villager', 'militia', 'spearman', 'archer'].filter((t) => !ficheCiv(t, 'solarien')).join(', '));
+    check('Atlantes : aucune image propre à chercher (ce sont les images communes)',
+      Object.keys(BUILDING_TYPES).every((t) => ficheCiv(t, 'atlante') === null) && ficheCiv('pig', 'solarien') === null);
   }
 }
 

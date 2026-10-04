@@ -24,8 +24,23 @@ Sur un téléphone : ouvrez l'URL, puis « Ajouter à l'écran d'accueil ». Le
 
 ## Formats de partie, vitesse et sauvegarde
 
-Quatre réglages se choisissent sur l'écran d'accueil, avant de lancer la partie :
-le format, la difficulté, la taille de la carte et la vitesse de jeu.
+Six réglages se choisissent sur l'écran d'accueil, avant de lancer la partie :
+votre civilisation, celle de l'adversaire, le format, la difficulté, la taille
+de la carte et la vitesse de jeu.
+
+**Deux civilisations.** Les **Atlantes** (peuple de la mer : marbre blanc, toits
+bleus, tridents) et les **Solariens** (peuple du désert : grès ocre, toits en
+terrasse, disques solaires). À ce stade, les règles sont les mêmes pour les
+deux — coûts, points de vie, IA — : une civilisation change ce que l'on voit et
+ce que l'interface nomme. Les Solariens ont leurs treize bâtiments (Palais du
+Soleil, Cour des Gardes, Grenier à dômes, Temple du Soleil…) et quatre troupes
+à eux, le Fellah (l'ouvrier), le Garde à coiffe rayée, le Lancier et l'Archer ;
+leurs autres troupes gardent pour l'instant l'allure atlante. La civilisation
+est un champ du joueur (`player.civ`, voir `CIVILISATIONS` dans `js/config.js`),
+gardé par la sauvegarde ; l'image d'un type se cherche par `spriteDe(type, civ)`
+(`IMAGES_CIV`, `js/sprites.js`) avec repli sur l'image atlante, son nom par
+`nomDe(type, civ)`. Le tissu bleu roi des deux peuples est la couleur d'équipe :
+le joueur 1 le porte en rouge, quelle que soit sa civilisation.
 
 | Format | Durée | Ce qui change |
 | --- | --- | --- |

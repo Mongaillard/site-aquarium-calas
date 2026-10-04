@@ -53,6 +53,7 @@ function serializeProjectile(pr) {
 
 function serializePlayer(p) {
   return {
+    civ: p.civ,
     resources: { ...p.resources },
     age: p.age,
     ageProgress: p.ageProgress
@@ -206,6 +207,8 @@ export function restoreWorld(data) {
   const world = new World({
     seed: data.seed, mode: data.mode, mapSize: data.mapSize,
     difficulty: data.difficulty, restoring: true,
+    // Champ absent (sauvegarde d'avant les civilisations) : Atlantes.
+    civs: (data.players || []).map((j) => j && j.civ),
   });
   world.time = data.time || 0;
   world.humanIndex = data.humanIndex || 0;
