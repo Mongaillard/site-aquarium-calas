@@ -913,6 +913,14 @@ class Game {
   }
 
   cancelConstruction(building) {
+    // Le chantier qui tient seul le camp en jeu (Classique : plus rien d'autre
+    // qui forme des troupes) : deux appuis, comme pour « Détruire ».
+    if (this.world.destructionFatale(building) && !this.demolitionEnAttente(building)) {
+      this.demolitionArmee = { id: building.id, jusqua: performance.now() + 3000 };
+      this.ui.toast('Ce chantier seul vous tient en jeu : l’annuler, c’est perdre la partie. Touchez « Confirmer » pour l’annuler.', 'error');
+      this.ui.refreshSelection(true);
+      return;
+    }
     if (this.world.cancelConstruction(building)) {
       this.ui.toast('Chantier annulé, ressources rendues');
       this.setSelection([]);
@@ -933,12 +941,11 @@ class Game {
   demolish(building) {
     if (!this.demolitionEnAttente(building)) {
       this.demolitionArmee = { id: building.id, jusqua: performance.now() + 3000 };
-      const w = this.world;
-      const dernier = building.type === 'towncenter' && w.mode.victory === 'towncenter'
-        && !w.buildings.some((b) => b !== building && !b.dead && b.complete
-          && b.type === 'towncenter' && b.playerIndex === building.playerIndex);
+      // Celui qui tient seul le camp en jeu : le dernier Centre-Ville en
+      // Express ; en Classique, le dernier Centre-Ville ou bâtiment militaire.
+      const dernier = this.world.destructionFatale(building);
       this.ui.toast(dernier
-        ? `Votre dernier ${nomDe('towncenter', this.civ)} : le détruire, c’est perdre la partie. Touchez « Confirmer » pour le raser.`
+        ? `Votre dernier ${building.type === 'towncenter' ? nomDe('towncenter', this.civ) : 'bâtiment militaire'} : le détruire, c’est perdre la partie. Touchez « Confirmer » pour le raser.`
         : `Touchez « Confirmer » pour raser : ${ficheDe(building.type, building.player.civ).name}.`, dernier ? 'error' : 'info');
       this.ui.refreshSelection(true);
       return;
@@ -1155,11 +1162,14 @@ class Game {
 
   deleteSelected() {
     const mine = this.selection.filter((e) => e.playerIndex === this.world.humanIndex);
-    for (const e of mine) {
-      if (e.kind === 'building' && !e.complete) this.world.cancelConstruction(e);
-      else if (e.kind === 'building') this.world.raserBatiment(e);
-      else this.world.killEntity(e, null, false);
+    // Un bâtiment passe par son bouton, garde-fous compris (« Détruire » en
+    // deux appuis) : la touche rasait d'un coup jusqu'au dernier Centre-Ville.
+    const batiment = mine.find((e) => e.kind === 'building');
+    if (batiment) {
+      if (batiment.complete) this.demolish(batiment); else this.cancelConstruction(batiment);
+      return;
     }
+    for (const e of mine) this.world.killEntity(e, null, false);
     this.setSelection([]);
   }
 

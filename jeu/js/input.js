@@ -216,7 +216,8 @@ export class InputController {
     const key = e.key.toLowerCase();
     this.keys.add(key);
     if (key === 'escape') { this.game.onEscape(); return; }
-    if (key === 'delete' || key === 'suppr') { this.game.deleteSelected(); return; }
+    // (Touche maintenue : la répétition du clavier ne vaut pas le second appui qui confirme une destruction.)
+    if (key === 'delete' || key === 'suppr') { if (!e.repeat) this.game.deleteSelected(); return; }
     if (key === '.') { this.game.focusIdleVillager(); return; }
     if (key === 'h') { this.game.focusTownCenter(); return; }
     if (key === ' ') { e.preventDefault(); this.game.togglePause(); }

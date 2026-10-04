@@ -1722,6 +1722,20 @@ export class World {
   }
 
   /**
+   * Raser ce bâtiment (ou annuler ce chantier) ferait-il perdre son camp ?
+   * La règle de checkVictory, appliquée d'avance : l'interface prévient ainsi
+   * le joueur avant qu'il ne détruise lui-même ce qui le tient en jeu.
+   */
+  destructionFatale(building) {
+    const autre = (b) => b !== building && !b.dead && b.playerIndex === building.playerIndex;
+    if (this.mode.victory === 'towncenter') {
+      return building.type === 'towncenter' && building.complete
+        && !this.buildings.some((b) => autre(b) && b.complete && b.type === 'towncenter');
+    }
+    return !!building.def.trains && !this.buildings.some((b) => autre(b) && b.def.trains);
+  }
+
+  /**
    * Score d'un joueur sur un format chronométré, en trois parts :
    *   recolte : la moitié de ce qu'il a récolté ;
    *   debout  : le prix de ses troupes en vie et de ses bâtiments achevés ;

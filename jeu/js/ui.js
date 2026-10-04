@@ -608,7 +608,9 @@ export class UI {
             ? { ok: true } : { ok: false, reason: `Aucun ${this.game.ouvrier()} disponible` }),
           action: () => this.game.reinforceSite(b),
         });
-        buttons.push({ icon: 'annuler', label: 'Annuler', action: () => this.game.cancelConstruction(b) });
+        // Le chantier qui tient seul le camp en jeu s'annule en deux appuis (voir Game.cancelConstruction).
+        const armee = this.game.demolitionEnAttente(b);
+        buttons.push({ icon: 'annuler', label: armee ? 'Confirmer' : 'Annuler', danger: armee, action: () => this.game.cancelConstruction(b) });
       } else {
         const def = b.def;
         for (const unitType of def.trains || []) {
