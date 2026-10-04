@@ -245,8 +245,9 @@ console.log('\n--- Ménage de bout en bout (fausses toiles) ---');
   check('rien en mémoire avant la première troupe', memoireTroupes().troupes === 0 && memoireTroupes().octets === 0);
   entretenirMemoire(10, [['knight', 'atlante']]);
   check('le ménage ne fait rien cuire : une troupe jamais vue attend son premier dessin', requetes.length === 0 && memoireTroupes().troupes === 0);
-  check('au premier dessin elle est demandée ; en attendant, pas d’image', spriteDe('knight', 'atlante') === null && requetes.length === 1, requetes.join(', '));
+  check('au premier dessin elle est demandée ; en attendant, pas d’image', spriteDe('knight', 'atlante') === null);
   await attendre(() => spriteDe('knight', 'atlante'));
+  check('son modèle n’est lu qu’une fois', requetes.join() === 'GET assets/modeles/cavalier.json', requetes.join(', '));
   const cavalier = spriteDe('knight', 'atlante');
   check('une troupe relue du cache est prête, et comptée', !!cavalier && cavalier.def.cuit3d && memoireTroupes().troupes === 1 && Math.abs(memoireTroupes().mo - MO_TROUPE) < 0.01,
     `${mo()} Mo`);
@@ -322,6 +323,109 @@ console.log('\n--- Ménage de bout en bout (fausses toiles) ---');
   entretenirMemoire(2010, [['spearman', 'solarien'], ['knight', 'atlante'], ['hydra', 'atlante']]);
   entretenirMemoire(2200, [['knight', 'atlante'], ['hydra', 'atlante']]);
   check('sans lancier solarien depuis deux minutes : déchargé à son tour', lancierSol.def.clips.marche.canvas.width === 0);
+}
+
+// ---------------------------------------------------------------------------
+// L'empreinte retenue : le modèle n'est plus relu à chaque lancement.
+// (Chaque « lancement » est une instance neuve du module, le stockage local reste.)
+// ---------------------------------------------------------------------------
+console.log('\n--- Empreinte des modèles retenue d’un lancement à l’autre ---');
+{
+  const { marqueFichier } = await import('../js/modele3d.js');
+  check('la marque d’un fichier : son ETag (faible ou fort, c’est le même) et sa date',
+    marqueFichier(new Headers({ etag: 'W/"abc"', 'last-modified': 'hier' })) === marqueFichier(new Headers({ etag: '"abc"', 'last-modified': 'hier' }))
+    && marqueFichier(new Headers({ etag: '"abc"' })) !== marqueFichier(new Headers({ etag: '"abd"' }))
+    && marqueFichier(new Headers({ 'last-modified': 'hier' })) !== '' && marqueFichier(new Headers({ 'content-length': '12' })) === '');
+
+  const SRC = 'assets/modeles/cavalier.json';
+  const stockage = fauxStockage();
+  globalThis.localStorage = stockage;
+  let serveur = { etag: '"v1"', corps: 'modele un '.repeat(40), entetes: true, head: 'ok' };
+  let requetes = [], cles = [], cacheVide = false;
+  globalThis.fetch = (src, options = {}) => {
+    const methode = options.method || 'GET';
+    requetes.push(methode);
+    const entetes = new Headers(serveur.entetes ? { etag: serveur.etag, 'last-modified': 'Sun, 04 Oct 2026 10:00:00 GMT' } : {});
+    if (methode === 'HEAD') {
+      if (serveur.head === 'panne') return Promise.reject(new TypeError('hors ligne'));
+      // (Un réseau à la peine : la réponse ne vient jamais ; seul l'abandon de la demande y met fin.)
+      if (serveur.head === 'muet') return new Promise((_, echec) => options.signal.addEventListener('abort', () => echec(new Error('abandon'))));
+      return Promise.resolve({ ok: serveur.head === 'ok', status: serveur.head === 'ok' ? 200 : 405, headers: entetes });
+    }
+    return Promise.resolve({ ok: true, status: 200, headers: entetes, arrayBuffer: async () => new TextEncoder().encode(serveur.corps).buffer });
+  };
+  globalThis.caches = {
+    open: async () => ({
+      match: async (cle) => {
+        if (String(cle).includes('&clip=')) return { blob: async () => ({}) };
+        cles.push(String(cle));
+        return cacheVide ? undefined : { json: async () => ({ cycle: 40, clips: {} }) };
+      },
+      put: async () => {}, keys: async () => [], delete: async () => true,
+    }),
+  };
+  let n = 0;
+  const lancement = async () => (await import(`../js/modele3d.js?lancement=${++n}`)).modeleCuit;
+  const essai = async (modeleCuit) => { requetes = []; cles = []; return modeleCuit('knight', 32, null); };
+
+  let modeleCuit = await lancement();
+  let cuit = await essai(modeleCuit);
+  const cle1 = cles[0];
+  check('premier lancement : le modèle est lu une fois, son empreinte retenue', requetes.join() === 'GET' && cuit.enCache === true
+    && JSON.parse(stockage.getItem('aem.empreintes.v1'))[SRC].empreinte.length > 0, requetes.join());
+  await essai(modeleCuit);
+  check('même page (une troupe déchargée qui revient) : plus aucune requête, même clé de cache', requetes.length === 0 && cles[0] === cle1, requetes.join());
+
+  modeleCuit = await lancement();
+  cuit = await essai(modeleCuit);
+  check('lancement suivant, fichier inchangé : les en-têtes seulement, pas le fichier', requetes.join() === 'HEAD' && cles[0] === cle1 && cuit.enCache === true, requetes.join());
+
+  serveur = { ...serveur, etag: '"v2"', corps: 'modele deux '.repeat(40) };
+  modeleCuit = await lancement();
+  await essai(modeleCuit);
+  const cle2 = cles[0];
+  check('fichier changé sur le serveur : il est relu, et la clé de cache change', requetes.join() === 'HEAD,GET' && cle2 !== cle1, requetes.join());
+  modeleCuit = await lancement();
+  await essai(modeleCuit);
+  check('… puis de nouveau les en-têtes seulement, sous la nouvelle clé', requetes.join() === 'HEAD' && cles[0] === cle2, requetes.join());
+
+  for (const [panne, libelle] of [['panne', 'hors ligne'], ['refus', 'demande d’en-têtes refusée par le serveur']]) {
+    serveur = { ...serveur, head: panne };
+    modeleCuit = await lancement();
+    await essai(modeleCuit);
+    check(`${libelle} : on relit le fichier, comme avant`, requetes.join() === 'HEAD,GET' && cles[0] === cle2, requetes.join());
+  }
+  serveur = { ...serveur, head: 'muet' };
+  modeleCuit = await lancement();
+  const debut = Date.now();
+  await essai(modeleCuit);
+  check('réseau à la peine : deux secondes d’attente au plus, puis le fichier', requetes.join() === 'HEAD,GET' && cles[0] === cle2 && Date.now() - debut < 3500,
+    `${Date.now() - debut} ms`);
+
+  serveur = { ...serveur, head: 'ok', entetes: false };
+  modeleCuit = await lancement();
+  await essai(modeleCuit);
+  check('un serveur qui ne dit plus rien du fichier : relu, et plus rien n’est retenu',
+    requetes.join() === 'HEAD,GET' && JSON.parse(stockage.getItem('aem.empreintes.v1'))[SRC] === undefined, requetes.join());
+  modeleCuit = await lancement();
+  await essai(modeleCuit);
+  check('… donc relu à chaque lancement, sans demande inutile', requetes.join() === 'GET', requetes.join());
+
+  globalThis.localStorage = { getItem() { throw new Error('refusé'); }, setItem() { throw new Error('refusé'); } };
+  serveur = { ...serveur, entetes: true };
+  modeleCuit = await lancement();
+  cuit = await essai(modeleCuit).catch((e) => e);
+  check('stockage refusé : le fichier est lu, rien ne casse', requetes.join() === 'GET' && cuit.enCache === true, requetes.join());
+
+  // Empreinte retenue, mais atlas absents du cache : il faut le fichier pour cuire (la cuisson, elle, n'existe pas sous Node).
+  globalThis.localStorage = stockage;
+  await essai(await lancement());          // retient l'empreinte
+  cacheVide = true;
+  const avertir = console.warn; console.warn = () => {};
+  modeleCuit = await lancement();
+  const issue = await essai(modeleCuit).then(() => 'cuit', () => 'cuisson impossible');
+  console.warn = avertir;
+  check('empreinte retenue mais atlas absents du cache : le fichier est relu pour cuire', requetes.join() === 'HEAD,GET' && issue === 'cuisson impossible', `${requetes.join()} → ${issue}`);
 }
 
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : `❌ ${failures} test(s) en échec`}`);
