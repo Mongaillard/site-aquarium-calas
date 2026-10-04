@@ -429,24 +429,38 @@ export const GAME_MODES = {
 
 export const DEFAULT_MODE = 'classique';
 
+/**
+ * Niveaux de l'adversaire. `armyTrigger` : la taille d'armée (éclaireur de
+ * départ compris) qui déclenche la première vague, `armyStep` : ce que chaque
+ * vague demande de plus que la précédente. Deux réglages propres au Facile,
+ * pour laisser le temps d'apprendre :
+ *   treve         : aucune vague avant cette heure de jeu (en secondes, par
+ *                   format) ; le joueur est prévenu une minute avant ;
+ *   petitesVagues : une vague n'emmène que le nombre de soldats qui la
+ *                   déclenche (3, puis 5, 7…), le reste de l'armée garde la base.
+ * Les `desc`, affichées à l'accueil, disent ce qui a été mesuré en partie
+ * (joueur passif, six graines par niveau et par format) : à revoir avec les
+ * chiffres ci-dessus.
+ */
 export const DIFFICULTIES = {
   easy: {
     id: 'easy', name: 'Facile',
-    gatherBonus: 0.8, maxVillagers: 14, armyTrigger: 5, armyStep: 3,
+    gatherBonus: 0.8, maxVillagers: 14, armyTrigger: 3, armyStep: 2,
     attackDelay: 260,
-    desc: 'L’IA se développe lentement et attaque tard.',
+    treve: { classique: 900, express: 270 }, petitesVagues: true,
+    desc: 'L’adversaire vous laisse 15 minutes pour vous installer (4 min 30 en Express), vous prévient, puis attaque par petits groupes.',
   },
   normal: {
     id: 'normal', name: 'Normal',
     gatherBonus: 1.0, maxVillagers: 20, armyTrigger: 6, armyStep: 4,
     attackDelay: 150,
-    desc: 'Une partie équilibrée, comme une escarmouche classique.',
+    desc: 'L’adversaire attaque sans prévenir au bout d’une dizaine de minutes (deux en Express), par vagues de plus en plus grosses.',
   },
   hard: {
     id: 'hard', name: 'Difficile',
     gatherBonus: 1.25, maxVillagers: 26, armyTrigger: 6, armyStep: 5,
     attackDelay: 100,
-    desc: 'L’IA récolte plus vite et harcèle sans relâche.',
+    desc: 'L’adversaire récolte plus vite et ses vagues grossissent plus vite ; sa première attaque arrive à la même heure qu’en Normal.',
   },
 };
 

@@ -143,6 +143,12 @@ function serializeAI(ai) {
     // Réserve pour le bâtiment voulu et commande d'unité chère en cours (voir ai.js).
     projet: ai.projet || null,
     commandeType: ai.commandeType || null, commandeDepuis: ai.commandeDepuis || 0, commandeAvance: ai.commandeAvance || 0,
+    // L'annonce du niveau Facile (une seule par partie), l'alerte bornée dans
+    // le temps et l'assaut d'un bâtiment qui tire (voir ai.js).
+    annonceFaite: !!ai.annonceFaite,
+    alerteDepuis: ai.alerteDepuis, repit: ai.repit,
+    assaut: ai.assaut ? { cible: ai.assaut.cible, fin: ai.assaut.fin } : null,
+    assauts: { ...ai.assauts }, assautsAge: ai.assautsAge,
   };
 }
 
@@ -398,6 +404,12 @@ export function restoreWorld(data) {
     ai.commandeType = saved.commandeType || null;
     ai.commandeDepuis = saved.commandeDepuis || 0;
     ai.commandeAvance = saved.commandeAvance || 0;
+    ai.annonceFaite = !!saved.annonceFaite;
+    ai.alerteDepuis = saved.alerteDepuis || 0;
+    ai.repit = saved.repit || 0;
+    ai.assaut = saved.assaut ? { cible: saved.assaut.cible, fin: saved.assaut.fin } : null;
+    ai.assauts = { ...(saved.assauts || {}) };
+    ai.assautsAge = saved.assautsAge || 0;
   }
 
   // 6. Terrain découvert, population, état dérivé.

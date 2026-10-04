@@ -5,9 +5,9 @@
 //   3. militaire  : composition d'armée, défense de la base, vagues d'attaque
 // ---------------------------------------------------------------------------
 
-import { TILE, BUILDING_TYPES, UNIT_TYPES, AGES } from './config.js';
+import { TILE, BUILDING_TYPES, UNIT_TYPES, AGES, nomDe, ficheDe } from './config.js';
 import { dist2, canAfford, RNG } from './utils.js';
-import { STATE, villagerTask } from './entities.js';
+import { STATE, villagerTask, computeDamage } from './entities.js';
 import { BLOCK } from './map.js';
 
 const JOB_RATIOS = [
@@ -32,6 +32,24 @@ const PRETRESSES_MAX = 2;
  */
 const HYDRES_VOULUES = 2;
 const ENGINS_VOULUS = 2;
+/** Au-delà de ce rayon autour du Centre-Ville (en cases), une troupe est en campagne, plus au camp. */
+const CAMP = 16;
+/**
+ * Une alerte sans combat ne dure pas (voir alerteFondee) : après tant de
+ * secondes sans un coup porté ni reçu dans la base, elle est levée pour tant
+ * de secondes.
+ */
+const ALERTE_CALME = 45;
+const ALERTE_REPIT = 120;
+/**
+ * L'assaut d'un bâtiment ennemi qui tire sur la base (voir assiegerBatimentArme) :
+ * la marge exigée sur les dégâts promis avant de partir, sa durée au plus (en
+ * secondes), et combien on en donne par bâtiment et par âge.
+ */
+const ASSAUT_MARGE = 1.15;
+const ASSAUT_DUREE = 120;
+const ASSAUT_MARCHE = 30;   // dont le trajet du camp jusqu'au pied du mur
+const ASSAUTS_MAX = 3;
 
 export class AIPlayer {
   constructor(world, playerIndex, difficulty) {
@@ -48,7 +66,19 @@ export class AIPlayer {
     this.attackTimer = difficulty.attackDelay * 0.35 * this.rush;
     this.armyTarget = Math.max(3, Math.round(difficulty.armyTrigger * this.rush));
     this.waveCount = 0;
+    // Trêve du niveau Facile : aucune vague avant cette heure de jeu, et le
+    // joueur prévenu une minute avant, une seule fois (voir annoncerAttaque).
+    this.treve = (difficulty.treve && difficulty.treve[world.modeId]) || 0;
+    this.annonceFaite = false;
     this.defendUntil = 0;
+    this.alerteDepuis = 0;       // début de l'alerte en cours
+    this.repit = 0;              // alerte levée faute de combat, jusqu'à cette heure
+    this.intrus = [];            // troupes ennemies dans la base (voir findThreat)
+    // Bâtiment ennemi qui tire sur la base : l'assaut en cours ({ cible, fin })
+    // et ceux déjà donnés à cet âge, par bâtiment (voir assiegerBatimentArme).
+    this.assaut = null;
+    this.assauts = {};
+    this.assautsAge = 0;
     this.lastHouseAt = -99;
     this.compositionIndex = 0;
     this.badSpots = new Set();   // emplacements où un chantier s'est révélé inaccessible
@@ -63,6 +93,7 @@ export class AIPlayer {
     if (this.timer > 0) return;
     this.timer = 0.7;
 
+    this.annoncerAttaque();
     this.survey();
     if (!this.townCenter && !this.tryRebuildTownCenter()) {
       this.lastStand();
@@ -441,6 +472,10 @@ export class AIPlayer {
     const projet = !menace && this.projet && (player.age >= 2 || exige) ? BUILDING_TYPES[this.projet].cost : null;
     const commande = this.commande();
     const pourCommande = !menace && commande ? UNIT_TYPES[commande.type].cost : null;
+    // Les troupes ennemies dans la base (this.intrus), avant de décider quoi
+    // former. La plus proche est la menace — sauf alerte levée faute de combat.
+    let threat = this.findThreat();
+    if (threat && !this.alerteFondee()) threat = null;
 
     // Production militaire dans tous les bâtiments disponibles.
     for (const b of this.completed) {
@@ -467,12 +502,16 @@ export class AIPlayer {
       // On s'autorise une garnison minimale, puis on met de côté le coût de
       // l'âge suivant : sans cette réserve l'armée mange tous les revenus et
       // l'IA reste bloquée au premier âge. Le plancher monte lentement avec le
-      // temps, et la réserve saute net si la base est attaquée.
-      const underThreat = this.world.time < this.defendUntil;
+      // temps. La réserve tient aussi en alerte : avant, elle sautait net à la
+      // première menace, et une alerte qui durait faisait passer tout l'or en
+      // miliciens sans que l'âge suivant soit jamais atteint. On n'y puise que
+      // pour faire face : tant que l'ennemi a plus de troupes dans la base
+      // qu'on n'a de soldats.
       const armyFloor = 3 + player.age * 3 + Math.floor(this.world.time / 420);
+      const deborde = !!threat && this.intrus.length > this.army.length;
       // Hystérésis : une fois la moitié du coût réunie, on garde le cap même si
       // un soldat tombe. Sinon l'IA redépense sa cagnotte à deux doigts du but.
-      const saving = !underThreat && this.ageTarget
+      const saving = !deborde && this.ageTarget
         && (this.savingForAge || this.army.length >= armyFloor)
         ? this.ageTarget.cost : null;
       const affordable = Object.keys(def.cost).every((k) => {
@@ -485,7 +524,6 @@ export class AIPlayer {
       if (affordable && this.world.trainUnit(b, pick) && commandee) { this.commandeDepuis = this.world.time; this.commandeAvance = 0; }
     }
 
-    const threat = this.findThreat();
     if (threat) {
       this.defendUntil = this.world.time + 8;
       for (const u of this.army) {
@@ -521,26 +559,35 @@ export class AIPlayer {
       if (b.garrison && b.garrison.length > 0) this.world.releaseGarrison(b);
     }
 
-    // Vague d'attaque quand l'armée est assez fournie.
-    if (this.attackTimer <= 0 && this.army.length >= this.armyTarget) {
-      const target = this.pickAttackTarget();
+    // Un bâtiment ennemi qui tire sur la base : l'armée va le raser, si elle
+    // en a les moyens. Le temps de l'assaut, la vague attend.
+    if (this.assiegerBatimentArme()) return;
+
+    // Vague d'attaque quand l'armée est assez fournie — et, en Facile, pas
+    // avant la fin de la trêve. Là, la vague est comptée : elle ne prend que
+    // les soldats présents au camp, le reste de l'armée garde la base.
+    const comptee = !!this.difficulty.petitesVagues;
+    const prets = comptee ? this.troupesAuCamp() : this.army;
+    if (this.attackTimer <= 0 && this.world.time >= this.treve && prets.length >= this.armyTarget) {
+      const vague = comptee ? prets.slice(0, this.armyTarget) : prets;
+      const target = this.pickAttackTarget(vague);
       if (target) {
         this.waveCount++;
         this.armyTarget = Math.min(24, Math.max(3, Math.round(
           (this.difficulty.armyTrigger + this.waveCount * this.difficulty.armyStep) * this.rush)));
         this.attackTimer = (this.difficulty.attackDelay * 0.25 + 20) * this.rush;
-        this.world.setStance(this.army, 'aggressive');   // en campagne, on engage
+        this.world.setStance(vague, 'aggressive');   // en campagne, on engage
         // Quand la victoire se joue sur le Centre-Ville, on le prend pour cible
         // explicitement : une attaque-déplacement s'égare sur les villageois et
         // la partie n'aboutit jamais à son objectif.
         if (this.world.mode.victory === 'towncenter' && target.kind === 'building') {
           // (Une soigneuse ne « frappe » pas un bâtiment : elle suit la troupe.)
-          for (const u of this.army) {
+          for (const u of vague) {
             if (u.def.heal) u.moveTo(target.x, target.y + TILE * 3, true);
             else u.attackEntity(target);
           }
         } else {
-          this.world.formationMove(this.army, target.x, target.y, true);
+          this.world.formationMove(vague, target.x, target.y, true);
         }
       }
     } else if (this.army.length > 0) {
@@ -554,11 +601,45 @@ export class AIPlayer {
       this.world.setStance(auCamp, 'defensive');     // au camp, on tient son poste
       for (const u of auCamp) {
         if (dist2(u.x, u.y, tc.x, tc.y) > (TILE * 11) ** 2) {
-          u.moveTo(tc.x + (this.rng.next() - 0.5) * TILE * 6,
-            tc.y + TILE * 4 + (this.rng.next() - 0.5) * TILE * 4, true);
+          const poste = this.posteAuCamp();
+          u.moveTo(poste.x, poste.y, true);
         }
       }
     }
+  }
+
+  /** Un point de regroupement au pied du Centre-Ville. */
+  posteAuCamp() {
+    const tc = this.townCenter;
+    return {
+      x: tc.x + (this.rng.next() - 0.5) * TILE * 6,
+      y: tc.y + TILE * 4 + (this.rng.next() - 0.5) * TILE * 4,
+    };
+  }
+
+  /** Les troupes présentes au camp, autour du Centre-Ville : celles qui ne sont pas en campagne. */
+  troupesAuCamp() {
+    const tc = this.townCenter;
+    if (!tc) return [];
+    return this.army.filter((u) => dist2(u.x, u.y, tc.x, tc.y) <= (TILE * CAMP) ** 2);
+  }
+
+  /**
+   * Niveau Facile : une minute avant la fin de la trêve, le joueur est prévenu
+   * — une seule fois par partie. Il a le temps de former quelques soldats.
+   */
+  annoncerAttaque() {
+    if (!this.treve || this.annonceFaite || this.world.time < this.treve - 60) return;
+    this.annonceFaite = true;
+    const world = this.world;
+    const ennemi = this.index === 0 ? 1 : 0;
+    // (Déjà en campagne — une sauvegarde d'avant ce réglage : il est trop tard pour prévenir.)
+    if (ennemi !== world.humanIndex || this.waveCount > 0) return;
+    const civ = world.players[ennemi].civ;
+    world.pushEvent({
+      type: 'notice',
+      text: `L’ennemi prépare une attaque : formez des soldats ${ficheDe('barracks', civ).fem ? 'à la' : 'au'} ${nomDe('barracks', civ)}`,
+    });
   }
 
   /**
@@ -608,22 +689,152 @@ export class AIPlayer {
     return null;
   }
 
-  /** Ennemi présent dans la base (à moins de treize cases d'un de ses bâtiments) ? */
+  /**
+   * Troupe ennemie présente dans la base (à moins de treize cases d'un de ses
+   * bâtiments) ? Une troupe abritée dans un bâtiment n'en est pas une : elle ne
+   * menace personne et personne ne peut l'atteindre. Avant, un seul ouvrier
+   * dans une tour posée à dix cases tenait l'IA en alerte jusqu'à la fin de la
+   * partie — plus de vague, plus d'âge, tout l'or en miliciens. (Le bâtiment
+   * qui tire, lui, se traite à part : voir assiegerBatimentArme.)
+   * Rend la plus proche, et les relève toutes au passage (`intrus`).
+   */
   findThreat() {
     const world = this.world;
     let best = null, bestD = Infinity;
+    this.intrus = [];
     for (const e of world.entities) {
       if (e.dead || e.playerIndex === this.index || e.isAnimal) continue;
-      if (e.kind === 'building') continue;
+      if (e.kind === 'building' || e.garrisonedIn) continue;
+      let dedans = false;
       for (const b of this.buildings) {
         const d = dist2(e.x, e.y, b.x, b.y);
-        if (d < (TILE * 13) ** 2 && d < bestD) { bestD = d; best = e; }
+        if (d >= (TILE * 13) ** 2) continue;
+        dedans = true;
+        if (d < bestD) { bestD = d; best = e; }
       }
+      if (dedans) this.intrus.push(e);
     }
     return best;
   }
 
-  pickAttackTarget() {
+  /**
+   * Une alerte sans combat ne dure pas. Si depuis ALERTE_CALME secondes
+   * personne n'a porté ni reçu de coup dans la base — l'intrus est hors
+   * d'atteinte, ou ne fait que rôder —, l'alerte est levée pour ALERTE_REPIT
+   * secondes : les ouvriers abrités ressortent, les vagues reprennent. Au
+   * premier coup, elle reprend.
+   * @returns {boolean} faux si la menace est à laisser courir.
+   */
+  alerteFondee() {
+    const now = this.world.time;
+    // Le dernier coup reçu par un intrus, ou par un des siens dans la base.
+    let coup = -Infinity;
+    for (const e of this.intrus) coup = Math.max(coup, e.lastHitAt);
+    for (const e of this.buildings) coup = Math.max(coup, e.lastHitAt);
+    for (const e of this.villagers) coup = Math.max(coup, e.lastHitAt);
+    for (const e of this.troupesAuCamp()) coup = Math.max(coup, e.lastHitAt);
+    if (now < this.repit) {
+      if (coup <= this.repit - ALERTE_REPIT) return false;   // toujours aussi calme
+      this.repit = 0;                                         // on se bat : l'alerte reprend
+    }
+    if (now >= this.defendUntil) this.alerteDepuis = now;     // une alerte commence
+    if (now - this.alerteDepuis < ALERTE_CALME || now - coup < ALERTE_CALME) return true;
+    this.repit = now + ALERTE_REPIT;
+    this.defendUntil = now;
+    return false;
+  }
+
+  /**
+   * Un bâtiment ennemi qui tire — une tour, un Centre-Ville occupé — avec un
+   * de ses ouvriers ou de ses bâtiments à portée. Ce n'est pas une alerte : les
+   * ouvriers restent au travail, l'épargne et les vagues suivent leur cours.
+   * Mais l'armée du camp va le raser dès qu'elle en a les moyens, et sans s'y
+   * user pour rien : pas d'assaut tant que les dégâts promis (voir
+   * degatsPromis) ne couvrent pas ce qu'il lui reste de points de vie ; un
+   * assaut dure au plus ASSAUT_DUREE secondes, après quoi on décroche ; et pas
+   * plus de ASSAUTS_MAX par bâtiment et par âge (un âge de plus, ce sont
+   * d'autres troupes : on retente).
+   * @returns {boolean} vrai tant qu'un assaut est en cours : la vague attend.
+   */
+  assiegerBatimentArme() {
+    const now = this.world.time;
+    // (Plus de Centre-Ville, plus de camp : l'heure n'est pas aux assauts.)
+    if (!this.townCenter) { this.assaut = null; return false; }
+    if (this.assautsAge !== this.player.age) { this.assautsAge = this.player.age; this.assauts = {}; }
+    const camp = this.troupesAuCamp().filter((u) => !u.def.heal);
+    if (this.assaut) {
+      const cible = this.world.byId.get(this.assaut.cible);
+      const troupe = cible ? this.army.filter((u) => u.target === cible && u.state === STATE.ATTACK) : [];
+      if (!cible || cible.dead || now >= this.assaut.fin || troupe.length + camp.length === 0) {
+        // Rasé, ou assaut manqué : on décroche, sans s'entêter sous les flèches.
+        this.assaut = null;
+        for (const u of troupe) {
+          const poste = this.posteAuCamp();
+          u.moveTo(poste.x, poste.y);
+        }
+        return false;
+      }
+      // Les troupes sorties de formation entre-temps rejoignent l'assaut.
+      for (const u of camp) {
+        if (u.state === STATE.IDLE || u.state === STATE.MOVE || !u.target) u.attackEntity(cible);
+      }
+      return true;
+    }
+    const cible = this.batimentArme();
+    if (!cible || this.degatsPromis(camp, cible) < cible.hp * ASSAUT_MARGE) return false;
+    this.assauts[cible.id] = (this.assauts[cible.id] || 0) + 1;
+    this.assaut = { cible: cible.id, fin: now + ASSAUT_DUREE };
+    for (const u of camp) u.attackEntity(cible);
+    return true;
+  }
+
+  /**
+   * Le bâtiment ennemi qui tire avec un de ses ouvriers ou de ses bâtiments à
+   * portée — le plus proche de son centre —, ou null. Ceux qui ont déjà eu
+   * leur compte d'assauts à cet âge sont laissés de côté.
+   */
+  batimentArme() {
+    const tc = this.townCenter;
+    let best = null, bestD = Infinity;
+    for (const b of this.world.buildings) {
+      if (b.dead || b.playerIndex === this.index || !b.complete || b.arrowCount() <= 0) continue;
+      if ((this.assauts[b.id] || 0) >= ASSAUTS_MAX) continue;
+      // La même mesure que le tir du bâtiment (voir World.findEnemyNear).
+      const portee = b.rangePx();
+      const vise = (e) => Math.max(b.edgeDistanceTo(e.x, e.y), e.edgeDistanceTo(b.x, b.y)) <= portee;
+      if (!this.buildings.some(vise) && !this.villagers.some((v) => !v.garrisonedIn && vise(v))) continue;
+      const d = tc ? dist2(b.x, b.y, tc.x, tc.y) : 0;
+      if (d < bestD) { bestD = d; best = b; }
+    }
+    return best;
+  }
+
+  /**
+   * Ce que cette troupe ôterait de points de vie à un bâtiment qui tire, le
+   * temps d'un assaut. Il abat ses assaillants un par un, les plus rapides
+   * d'abord (ils arrivent les premiers) ; chacun frappe de son arrivée au pied
+   * du mur jusqu'à sa mort. Une troupe qui porte aussi loin que lui (la
+   * Catapulte) reste hors d'atteinte et tire jusqu'au bout.
+   */
+  degatsPromis(troupe, cible) {
+    const fleches = cible.arrowCount();
+    const portee = cible.rangePx();
+    const utile = ASSAUT_DUREE - ASSAUT_MARCHE;
+    const rangs = troupe.slice().sort((a, b) => b.def.speed - a.def.speed);
+    let t = 0, total = 0;
+    for (const u of rangs) {
+      const frappe = computeDamage(u.def, u.player, cible) / u.def.attackSpeed;
+      if (u.rangePx() >= portee) { total += frappe * utile; continue; }
+      const salves = Math.ceil(u.hp / (fleches * computeDamage(cible.def, cible.player, u)));
+      t += salves * cible.def.attackSpeed;
+      const approche = (portee - u.rangePx()) / (u.def.speed * TILE);
+      total += frappe * Math.max(0, Math.min(t, utile) - approche);
+    }
+    return total;
+  }
+
+  /** La cible de la vague `troupe` : un bâtiment adverse, à défaut une de ses unités. */
+  pickAttackTarget(troupe = this.army) {
     const world = this.world;
     const enemyIndex = this.index === 0 ? 1 : 0;
     const tc = this.townCenter;
@@ -637,15 +848,28 @@ export class AIPlayer {
       const centre = targets.find((b) => b.type === 'towncenter');
       if (centre) return centre;
     }
-    // On vise en priorité ce qui produit, puis ce qui est proche.
+    // On vise en priorité ce qui produit, puis ce qui est proche. Un bâtiment
+    // qui tire n'est une cible que si la vague a de quoi l'abattre (voir
+    // degatsPromis), et s'il n'a pas déjà eu son compte d'assauts : une tour
+    // posée près de sa base était toujours le bâtiment le plus proche, et
+    // chaque vague allait s'y faire tuer au lieu de marcher sur le joueur.
+    // S'il ne reste que cela, on y va quand même.
     const priority = { towncenter: 0.6, barracks: 0.8, archery: 0.8, stable: 0.8, siege: 0.8 };
-    let best = null, bestScore = Infinity;
+    // (Seuls comptent les soldats au camp : ceux qui se battent encore au loin
+    // arriveraient un par un.)
+    const camp = new Set(this.troupesAuCamp());
+    const soldats = troupe.filter((u) => !u.def.heal && camp.has(u));
+    let best = null, bestScore = Infinity, tire = null, tireScore = Infinity;
     for (const b of targets) {
       const d = tc ? dist2(tc.x, tc.y, b.x, b.y) : 0;
       const score = d * (priority[b.type] || 1);
-      if (score < bestScore) { bestScore = score; best = b; }
+      const imprenable = b.complete && b.arrowCount() > 0
+        && ((this.assauts[b.id] || 0) >= ASSAUTS_MAX || this.degatsPromis(soldats, b) < b.hp * ASSAUT_MARGE);
+      if (imprenable) {
+        if (score < tireScore) { tireScore = score; tire = b; }
+      } else if (score < bestScore) { bestScore = score; best = b; }
     }
-    return best;
+    return best || tire;
   }
 
   tryRebuildTownCenter() {
