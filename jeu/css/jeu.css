@@ -181,6 +181,8 @@ html, body {
 .option-desc { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
 
 .start-actions { display: flex; gap: 10px; margin-top: 22px; }
+/* Le palmarès du format et de la difficulté choisis : une ligne discrète sous « Jouer ». */
+.palmares { margin: 10px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
 
 .btn {
   flex: 1;
@@ -261,6 +263,16 @@ ul.help a { color: var(--gold); }
 #game-timer { color: var(--muted); font-variant-numeric: tabular-nums; }
 .age-progress { width: 54px; height: 3px; background: rgba(255,255,255,.2); border-radius: 2px; overflow: hidden; }
 .age-progress span { display: block; height: 100%; background: var(--gold); width: 0; transition: width .2s linear; }
+/* Format chronométré : le score des deux camps à côté du temps qui reste — le
+   vôtre puis celui de l'adversaire, chacun à la couleur de son camp. Si la
+   ligne manque de place, c'est le nom de l'âge qui s'abrège, pas les chiffres. */
+#score-box { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+#score-box b { font-weight: 700; }
+.score-icone { display: flex; color: var(--gold); }
+.score-icone svg.ic { width: 11px; height: 11px; }
+#age-box { min-width: 0; }
+#age-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#game-timer, .age-progress { flex: 0 0 auto; }
 
 .icon-btn {
   width: 38px; height: 38px;
@@ -599,6 +611,11 @@ ul.help a { color: var(--gold); }
 .scores th, .scores td { padding: 7px 6px; text-align: right; border-bottom: 1px solid var(--border); }
 .scores th:first-child, .scores td:first-child { text-align: left; color: var(--muted); }
 .scores th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+/* Écran de fin : d'où vient le score, et ce que la partie change au palmarès. */
+.fin-note { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.fin-palmares { margin: -6px 0 12px; font-size: 13px; line-height: 1.4; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fin-palmares p { margin: 2px 0; }
+.fin-palmares .record { color: var(--gold); }
 
 /* --- Adaptations ---------------------------------------------------------- */
 

@@ -48,6 +48,7 @@ export class UI {
       food: el('res-food'), wood: el('res-wood'), gold: el('res-gold'),
       pop: el('res-pop'), age: el('age-label'), ageBar: el('age-bar'),
       timer: el('game-timer'),
+      scoreBox: el('score-box'), scoreMoi: el('score-moi'), scoreAdverse: el('score-adverse'),
       selection: el('selection-panel'), commands: el('command-panel'),
       alerts: el('alerts'), buildMenu: el('build-menu'), modal: el('modal'),
       workerBar: el('worker-bar'), workerMenu: el('worker-menu'),
@@ -76,6 +77,14 @@ export class UI {
     // Le moteur audio sert toute la session : coupé dans la partie précédente,
     // il l'est encore — le bouton doit le dire.
     if (!this.game.audio.enabled) el('btn-sound').innerHTML = iconeSVG('sonCoupe', 19);
+    // Le score des deux camps ne s'affiche que sur un format qui se joue aussi
+    // aux points, chacun à la couleur de son camp. (Le HUD survit à la partie :
+    // on le remet dans l'état de celle qui commence.)
+    if (this.nodes.scoreBox) {
+      this.nodes.scoreBox.classList.toggle('hidden', !this.world.mode.timeLimit);
+      this.nodes.scoreMoi.style.color = this.world.players[this.world.humanIndex].color.light;
+      this.nodes.scoreAdverse.style.color = this.world.players[1 - this.world.humanIndex].color.light;
+    }
 
     // Ces éléments survivent à la partie : leurs écouteurs partent avec elle
     // (voir Game.destroy), sinon la partie suivante hériterait des deux.
@@ -145,6 +154,12 @@ export class UI {
       ? formatTime(Math.max(0, limite - this.world.time))
       : formatTime(this.world.time));
     this.nodes.timer.classList.toggle('urgent', limite > 0 && limite - this.world.time < 60);
+    // … et le score des deux camps : c'est lui qui tranchera au bout du temps.
+    if (limite) {
+      const adverse = this.world.players[1 - this.world.humanIndex];
+      this.setText('scoreMoi', this.nodes.scoreMoi, String(this.world.score(player)));
+      this.setText('scoreAdverse', this.nodes.scoreAdverse, String(this.world.score(adverse)));
+    }
 
     this.refreshWorkerBar();
     this.refreshSelection();
@@ -793,6 +808,9 @@ export class UI {
 
   showHelp() {
     const civAdverse = this.world.players[1 - this.world.humanIndex].civ;
+    // Les bâtiments militaires : tout ce qui forme des troupes, hors Centre-Ville (voir World.checkVictory).
+    const militaires = Object.values(BUILDING_TYPES)
+      .filter((b) => b.trains && b.id !== 'towncenter').map((b) => nomDe(b.id, civAdverse)).join(', ');
     const modal = this.showModal(`
       <h2>Comment jouer</h2>
       <ul class="help">
@@ -809,7 +827,8 @@ export class UI {
         <li>Passez les <b>âges</b> depuis le ${nomDe('towncenter', this.game.civ)} pour débloquer de nouvelles unités</li>
         <li><b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil</li>
         <li><b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>Reprendre</b></li>
-        <li><b>Objectif</b> : détruire tous les bâtiments adverses et leurs ${nomDe('villager', civAdverse, 2).toLowerCase()} — en mode ${ic('modeExpress')} Express, leur dernier ${nomDe('towncenter', civAdverse)} suffit</li>
+        <li><b>Objectif</b> : ne laisser à l'adversaire ni ${nomDe('towncenter', civAdverse)} ni bâtiment militaire (${militaires}), achevé ou en chantier — inutile de raser la dernière ferme. En mode ${ic('modeExpress')} Express, son dernier ${nomDe('towncenter', civAdverse)} suffit ; sinon, au bout du temps, le meilleur score l'emporte</li>
+        ${this.world.mode.timeLimit ? `<li><b>Score</b> ${ic('score')} : la moitié de ce que vous récoltez, le prix de vos troupes et bâtiments encore debout, et deux fois le prix de ce que vous abattez. Il s'affiche en haut, à côté du chrono : le vôtre, puis celui de l'adversaire</li>` : ''}
       </ul>
       <div class="modal-actions"><button class="btn primary" data-act="close">J'ai compris</button></div>`, { wide: true });
     modal.querySelector('[data-act="close"]').addEventListener('click', () => {
@@ -850,7 +869,48 @@ export class UI {
     }, this.ecoute());
   }
 
-  showGameOver(result) {
+  /** Pourquoi la partie s'arrête, en une phrase : la conquête n'attend plus la dernière ferme, autant dire ce qui a tranché. */
+  raisonDeFin(result) {
+    const duree = formatTime(result.time);
+    if (result.timeUp) return `Temps écoulé après ${duree} — le score départage`;
+    if (result.resigned) return `Vous avez abandonné après ${duree}`;
+    if (result.winner === -1) return `Durée de la partie : ${duree}`;
+    const moi = this.world.humanIndex;
+    const centre = ficheDe('towncenter', this.world.players[result.victory ? 1 - moi : moi].civ);
+    if (this.world.mode.victory === 'towncenter') {
+      const tombe = `${centre.name}${result.victory ? ' adverse' : ''} est tombé${centre.fem ? 'e' : ''}`;
+      return result.victory
+        ? `${centre.fem ? 'La' : 'Le'} ${tombe} en ${duree}`
+        : `Votre ${tombe} — durée de la partie : ${duree}`;
+    }
+    return `${result.victory ? 'L’adversaire n’a' : 'Vous n’avez'} plus ni ${centre.name} ni bâtiment militaire — durée de la partie : ${duree}`;
+  }
+
+  /**
+   * Ce que la partie change au palmarès (voir inscrireAuPalmares, save.js) :
+   * un record battu s'annonce, avec le précédent ; sinon on rappelle celui qui
+   * tient, puis le compte des victoires et des défaites dans ce format.
+   */
+  textePalmares(palmares, exact) {
+    if (!palmares) return '';
+    const { ligne, temps, score } = palmares;
+    const lignes = [];
+    if (temps && temps.record) {
+      lignes.push(`<p class="record">${temps.ancien
+        ? `<b>Nouveau record !</b> Victoire en ${formatTime(temps.valeur)} — le précédent était de ${formatTime(temps.ancien)}`
+        : `<b>Premier temps au palmarès :</b> victoire en ${formatTime(temps.valeur)}`}</p>`);
+    } else if (temps) lignes.push(`<p>Meilleur temps à battre : ${formatTime(temps.ancien)}</p>`);
+    if (score && score.record) {
+      lignes.push(`<p class="record">${score.ancien
+        ? `<b>Nouveau record !</b> ${exact(score.valeur)} points — le précédent était de ${exact(score.ancien)}`
+        : `<b>Premier score au palmarès :</b> ${exact(score.valeur)} points`}</p>`);
+    } else if (score && score.ancien) lignes.push(`<p>Meilleur score à battre : ${exact(score.ancien)} points</p>`);
+    const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+    lignes.push(`<p>${this.world.mode.name} · ${this.world.difficulty.name} : ${pluriel(ligne.victoires, 'victoire')}, ${pluriel(ligne.defaites, 'défaite')}</p>`);
+    return `<div class="fin-palmares">${lignes.join('')}</div>`;
+  }
+
+  showGameOver(result, palmares = null) {
     const player = this.world.players[this.world.humanIndex];
     const enemy = this.world.players[1 - this.world.humanIndex];
     const egalite = result.winner === -1;
@@ -858,6 +918,9 @@ export class UI {
     // Chiffres exacts : arrondis (« 4,0k » contre « 4,0k »), un score serré
     // départagé au temps écoulé ne se lisait plus.
     const exact = (n) => Math.floor(n).toLocaleString('fr-FR');
+    // D'où vient le score, part par part (formats chronométrés : voir World.detailScore).
+    const part = (cle, libelle) => (result.detail ? `<tr><td>${libelle}</td>
+          <td>${exact(result.detail[player.index][cle])}</td><td>${exact(result.detail[enemy.index][cle])}</td></tr>` : '');
     const summary = `
       <table class="scores">
         <tr><th></th><th>Vous</th><th>Adversaire</th></tr>
@@ -867,10 +930,14 @@ export class UI {
         <tr><td>Unités perdues</td><td>${player.stats.lost}</td><td>${enemy.stats.lost}</td></tr>
         <tr><td>Bâtiments construits</td><td>${player.stats.built}</td><td>${enemy.stats.built}</td></tr>
         <tr><td>Âge atteint</td><td>${AGES[player.age].name}</td><td>${AGES[enemy.age].name}</td></tr>
+        ${part('recolte', 'Points de récolte')}
+        ${part('debout', 'Troupes et bâtiments debout')}
+        ${part('abattu', 'Ennemis abattus')}
         ${result.scores ? `<tr class="total"><td><b>Score final</b></td>
           <td><b>${exact(result.scores[player.index])}</b></td>
           <td><b>${exact(result.scores[enemy.index])}</b></td></tr>` : ''}
-      </table>`;
+      </table>
+      ${result.detail ? '<p class="fin-note">Score : la moitié des ressources récoltées, le prix de ce qui est encore debout, et deux fois le prix de ce qui a été abattu chez l’autre.</p>' : ''}`;
     // (Le héros debout et le héros à terre sont des chevaliers atlantes : pas d'illustration pour une autre civilisation, en attendant la sienne.)
     const illustration = egalite || player.civ !== 'atlante' ? ''
       : `<img class="fin-illustration${result.victory ? '' : ' tombe'}"
@@ -878,9 +945,8 @@ export class UI {
     const modal = this.showModal(`
       ${illustration}
       <h2>${title}</h2>
-      <p class="subtitle">${result.timeUp
-        ? `Temps écoulé après ${formatTime(result.time)} — le score départage`
-        : `Durée de la partie : ${formatTime(result.time)}`}</p>
+      <p class="subtitle">${this.raisonDeFin(result)}</p>
+      ${this.textePalmares(palmares, exact)}
       ${summary}
       <div class="modal-actions">
         <button class="btn primary" data-act="again">Nouvelle partie</button>

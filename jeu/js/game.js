@@ -7,7 +7,7 @@
 import {
   TILE, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
   START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, GAME_MODES, DEFAULT_MODE,
-  DEFAULT_CIV, civDe, nomDe,
+  DEFAULT_CIV, civDe, nomDe, ficheDe,
 } from './config.js';
 import { GameMap, BLOCK } from './map.js';
 import { PathFinder } from './pathfinding.js';
@@ -17,6 +17,13 @@ import { AIPlayer } from './ai.js';
 
 const PATHS_PER_TICK = 10;
 const FOG_INTERVAL = 0.25;
+
+/** Ce que vaut une troupe ou un bâtiment au score : son prix, toutes ressources confondues. */
+function valeurDe(def) {
+  let v = 0;
+  for (const k in def.cost) v += def.cost[k];
+  return v;
+}
 
 function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
   return {
@@ -39,7 +46,8 @@ function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
       attackMelee: 0, attackPierce: 0, meleeArmor: 0, pierceArmor: 0,
       villagerSpeed: 1, villagerCarry: 0, range: 0, gatherRate: 1,
     },
-    stats: { gathered: { food: 0, wood: 0, gold: 0 }, trained: 0, lost: 0, built: 0, killed: 0 },
+    // `destroyed` : le prix cumulé des troupes et bâtiments adverses abattus (voir detailScore).
+    stats: { gathered: { food: 0, wood: 0, gold: 0 }, trained: 0, lost: 0, built: 0, killed: 0, destroyed: 0 },
   };
 }
 
@@ -689,6 +697,9 @@ export class World {
     entity.selected = false;
     this.byId.delete(entity.id);
     const owner = this.players[entity.playerIndex] || this.gaia;
+    // Ce qu'un camp abat chez l'autre lui est compté, à son prix : le score s'en sert.
+    const tueur = source && source.playerIndex !== entity.playerIndex ? this.players[source.playerIndex] : null;
+    if (tueur && !entity.isAnimal) tueur.stats.destroyed += valeurDe(entity.def);
 
     if (entity.kind === 'unit') {
       const i = this.units.indexOf(entity);
@@ -741,6 +752,20 @@ export class World {
         if (owner.autoWorkers) this.reseedFarm(entity);
         else if (entity.playerIndex === this.humanIndex) {
           this.pushEvent({ type: 'notice', text: 'Ferme épuisée — reconstruisez-la pour continuer.' });
+        }
+      }
+      // En conquête, le dernier Centre-Ville tombé ne perd pas la partie tant
+      // qu'il reste un bâtiment militaire (voir checkVictory) : le joueur doit
+      // savoir qu'il ne tient plus qu'à eux, et quoi faire.
+      if (!silent && entity.type === 'towncenter' && entity.playerIndex === this.humanIndex
+          && this.mode.victory !== 'towncenter') {
+        const restants = this.buildings.filter((b) => !b.dead && b.playerIndex === entity.playerIndex);
+        if (!restants.some((b) => b.type === 'towncenter') && restants.some((b) => b.def.trains)) {
+          const f = ficheDe('towncenter', owner.civ);
+          this.pushEvent({
+            type: 'notice',
+            text: `${f.name} perdu${f.fem ? 'e' : ''} ! Rebâtissez ${f.fem ? 'une' : 'un'} ${f.name} : il ne vous reste que vos bâtiments militaires.`,
+          });
         }
       }
     }
@@ -1465,33 +1490,63 @@ export class World {
         if (!hasTC) p.defeated = true;
         continue;
       }
-      const hasBuildings = this.buildings.some((b) => !b.dead && b.playerIndex === p.index);
-      const hasVillagers = this.units.some((u) => !u.dead && u.playerIndex === p.index && u.isVillager);
-      if (!hasBuildings && !hasVillagers) p.defeated = true;
+      // Conquête : un camp tient tant qu'il lui reste un Centre-Ville ou un
+      // bâtiment militaire — caserne, archerie, écurie, atelier de siège,
+      // temple : tout ce qui forme des troupes (`trains`) —, achevé ou en
+      // chantier. Avant, il fallait raser jusqu'à la dernière ferme et tuer le
+      // dernier villageois : des parties entières ne se terminaient pas.
+      const tient = this.buildings.some((b) => !b.dead && b.playerIndex === p.index && b.def.trains);
+      if (!tient) p.defeated = true;
     }
     const alive = this.players.filter((p) => !p.defeated);
     if (alive.length <= 1 && !this.gameOver) {
       const winner = alive[0] || null;
-      this.gameOver = {
+      this.gameOver = this.avecScores({
         winner: winner ? winner.index : -1,
         victory: winner ? winner.index === this.humanIndex : false,
         time: this.time,
-      };
+      });
       this.pushEvent({ type: 'gameOver', result: this.gameOver });
     }
   }
 
   /**
-   * Score d'un joueur à la fin d'une partie limitée dans le temps : ce qu'il a
-   * récolté, plus ce qui est encore debout. Lisible d'un coup d'œil, et
-   * impossible à gonfler en se cachant.
+   * Score d'un joueur sur un format chronométré, en trois parts :
+   *   recolte : la moitié de ce qu'il a récolté ;
+   *   debout  : le prix de ses troupes en vie et de ses bâtiments achevés ;
+   *   abattu  : deux fois le prix des troupes et des bâtiments adverses qu'il
+   *             a abattus.
+   * Avant, la récolte faisait 80 % du score et un soldat perdu n'en retirait
+   * que dix points : le camp qui perdait le plus de soldats pouvait gagner.
+   * Ici une troupe perdue coûte son prix à l'un et le rapporte deux fois à
+   * l'autre : se battre paie, et un échange à égalité vaut mieux que rester
+   * chez soi.
    */
-  score(player) {
+  detailScore(player) {
     const g = player.stats.gathered;
-    const unites = this.units.filter((u) => !u.dead && !u.isAnimal && u.playerIndex === player.index).length;
-    const batiments = this.buildings.filter(
-      (b) => !b.dead && b.complete && b.playerIndex === player.index).length;
-    return Math.round(g.food + g.wood + g.gold + unites * 10 + batiments * 25);
+    let debout = 0;
+    for (const u of this.units) {
+      if (!u.dead && !u.isAnimal && u.playerIndex === player.index) debout += valeurDe(u.def);
+    }
+    for (const b of this.buildings) {
+      if (!b.dead && b.complete && b.playerIndex === player.index) debout += valeurDe(b.def);
+    }
+    const recolte = Math.round((g.food + g.wood + g.gold) / 2);
+    const abattu = 2 * player.stats.destroyed;
+    return { recolte, debout, abattu, total: recolte + debout + abattu };
+  }
+
+  score(player) { return this.detailScore(player).total; }
+
+  /**
+   * Sur un format chronométré, le résultat porte les scores et leur détail,
+   * quelle que soit la façon dont la partie s'arrête : ils sont à l'écran
+   * pendant la partie, l'écran de fin et le palmarès les reprennent.
+   */
+  avecScores(resultat) {
+    if (!this.mode.timeLimit) return resultat;
+    const detail = this.players.map((p) => this.detailScore(p));
+    return { ...resultat, scores: detail.map((d) => d.total), detail };
   }
 
   /** Fin au temps imparti (mode Express) : le meilleur score l'emporte. */
@@ -1502,20 +1557,19 @@ export class World {
     let best = 0;
     for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
     const egalite = scores.filter((s) => s === scores[best]).length > 1;
-    this.gameOver = {
+    this.gameOver = this.avecScores({
       winner: egalite ? -1 : best,
       victory: !egalite && best === this.humanIndex,
       time: this.time,
       timeUp: true,
-      scores,
-    };
+    });
     this.pushEvent({ type: 'gameOver', result: this.gameOver });
   }
 
   resign() {
     if (this.gameOver) return;
     this.players[this.humanIndex].defeated = true;
-    this.gameOver = { winner: 1, victory: false, time: this.time, resigned: true };
+    this.gameOver = this.avecScores({ winner: 1, victory: false, time: this.time, resigned: true });
     this.pushEvent({ type: 'gameOver', result: this.gameOver });
   }
 

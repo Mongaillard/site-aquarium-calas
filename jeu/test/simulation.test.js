@@ -939,9 +939,11 @@ function empreinte(world) {
     && express.gameOver.scores.every((v) => Number.isFinite(v)),
     express.gameOver ? express.gameOver.scores.join(' vs ') : '');
 
-  // En Classique, raser le seul Centre-Ville ne suffit pas.
+  // En Classique, raser le seul Centre-Ville ne suffit pas tant qu'il reste un
+  // bâtiment militaire (la règle entière : test/reglages-score.test.js).
   const classique = new World({ seed: 91, mode: 'classique', difficulty: 'normal' });
   const tc2 = classique.buildings.find((b) => b.playerIndex === 1 && b.type === 'towncenter');
+  classique.spawnBuilding(1, 'barracks', tc2.tx - 4, tc2.ty, true);
   classique.killEntity(tc2, null, true);
   classique.checkVictory();
   check('en Classique la partie continue après le Centre-Ville',
