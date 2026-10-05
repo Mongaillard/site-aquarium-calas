@@ -418,6 +418,21 @@ export function ficheCiv(type, civ) {
   return cle ? (ATLAS[cle] || EN_3D[cle]) : null;
 }
 
+/**
+ * Les types de troupe dont l'image suit le style, dans cette civilisation :
+ * ceux qui ont plusieurs images selon le style — sauf là où la civilisation a
+ * son propre modèle, le même dans tous les styles. (Modèle impossible à
+ * préparer — pas de WebGL, fichier illisible : la troupe retombe sur l'image
+ * atlante, et le style agit de nouveau.) Sert au message du menu de pause.
+ */
+export function troupesSelonStyle(civ) {
+  return Object.keys(ALTERNATIVES).filter((type) => {
+    const propre = CLES_CIV[civ]?.[type];
+    if (propre && !charges.get(propre)?.absent) return false;
+    return new Set(Object.values(ALTERNATIVES[type])).size > 1;
+  });
+}
+
 export function styleUnites() { return style; }
 
 /**
@@ -856,7 +871,8 @@ function decharger(cle) {
 /**
  * Le ménage, à appeler une fois par seconde hors du dessin. `maintenant` : des
  * secondes d'horloge réelle. `enJeu` : les couples `[type, civilisation]` des
- * unités en vie ou en formation, quel que soit le camp, vues ou non.
+ * unités en vie ou en formation, ou dont le corps est encore à terre, quel que
+ * soit le camp, vues ou non.
  * 1. Leurs troupes sont marquées « en jeu » ; une troupe déchargée est relue
  *    du cache sans attendre qu'on la dessine (le temps d'une formation suffit).
  * 2. Les copies de l'autre camp restées sans dessin sont rendues.

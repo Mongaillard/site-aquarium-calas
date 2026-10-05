@@ -19,6 +19,12 @@ import { formatTime } from './utils.js';
 
 export const SAVE_KEY = 'aem.partie';
 export const SAVE_VERSION = 1;
+/**
+ * Prix des âges jusqu'aux réglages d'octobre 2026 (AGES, par âge visé). Un
+ * passage d'âge noté sans son prix vient d'une sauvegarde de ce temps-là :
+ * c'est ce prix qui a été payé, et c'est lui que raser le porteur doit rendre.
+ */
+const PRIX_AGES_AVANT_OCTOBRE = [null, { food: 300 }, { food: 500, gold: 150 }];
 
 // --- Sérialisation -----------------------------------------------------------
 
@@ -58,7 +64,7 @@ function serializePlayer(p) {
     resources: { ...p.resources },
     age: p.age,
     ageProgress: p.ageProgress
-      ? { timeLeft: p.ageProgress.timeLeft, total: p.ageProgress.total, building: refId(p.ageProgress.building) }
+      ? { timeLeft: p.ageProgress.timeLeft, total: p.ageProgress.total, building: refId(p.ageProgress.building), cost: { ...p.ageProgress.cost } }
       : null,
     techs: [...p.techs],
     defeated: p.defeated,
@@ -248,6 +254,7 @@ export function restoreWorld(data) {
     p.stats = { ...p.stats, ...saved.stats, gathered: { ...saved.stats.gathered } };
     // `ageProgress` référence un bâtiment : rattaché plus bas.
     p.ageProgress = saved.ageProgress ? { ...saved.ageProgress } : null;
+    if (p.ageProgress && !p.ageProgress.cost) p.ageProgress.cost = { ...PRIX_AGES_AVANT_OCTOBRE[saved.age + 1] };
   });
 
   // 3. Les entités. On les crée d'abord avec des identifiants temporaires, puis

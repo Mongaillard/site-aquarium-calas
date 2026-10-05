@@ -39,7 +39,10 @@ le Chacal dressé (leur éclaireur), le Méhariste sur son dromadaire (leur
 cavalerie lourde), le Garde masqué à tête de chacal (leur élite), le Prêtre du
 Soleil et son sceptre, et les deux engins en bois blond cerclé de bronze doré.
 L'arbalétrier, l'archer monté et l'Hydre gardent pour l'instant l'allure
-atlante. Seuls l'ouvrier et l'éclaireur sont préparés au lancement ; le modèle
+atlante. Les troupes solariennes n'ont que leur modèle 3D : le style choisi au
+menu de pause n'agit que sur les troupes atlantes, et son message le dit
+(`troupesSelonStyle`, `js/sprites.js`). Seuls l'ouvrier et l'éclaireur sont
+préparés au lancement ; le modèle
 d'une autre troupe se prépare quand on la commande (`prevoirTroupe`,
 `js/sprites.js`), pour ne pas cuire dix modèles avant la première minute. La civilisation
 est un champ du joueur (`player.civ`, voir `CIVILISATIONS` dans `js/config.js`),
@@ -339,7 +342,11 @@ l'armée. Attaquée chez elle, elle lâche l'épargne et forme ce qu'elle peut.
 Dix relecteurs ont joué le jeu sans écran et l'ont noté (4 à 6,5 sur 10 selon
 le thème). Leur avis commun : le prochain gain ne viendrait pas d'une troupe de
 plus, mais d'une vingtaine de petits réglages. Les voici, par thème ; chacun a
-son fichier de vérifications, et `npm test` les lance tous.
+son fichier de vérifications, et `npm test` les lance tous. Ce qui ne se voit
+qu'une fois les thèmes réunis (la cloche et le Centre-Ville perdu, réparer sous
+le siège de l'IA, une sauvegarde d'avant les nouveaux prix, les corps à terre et
+la mémoire, le style et les civilisations, la consigne d'un ordre armé) a le
+sien : `node test/reglages-integration.test.js`.
 
 **Alerte d'attaque, armée et sélection au doigt.** Quand vous êtes attaqué, le
 message « Vous êtes attaqué ! Touchez pour voir où » reste six secondes :
@@ -355,7 +362,10 @@ un second toucher amène la vue sur le gros de la troupe. Elle est grisée sans
 soldat, et montre l'abri si toute l'armée s'y trouve. Enfin, dès qu'une
 sélection existe, une **croix** en haut à droite du panneau du bas la lâche —
 avec la pose en cours et l'ordre armé : un appui raté ne devient plus un ordre
-(au clavier, c'est toujours `Échap`). La logique de ces trois réglages vit sans
+(au clavier, c'est toujours `Échap`). « Stop » fait aussi tomber l'ordre armé,
+et la consigne d'un ordre (« Touchez la zone à attaquer ») part toujours avec
+lui — elle ne reste ni après « Stop », ni dans la partie suivante. La logique de
+ces trois réglages vit sans
 DOM dans `js/ui.js` (`FoyersAttaque`, `armeeDe`, `toucherArmee`) et se vérifie
 sous Node : `node test/reglages-alerte.test.js`, 46 vérifications.
 
@@ -373,7 +383,11 @@ l'unité s'est retournée, et la règle vaut aussi pour l'adversaire. Enfin, on
 **répare** et on **soigne** au doigt : des ouvriers en main, toucher un de ses
 bâtiments achevés et abîmés lance la réparation ; des Prêtresses seules en main,
 toucher un allié blessé lance le soin, y compris en pleine mêlée, où le blessé
-passe avant l'ennemi collé à lui. Le double tap sélectionne toujours. Mesuré
+passe avant l'ennemi collé à lui. Réparer sous le feu a son prix : les soldats
+de l'IA qui frappent un bâtiment se retournent contre les ouvriers qui le
+réparent, puis reprennent le bâtiment (`chasserLesReparateurs`, `js/ai.js`) —
+sans cela un seul ouvrier, que personne ne visait, rendait le Centre-Ville
+imprenable en Express. Le double tap sélectionne toujours. Mesuré
 dans le moteur : six miliciens en mêlée reculent de 7,9 cases en huit secondes
 sans perte (0,7 case et un mort auparavant) ; cinq miliciens sur une maison
 attaqués par trois gagnent en perdant un homme (ils mouraient tous) ; six
@@ -401,7 +415,9 @@ les coups reçus : le marteau ajoute des points de vie, il ne les recalcule pas 
 achevé abîmé, il libère ses bâtisseurs — réparer est un autre ordre. Le pas du
 groupe tombe à chaque nouvel ordre. Raser un de ses bâtiments
 (`World.raserBatiment`) fait sortir les occupants vivants et rend la file, une
-recherche et un passage d'âge en cours ; détruit par l'ennemi, un bâtiment
+recherche et un passage d'âge en cours — au prix payé, noté avec le passage (une
+sauvegarde d'avant les nouveaux prix rend l'ancien) ; détruit par l'ennemi, un
+bâtiment
 emporte toujours sa garnison, et un passage d'âge s'arrête si son Centre-Ville
 tombe. Une file pleine refuse aussi une technologie, on ne bâtit pas sur une
 carcasse, et une fondation n'éclaire que ses abords. Ces règles ont leur fichier
@@ -420,7 +436,9 @@ en donne le détail (`World.detailScore`, `js/game.js`). En Classique, la
 conquête n'exige plus de raser la dernière ferme : un camp est vaincu quand il
 n'a plus **ni Centre-Ville ni bâtiment militaire** (caserne, archerie, écurie,
 atelier de siège, temple — tout ce qui forme des troupes), achevé ou en chantier
-; le joueur qui perd son dernier Centre-Ville en est averti, et l'écran de fin
+; le joueur qui perd son dernier Centre-Ville en est averti (« Rebâtissez… » ou,
+s'il ne lui reste aucun villageois pour le faire, qu'il ne tient plus que par
+ses troupes et ses bâtiments militaires), et l'écran de fin
 dit pourquoi la partie s'arrête. Le joueur ne peut plus se faire perdre par
 mégarde : « Détruire » (et la touche `Suppr`, qui demande désormais deux appuis
 pour un bâtiment) prévient en rouge quand le bâtiment visé est le dernier qui
@@ -477,8 +495,9 @@ troupes, troupes en mémoire, pixels par point. Le **plafond de mémoire**
 (`js/sprites.js`, `entretenirMemoire`, appelé une fois par seconde) rend la
 copie rouge d'une troupe après trente secondes sans dessin (elle se refait au
 dessin suivant, jamais la toile d'origine) ; au-delà de `BUDGET_TROUPES_MO`
-(120), une troupe sans unité en vie ni en formation depuis deux minutes est
-déchargée et relue du cache dès qu'on en reforme — jamais une cuisson allégée,
+(120), une troupe sans unité en vie ni en formation, ni corps encore à terre,
+depuis deux minutes est déchargée et relue du cache dès qu'on en reforme (partie
+figée, un corps ne s'efface pas : sa troupe reste) — jamais une cuisson allégée,
 ni une cuisson pas encore rangée dans le cache, ni l'ouvrier et le milicien
 atlantes, qui servent de repli. Page masquée ou partie quittée, le sol en cache
 et les copies rouges sont rendus tout de suite. **Batterie** : menu de pause
