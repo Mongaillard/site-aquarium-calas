@@ -114,7 +114,41 @@ export class AIPlayer {
     this.manageEconomy();
     this.manageConstruction();
     this.manageResearch();
+    this.chasserLesReparateurs();
     this.manageMilitary();
+  }
+
+  /**
+   * Des ouvriers adverses réparent le bâtiment que frappent les soldats de
+   * l'IA : ceux-ci se retournent contre le plus proche, comme pour une
+   * riposte, puis reprennent le bâtiment (Unit.riposter). Sans cela un seul
+   * ouvrier, que personne ne visait, rendait plus de points de vie que toute
+   * la vague n'en ôtait : en Express, le Centre-Ville du joueur ne tombait
+   * plus jamais. Engins de siège et soigneuses restent à leur tâche
+   * (Unit.peutRiposter).
+   */
+  chasserLesReparateurs() {
+    const parBatiment = new Map();
+    for (const v of this.world.units) {
+      if (v.dead || v.garrisonedIn || !v.isVillager || v.playerIndex === this.index) continue;
+      const b = v.target;
+      if (v.state !== STATE.BUILD || !b || b.dead || b.kind !== 'building' || !b.complete) continue;
+      if (b.edgeDistanceTo(v.x, v.y) > TILE * 2) continue;   // encore en chemin : il ne répare rien
+      if (!parBatiment.has(b)) parBatiment.set(b, []);
+      parBatiment.get(b).push(v);
+    }
+    if (parBatiment.size === 0) return;
+    for (const u of this.army) {
+      if (u.state !== STATE.ATTACK || u.reprise) continue;
+      const ouvriers = parBatiment.get(u.target);
+      if (!ouvriers) continue;
+      let proche = null, d2 = Infinity;
+      for (const v of ouvriers) {
+        const d = dist2(u.x, u.y, v.x, v.y);
+        if (d < d2) { d2 = d; proche = v; }
+      }
+      if (u.peutRiposter(proche)) u.riposter(proche);
+    }
   }
 
   /** Photographie de l'état courant, refaite à chaque réflexion. */

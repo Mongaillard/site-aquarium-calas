@@ -5,8 +5,8 @@
 
 import { World } from '../js/game.js';
 import { serializeWorld, restoreWorld } from '../js/save.js';
-import { TICKS_PER_SECOND, TILE } from '../js/config.js';
-import { dist } from '../js/utils.js';
+import { TICKS_PER_SECOND, TILE, nomDe } from '../js/config.js';
+import { dist, clamp } from '../js/utils.js';
 import { STATE } from '../js/entities.js';
 import { readFileSync } from 'node:fs';
 
@@ -258,6 +258,99 @@ for (const [attitude, nom] of [['standGround', 'position tenue'], ['passive', 's
   check('un seul homme frappé : ses camarades se retournent avec lui', retournes === 4, `${retournes}/4`);
 }
 
+/**
+ * Siège en anneau : `n` miliciens répartis tout autour d'un bâtiment de trois
+ * cases, puis `m` miliciens ennemis arrivent par l'ouest. D'une face à l'autre,
+ * les assiégeants sont à plus de cinq cases : hors de vue les uns des autres.
+ */
+function anneau(n, m, type = 'towncenter') {
+  const { w, c } = arene(35);
+  const batiment = w.spawnBuilding(1, type, c, c, true);
+  batiment.maxHp = 100000; batiment.hp = 100000;
+  const rayon = (batiment.size / 2 + 1.5) * TILE;
+  const miens = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    miens.push(w.spawnUnit(0, 'militia', batiment.x + Math.cos(a) * rayon, batiment.y + Math.sin(a) * rayon));
+  }
+  for (const u of miens) u.attackEntity(batiment);
+  advance(w, 6);
+  const auMur = miens.filter((u) => u.state === STATE.ATTACK && u.target === batiment).length;
+  const eux = colonne(w, 1, 'militia', m, batiment.x - (batiment.size / 2 + 7) * TILE, batiment.y);
+  for (const e of eux) e.moveTo(batiment.x - (batiment.size / 2 + 1) * TILE, batiment.y, true);
+  // Au premier coup reçu : qui s'est retourné, et qui ne voyait pas l'homme frappé ?
+  advance(w, 30, () => miens.some((u) => u.hp < u.maxHp));
+  const frappe = miens.find((u) => u.hp < u.maxHp);
+  const horsDeVue = frappe ? miens.filter((u) => dist(u.x, u.y, frappe.x, frappe.y) > u.def.los * TILE).length : 0;
+  const retournes = miens.filter((u) => u.target && u.target.kind === 'unit').length;
+  advance(w, 120, () => vivants(miens).length === 0 || vivants(eux).length === 0);
+  advance(w, 8);
+  const restent = vivants(miens);
+  return {
+    auMur, horsDeVue, retournes, restent: restent.length, ennemis: vivants(eux).length,
+    repris: restent.filter((u) => u.state === STATE.ATTACK && u.target === batiment && !u.reprise).length,
+  };
+}
+
+{
+  const r = anneau(6, 4);
+  check('6 miliciens autour d’un Centre-Ville, 4 ennemis arrivent : au premier coup tous se retournent, la face opposée aussi',
+    r.auMur === 6 && r.horsDeVue >= 2 && r.retournes === 6,
+    `${r.retournes}/6 retournés, dont ${r.horsDeVue} hors de vue de l’homme frappé`);
+  check('siège en anneau, 6 contre 4 : ils gagnent, puis reprennent le bâtiment',
+    r.ennemis === 0 && r.restent >= 2 && r.repris === r.restent,
+    `restent ${r.restent} sur 6, ${r.ennemis} ennemi(s), ${r.repris} au mur`);
+}
+
+for (const [n, m, type] of [[4, 3, 'towncenter'], [5, 4, 'temple'], [8, 6, 'barracks']]) {
+  const r = anneau(n, m, type);
+  check(`siège en anneau (${type}), ${n} contre ${m} : les plus nombreux gagnent`,
+    r.auMur === n && r.retournes === n && r.ennemis === 0 && r.restent >= 1,
+    `${r.retournes}/${n} retournés, restent ${r.restent}, ${r.ennemis} ennemi(s)`);
+}
+
+{
+  // Sans placement à la main : deux groupes envoyés par ordre sur un
+  // Centre-Ville, l'un par l'ouest, l'autre par l'est, puis six ennemis.
+  const { w, c } = arene(36);
+  const cv = w.spawnBuilding(1, 'towncenter', c, c, true);
+  cv.maxHp = 100000; cv.hp = 100000;
+  const miens = [...colonne(w, 0, 'militia', 4, cv.x - TILE * 7, cv.y), ...colonne(w, 0, 'militia', 4, cv.x + TILE * 7, cv.y)];
+  const ordre = w.commandUnits(miens, cv.x, cv.y);
+  advance(w, 16);
+  const auMur = miens.filter((u) => u.state === STATE.ATTACK && u.target === cv && cv.edgeDistanceTo(u.x, u.y) < TILE * 1.5).length;
+  const eux = colonne(w, 1, 'militia', 6, cv.x - TILE * 9, cv.y);
+  for (const e of eux) e.moveTo(cv.x - TILE * 2.5, cv.y, true);
+  advance(w, 150, () => vivants(miens).length === 0 || vivants(eux).length === 0);
+  check('deux groupes de 4 sur un Centre-Ville, pris à revers par 6 : ils gagnent',
+    ordre.kind === 'attack' && auMur === 8 && vivants(eux).length === 0 && vivants(miens).length >= 2,
+    `${auMur}/8 au mur, restent ${vivants(miens).length} sur 8, ${vivants(eux).length} ennemi(s)`);
+}
+
+{
+  // La règle s'arrête au bâtiment : un soldat occupé sur un AUTRE mur, hors de
+  // vue de l'homme frappé, y reste — on ne vide pas tout un front pour un coup.
+  const { w, c, cx, cy } = arene(37);
+  const maison = w.spawnBuilding(1, 'house', c, c, true);
+  const autre = w.spawnBuilding(1, 'house', c + 4, c, true);
+  for (const b of [maison, autre]) { b.maxHp = 100000; b.hp = 100000; }
+  const miens = colonne(w, 0, 'militia', 2, cx - TILE * 1.2, cy + TILE);
+  const ailleurs = w.spawnUnit(0, 'militia', autre.x + TILE * 1.7, autre.y);
+  for (const u of miens) u.attackEntity(maison);
+  ailleurs.attackEntity(autre);
+  advance(w, 5);
+  const ennemi = w.spawnUnit(1, 'champion', cx - TILE * 4, cy + TILE);
+  ennemi.attackEntity(miens[0], true);
+  advance(w, 30, () => miens.some((u) => u.hp < u.maxHp));
+  const frappe = miens.find((u) => u.hp < u.maxHp);
+  const ecart = frappe ? dist(ailleurs.x, ailleurs.y, frappe.x, frappe.y) / TILE : 0;
+  // (Son attitude, elle, le laisserait riposter : c'est bien le bâtiment qui le retient.)
+  check('un soldat occupé sur un autre bâtiment, hors de vue, reste à son mur',
+    miens.every((u) => u.target === ennemi) && ailleurs.target === autre && !ailleurs.reprise
+    && ecart > ailleurs.def.los && ailleurs.peutRiposter(ennemi),
+    `à ${ecart.toFixed(1)} cases de l’homme frappé (vue ${ailleurs.def.los})`);
+}
+
 {
   // Une riposte ne se laisse pas entraîner : la cible partie trop loin, on
   // retourne au bâtiment (pas à un poste, pas à l'arrêt).
@@ -419,14 +512,134 @@ console.log('\n— Réparer et soigner au doigt');
 }
 
 {
-  // Le toucher (js/main.js) ne se joue pas sans navigateur : on s'assure au
-  // moins qu'il passe par la règle et transmet la cible reconnue sous le doigt.
+  // Le texte du toucher (js/main.js) : il passe par la règle et transmet la
+  // cible reconnue sous le doigt.
   const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
   check('le toucher applique la règle, sauf au double appui',
     /isDouble \? null : this\.world\.ordreSurAllie\(ownUnits, entity\)/.test(main));
   check('le toucher transmet la cible à l’ordre',
     /this\.issueOrder\(entity\.x, entity\.y, entity\)/.test(main)
     && /commandUnits\(units, worldX, worldY, \{[^}]*\bcible\b[^}]*\}\)/.test(main));
+}
+
+/**
+ * Le toucher lui-même. js/main.js ne s'importe pas sous node — il s'adresse au
+ * navigateur dès son chargement — : on en extrait le texte de quelques méthodes
+ * et on les joue sur un faux écran, un vrai monde derrière une interface
+ * muette. Si tapAt se met à appeler une méthode ou un import de plus, le banc
+ * s'arrête en le nommant : il suffit de l'ajouter ici.
+ */
+function fauxEcran(w, zoom) {
+  const source = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+  const methode = (nom) => {
+    const debut = new RegExp(`\\n  ${nom}\\([^)]*\\) \\{`).exec(source);
+    if (!debut) throw new Error(`méthode ${nom} introuvable dans js/main.js`);
+    let i = debut.index + debut[0].length;
+    for (let ouvertes = 1; ouvertes > 0 && i < source.length; i++) {
+      if (source[i] === '{') ouvertes++; else if (source[i] === '}') ouvertes--;
+    }
+    return source.slice(debut.index + 1, i);
+  };
+  const vraies = ['tapAt', 'issueOrder', 'devantSousLeDoigt', 'tapTolerance', 'setSelection', 'pingOrder'];
+  const Ecran = new Function('nomDe', 'clamp', 'spriteDe', 'TILE',
+    `return class { ${vraies.map(methode).join('\n')} }`)(nomDe, clamp, () => null, TILE);
+  const g = new Ecran();
+  return Object.assign(g, {
+    world: w, civ: w.players[w.humanIndex].civ, selection: [], messages: [],
+    rallyArmed: false, attackMoveArmed: false, garrisonArmed: false, gestesDits: new Set(),
+    camera: { zoom, screenToWorld: (x, y) => ({ x, y }) },
+    renderer: { isEntityVisible: () => true },
+    ui: { toast: (texte) => g.messages.push(texte), refreshSelection() {}, setBuildHint() {} },
+    audio: { resume() {}, play() {} },
+    vibrate() {},
+    batimentIllustreSous: () => null,   // pas d'images sous node
+    selectSameTypeOnScreen: (e) => g.setSelection([e]),
+    ouvrier: (n = 1) => nomDe('villager', g.civ, n).toLowerCase(),
+  });
+}
+
+{
+  const cercles = (w) => w.effects.filter((e) => e.kind === 'ping').map((e) => e.color).join();
+  /**
+   * Une Prêtresse et un soldat à l'écart ; un Champion blessé au contact d'un
+   * Champion ennemi — à 44 px, l'écart mesuré entre deux Champions en mêlée.
+   * C'est là que le soin sert le plus, et l'ennemi entre dans la tolérance du
+   * doigt dès qu'on dézoome : il captait l'appui, la Prêtresse marchait vers lui.
+   */
+  const melee = (zoom) => {
+    const { w, cx, cy } = arene(44);
+    const g = fauxEcran(w, zoom);
+    const pretresse = w.spawnUnit(0, 'priest', cx - TILE * 6, cy);
+    const blesse = w.spawnUnit(0, 'champion', cx, cy);
+    const ennemi = w.spawnUnit(1, 'champion', cx + TILE * 2, cy);
+    const soldat = w.spawnUnit(0, 'militia', cx - TILE * 6, cy + TILE * 2);
+    for (const u of [pretresse, blesse, ennemi, soldat]) u.stance = 'passive';
+    blesse.hp = 40;
+    ennemi.x = blesse.x + 44;
+    return { g, w, pretresse, blesse, ennemi, soldat };
+  };
+  let panne = '';
+  try {
+    // [zoom, décalage du doigt vers l'ennemi] — 2/3 est le zoom de départ d'un
+    // téléphone. À chacun de ces appuis, l'ennemi est dans la tolérance du doigt.
+    const soins = [[2 / 3, 4], [2 / 3, 12], [0.5, 0], [0.5, 20], [0.4, 30]].map(([zoom, dx]) => {
+      const { g, w, pretresse, blesse, ennemi } = melee(zoom);
+      g.setSelection([pretresse]);
+      const piege = w.enemyAt(blesse.x + dx, blesse.y, 0, g.tapTolerance()) === ennemi;
+      g.tapAt(blesse.x + dx, blesse.y, false);
+      const soin = pretresse.state === STATE.ATTACK && pretresse.target === blesse && g.selection[0] === pretresse
+        && cercles(w) === '#8ff0c0' && g.messages.length === 1;
+      return { piege, soin, texte: `zoom ${zoom.toFixed(2)} +${dx} px : ${soin ? 'soin' : pretresse.state}` };
+    });
+    check('toucher, en mêlée : la Prêtresse seule soigne le blessé, l’ennemi au contact ne capte pas l’appui',
+      soins.every((r) => r.piege && r.soin), soins.map((r) => r.texte).join(', '));
+
+    {
+      const { g, pretresse, blesse } = melee(0.5);
+      g.setSelection([pretresse]);
+      g.tapAt(blesse.x + 4, blesse.y, false);
+      g.tapAt(blesse.x + 4, blesse.y, true);
+      check('toucher, en mêlée : le double tap sélectionne le blessé, la Prêtresse garde son ordre',
+        g.selection.length === 1 && g.selection[0] === blesse && pretresse.target === blesse,
+        `sélection ${g.selection.map((e) => e.type)}, Prêtresse ${pretresse.state}`);
+    }
+    {
+      const { g, w, pretresse, blesse, ennemi, soldat } = melee(0.5);
+      g.setSelection([pretresse, soldat]);
+      g.tapAt(blesse.x + 4, blesse.y, false);
+      check('toucher, en mêlée : avec un soldat dans le groupe, c’est l’ennemi qu’on attaque, comme avant',
+        soldat.target === ennemi && cercles(w) === '#ff6b6b' && g.selection.length === 2,
+        `soldat ${soldat.state}, cercle ${cercles(w)}`);
+    }
+    {
+      const { g, w, pretresse, blesse, ennemi } = melee(0.5);
+      ennemi.x = blesse.x + TILE * 4;
+      g.setSelection([pretresse]);
+      g.tapAt(ennemi.x, ennemi.y, false);
+      check('toucher : sans blessé sous le doigt, la Prêtresse suit l’ordre vers l’ennemi, comme avant',
+        pretresse.state === STATE.MOVE && !pretresse.target && cercles(w) === '#ff6b6b' && g.messages.length === 0,
+        `${pretresse.state}, cercle ${cercles(w)}`);
+    }
+    {
+      // Et la réparation, par le même chemin : un ouvrier, une maison abîmée.
+      const { w, c } = arene(45);
+      const g = fauxEcran(w, 2 / 3);
+      const maison = w.spawnBuilding(0, 'house', c, c, true);
+      maison.hp = maison.maxHp * 0.4;
+      const ouvrier = w.spawnUnit(0, 'villager', maison.x - TILE * 4, maison.y);
+      g.setSelection([ouvrier]);
+      g.tapAt(maison.x, maison.y, false);
+      check('toucher : un ouvrier en main, l’appui sur un bâtiment abîmé le répare et garde la sélection',
+        ouvrier.state === STATE.BUILD && ouvrier.target === maison && g.selection[0] === ouvrier
+        && cercles(w) === '#8ecae6' && g.messages.some((m) => /[Dd]ouble tap/.test(m)),
+        `${ouvrier.state}, cercle ${cercles(w)}, ${g.messages.length} message(s)`);
+      g.tapAt(maison.x, maison.y, true);
+      check('toucher : le double tap sélectionne le bâtiment', g.selection.length === 1 && g.selection[0] === maison);
+    }
+  } catch (e) {
+    panne = e.message;
+  }
+  check('le faux écran a pu jouer le toucher de js/main.js', panne === '', panne);
 }
 
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : '❌ ' + failures + ' test(s) en échec'}`);

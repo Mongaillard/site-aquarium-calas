@@ -12,7 +12,7 @@ import {
   saveGame, loadSave, clearSave, restoreWorld,
   lirePalmares, lignePalmares, inscrireAuPalmares, resumePalmares,
 } from './save.js';
-import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, phraseIncident } from './save.js';
+import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
 import { UI, FoyersAttaque, toucherArmee } from './ui.js';
@@ -21,7 +21,7 @@ import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
 import { setStyleUnites, styleUnites, spriteDe, chargerSprites, chargerCivilisation, prevoirTroupe, etatModeles3d } from './sprites.js';
-import { memoireTroupes, entretenirMemoire, rendreVariantes } from './sprites.js';
+import { memoireTroupes, entretenirMemoire, rendreVariantes, troupesSelonStyle } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
 import { DENSITE } from './modele3d.js';
 
@@ -256,6 +256,9 @@ class Game {
    * Les couples [type, civilisation] qui ont une unité en vie ou en formation,
    * dans les deux camps, vue ou non : leurs images restent en mémoire. (Une
    * file de production porte aussi des technologies : sprites.js les ignore.)
+   * Un corps à terre compte aussi : il est encore dessiné, et partie figée
+   * (pause, écran de fin) il ne vieillit plus — sa troupe déchargée était
+   * relue du cache à l'image suivante, toutes les deux minutes, sans fin.
    */
   troupesEnJeu() {
     const couples = new Map();
@@ -265,6 +268,11 @@ class Game {
     for (const b of this.world.buildings) {
       if (b.dead) continue;
       for (const q of b.queue) couples.set(`${q.id}|${b.player.civ}`, [q.id, b.player.civ]);
+    }
+    for (const fx of this.world.effects) {
+      if (fx.kind !== 'cadavre') continue;
+      const civ = this.world.players[fx.joueur]?.civ;
+      couples.set(`${fx.type}|${civ}`, [fx.type, civ]);
     }
     return [...couples.values()];
   }
@@ -520,12 +528,18 @@ class Game {
     // Exception : le doigt posé franchement sur un de ses bâtiments le
     // sélectionne quand même — en plein raid, il faut pouvoir produire.
     const ownBuilding = this.devantSousLeDoigt(p, this.world.entityAt(p.x, p.y, this.world.humanIndex, 0), this.world.humanIndex);
-    let enemy = ownUnits.length > 0 && !(ownBuilding && ownBuilding.kind === 'building')
+    // Autre exception : des soigneuses seules en main n'attaquent pas. Un allié
+    // blessé sous le doigt passe alors avant l'ennemi : en mêlée — là où le
+    // soin sert le plus — cet ennemi est à deux pas, il captait l'appui et la
+    // soigneuse marchait dans le combat au lieu de soigner.
+    const allie = this.world.entityAt(p.x, p.y, this.world.humanIndex, tolerance);
+    const aSoigner = this.world.ordreSurAllie(ownUnits, allie) === 'heal' ? allie : null;
+    let enemy = ownUnits.length > 0 && !aSoigner && !(ownBuilding && ownBuilding.kind === 'building')
       ? this.world.enemyAt(p.x, p.y, this.world.humanIndex, tolerance) : null;
     // Le doigt sur les toits d'un palais ennemi : c'est lui qu'on attaque, et
     // l'ordre vise son centre — le point touché, lui, est hors de l'emprise.
     let cible = p;
-    if (!enemy && ownUnits.length > 0 && !ownBuilding) {
+    if (!enemy && !aSoigner && ownUnits.length > 0 && !ownBuilding) {
       const illustre = this.batimentIllustreSous(p.x, p.y);
       if (illustre && illustre.playerIndex !== this.world.humanIndex) { enemy = illustre; cible = { x: illustre.x, y: illustre.y }; }
     }
@@ -534,7 +548,7 @@ class Game {
       return;
     }
 
-    const entity = this.devantSousLeDoigt(p, this.world.entityAt(p.x, p.y, null, tolerance));
+    const entity = aSoigner || this.devantSousLeDoigt(p, this.world.entityAt(p.x, p.y, null, tolerance));
     const isMine = entity && entity.playerIndex === this.world.humanIndex;
     const visible = entity && (isMine || this.renderer.isEntityVisible(entity));
 
@@ -733,11 +747,15 @@ class Game {
     if (filtered.length) this.setSelection(filtered);
   }
 
-  /** Plus aucun ordre en attente d'un appui (attaque, abri, ralliement) : sa consigne s'efface avec lui. */
+  /**
+   * Plus aucun ordre en attente d'un appui (attaque, abri, ralliement) : sa
+   * consigne s'efface avec lui — sauf pendant une pose, dont la consigne a
+   * pris sa place et doit rester tant que le fantôme est là.
+   */
   desarmer() {
     if (!this.attackMoveArmed && !this.rallyArmed && !this.garrisonArmed) return;
     this.attackMoveArmed = false; this.rallyArmed = false; this.garrisonArmed = false;
-    this.ui.setBuildHint('');
+    if (!this.buildMode) this.ui.setBuildHint('');
   }
 
   /**
@@ -748,6 +766,7 @@ class Game {
   lacherSelection() {
     if (this.buildMode) this.cancelBuild();
     this.desarmer();
+    this.ui.setBuildHint('');   // plus rien en main : aucune consigne ne reste
     this.setSelection([]);
   }
 
@@ -812,7 +831,7 @@ class Game {
 
   stopSelection() {
     for (const e of this.selection) if (e.kind === 'unit') e.stop();
-    this.attackMoveArmed = false;
+    this.desarmer();   // l'ordre armé tombe avec sa consigne (« Touchez la zone à attaquer » restait)
     this.ui.refreshSelection(true);
   }
 
@@ -913,6 +932,14 @@ class Game {
   }
 
   cancelConstruction(building) {
+    // Le chantier qui tient seul le camp en jeu (Classique : plus rien d'autre
+    // qui forme des troupes) : deux appuis, comme pour « Détruire ».
+    if (this.world.destructionFatale(building) && !this.demolitionEnAttente(building)) {
+      this.demolitionArmee = { id: building.id, jusqua: performance.now() + 3000 };
+      this.ui.toast('Ce chantier seul vous tient en jeu : l’annuler, c’est perdre la partie. Touchez « Confirmer » pour l’annuler.', 'error');
+      this.ui.refreshSelection(true);
+      return;
+    }
     if (this.world.cancelConstruction(building)) {
       this.ui.toast('Chantier annulé, ressources rendues');
       this.setSelection([]);
@@ -933,12 +960,11 @@ class Game {
   demolish(building) {
     if (!this.demolitionEnAttente(building)) {
       this.demolitionArmee = { id: building.id, jusqua: performance.now() + 3000 };
-      const w = this.world;
-      const dernier = building.type === 'towncenter' && w.mode.victory === 'towncenter'
-        && !w.buildings.some((b) => b !== building && !b.dead && b.complete
-          && b.type === 'towncenter' && b.playerIndex === building.playerIndex);
+      // Celui qui tient seul le camp en jeu : le dernier Centre-Ville en
+      // Express ; en Classique, le dernier Centre-Ville ou bâtiment militaire.
+      const dernier = this.world.destructionFatale(building);
       this.ui.toast(dernier
-        ? `Votre dernier ${nomDe('towncenter', this.civ)} : le détruire, c’est perdre la partie. Touchez « Confirmer » pour le raser.`
+        ? `Votre dernier ${building.type === 'towncenter' ? nomDe('towncenter', this.civ) : 'bâtiment militaire'} : le détruire, c’est perdre la partie. Touchez « Confirmer » pour le raser.`
         : `Touchez « Confirmer » pour raser : ${ficheDe(building.type, building.player.civ).name}.`, dernier ? 'error' : 'info');
       this.ui.refreshSelection(true);
       return;
@@ -1155,11 +1181,14 @@ class Game {
 
   deleteSelected() {
     const mine = this.selection.filter((e) => e.playerIndex === this.world.humanIndex);
-    for (const e of mine) {
-      if (e.kind === 'building' && !e.complete) this.world.cancelConstruction(e);
-      else if (e.kind === 'building') this.world.raserBatiment(e);
-      else this.world.killEntity(e, null, false);
+    // Un bâtiment passe par son bouton, garde-fous compris (« Détruire » en
+    // deux appuis) : la touche rasait d'un coup jusqu'au dernier Centre-Ville.
+    const batiment = mine.find((e) => e.kind === 'building');
+    if (batiment) {
+      if (batiment.complete) this.demolish(batiment); else this.cancelConstruction(batiment);
+      return;
     }
+    for (const e of mine) this.world.killEntity(e, null, false);
     this.setSelection([]);
   }
 
@@ -1209,14 +1238,24 @@ class Game {
   setStyleUnites(id) {
     setStyleUnites(id);
     try { localStorage.setItem(STYLE_KEY, styleUnites()); } catch { /* stockage indisponible */ }
+    // Une civilisation qui a ses propres modèles 3D ne suit pas le style : le
+    // message ne doit pas annoncer un changement que l'écran ne montre pas.
+    const moi = this.civ, adverse = this.world.players[1 - this.world.humanIndex].civ;
+    const miennes = troupesSelonStyle(moi), adverses = troupesSelonStyle(adverse);
+    // (Le chevalier d'essai n'habille que le milicien, sous le nom que lui donne la civilisation.)
+    const essai = miennes.includes('militia') ? `${nomDe('militia', moi)} : chevalier d’essai` : null;
     const messages = {
       '3d': 'Personnages : tes modèles 3D animés',
       anime: 'Personnages : marche dessinée',
       peint: 'Personnages : illustration peinte',
-      '3d-precalc': 'Milicien : chevalier d’essai rendu à l’avance',
-      '3d-direct': 'Milicien : chevalier d’essai animé en direct',
+      '3d-precalc': essai ? `${essai} rendu à l’avance` : 'Personnages : marche dessinée',
+      '3d-direct': essai ? `${essai} animé en direct` : 'Personnages : marche dessinée',
     };
-    if (styleUnites() === '3d-direct' && !webglDisponible()) {
+    if (miennes.length === 0) {
+      this.ui.toast(adverses.length === 0
+        ? 'Style : rien ne change, les troupes de cette partie n’ont que leur modèle 3D'
+        : `Style : seules les troupes des ${CIVILISATIONS[adverse].name} changent, les tiennes n’ont que leur modèle 3D`);
+    } else if (styleUnites() === '3d-direct' && !webglDisponible()) {
       this.ui.toast('3D en direct : WebGL indisponible ici — le rendu précalculé le remplace', 'warn');
     } else {
       this.ui.toast(messages[styleUnites()]);
@@ -1279,6 +1318,7 @@ class Game {
     this.ui.hideModal();
     this.ui.closeBuildMenu();
     this.ui.closeWorkerMenu();
+    this.ui.setBuildHint('');   // une consigne en cours (ordre armé, pose) ne suit pas dans la partie suivante
     document.getElementById('hud').classList.add('hidden');
   }
 }
@@ -1301,9 +1341,10 @@ const settings = {
 /**
  * La dernière partie a-t-elle été coupée ? (Le témoin de coupure, js/save.js.)
  * L'accueil le dit en une ligne discrète sous la carte de reprise, jusqu'à la
- * prochaine partie lancée ; le menu de pause garde la trace des suivantes.
+ * prochaine partie lancée — même si la page est relancée entre-temps, d'où
+ * l'incident « non lu » ; le menu de pause garde la trace des suivantes.
  */
-let incidentAccueil = releverTemoin();
+let incidentAccueil = releverTemoin() || incidentNonLu();
 
 function afficherIncident() {
   const box = document.getElementById('resume-box');
@@ -1391,6 +1432,7 @@ function startGame(options) {
   document.getElementById('hud').classList.remove('hidden');
   audio.resume();
   incidentAccueil = null;
+  try { marquerIncidentsLus(); } catch { /* stockage indisponible */ }
   currentGame = new Game(options);
   window.__jeu = currentGame;   // pratique pour déboguer depuis la console
 }

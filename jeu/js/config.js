@@ -235,7 +235,7 @@ export const UNIT_TYPES = {
     meleeArmor: 0, pierceArmor: 6, los: 8, radius: 13,
     projectile: true, splash: 0.8,
     from: 'siege', age: 2,
-    desc: 'Lance des boulets de loin : dégâts de zone, redoutable contre les bâtiments et les troupes à l’arrêt. Une troupe en marche l’esquive, et le boulet blesse aussi vos hommes. Lente, sans défense au corps à corps.',
+    desc: 'Lance des boulets de loin : dégâts de zone, redoutable contre les bâtiments et les troupes à l’arrêt. Un soldat ou un rang en marche l’esquive (pas une colonne profonde), et le boulet blesse aussi vos hommes. Lente, sans défense au corps à corps.',
   },
   // Les animaux vivent sur la carte : ni produits, ni comptés dans la
   // population, sans camp (voir Animal, entities.js). `food` est ce que rend
@@ -507,7 +507,7 @@ export const CIVILISATIONS = {
       stable: { name: 'Enclos des montures', fem: false }, // Écurie était féminin
       siege: { name: 'Atelier des engins' },
       blacksmith: { name: 'Fonderie' },                    // féminin, comme Forge
-      temple: { name: 'Temple du Soleil' },
+      temple: { name: 'Temple du Soleil', desc: 'Forme les Prêtres du Soleil, qui soignent vos troupes ; à l’Âge des Châteaux, invoque l’Hydre.' },
     },
     // type → portrait, seulement une fois le fichier livré (et listé dans sw.js).
     portraits: {

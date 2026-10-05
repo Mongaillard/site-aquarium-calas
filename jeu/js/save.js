@@ -19,6 +19,12 @@ import { formatTime } from './utils.js';
 
 export const SAVE_KEY = 'aem.partie';
 export const SAVE_VERSION = 1;
+/**
+ * Prix des âges jusqu'aux réglages d'octobre 2026 (AGES, par âge visé). Un
+ * passage d'âge noté sans son prix vient d'une sauvegarde de ce temps-là :
+ * c'est ce prix qui a été payé, et c'est lui que raser le porteur doit rendre.
+ */
+const PRIX_AGES_AVANT_OCTOBRE = [null, { food: 300 }, { food: 500, gold: 150 }];
 
 // --- Sérialisation -----------------------------------------------------------
 
@@ -58,7 +64,7 @@ function serializePlayer(p) {
     resources: { ...p.resources },
     age: p.age,
     ageProgress: p.ageProgress
-      ? { timeLeft: p.ageProgress.timeLeft, total: p.ageProgress.total, building: refId(p.ageProgress.building) }
+      ? { timeLeft: p.ageProgress.timeLeft, total: p.ageProgress.total, building: refId(p.ageProgress.building), cost: { ...p.ageProgress.cost } }
       : null,
     techs: [...p.techs],
     defeated: p.defeated,
@@ -260,6 +266,7 @@ export function restoreWorld(data) {
     p.stats = { ...p.stats, ...saved.stats, gathered: { ...saved.stats.gathered } };
     // `ageProgress` référence un bâtiment : rattaché plus bas.
     p.ageProgress = saved.ageProgress ? { ...saved.ageProgress } : null;
+    if (p.ageProgress && !p.ageProgress.cost) p.ageProgress.cost = { ...PRIX_AGES_AVANT_OCTOBRE[saved.age + 1] };
   });
 
   // 3. Les entités. On les crée d'abord avec des identifiants temporaires, puis
@@ -551,6 +558,27 @@ export function releverTemoin(maintenant = Date.now(), store = storage()) {
   } catch {
     return null;
   }
+}
+
+/**
+ * L'incident que l'accueil doit encore dire : le dernier de la liste, tant
+ * qu'aucune partie n'a été lancée depuis (`lu`). La marque ne se relève qu'une
+ * fois : sans cette trace, la ligne ne tiendrait qu'un chargement, et une page
+ * relancée avant d'avoir été lue ne dirait plus rien de la coupure.
+ */
+export function incidentNonLu(store = storage()) {
+  const { incidents } = lireTemoin(store);
+  const dernier = incidents[incidents.length - 1];
+  return dernier && !dernier.lu ? dernier : null;
+}
+
+/** Une partie est lancée : l'accueil n'a plus à redire les incidents relevés jusque-là. */
+export function marquerIncidentsLus(store = storage()) {
+  if (!store) return false;
+  const temoin = lireTemoin(store);
+  if (temoin.incidents.every((i) => i.lu)) return false;   // rien de neuf : on n'écrit pas
+  for (const i of temoin.incidents) i.lu = true;
+  return rangerTemoin(temoin, store);
 }
 
 /** « après 12 min — 180 Mo d’images, 64 unités » : où en était la partie, ce que pesait la page. */

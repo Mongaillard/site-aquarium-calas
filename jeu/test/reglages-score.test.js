@@ -10,7 +10,7 @@ import {
   serializeWorld, restoreWorld, clearSave, saveGame, loadSave, SAVE_VERSION, SAVE_KEY,
   PALMARES_KEY, lirePalmares, lignePalmares, inscrireAuPalmares, resumePalmares,
 } from '../js/save.js';
-import { DIFFICULTIES, TICKS_PER_SECOND, TILE, UNIT_TYPES, BUILDING_TYPES } from '../js/config.js';
+import { DIFFICULTIES, TICKS_PER_SECOND, TILE, UNIT_TYPES, BUILDING_TYPES, nomDe, ficheDe } from '../js/config.js';
 import { UI } from '../js/ui.js';
 import { ICONES } from '../js/icones.js';
 import { formatTime } from '../js/utils.js';
@@ -634,6 +634,283 @@ function fausseInterface(w) {
   const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
   check('aucun emoji dans les textes ajoutés', !emoji.test(html) && !emoji.test(ui.slice(ui.indexOf('raisonDeFin(result)'))),
     'index.html et la fin de js/ui.js');
+}
+
+// ---------------------------------------------------------------------------
+// 5. Le garde-fou : ne pas raser soi-même ce qui tient son camp en jeu
+// ---------------------------------------------------------------------------
+console.log('\n--- Raser soi-même ce qui tient son camp en jeu ---');
+{
+  // La règle, dite d'avance : World.destructionFatale annonce ce que checkVictory décidera.
+  const classique = (civs) => monde({ seed: 91, mode: 'classique', ...(civs ? { civs } : {}) });
+  const express = () => monde({ seed: 91, mode: 'express' });
+  const scenes = {
+    'Classique, Centre-Ville seul': () => { const w = classique(); batir(w, 0, 'house'); return w; },
+    'Classique, Centre-Ville et caserne': () => { const w = classique(); batir(w, 0, 'barracks'); return w; },
+    'Classique, Centre-Ville et caserne en chantier': () => { const w = classique(); batir(w, 0, 'barracks', false); return w; },
+    'Classique, caserne seule': () => { const w = classique(); batir(w, 0, 'barracks'); batir(w, 0, 'house', true, 1); w.killEntity(centre(w), null); return w; },
+    'Classique, caserne et Centre-Ville en chantier': () => { const w = classique(); const c = centre(w); batir(w, 0, 'barracks'); batir(w, 0, 'towncenter', false, 2); w.killEntity(c, null); return w; },
+    'Classique, Centre-Ville en chantier seul': () => {
+      const w = classique(); const c = centre(w); const caserne = batir(w, 0, 'barracks');
+      batir(w, 0, 'towncenter', false, 2); batir(w, 0, 'house', true, 4); w.killEntity(c, null); w.killEntity(caserne, null); return w;
+    },
+    'Classique, deux Centres-Villes': () => { const w = classique(); batir(w, 0, 'towncenter', true, 2); return w; },
+    'Classique, temple et écurie sans Centre-Ville': () => { const w = classique(); batir(w, 0, 'temple'); batir(w, 0, 'stable', true, 1); w.killEntity(centre(w), null); return w; },
+    'Classique solarien, Palais seul': () => classique(['solarien', 'atlante']),
+    'Express, Centre-Ville seul': () => { const w = express(); batir(w, 0, 'house'); return w; },
+    'Express, Centre-Ville et caserne': () => { const w = express(); batir(w, 0, 'barracks'); return w; },
+    'Express, Centre-Ville et Centre-Ville en chantier': () => { const w = express(); batir(w, 0, 'towncenter', false, 2); return w; },
+    'Express, deux Centres-Villes': () => { const w = express(); batir(w, 0, 'towncenter', true, 2); return w; },
+  };
+  // Chaque bâtiment du joueur, dans chaque scène : la prédiction, puis le fait.
+  const ecarts = [];
+  let essais = 0, fatals = 0;
+  for (const [nom, scene] of Object.entries(scenes)) {
+    const combien = batiments(scene(), 0).length;
+    for (let i = 0; i < combien; i++) {
+      const w = scene();
+      w.update(DT);
+      const b = batiments(w, 0)[i];
+      const annonce = w.destructionFatale(b);
+      if (b.complete) w.killEntity(b, null, false); else w.cancelConstruction(b);
+      w.update(DT);
+      const perdu = !!w.gameOver && w.gameOver.victory === false;
+      essais++;
+      if (annonce) fatals++;
+      if (annonce !== perdu) ecarts.push(`${nom} / ${b.type}${b.complete ? '' : ' en chantier'} : annoncé ${annonce}, perdu ${perdu}`);
+    }
+  }
+  check('destructionFatale annonce exactement ce que checkVictory décide, bâtiment par bâtiment', ecarts.length === 0 && fatals >= 6 && essais - fatals >= 10,
+    ecarts.join(' · ') || `${essais} destructions essayées, dont ${fatals} qui font perdre`);
+
+  const de = (w, type, acheve = true) => batiments(w, 0).find((b) => b.type === type && b.complete === acheve);
+  const seul = scenes['Classique, Centre-Ville seul']();
+  check('Classique : le Centre-Ville seul tient le camp, la maison non', seul.destructionFatale(centre(seul)) === true && seul.destructionFatale(de(seul, 'house')) === false);
+  const deux = scenes['Classique, Centre-Ville et caserne']();
+  const etat = [deux.destructionFatale(centre(deux)), deux.destructionFatale(de(deux, 'barracks'))];
+  deux.killEntity(centre(deux), null);
+  etat.push(deux.destructionFatale(de(deux, 'barracks')));
+  check('Classique : avec une caserne, ni l’un ni l’autre n’est le dernier ; le Centre-Ville perdu, la caserne l’est', etat.join() === 'false,false,true', etat.join());
+  const chantier = scenes['Classique, Centre-Ville et caserne en chantier']();
+  const dernierChantier = scenes['Classique, Centre-Ville en chantier seul']();
+  check('Classique : un chantier militaire tient le camp, et le dernier chantier est le dernier appui',
+    chantier.destructionFatale(centre(chantier)) === false && dernierChantier.destructionFatale(de(dernierChantier, 'towncenter', false)) === true
+    && dernierChantier.destructionFatale(de(dernierChantier, 'house')) === false);
+  const ex = scenes['Express, Centre-Ville et caserne']();
+  const exChantier = scenes['Express, Centre-Ville et Centre-Ville en chantier']();
+  const exDeux = scenes['Express, deux Centres-Villes']();
+  check('Express : seul le dernier Centre-Ville achevé compte — ni caserne ni chantier ne le remplacent',
+    ex.destructionFatale(centre(ex)) === true && ex.destructionFatale(de(ex, 'barracks')) === false
+    && exChantier.destructionFatale(de(exChantier, 'towncenter')) === true && exChantier.destructionFatale(de(exChantier, 'towncenter', false)) === false
+    && batiments(exDeux, 0).every((b) => exDeux.destructionFatale(b) === false));
+}
+
+/**
+ * Le jeu (Game, js/main.js) ne se charge pas sous Node : écrans, toile, son.
+ * Ses méthodes de destruction sont donc lues dans sa source et jouées telles
+ * quelles sur un faux jeu — le monde est vrai, l'interface retient ses messages.
+ */
+function methodesDe(fichier, noms) {
+  const source = readFileSync(new URL(fichier, import.meta.url), 'utf8');
+  const methode = (nom) => {
+    const m = source.match(new RegExp(`\\n  ${nom}\\([^)]*\\) \\{\\n[\\s\\S]*?\\n  \\}\\n`));
+    if (!m) throw new Error(`${fichier} : méthode ${nom} introuvable`);
+    return m[0];
+  };
+  return new Function('nomDe', 'ficheDe', `return class {${noms.map(methode).join('')}};`)(nomDe, ficheDe);
+}
+function fauxJeu(w, selection = []) {
+  const Jeu = methodesDe('../js/main.js', ['cancelConstruction', 'demolitionEnAttente', 'demolish', 'deleteSelected']);
+  const jeu = new Jeu();
+  jeu.world = w;
+  jeu.civ = w.players[w.humanIndex].civ;
+  jeu.selection = selection;
+  jeu.demolitionArmee = null;
+  jeu.dits = [];
+  jeu.ui = { toast: (texte, genre = 'info') => jeu.dits.push({ texte, genre }), refreshSelection() {} };
+  jeu.setSelection = (liste) => { jeu.selection = liste.filter((e) => e && !e.dead); };
+  jeu.dernier = () => jeu.dits[jeu.dits.length - 1] || { texte: '', genre: '' };
+  return jeu;
+}
+{
+  // Le défaut signalé : en Classique, deux appuis sur « Détruire » rasaient le
+  // dernier Centre-Ville sans prévenir que c'était la défaite.
+  const w = monde({ seed: 91, mode: 'classique' });
+  for (let i = 0; i < 200; i++) w.update(DT);
+  const tc = centre(w);
+  const jeu = fauxJeu(w, [tc]);
+  jeu.demolish(tc);
+  w.update(DT);
+  check('Classique, « Détruire » sur le dernier Centre-Ville : le premier appui ne rase rien et prévient que c’est la défaite',
+    !tc.dead && !w.gameOver && jeu.dits.length === 1 && jeu.dernier().genre === 'error' && jeu.demolitionEnAttente(tc)
+    && jeu.dernier().texte.includes('Votre dernier Centre-Ville') && jeu.dernier().texte.includes('c’est perdre la partie')
+    && jeu.dernier().texte.includes('« Confirmer »'), jeu.dernier().texte);
+  jeu.demolish(tc);
+  w.update(DT);
+  check('… « Confirmer » le rase quand même : la défaite est alors choisie', tc.dead && !!w.gameOver && w.gameOver.victory === false
+    && jeu.selection.length === 0);
+
+  const s = monde({ seed: 91, mode: 'classique', civs: ['solarien', 'atlante'] });
+  const jeuS = fauxJeu(s);
+  jeuS.demolish(centre(s));
+  check('… avec le nom du bâtiment dans sa civilisation', jeuS.dernier().texte.includes('Votre dernier Palais du Soleil')
+    && !jeuS.dernier().texte.includes('Centre-Ville'), jeuS.dernier().texte);
+}
+{
+  // Avec une caserne : le Centre-Ville n'est pas le dernier appui, la caserne le devient.
+  const w = monde({ seed: 91, mode: 'classique' });
+  const caserne = batir(w, 0, 'barracks');
+  const tc = centre(w);
+  const jeu = fauxJeu(w);
+  jeu.demolish(tc);
+  const premier = jeu.dernier();
+  jeu.demolish(tc);
+  w.update(DT);
+  check('Classique, caserne debout : raser le Centre-Ville reste une destruction ordinaire, la partie continue',
+    premier.genre === 'info' && premier.texte.includes('pour raser : Centre-Ville') && tc.dead && !w.gameOver, premier.texte);
+  jeu.demolish(caserne);
+  w.update(DT);
+  check('… puis la caserne est le dernier bâtiment militaire : même avertissement', !caserne.dead && !w.gameOver && jeu.dernier().genre === 'error'
+    && jeu.dernier().texte.includes('Votre dernier bâtiment militaire') && jeu.dernier().texte.includes('c’est perdre la partie'), jeu.dernier().texte);
+  jeu.demolish(caserne);
+  w.update(DT);
+  check('… et la confirmation fait perdre', caserne.dead && !!w.gameOver && w.gameOver.victory === false);
+
+  // Express : rien ne change, le dernier Centre-Ville prévient, caserne ou pas ; une maison non.
+  const e = monde({ seed: 91, mode: 'express' });
+  batir(e, 0, 'barracks');
+  const maison = batir(e, 0, 'house', true, 1);
+  const jeuE = fauxJeu(e);
+  jeuE.demolish(centre(e));
+  const alerte = jeuE.dernier();
+  jeuE.demolish(maison);
+  check('Express : l’avertissement du dernier Centre-Ville est toujours là, et une maison se rase sans alarme',
+    alerte.genre === 'error' && alerte.texte.includes('Votre dernier Centre-Ville') && alerte.texte.includes('c’est perdre la partie')
+    && jeuE.dernier().genre === 'info' && jeuE.dernier().texte.includes('pour raser : Maison') && !centre(e).dead && !maison.dead,
+    `${alerte.texte} | ${jeuE.dernier().texte}`);
+}
+{
+  // La touche Suppr : elle rasait d'un coup, sans aucune confirmation.
+  const w = monde({ seed: 91, mode: 'classique' });
+  const tc = centre(w);
+  const jeu = fauxJeu(w, [tc]);
+  jeu.deleteSelected();
+  w.update(DT);
+  check('touche Suppr sur le dernier Centre-Ville : rien n’est rasé, le joueur est prévenu, le bâtiment reste en main',
+    !tc.dead && !w.gameOver && jeu.dernier().genre === 'error' && jeu.dernier().texte.includes('c’est perdre la partie')
+    && jeu.selection.length === 1 && jeu.selection[0] === tc, jeu.dernier().texte);
+  // Le délai passé (trois secondes), un nouvel appui redemande confirmation.
+  if (jeu.demolitionArmee) jeu.demolitionArmee.jusqua = performance.now() - 1;
+  jeu.deleteSelected();
+  w.update(DT);
+  check('… passé le délai, un nouvel appui redemande confirmation au lieu de raser', !tc.dead && !w.gameOver && jeu.demolitionEnAttente(tc));
+  jeu.deleteSelected();
+  w.update(DT);
+  check('… un second appui dans le délai confirme', tc.dead && !!w.gameOver && w.gameOver.victory === false);
+
+  // La touche elle-même (js/input.js) : maintenue, elle se répète — et ne doit pas se confirmer toute seule.
+  const m = monde({ seed: 91, mode: 'classique' });
+  const jeuM = fauxJeu(m, [centre(m)]);
+  const clavier = new (methodesDe('../js/input.js', ['onKeyDown']))();
+  clavier.keys = new Set();
+  clavier.game = jeuM;
+  clavier.onKeyDown({ key: 'Delete', repeat: false });
+  for (let i = 0; i < 20; i++) clavier.onKeyDown({ key: 'Delete', repeat: true });
+  m.update(DT);
+  const tenu = !!centre(m) && !m.gameOver && jeuM.dits.length === 1;
+  clavier.onKeyDown({ key: 'Delete', repeat: false });
+  m.update(DT);
+  check('touche Suppr maintenue : la répétition du clavier ne confirme rien, un vrai second appui si', tenu && !centre(m) && !!m.gameOver,
+    `${jeuM.dits.length} message(s)`);
+
+  const o = monde({ seed: 91, mode: 'classique' });
+  const maison = batir(o, 0, 'house');
+  const jeuO = fauxJeu(o, [maison]);
+  jeuO.deleteSelected();
+  const debout = !maison.dead && jeuO.dernier().genre === 'info';
+  jeuO.deleteSelected();
+  check('touche Suppr sur un bâtiment ordinaire : deux appuis, comme le bouton « Détruire »', debout && maison.dead && jeuO.selection.length === 0
+    && jeuO.dernier().texte.startsWith('Maison détruit'));
+  // Ce qui ne change pas : les troupes, un chantier ordinaire, un bâtiment adverse.
+  const soldats = [troupe(o, 0, 'militia'), troupe(o, 0, 'militia', 1)];
+  jeuO.selection = soldats;
+  jeuO.deleteSelected();
+  const fondation = batir(o, 0, 'house', false, 1);
+  const bois = o.players[0].resources.wood;
+  jeuO.selection = [fondation];
+  jeuO.deleteSelected();
+  const rendu = o.players[0].resources.wood - bois;
+  jeuO.selection = [centre(o, 1)];
+  jeuO.deleteSelected();
+  jeuO.deleteSelected();
+  o.update(DT);
+  check('touche Suppr : les troupes meurent d’un appui, un chantier ordinaire s’annule d’un appui, un bâtiment adverse ne risque rien',
+    soldats.every((u) => u.dead) && fondation.dead && rendu === BUILDING_TYPES.house.cost.wood && !centre(o, 1).dead && !o.gameOver,
+    `bois rendu ${rendu}`);
+}
+{
+  // Le chantier qui tient seul le camp en jeu : « Annuler » demande confirmation, lui aussi.
+  const dernierChantier = () => {
+    const w = monde({ seed: 91, mode: 'classique' });
+    const tc = centre(w), caserne = batir(w, 0, 'barracks');
+    const fondation = batir(w, 0, 'towncenter', false, 2);
+    w.killEntity(tc, null);
+    w.killEntity(caserne, null);
+    w.update(DT);
+    w.drainEvents();
+    return { w, fondation };
+  };
+  const { w, fondation } = dernierChantier();
+  const jeu = fauxJeu(w, [fondation]);
+  const bois = w.players[0].resources.wood;
+  jeu.cancelConstruction(fondation);
+  w.update(DT);
+  check('« Annuler » sur le chantier qui tient seul le camp : rien n’est annulé, le joueur est prévenu',
+    !w.gameOver && !fondation.dead && w.players[0].resources.wood === bois && jeu.dernier().genre === 'error'
+    && jeu.dernier().texte.includes('c’est perdre la partie') && jeu.dernier().texte.includes('« Confirmer »') && jeu.demolitionEnAttente(fondation),
+    jeu.dernier().texte);
+
+  // Le bouton lui-même : « Annuler » devient « Confirmer », en rouge, le temps du délai.
+  const ui = Object.create(UI.prototype);
+  ui.world = w;
+  ui.game = jeu;
+  jeu.hasSpareWorker = () => true;
+  jeu.ouvrier = () => 'ouvrier';
+  ui.nodes = { commands: { innerHTML: '', querySelectorAll: () => [] } };
+  const boutons = () => { ui.renderCommands([fondation]); return ui.commandButtons.map((b) => b.label + (b.danger ? ' (danger)' : '')).join(', '); };
+  const arme = boutons(), signatureArmee = ui.commandSignature([fondation]);
+  if (jeu.demolitionArmee) jeu.demolitionArmee.jusqua = performance.now() - 1;
+  const desarme = boutons();
+  check('… le bouton « Annuler » devient « Confirmer », puis redevient « Annuler » une fois le délai passé',
+    arme === '+1 ouvrier, Confirmer (danger)' && desarme === '+1 ouvrier, Annuler' && signatureArmee !== ui.commandSignature([fondation])
+    && ui.nodes.commands.innerHTML.includes('Annuler'), `${arme} → ${desarme}`);
+
+  jeu.cancelConstruction(fondation);
+  jeu.cancelConstruction(fondation);
+  w.update(DT);
+  check('… un second appui dans le délai annule, rembourse, et c’est la défaite', fondation.dead && !!w.gameOver && w.gameOver.victory === false
+    && w.players[0].resources.wood === bois + BUILDING_TYPES.towncenter.cost.wood && jeu.dernier().texte.includes('Chantier annulé'));
+
+  const clavier = dernierChantier();
+  const jeuC = fauxJeu(clavier.w, [clavier.fondation]);
+  jeuC.deleteSelected();
+  clavier.w.update(DT);
+  check('… la touche Suppr passe par le même garde-fou', !clavier.fondation.dead && !clavier.w.gameOver && jeuC.dernier().genre === 'error'
+    && jeuC.selection[0] === clavier.fondation);
+
+  // Un chantier ordinaire s'annule toujours d'un appui, sans bouton rouge.
+  const o = monde({ seed: 91, mode: 'classique' });
+  const maison = batir(o, 0, 'house', false);
+  const jeuO = fauxJeu(o, [maison]);
+  jeuO.hasSpareWorker = () => true;
+  jeuO.ouvrier = () => 'ouvrier';
+  ui.world = o;
+  ui.game = jeuO;
+  ui.renderCommands([maison]);
+  const ordinaire = ui.commandButtons.map((b) => b.label + (b.danger ? ' (danger)' : '')).join(', ');
+  jeuO.cancelConstruction(maison);
+  check('un chantier ordinaire s’annule d’un appui, comme avant', ordinaire === '+1 ouvrier, Annuler' && maison.dead
+    && jeuO.dernier().texte.includes('Chantier annulé') && jeuO.dernier().genre === 'info');
 }
 
 console.log(`\n${failures === 0 ? '✅ Tous les tests passent' : '❌ ' + failures + ' test(s) en échec'}`);

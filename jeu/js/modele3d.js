@@ -341,6 +341,10 @@ export function marqueFichier(entetes) {
 /** L'empreinte retenue pour ce fichier si le serveur dit qu'il n'a pas changé ; sinon null : il faut le relire. */
 async function empreinteRetenue(src) {
   if (empreintesVues.has(src)) return empreintesVues.get(src);
+  // Jeu installé : le service worker sert le fichier depuis son cache sans
+  // attendre le réseau, alors qu'une demande d'en-têtes y partirait toujours
+  // (jusqu'à deux secondes de dessin de repli sur un réseau accroché).
+  if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.controller) return null;
   try {
     const connu = JSON.parse(localStorage.getItem(EMPREINTES_KEY) || '{}')[src];
     if (!connu || !connu.marque || !connu.empreinte) return null;
