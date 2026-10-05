@@ -446,28 +446,34 @@ essai('tour vide', () => {
 // temps, aucune vague, 13 à 15 pertes, l'IA gagnait au score. Avec les
 // premiers réglages seuls : ses ouvriers marchaient sous la tour — 20 et 28
 // pertes sur ces deux graines — et le joueur passif gagnait la partie au score.)
+// (`d` : la distance de la tour au centre adverse, en cases ; `occupants` : les
+// ouvriers qui la bâtissent et s'y abritent.)
+const partieTourExpress = (seed, { d = 11, niveau = 'normal', occupants = 2 } = {}) => {
+  const w = new World({ seed, mode: 'express', difficulty: niveau });
+  const ai = w.ais[0];
+  const moi = centre(w, 0);
+  const e = emplacementTour(w, d, 'devant');
+  const pied = { x: (e.tx + 1) * TILE, y: (e.ty + 1) * TILE };
+  const equipe = ouvriers(w, 0).slice(0, occupants);
+  for (const v of equipe) v.moveTo(pied.x - TILE * 2, pied.y);
+  let tour = null, habitee = null, secondes = 0, alerte = 0, pas = 0;
+  jouer(w, 11 * 60, () => {
+    const vivants = equipe.filter((v) => !v.dead);
+    if (!tour && vivants.some((v) => Math.hypot(v.x - pied.x, v.y - pied.y) < TILE * 4)) tour = w.placeBuilding(0, 'tower', e.tx, e.ty, vivants);
+    if (tour && tour.complete && habitee === null) {
+      if (tour.garrison.length > 0) habitee = w.time; else for (const v of vivants) if (!v.garrisonedIn && v.state !== 'garrison') v.garrisonAt(tour);
+    }
+    if (++pas % TICKS_PER_SECOND === 0) { secondes++; if (w.time < ai.defendUntil) alerte++; }
+    w.drainEvents();
+  });
+  return { habitee, alerte: alerte / secondes, vagues: ai.waveCount, pertes: w.players[1].stats.lost,
+    centre: moi.dead ? 0 : Math.round(moi.hp), dedans: tour ? tour.garrison.length : 0,
+    fin: w.gameOver ? w.time : null, vainqueur: w.gameOver ? w.gameOver.winner : null, scores: w.players.map((p) => Math.round(w.score(p))) };
+};
+const issue = (p) => (p.fin === null ? 'partie en cours' : `${p.vainqueur === 1 ? 'IA' : 'joueur'} à ${mmss(p.fin)} (${p.scores.join(' contre ')})`);
+
 essai('Express, la tour bâtie par le joueur', () => {
-  const partie = (seed) => {
-    const w = new World({ seed, mode: 'express', difficulty: 'normal' });
-    const ai = w.ais[0];
-    const e = emplacementTour(w, 11, 'devant');
-    const pied = { x: (e.tx + 1) * TILE, y: (e.ty + 1) * TILE };
-    const equipe = ouvriers(w, 0).slice(0, 2);
-    for (const v of equipe) v.moveTo(pied.x - TILE * 2, pied.y);
-    let tour = null, habitee = null, secondes = 0, alerte = 0, pas = 0;
-    jouer(w, 11 * 60, () => {
-      const vivants = equipe.filter((v) => !v.dead);
-      if (!tour && vivants.some((v) => Math.hypot(v.x - pied.x, v.y - pied.y) < TILE * 4)) tour = w.placeBuilding(0, 'tower', e.tx, e.ty, vivants);
-      if (tour && tour.complete && habitee === null) {
-        if (tour.garrison.length > 0) habitee = w.time; else for (const v of vivants) if (!v.garrisonedIn && v.state !== 'garrison') v.garrisonAt(tour);
-      }
-      if (++pas % TICKS_PER_SECOND === 0) { secondes++; if (w.time < ai.defendUntil) alerte++; }
-      w.drainEvents();
-    });
-    return { habitee, alerte: alerte / secondes, vagues: ai.waveCount, pertes: w.players[1].stats.lost,
-      fin: w.gameOver ? w.time : null, vainqueur: w.gameOver ? w.gameOver.winner : null, scores: w.players.map((p) => Math.round(w.score(p))) };
-  };
-  const parties = [2024, 7].map(partie);
+  const parties = [2024, 7].map((seed) => partieTourExpress(seed));
   const liste = (f) => parties.map(f).join(', ');
   check('Express : la tour du joueur est debout et habitée avant 1:30, à onze cases du centre adverse',
     parties.every((p) => p.habitee !== null && p.habitee < 90), `habitée à ${liste((p) => mmss(p.habitee))}`);
@@ -476,7 +482,33 @@ essai('Express, la tour bâtie par le joueur', () => {
   check('… ses ouvriers ne vont pas se faire tuer sous la tour : six pertes au plus de toute la partie',
     parties.every((p) => p.pertes <= 6), `pertes de l’IA : ${liste((p) => p.pertes)}`);
   check('… et le joueur qui ne fait rien d’autre ne gagne pas : l’IA l’emporte',
-    parties.every((p) => p.vainqueur === 1), liste((p) => (p.fin === null ? 'partie en cours' : `${p.vainqueur === 1 ? 'IA' : 'joueur'} à ${mmss(p.fin)} (${p.scores.join(' contre ')})`)));
+    parties.every((p) => p.vainqueur === 1), liste(issue));
+});
+
+// La même tour là où elle tient davantage que le terrain autour d'elle.
+// Graine 25, à dix cases : la cour où sortent ses ouvriers n'a d'issue que
+// sous les flèches. (Avant : quatorze ouvriers neufs et dix archers tués en
+// sortant, 25 pertes, et le joueur passif gagnait au score, 3790 contre 3367.)
+// Graine 58 : la sortie de son camp de tir est sous les flèches. (Avant :
+// quatorze archers abattus à peine formés, 15 pertes, le centre du joueur
+// intact.)
+// Graine 22 : la tour tient le seul passage entre les deux bases. (Avant :
+// ses vagues y passaient trois soldats après trois soldats, 17 pertes, sans
+// rien frapper. De même graine 63 en Facile, quatre ouvriers dans la tour :
+// 19 pertes, et le joueur passif gagnait, 3470 contre 3023.)
+essai('Express, la tour qui tient la sortie', () => {
+  const cour = partieTourExpress(25, { d: 10 });
+  check('Express, tour à dix cases devant la cour de son centre (graine 25) : ses ouvriers et ses archers sortent hors des flèches, l’IA l’emporte',
+    cour.habitee !== null && cour.pertes <= 6 && cour.vainqueur === 1, `${cour.pertes} perte(s) pour l’IA ; ${issue(cour)}`);
+  const camp = partieTourExpress(58);
+  check('Express, tour qui bat la sortie de son camp de tir (graine 58) : ses archers ne tombent plus en sortant, elle rase le centre du joueur',
+    camp.habitee !== null && camp.pertes <= 6 && camp.centre === 0, `${camp.pertes} perte(s) pour l’IA ; ${issue(camp)}`);
+  const goulet = partieTourExpress(22);
+  check('Express, tour qui tient le seul passage (graine 22) : ses vagues ne vont plus y mourir, et le joueur passif ne gagne pas',
+    goulet.habitee !== null && goulet.pertes <= 6 && goulet.vainqueur === 1, `${goulet.pertes} perte(s) pour l’IA, ${goulet.vagues} vague(s) ; ${issue(goulet)}`);
+  const facile = partieTourExpress(63, { niveau: 'easy', occupants: 4 });
+  check('… de même en Facile, quatre ouvriers dans la tour (graine 63)',
+    facile.dedans === 4 && facile.pertes <= 6 && facile.vainqueur === 1, `${facile.pertes} perte(s) pour l’IA, ${facile.vagues} vague(s) ; ${issue(facile)}`);
 });
 
 // L'assaut du bâtiment qui tire : pas sans de quoi l'abattre, et sans s'y user.

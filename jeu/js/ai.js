@@ -188,8 +188,9 @@ export class AIPlayer {
    * avec un de ses ouvriers à portée. Relevés une fois, ils le restent tant
    * qu'ils tiennent debout et qu'ils tirent. Autour de chacun, ses unités
    * évitent le terrain : le relevé par case est posé sur le joueur
-   * (zoneEvitee), où le monde le consulte pour les chemins, les gisements et
-   * les dépôts ; ici, pour les chantiers, les fermes et le camp. Avant, hors
+   * (zoneEvitee), où le monde le consulte pour les chemins, les gisements,
+   * les dépôts et la sortie des bâtiments (voir Building.spawnPoint) ; ici,
+   * pour les chantiers, les fermes, le camp et les vagues. Avant, hors
    * alerte, les ouvriers retournaient un par un sous la tour — quarante-sept
    * morts dans une partie, plus de nourriture, et jamais de quoi donner
    * l'assaut — et les soldats au repos s'y faisaient abattre sans bouger.
@@ -778,9 +779,22 @@ export class AIPlayer {
     // les soldats présents au camp, le reste de l'armée garde la base.
     const comptee = !!this.difficulty.petitesVagues;
     const prets = comptee ? this.troupesAuCamp() : this.army;
-    if (this.attackTimer <= 0 && this.world.time >= this.treve && prets.length >= this.armyTarget) {
-      const vague = comptee ? prets.slice(0, this.armyTarget) : prets;
-      const target = this.pickAttackTarget(vague);
+    let attente = this.attackTimer > 0 || this.world.time < this.treve || prets.length < this.armyTarget;
+    if (!attente) {
+      let vague = comptee ? prets.slice(0, this.armyTarget) : prets;
+      let target = this.pickAttackTarget(vague);
+      // Pas d'autre chemin que sous les flèches d'un bâtiment relevé : la
+      // vague ne part que si elle y laisse un tiers des siens au plus (voir
+      // pertesEnChemin) — comptée, elle en prend autant qu'il faut. D'ici là
+      // elle grossit au camp. Avant, trois soldats après trois soldats, toute
+      // l'armée tombait en route sans rien frapper. (Une cible elle-même sous
+      // les flèches relève de pickAttackTarget : on n'y va qu'en dernier.)
+      const pertes = target && this.niveauZone(target.x, target.y) < 2 ? this.pertesEnChemin(target) : 0;
+      if (pertes > 0) {
+        const camp = this.troupesAuCamp();
+        if (pertes * 3 > camp.length) { target = null; attente = true; }
+        else if (comptee) vague = camp.slice(0, Math.max(this.armyTarget, pertes * 3));
+      }
       if (target) {
         this.waveCount++;
         // (Lancée sur un bâtiment qui tire, la vague lui compte pour un assaut : voir pickAttackTarget.)
@@ -806,7 +820,8 @@ export class AIPlayer {
           this.world.formationMove(vague, target.x, target.y, true);
         }
       }
-    } else if (this.army.length > 0) {
+    }
+    if (attente && this.army.length > 0) {
       // Regroupement défensif autour du Centre-Ville. Seules les troupes au
       // repos passent en défensif : changer d'attitude recale le poste de garde
       // sur la position courante, et une vague en marche, ramenée ainsi à son
@@ -1119,6 +1134,75 @@ export class AIPlayer {
       total += frappe * Math.max(0, Math.min(t, utile) - approche);
     }
     return total;
+  }
+
+  /**
+   * Ce que la troupe du camp laisserait de soldats en marchant sur `cible`,
+   * quand son chemin — celui que le jeu lui calculera, qui fait le tour des
+   * zones s'il y a un tour à faire (voir World.processPathQueue) — passe sous
+   * les flèches d'un bâtiment relevé (voir releverZones). Compté au pire :
+   * chaque fois qu'il peut tirer, il prend, de ceux qui sont à sa portée,
+   * celui qu'il abat le plus vite — s'il en est un qu'il abat avant sa sortie.
+   */
+  pertesEnChemin(cible) {
+    const cout = this.player.zoneEvitee, tc = this.townCenter;
+    const soldats = this.troupesAuCamp().filter((u) => !u.def.heal);
+    if (!cout || soldats.length === 0) return 0;
+    const world = this.world;
+    // Le chemin du soldat le plus proche du centre : les autres le rejoignent.
+    let guide = soldats[0];
+    for (const u of soldats) if (dist2(u.x, u.y, tc.x, tc.y) < dist2(guide.x, guide.y, tc.x, tc.y)) guide = u;
+    const rect = cible.kind === 'building'
+      ? { x0: cible.tx, y0: cible.ty, x1: cible.tx + cible.size - 1, y1: cible.ty + cible.size - 1 } : null;
+    const chemin = world.pathfinder.find(Math.floor(guide.x / TILE), Math.floor(guide.y / TILE),
+      Math.floor(cible.x / TILE), Math.floor(cible.y / TILE), { rect, adjacent: !rect, smooth: false, cout }) || [];
+    const tombes = new Set();
+    for (const z of this.zones) {
+      const b = world.byId.get(z.id);
+      const court = (z.portee + ZONE_BATTUE * TILE) ** 2;
+      const battue = (c) => dist2(c.tx * TILE + TILE / 2, c.ty * TILE + TILE / 2, z.x, z.y) <= court;
+      const entree = chemin.findIndex(battue);
+      const fleches = b && !b.dead ? b.arrowCount() : 0;
+      if (fleches <= 0 || entree < 0) continue;
+      // La traversée : de la première à la dernière case battue du chemin —
+      // sans fin s'il s'arrête là, faute de passage (il mène alors au plus près).
+      let longueur = TILE;
+      for (let k = entree + 1, d = 0; k < chemin.length; k++) {
+        d += Math.hypot(chemin[k].tx - chemin[k - 1].tx, chemin[k].ty - chemin[k - 1].ty) * TILE;
+        if (battue(chemin[k])) longueur = TILE + d;
+      }
+      if (battue(chemin[chemin.length - 1])) longueur = Infinity;
+      // Chacun y entre à son heure (on marche en file, à une case d'écart), en
+      // sort, et tombe en tant de salves.
+      const cadence = b.def.attackSpeed;
+      const file = soldats.filter((u) => !tombes.has(u)).map((u) => ({
+        u, v: u.def.speed * TILE,
+        entre: (Math.hypot(u.x - guide.x, u.y - guide.y) + entree * TILE) / (u.def.speed * TILE),
+        salves: Math.ceil(u.hp / (fleches * computeDamage(b.def, b.player, u))),
+      })).sort((p, q) => p.entre - q.entre);
+      file.forEach((r, k) => {
+        if (k > 0) r.entre = Math.max(r.entre, file[k - 1].entre + TILE / r.v);
+        r.sort = r.entre + longueur / r.v;
+      });
+      // `t` : l'heure où le bâtiment peut tirer de nouveau — pas avant d'en
+      // avoir fini avec le bâtiment de la base qu'il vise (voir occupeEncore).
+      for (let t = this.occupeEncore(b); ;) {
+        const presents = file.filter((r) => !tombes.has(r.u) && r.entre <= t && t < r.sort);
+        if (presents.length === 0) {
+          const suivant = file.find((r) => r.entre > t);
+          if (!suivant) break;
+          t = suivant.entre;
+          continue;
+        }
+        let pris = null;
+        for (const r of presents) {
+          if (t + (r.salves - 1) * cadence <= r.sort && (!pris || r.salves < pris.salves)) pris = r;
+        }
+        if (pris) tombes.add(pris.u);
+        t += (pris ? pris.salves : 1) * cadence;
+      }
+    }
+    return tombes.size;
   }
 
   /** La cible de la vague `troupe` : un bâtiment adverse, à défaut une de ses unités. */

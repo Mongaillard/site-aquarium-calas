@@ -1604,11 +1604,23 @@ export class Building extends Entity {
   /** Point d'apparition des unités : juste sous le bâtiment, sur une case libre. */
   spawnPoint() {
     const map = this.world.map;
+    const milieu = Math.floor(this.size / 2);
     // Une case OUVERTE : la case libre la plus proche peut être une poche murée
     // par les bâtiments voisins, d'où l'unité formée — ou sortie de l'abri — ne
     // sortirait jamais.
-    const free = map.findOpenTile(this.tx + Math.floor(this.size / 2), this.ty + this.size, 8)
-      || map.findFreeTile(this.tx - 1, this.ty + this.size, 10);
+    let free = map.findOpenTile(this.tx + milieu, this.ty + this.size, 8);
+    // Pour un camp qui a relevé les bâtiments ennemis qui tirent près de chez
+    // lui (voir World.zoneEvitee) : si cette sortie est sous leurs flèches, ou
+    // ne débouche que là, on sort par une autre case de son pourtour (ou une
+    // case plus loin) qui n'y est pas, s'il en est une. Sinon chaque troupe
+    // formée — chaque ouvrier, dans une cour dont la seule issue est battue —
+    // tombait en sortant, l'une après l'autre.
+    const evite = this.world.zoneEvitee(this.playerIndex);
+    const battue = evite && ((i) => evite[i] === 2);
+    if (battue && free && (battue(map.idx(free.tx, free.ty)) || map.floodSize(free.tx, free.ty, 40, battue) < 40)) {
+      free = map.findOpenTile(this.tx + milieu, this.ty + milieu, milieu + 2, 40, battue) || free;
+    }
+    free = free || map.findFreeTile(this.tx - 1, this.ty + this.size, 10);
     if (free) return { x: free.tx * TILE + TILE / 2, y: free.ty * TILE + TILE / 2 };
     return { x: this.x, y: this.y + this.radius + TILE };
   }
