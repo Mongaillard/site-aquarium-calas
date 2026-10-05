@@ -533,10 +533,13 @@ sa base est rasé par l'armée restée au camp dès qu'elle en a les moyens (il 
 dure deux minutes au plus, trois assauts par bâtiment et par âge, et une vague
 ne le prend pas pour cible tant qu'elle ne peut pas l'abattre ; ses troupes
 contournent la zone battue par la tour quand un détour existe. Limites connues :
-une tour habitée posée au cœur même de sa base (six à huit cases de son
-Centre-Ville) retarde encore sa première vague sur quelques emplacements ; une
-tour vide qui ne menace aucun de ses bâtiments peut rester debout. Tests : `node
-test/reglages-ia.test.js`.
+une tour habitée posée au cœur même de sa base (moins de dix cases de son
+Centre-Ville) retarde encore de trois à six minutes son âge ou sa première vague
+sur une partie des emplacements, et en Express une tour à deux ouvriers collée à
+son Centre-Ville (quatre à sept cases) peut encore le lui raser, faute de
+riposte ; une tour vide qui ne menace aucun de ses bâtiments peut rester debout.
+Une armée tombée nettement sous son plancher est complétée avant d'épargner pour
+l'âge suivant. Tests : `node test/reglages-ia.test.js`.
 
 ## Architecture
 
@@ -587,7 +590,7 @@ chemin sont mises en file avec un budget par tick pour éviter les à-coups.
 
 ```bash
 cd jeu
-npm test                  # sans écran : 800 vérifications en neuf fichiers — deux IA jouent 16 minutes, sauvegarde comprise, puis les réglages d'octobre (test/reglages-*.test.js)
+npm test                  # sans écran : 802 vérifications en neuf fichiers — deux IA jouent 16 minutes, sauvegarde comprise, puis les réglages d'octobre (test/reglages-*.test.js)
 npm run test:navigateur   # Chromium (Playwright) : 213 vérifications — chargement, gestes, rendu, images/s
 ```
 
