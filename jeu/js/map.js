@@ -391,8 +391,10 @@ export class GameMap {
    * au cœur d'une forêt est libre, parfois bordée de plusieurs cases libres,
    * mais sans issue ; ce critère-là ne s'y trompe pas. À défaut, la case libre
    * la plus proche.
+   * @param {(i:number)=>boolean} [mur] des cases libres à tenir pour des murs
+   *   (leur indice est donné) : ni choisies ni traversées. Alors, rien à défaut : null.
    */
-  findOpenTile(tx, ty, maxRadius = 8, seuil = 40) {
+  findOpenTile(tx, ty, maxRadius = 8, seuil = 40, mur = null) {
     tx = clamp(tx, 0, this.w - 1);
     ty = clamp(ty, 0, this.h - 1);
     for (let r = 0; r <= maxRadius; r++) {
@@ -400,15 +402,16 @@ export class GameMap {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const nx = tx + dx, ny = ty + dy;
-          if (this.inBounds(nx, ny) && !this.isBlocked(nx, ny) && this.floodSize(nx, ny, seuil) >= seuil) return { tx: nx, ty: ny };
+          if (!this.inBounds(nx, ny) || this.isBlocked(nx, ny) || (mur && mur(this.idx(nx, ny)))) continue;
+          if (this.floodSize(nx, ny, seuil, mur) >= seuil) return { tx: nx, ty: ny };
         }
       }
     }
-    return this.findFreeTile(tx, ty, maxRadius);
+    return mur ? null : this.findFreeTile(tx, ty, maxRadius);
   }
 
-  /** Nombre de cases atteignables depuis (tx, ty), compté jusqu'à `limite`. */
-  floodSize(tx, ty, limite) {
+  /** Nombre de cases atteignables depuis (tx, ty), compté jusqu'à `limite` — sans passer par les cases `mur` (voir findOpenTile). */
+  floodSize(tx, ty, limite, mur = null) {
     const { w, h } = this;
     const vus = new Set([ty * w + tx]);
     const file = [ty * w + tx];
@@ -420,7 +423,7 @@ export class GameMap {
           const nx = cx + dx, ny = cy + dy;
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
           const ni = ny * w + nx;
-          if (vus.has(ni) || this.blocked[ni]) continue;
+          if (vus.has(ni) || this.blocked[ni] || (mur && mur(ni))) continue;
           if (dx && dy && (this.blocked[cy * w + nx] || this.blocked[ny * w + cx])) continue;
           vus.add(ni); file.push(ni);
           if (vus.size >= limite) return vus.size;

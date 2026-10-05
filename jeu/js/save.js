@@ -111,6 +111,9 @@ function serializeUnit(u) {
     buildQueue: u.buildQueue.map(refId).filter((id) => id !== null),
     failedDropoffs: u.failedDropoffs ? [...u.failedDropoffs] : null,
     fleeUntil: u.fleeUntil, spawnTime: u.spawnTime,
+    // L'heure du dernier coup reçu : l'IA lève une alerte où plus personne ne
+    // se bat (voir alerteFondee) — oubliée, elle la levait en plein combat.
+    lastHitAt: u.lastHitAt,
     // Un animal : sa pâture et ses minuteries (voir Animal).
     animal: u.isAnimal ? { home: point(u.home), wanderTimer: u.wanderTimer, fleeTimer: u.fleeTimer, captureCooldown: u.captureCooldown } : null,
   };
@@ -136,7 +139,7 @@ function serializeBuilding(b) {
     garrison: b.garrison.map(refId).filter((id) => id !== null),
     target: refId(b.target),
     attackCooldown: b.attackCooldown, scanCooldown: b.scanCooldown,
-    createdAt: b.createdAt,
+    createdAt: b.createdAt, lastHitAt: b.lastHitAt,
   };
 }
 
@@ -149,6 +152,15 @@ function serializeAI(ai) {
     // Réserve pour le bâtiment voulu et commande d'unité chère en cours (voir ai.js).
     projet: ai.projet || null,
     commandeType: ai.commandeType || null, commandeDepuis: ai.commandeDepuis || 0, commandeAvance: ai.commandeAvance || 0,
+    // L'annonce du niveau Facile (une seule par partie), l'alerte bornée dans
+    // le temps et l'assaut d'un bâtiment qui tire (voir ai.js).
+    annonceFaite: !!ai.annonceFaite,
+    alerteDepuis: ai.alerteDepuis, repit: ai.repit,
+    assaut: ai.assaut ? { cible: ai.assaut.cible, fin: ai.assaut.fin } : null,
+    assauts: { ...ai.assauts }, assautsAge: ai.assautsAge,
+    // Les bâtiments ennemis qui tirent près de sa base : ses unités évitent
+    // leurs abords, et les chemins déjà demandés en dépendent.
+    zones: ai.zones.map((z) => ({ ...z })),
   };
 }
 
@@ -278,6 +290,7 @@ export function restoreWorld(data) {
     b.attackCooldown = saved.attackCooldown;
     b.scanCooldown = saved.scanCooldown;
     b.createdAt = saved.createdAt;
+    b.lastHitAt = saved.lastHitAt ?? -999;   // (absent des sauvegardes plus anciennes)
     paires.push([saved, b]);
   }
   for (const saved of data.units) {
@@ -320,6 +333,7 @@ export function restoreWorld(data) {
     u.failedDropoffs = saved.failedDropoffs ? new Set(saved.failedDropoffs) : null;
     u.fleeUntil = saved.fleeUntil;
     u.spawnTime = saved.spawnTime;
+    u.lastHitAt = saved.lastHitAt ?? -999;
     u.pathPending = !!saved.pathPending;
     u.pathRequest = saved.pathRequest ? { ...saved.pathRequest, rect: saved.pathRequest.rect ? { ...saved.pathRequest.rect } : null } : null;
     u.pathSeq = saved.pathSeq || 0;
@@ -405,6 +419,14 @@ export function restoreWorld(data) {
     ai.commandeType = saved.commandeType || null;
     ai.commandeDepuis = saved.commandeDepuis || 0;
     ai.commandeAvance = saved.commandeAvance || 0;
+    ai.annonceFaite = !!saved.annonceFaite;
+    ai.alerteDepuis = saved.alerteDepuis || 0;
+    ai.repit = saved.repit || 0;
+    ai.assaut = saved.assaut ? { cible: saved.assaut.cible, fin: saved.assaut.fin } : null;
+    ai.assauts = { ...(saved.assauts || {}) };
+    ai.assautsAge = saved.assautsAge || 0;
+    ai.zones = (saved.zones || []).map((z) => ({ ...z }));
+    ai.poserZones();
   }
 
   // 6. Terrain découvert, population, état dérivé.

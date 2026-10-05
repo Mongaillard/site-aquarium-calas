@@ -6,7 +6,7 @@
   "description": "Jeu de stratégie temps réel façon Age of Empires, jouable au doigt dans le navigateur.",
   "scripts": {
     "start": "npx --yes http-server . -p 8080 -c-1 -o /index.html",
-    "test": "node test/simulation.test.js && node test/reglages-bugs.test.js && node test/reglages-ordres.test.js && node test/reglages-alerte.test.js && node test/reglages-score.test.js && node test/reglages-memoire.test.js && node test/reglages-equilibre.test.js && node test/reglages-integration.test.js",
+    "test": "node test/simulation.test.js && node test/reglages-bugs.test.js && node test/reglages-ordres.test.js && node test/reglages-alerte.test.js && node test/reglages-score.test.js && node test/reglages-memoire.test.js && node test/reglages-equilibre.test.js && node test/reglages-integration.test.js && node test/reglages-ia.test.js",
     "test:navigateur": "node test/navigateur.test.mjs",
     "test:tout": "npm test && npm run test:navigateur"
   },
