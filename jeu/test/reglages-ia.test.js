@@ -406,6 +406,32 @@ essai('tour mal placée', () => {
     `tour rasée à ${mmss(rasee)} d’un côté, ${tourReprise.dead ? mmss(repris.time) : 'debout'} de l’autre`);
 });
 
+// Une tour au cœur de sa base : au milieu de ses ouvriers, à sept cases de son
+// centre (graine 99). Dépôts et fermes sont à rebâtir ailleurs, le bois manque :
+// elle arrive à l'Âge Féodal avec cinq soldats, un de moins qu'il n'en faut à
+// sa première vague, et rase la tour à 12:14. La vague suit. (Avant : plus un
+// soldat formé tant que l'Archerie et l'Écurie n'étaient pas bâties — première
+// vague à 17:49, cinq minutes et demie après la chute de la tour, avec 945
+// d'or et 659 de nourriture en caisse.)
+essai('tour au cœur de sa base', () => {
+  const w = new World({ seed: 99, mode: 'classique', difficulty: 'normal' });
+  const r = releve(w);
+  jouer(w, 7 * 60, r.pas);
+  const tour = tourHabitee(w, 6, 'ouvriers');
+  let rasee = null;
+  jouer(w, 14.5 * 60, () => {
+    r.pas();
+    if (tour.dead && rasee === null) rasee = w.time;
+    return rasee !== null && r.vagues.length > 0;
+  });
+  check('une tour habitée au milieu de ses ouvriers, à sept cases de son centre : elle passe à l’Âge Féodal et rase la tour (avant 13:00)',
+    r.ages.length > 0 && rasee !== null && rasee < 13 * 60,
+    `Âge Féodal à ${mmss(r.ages[0])}, tour ${rasee === null ? `à ${Math.round(tour.hp)}/${tour.maxHp}` : 'rasée à ' + mmss(rasee)}`);
+  check('… et sa première vague n’attend pas l’Archerie et l’Écurie : elle part dans les deux minutes',
+    r.vagues.length > 0 && rasee !== null && r.vagues[0].t < rasee + 120,
+    `première vague à ${mmss(r.vagues[0] && r.vagues[0].t)}, ${armee(w).length} soldat(s) à ${mmss(w.time)}`);
+});
+
 // Une tour vide. Près de ses ouvriers (graine 58), elle tire sur un bâtiment :
 // le camp la rase tant qu'elle est occupée. (Avant ces réglages : rasée à
 // 24:43 seulement, après 43 ouvriers et 19 soldats tués, Âge Féodal à 24:36.

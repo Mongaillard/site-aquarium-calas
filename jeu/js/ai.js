@@ -722,12 +722,20 @@ export class AIPlayer {
       const deborde = !!threat && this.intrus.length > this.army.length;
       // Hystérésis : une fois la moitié du coût réunie, on garde le cap même si
       // un soldat tombe. Sinon l'IA redépense sa cagnotte à deux doigts du but.
+      // Un soldat, pas deux : dégarnie (à deux soldats ou plus de son plancher),
+      // elle complète sa garnison avant de mettre de côté pour l'âge, et avant
+      // de garder le bois du bâtiment qu'il exige. Sinon, arrivée à l'Âge Féodal
+      // avec quatre ou cinq soldats — une tour du joueur au cœur de sa base lui
+      // avait coûté son bois —, elle n'en formait plus un seul avant d'avoir
+      // bâti l'Archerie et l'Écurie : Lancier et Archer coûtent du bois. Cinq
+      // minutes à un soldat de sa première vague, la nourriture et l'or en caisse.
+      const degarnie = this.army.length < armyFloor - 1;
       const saving = !deborde && this.ageTarget
-        && (this.savingForAge || this.army.length >= armyFloor)
+        && (this.army.length >= armyFloor || (this.savingForAge && !degarnie))
         ? this.ageTarget.cost : null;
       const affordable = Object.keys(def.cost).every((k) => {
         const keep = (k === 'wood' ? reserve : 0) + (saving && saving[k] ? saving[k] : 0)
-          + (projet && projet[k] ? projet[k] : 0)
+          + (projet && !(exige && degarnie) && projet[k] ? projet[k] : 0)
           + (pourCommande && !commandee && pourCommande[k] ? pourCommande[k] : 0);
         return player.resources[k] >= def.cost[k] + keep;
       });
