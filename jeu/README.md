@@ -326,8 +326,9 @@ vitesse de récolte de l'IA (×0,8, ×1, ×1,25), le nombre de ses villageois (1
 ses villageois selon des quotas par ressource, met de côté le coût du prochain
 âge, remplace ses fermes épuisées, défend sa base quand elle est attaquée et
 lance des vagues d'assaut de plus en plus grosses. Première offensive typique :
-9 à 11 minutes en Normal (7 min 30 s à 13 min en Facile, 8 min 45 s à
-10 min 30 s en Difficile) ; en Express, dès la deuxième minute. L'IA ne pose
+vers la dixième minute en Normal, un peu plus tôt en Difficile, jamais avant
+la quinzième en Facile ; en Express, dès la deuxième minute (4 min 30 s en
+Facile). L'IA ne pose
 jamais un bâtiment qui murerait un des siens ni qui couperait un passage.
 
 À l'Âge des Châteaux elle bâtit aussi un Temple et forme toutes les troupes du
@@ -509,6 +510,34 @@ annonce : une demande d'en-têtes remplace le téléchargement de 2 à 3 Mo, et 
 moindre doute le fichier est relu comme avant. Tests : `node
 test/reglages-memoire.test.js` (94 vérifications).
 
+**L'adversaire, niveau par niveau.** En Facile, l'adversaire laisse le temps
+d'apprendre : aucune vague avant 15:00 de jeu en Classique (4:30 en Express), un
+message une minute avant (« L’ennemi prépare une attaque : formez des soldats à
+la Caserne », au nom de la caserne de votre peuple), puis de petites vagues
+comptées — 3 soldats, puis 5, puis 7 — pendant que le reste de son armée garde
+sa base. La trêve tient quoi que fasse le joueur : s'il envoie son éclaireur
+voir la base adverse, l'adversaire le chasse de chez lui sans le suivre jusqu'à
+la sienne. Un joueur qui ne fait rien perd quand même, vers 20:30 en Classique
+et vers 9:45 en Express. Normal et Difficile gardent leurs heures, à la seconde
+près : première vague de six soldats vers la dixième minute en Classique, de
+trois soldats vers 1:20 en Express ; Difficile récolte davantage, ses vagues
+grossissent plus vite et, en Classique, il attaque un peu plus tôt. L'adversaire
+ne se laisse plus paralyser par une tour habitée posée près de chez lui : une
+troupe abritée n'est plus une menace ; une alerte où personne ne porte ni ne
+reçoit de coup est levée au bout de 45 secondes, pour deux minutes, et les
+ouvriers abrités ressortent ; l'épargne pour l'âge suivant tient pendant
+l'alerte, sauf tant que l'ennemi a plus de troupes dans sa base qu'il n'a de
+soldats ; l'état d'alerte est gardé par la sauvegarde. Un bâtiment qui tire sur
+sa base est rasé par l'armée restée au camp dès qu'elle en a les moyens (il faut
+14 miliciens ou 6 champions contre une tour qui abrite un ouvrier) : un assaut
+dure deux minutes au plus, trois assauts par bâtiment et par âge, et une vague
+ne le prend pas pour cible tant qu'elle ne peut pas l'abattre ; ses troupes
+contournent la zone battue par la tour quand un détour existe. Limites connues :
+une tour habitée posée au cœur même de sa base (six à huit cases de son
+Centre-Ville) retarde encore sa première vague sur quelques emplacements ; une
+tour vide qui ne menace aucun de ses bâtiments peut rester debout. Tests : `node
+test/reglages-ia.test.js`.
+
 ## Architecture
 
 ```
@@ -558,7 +587,7 @@ chemin sont mises en file avec un budget par tick pour éviter les à-coups.
 
 ```bash
 cd jeu
-npm test                  # sans écran : 725 vérifications en huit fichiers — deux IA jouent 16 minutes, sauvegarde comprise, puis les réglages d'octobre (test/reglages-*.test.js)
+npm test                  # sans écran : 800 vérifications en neuf fichiers — deux IA jouent 16 minutes, sauvegarde comprise, puis les réglages d'octobre (test/reglages-*.test.js)
 npm run test:navigateur   # Chromium (Playwright) : 213 vérifications — chargement, gestes, rendu, images/s
 ```
 
