@@ -558,7 +558,7 @@ chemin sont mises en file avec un budget par tick pour éviter les à-coups.
 
 ```bash
 cd jeu
-npm test                  # simulation headless : 206 vérifications — deux IA jouent 16 minutes, sauvegarde comprise
+npm test                  # sans écran : 725 vérifications en huit fichiers — deux IA jouent 16 minutes, sauvegarde comprise, puis les réglages d'octobre (test/reglages-*.test.js)
 npm run test:navigateur   # Chromium (Playwright) : 213 vérifications — chargement, gestes, rendu, images/s
 ```
 
