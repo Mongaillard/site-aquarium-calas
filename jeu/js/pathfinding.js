@@ -10,6 +10,11 @@ import { TILE } from './config.js';
 
 const STRAIGHT = 10;
 const DIAGONAL = 14;
+/**
+ * Ce que coûte en plus d'entrer dans une case à éviter, par niveau du relevé
+ * `cout` (1 : à éviter, 2 : dangereuse) : quatre cases de détour, ou huit.
+ */
+const COUT_ZONE = 4 * STRAIGHT;
 
 export class PathFinder {
   constructor(map) {
@@ -34,13 +39,16 @@ export class PathFinder {
   /**
    * @param {number} sx,sy case de départ
    * @param {number} gx,gy case d'arrivée
-   * @param {{adjacent?:boolean, rect?:{x0:number,y0:number,x1:number,y1:number}, budget?:number, smooth?:boolean, passable?:(i:number)=>boolean}} opts
+   * @param {{adjacent?:boolean, rect?:{x0:number,y0:number,x1:number,y1:number}, budget?:number, smooth?:boolean, passable?:(i:number)=>boolean, cout?:Uint8Array}} opts
    *   adjacent : s'arrêter dès qu'on touche la case cible (cible bloquée : arbre, bâtiment…)
    *   rect : viser n'importe quelle case praticable au contact de ce rectangle
    *     (l'emprise d'un bâtiment, bornes comprises) — la plus proche PAR LE
    *     CHEMIN, pas à vol d'oiseau : une case du pourtour emmurée par des arbres
    *     ou d'autres bâtiments n'est jamais choisie si une autre est joignable
    *   smooth : false pour obtenir la suite complète des cases, sans lissage
+   *   cout : surcoût par case (0, 1 ou 2, voir COUT_ZONE) — des cases à éviter
+   *     sans les interdire : le chemin en fait le tour quand le détour reste
+   *     raisonnable, et les traverse au plus court sinon
    * @returns {{tx:number,ty:number}[] | null}
    */
   find(sx, sy, gx, gy, opts = {}) {
@@ -49,7 +57,9 @@ export class PathFinder {
     if (!map.inBounds(sx, sy) || !map.inBounds(gx, gy)) return null;
     const adjacent = !!opts.adjacent;
     const rect = opts.rect || null;
-    const budget = opts.budget || 6000;
+    const cout = opts.cout || null;
+    // (Avec des cases à éviter, la recherche s'étale : on lui laisse la carte entière.)
+    const budget = opts.budget || (cout ? w * h : 6000);
     const passable = opts.passable || ((i) => map.blocked[i] === 0);
     const smooth = opts.smooth !== false;
 
@@ -116,7 +126,7 @@ export class PathFinder {
             // interdiction de couper un angle entre deux obstacles
             if (!passable(cy * w + nx) || !passable(ny * w + cx)) continue;
           }
-          const tentative = gScore[current] + (diagonal ? DIAGONAL : STRAIGHT);
+          const tentative = gScore[current] + (diagonal ? DIAGONAL : STRAIGHT) + (cout ? cout[ni] * COUT_ZONE : 0);
           const seen = stamp[ni] === gen;
           if (seen && closed[ni] === 1) continue;
           if (!seen || tentative < gScore[ni]) {

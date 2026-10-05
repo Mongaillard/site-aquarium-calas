@@ -50,6 +50,11 @@ function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
     },
     // `destroyed` : le prix cumulé des troupes et bâtiments adverses abattus (voir detailScore).
     stats: { gathered: { food: 0, wood: 0, gold: 0 }, trained: 0, lost: 0, built: 0, killed: 0, destroyed: 0 },
+    // Les cases que ses unités évitent, une valeur par case (0 : libre, 1 : à
+    // éviter, 2 : battue par un bâtiment ennemi qui tire). Tenu par son IA
+    // (voir AIPlayer.releverZones) ; le joueur humain n'en a pas, ses unités
+    // vont où il les envoie.
+    zoneEvitee: null,
   };
 }
 
@@ -430,6 +435,8 @@ export class World {
       if (!unit || unit.dead || !unit.pathPending || !unit.pathRequest) continue;
       const req = unit.pathRequest;
       processed++;
+      // Les cases que son camp évite (voir makePlayer) : le chemin en fait le tour.
+      const cout = this.zoneEvitee(unit.playerIndex);
       const sx = Math.floor(unit.x / TILE);
       const sy = Math.floor(unit.y / TILE);
       if (req.rect) {
@@ -438,7 +445,7 @@ export class World {
         const r = req.rect;
         const gxr = clamp(Math.floor(req.x / TILE), r.x0, r.x1);
         const gyr = clamp(Math.floor(req.y / TILE), r.y0, r.y1);
-        unit.setPath(this.pathfinder.find(sx, sy, gxr, gyr, { rect: r, smooth: false }) || []);
+        unit.setPath(this.pathfinder.find(sx, sy, gxr, gyr, { rect: r, smooth: false, cout }) || []);
         continue;
       }
       let gx = clamp(Math.floor(req.x / TILE), 0, this.map.w - 1);
@@ -453,10 +460,10 @@ export class World {
         gx = free.tx; gy = free.ty; adjacent = false;
       }
       // Chemin complet, sans lissage : l'unité lisse elle-même en marchant.
-      let path = this.pathfinder.find(sx, sy, gx, gy, { adjacent, smooth: false });
+      let path = this.pathfinder.find(sx, sy, gx, gy, { adjacent, smooth: false, cout });
       if (!path && !adjacent) {
         const free = this.map.findFreeTile(gx, gy, 6);
-        if (free) path = this.pathfinder.find(sx, sy, free.tx, free.ty, { smooth: false });
+        if (free) path = this.pathfinder.find(sx, sy, free.tx, free.ty, { smooth: false, cout });
       }
       unit.setPath(path || []);
     }
@@ -465,6 +472,27 @@ export class World {
 
 
   // --- Voisinage et recherche -----------------------------------------------
+
+  /** Le relevé des cases que ce camp évite (voir makePlayer), ou null. */
+  zoneEvitee(playerIndex) {
+    const player = this.players[playerIndex];
+    return (player && player.zoneEvitee) || null;
+  }
+
+  /**
+   * Ce segment ne passe-t-il par aucune case pire que `permis`, dans le
+   * relevé des cases à éviter ? (Son point de départ ne compte pas : on a le
+   * droit de sortir d'une zone.)
+   */
+  segmentHorsZone(evite, x0, y0, x1, y1, permis) {
+    const map = this.map;
+    const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / (TILE / 2));
+    for (let k = 2; k <= n; k++) {
+      const tx = Math.floor((x0 + ((x1 - x0) * k) / n) / TILE), ty = Math.floor((y0 + ((y1 - y0) * k) / n) / TILE);
+      if (map.inBounds(tx, ty) && evite[map.idx(tx, ty)] > permis) return false;
+    }
+    return true;
+  }
 
   separationForce(unit) {
     let fx = 0, fy = 0;
@@ -484,11 +512,25 @@ export class World {
     return { x: fx * 0.85, y: fy * 0.85 };
   }
 
+  /**
+   * Ce bâtiment est-il planté dans une zone que ce camp tient pour battue
+   * (voir zoneEvitee) ? Ses troupes ne s'en prennent pas à lui d'elles-mêmes,
+   * ni pour l'attaquer ni pour lui rendre ses flèches : c'est son IA qui
+   * décide de l'assaut. Sinon chaque soldat qui passait en vue d'une tour
+   * habitée, ou qu'elle touchait au camp, allait s'y faire tuer, un par un.
+   */
+  laisseALAssaut(playerIndex, other) {
+    const evite = other.kind === 'building' ? this.zoneEvitee(playerIndex) : null;
+    return !!evite && evite[this.map.idx(Math.floor(other.x / TILE), Math.floor(other.y / TILE))] === 2;
+  }
+
   findEnemyNear(entity, radius) {
+    const troupe = entity.kind === 'unit';
     let best = null, bestScore = Infinity;
     this.grid.forEachNear(entity.x, entity.y, radius, (other) => {
       if (other.dead || other.playerIndex === entity.playerIndex || other.isAnimal) return;
       if (other.kind === 'building' && !other.complete && other.hp <= 1) return;
+      if (troupe && this.laisseALAssaut(entity.playerIndex, other)) return;
       const d = entity.kind === 'building' || other.kind === 'building'
         ? Math.max(entity.edgeDistanceTo(other.x, other.y), other.edgeDistanceTo(entity.x, entity.y))
         : dist(entity.x, entity.y, other.x, other.y);
@@ -523,26 +565,50 @@ export class World {
    *   ne doit pas priver tous les autres de leur dépôt.
    */
   findNearestDropoff(unit, resType, exclude) {
-    let best = null, bestD = Infinity;
+    // Un dépôt battu par un bâtiment ennemi (voir batimentBattu) ne sert que
+    // s'il n'en reste pas d'autre : on n'y porte pas son chargement sous les flèches.
+    let best = null, bestD = Infinity, battu = null, battuD = Infinity;
     for (const b of this.buildings) {
       if (b.dead || b.playerIndex !== unit.playerIndex || !b.complete) continue;
       if (exclude && exclude.has(b.id)) continue;
       if (!b.def.dropoff || !b.def.dropoff.includes(resType)) continue;
       const d = dist2(unit.x, unit.y, b.x, b.y);
-      if (d < bestD) { bestD = d; best = b; }
+      if (this.batimentBattu(b)) {
+        if (d < battuD) { battuD = d; battu = b; }
+      } else if (d < bestD) { bestD = d; best = b; }
     }
-    return best;
+    return best || battu;
+  }
+
+  /**
+   * Ce bâtiment a-t-il une case de son pourtour sous les flèches d'un bâtiment
+   * ennemi, d'après le relevé de son camp (voir zoneEvitee) ? On ne s'en
+   * approche alors qu'à ses risques.
+   */
+  batimentBattu(b) {
+    const evite = this.zoneEvitee(b.playerIndex);
+    if (!evite) return false;
+    const map = this.map;
+    for (let y = b.ty - 1; y <= b.ty + b.size; y++) {
+      for (let x = b.tx - 1; x <= b.tx + b.size; x++) {
+        if (map.inBounds(x, y) && evite[map.idx(x, y)] === 2) return true;
+      }
+    }
+    return false;
   }
 
   /** Gisement le plus proche : case de ressource ou ferme alliée pour la nourriture. */
   findNearestResource(x, y, type, maxRadius, playerIndex) {
     const map = this.map;
+    // Ni gisement ni ferme dans les cases que ce camp évite (voir zoneEvitee).
+    const evite = this.zoneEvitee(playerIndex);
     // Plusieurs passes : si le meilleur gisement s'avère enclavé, on le marque
     // et on relance la recherche sans lui.
     for (let attempt = 0; attempt < 4; attempt++) {
       let best = null, bestD = maxRadius * maxRadius;
       for (const res of map.resources.values()) {
         if (res.type !== type || res.inaccessible) continue;
+        if (evite && evite[map.idx(res.tx, res.ty)]) continue;
         const d = dist2(x, y, res.tx * TILE + TILE / 2, res.ty * TILE + TILE / 2);
         if (d < bestD) { bestD = d; best = res; }
       }
@@ -550,6 +616,7 @@ export class World {
         for (const b of this.buildings) {
           if (b.dead || b.type !== 'farm' || b.playerIndex !== playerIndex || !b.complete) continue;
           if (b.foodLeft <= 0 || b.gatherUnreachable) continue;
+          if (evite && evite[map.idx(Math.floor(b.x / TILE), Math.floor(b.y / TILE))]) continue;
           const d = dist2(x, y, b.x, b.y);
           if (d < bestD) { bestD = d; best = b; }
         }
@@ -739,9 +806,11 @@ export class World {
     // Riposte : une unité inoccupée rend les coups, sauf attitude « sans
     // attaque ». Les villageois ne se défendent que contre d'autres villageois
     // (comme dans AoE : face à un soldat, mieux vaut fuir ou se réfugier).
+    // (Et pas contre un bâtiment que son camp réserve à l'assaut.)
     if (entity.kind === 'unit' && source && !source.dead && !entity.garrisonedIn
         && entity.stance !== 'passive' && !entity.def.heal
-        && (entity.state === STATE.IDLE || (entity.state === STATE.MOVE && !entity.destination))) {
+        && (entity.state === STATE.IDLE || (entity.state === STATE.MOVE && !entity.destination))
+        && !this.laisseALAssaut(entity.playerIndex, source)) {
       entity.attackEntity(source, true);
     } else if (entity.kind === 'unit' && entity.isVillager && source && !source.dead
         && source.kind === 'unit' && source.isVillager && entity.state === STATE.IDLE) {

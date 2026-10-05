@@ -44,12 +44,22 @@ const ALERTE_REPIT = 120;
 /**
  * L'assaut d'un bâtiment ennemi qui tire sur la base (voir assiegerBatimentArme) :
  * la marge exigée sur les dégâts promis avant de partir, sa durée au plus (en
- * secondes), et combien on en donne par bâtiment et par âge.
+ * secondes), et combien on en donne par bâtiment et par âge — vagues lancées
+ * sur lui comprises.
  */
 const ASSAUT_MARGE = 1.15;
 const ASSAUT_DUREE = 120;
 const ASSAUT_MARCHE = 30;   // dont le trajet du camp jusqu'au pied du mur
+const ASSAUT_LONG = 240;    // sa durée au plus quand le bâtiment est occupé ailleurs (voir occupeEncore)
 const ASSAUTS_MAX = 3;
+/**
+ * Autour d'un bâtiment ennemi qui tire près de la base (voir releverZones), en
+ * cases au-delà de sa portée : à moins de ZONE_BATTUE on est sous ses flèches ;
+ * à moins de ZONE_EVITEE on ne prend ni poste ni chantier, et les chemins font
+ * le tour (la marge couvre les angles que coupe une unité en marche).
+ */
+const ZONE_BATTUE = 1.5;
+const ZONE_EVITEE = 3;
 
 export class AIPlayer {
   constructor(world, playerIndex, difficulty) {
@@ -79,6 +89,8 @@ export class AIPlayer {
     this.assaut = null;
     this.assauts = {};
     this.assautsAge = 0;
+    // Bâtiments ennemis qui tirent près de la base : { id, x, y, portee } (voir releverZones).
+    this.zones = [];
     this.lastHouseAt = -99;
     this.compositionIndex = 0;
     this.badSpots = new Set();   // emplacements où un chantier s'est révélé inaccessible
@@ -133,6 +145,88 @@ export class AIPlayer {
           .every((k) => player.resources[k] >= nextAge.cost[k] * 0.5);
       }
     }
+    this.releverZones();
+  }
+
+  /**
+   * Les bâtiments ennemis qui tirent près de la base — une tour, un
+   * Centre-Ville occupé — : à moins de treize cases d'un de ses bâtiments, ou
+   * avec un de ses ouvriers à portée. Relevés une fois, ils le restent tant
+   * qu'ils tiennent debout et qu'ils tirent. Autour de chacun, ses unités
+   * évitent le terrain : le relevé par case est posé sur le joueur
+   * (zoneEvitee), où le monde le consulte pour les chemins, les gisements et
+   * les dépôts ; ici, pour les chantiers, les fermes et le camp. Avant, hors
+   * alerte, les ouvriers retournaient un par un sous la tour — quarante-sept
+   * morts dans une partie, plus de nourriture, et jamais de quoi donner
+   * l'assaut — et les soldats au repos s'y faisaient abattre sans bouger.
+   * Les défenses que l'adversaire a chez lui n'en sont pas (voir chezLui) :
+   * là-bas, ses troupes doivent s'en prendre d'elles-mêmes à ce qu'elles
+   * trouvent, tours comprises — sinon elles ne raseraient plus rien.
+   */
+  releverZones() {
+    const zones = [];
+    for (const b of this.world.buildings) {
+      if (b.dead || b.playerIndex === this.index || !b.complete || b.arrowCount() <= 0) continue;
+      const portee = b.rangePx();
+      if (!this.zones.some((z) => z.id === b.id)) {
+        if (this.chezLui(b)) continue;
+        // La même mesure que le tir du bâtiment (voir World.findEnemyNear).
+        const vise = (e) => Math.max(b.edgeDistanceTo(e.x, e.y), e.edgeDistanceTo(b.x, b.y)) <= portee;
+        if (!this.presDeLaBase(b) && !this.villagers.some((v) => !v.garrisonedIn && vise(v))) continue;
+      }
+      zones.push({ id: b.id, x: b.x, y: b.y, portee });
+    }
+    const change = zones.length !== this.zones.length
+      || zones.some((z, i) => z.id !== this.zones[i].id || z.portee !== this.zones[i].portee);
+    this.zones = zones;
+    if (change) this.poserZones();
+  }
+
+  /** Dans la base : à moins de treize cases d'un de ses bâtiments (la mesure de findThreat) ? */
+  presDeLaBase(e) {
+    return this.buildings.some((m) => dist2(m.x, m.y, e.x, e.y) < (TILE * 13) ** 2);
+  }
+
+  /**
+   * Ce bâtiment ennemi est-il chez son propriétaire : plus près d'un de ses
+   * Centres-Villes que du sien ? (Sans Centre-Ville à soi, tout est chez lui.)
+   */
+  chezLui(b) {
+    const tc = this.townCenter;
+    if (!tc) return true;
+    const d = dist2(b.x, b.y, tc.x, tc.y);
+    return this.world.buildings.some((m) => !m.dead && m.type === 'towncenter'
+      && m.playerIndex === b.playerIndex && dist2(b.x, b.y, m.x, m.y) < d);
+  }
+
+  /** Pose sur le joueur le relevé par case des zones (voir releverZones) : 2 sous les flèches, 1 à éviter. */
+  poserZones() {
+    if (this.zones.length === 0) { this.player.zoneEvitee = null; return; }
+    const map = this.world.map;
+    const cases = new Uint8Array(map.w * map.h);
+    for (const z of this.zones) {
+      const large = z.portee + ZONE_EVITEE * TILE, court = z.portee + ZONE_BATTUE * TILE;
+      const x0 = Math.max(0, Math.floor((z.x - large) / TILE)), x1 = Math.min(map.w - 1, Math.floor((z.x + large) / TILE));
+      const y0 = Math.max(0, Math.floor((z.y - large) / TILE)), y1 = Math.min(map.h - 1, Math.floor((z.y + large) / TILE));
+      for (let ty = y0; ty <= y1; ty++) {
+        for (let tx = x0; tx <= x1; tx++) {
+          const d = dist2(tx * TILE + TILE / 2, ty * TILE + TILE / 2, z.x, z.y);
+          if (d > large * large) continue;
+          const i = map.idx(tx, ty);
+          cases[i] = Math.max(cases[i], d <= court * court ? 2 : 1);
+        }
+      }
+    }
+    this.player.zoneEvitee = cases;
+  }
+
+  /** Ce point est-il dans une zone à éviter (1), sous les flèches (2) ? 0 sinon. */
+  niveauZone(x, y) {
+    const cases = this.player.zoneEvitee;
+    if (!cases) return 0;
+    const map = this.world.map;
+    const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
+    return map.inBounds(tx, ty) ? cases[map.idx(tx, ty)] : 0;
   }
 
   has(type, min = 1) { return (this.counts[type] || 0) >= min; }
@@ -148,6 +242,8 @@ export class AIPlayer {
         && tc.queue.length < 2 && player.pop < player.popCap && !this.savingForAge) {
       this.world.trainUnit(tc, 'villager');
     }
+
+    if (this.zones.length > 0) this.quitterZones();
 
     // Répartition : on vise des proportions par ressource selon l'âge.
     const ratios = JOB_RATIOS[Math.min(player.age, JOB_RATIOS.length - 1)];
@@ -179,6 +275,57 @@ export class AIPlayer {
         if (mover) this.assignJob(mover, want);
       }
     }
+  }
+
+  /**
+   * Les ouvriers dont le poste — gisement, ferme — est pris dans une zone à
+   * éviter (voir releverZones) en changent ; celui qui porte son chargement à
+   * un dépôt battu le porte ailleurs, s'il en reste un autre. De même celui
+   * dont le chemin passerait sous les flèches pour atteindre un poste situé
+   * de l'autre côté : ce gisement-là (cette ferme, ce dépôt) est tenu pour
+   * injoignable, comme s'il était enclavé, et il va ailleurs.
+   */
+  quitterZones() {
+    const world = this.world, now = world.time;
+    for (const v of this.villagers) {
+      if (v.garrisonedIn || v.fleeUntil > now || v.state === STATE.GARRISON) continue;
+      const job = v.pendingJob;
+      const tile = v.resourceTile || (job && job.kind === 'tile' ? job : null);
+      const farm = v.target && v.target.type === 'farm' ? v.target : (job && job.kind === 'farm' ? job.farm : null);
+      const poste = tile ? { x: tile.tx * TILE + TILE / 2, y: tile.ty * TILE + TILE / 2 } : farm;
+      const autreDepot = (exclus) => {
+        const autre = v.returnTo && world.findNearestDropoff(v, v.carry.type, exclus);
+        return autre && autre !== v.returnTo ? autre : null;
+      };
+      if (poste && this.niveauZone(poste.x, poste.y) > 0) {
+        this.assignJob(v, this.jobOf(v) || 'food');
+      } else if (v.state === STATE.RETURN && v.returnTo && world.batimentBattu(v.returnTo)) {
+        if (autreDepot(v.failedDropoffs)) v.startReturn();
+      } else if (this.traverseZone(v)) {
+        if (v.state === STATE.RETURN) {
+          const exclus = new Set(v.failedDropoffs || []).add(v.returnTo.id);
+          if (autreDepot(exclus)) { v.failedDropoffs = exclus; v.startReturn(); }
+        } else if (v.state === STATE.BUILD && v.target && !v.target.complete) {
+          this.badSpots.add(v.target.tx + ',' + v.target.ty);
+          world.cancelConstruction(v.target);
+        } else if (v.state === STATE.GATHER && poste) {
+          const res = tile && world.map.resourceAt(tile.tx, tile.ty);
+          if (res) res.inaccessible = true; else if (farm) farm.gatherUnreachable = true;
+          this.assignJob(v, this.jobOf(v) || 'food');
+        }
+      }
+    }
+  }
+
+  /** Cet ouvrier, qui n'est pas sous les flèches, y passerait-il en suivant son chemin ? */
+  traverseZone(v) {
+    const cases = this.player.zoneEvitee;
+    if (!cases || v.pathPending || !v.path || this.niveauZone(v.x, v.y) === 2) return false;
+    const w = this.world.map.w;
+    for (let j = v.pathIndex; j < v.path.length; j++) {
+      if (cases[v.path[j].ty * w + v.path[j].tx] === 2) return true;
+    }
+    return false;
   }
 
   jobOf(v) {
@@ -217,6 +364,11 @@ export class AIPlayer {
       else villager.gatherAt(target.tx, target.ty);
       return candidate === type;
     }
+    // Rien à récolter nulle part : au moins, on ne reste pas sous les flèches.
+    if (this.townCenter && this.niveauZone(villager.x, villager.y) > 0) {
+      const poste = this.posteAuCamp();
+      villager.moveTo(poste.x, poste.y);
+    }
     return false;
   }
 
@@ -233,6 +385,11 @@ export class AIPlayer {
     // Un chantier qu'aucun villageois ne peut rejoindre est annulé (et remboursé).
     for (const site of this.buildings.filter((b) => !b.complete && b.unreachable)) {
       this.badSpots.add(site.tx + ',' + site.ty);
+      this.world.cancelConstruction(site);
+    }
+    // De même un chantier pris dans une zone à éviter (voir releverZones) :
+    // personne n'ira le bâtir sous les flèches, il sera reposé ailleurs.
+    for (const site of this.buildings.filter((b) => !b.complete && !b.dead && this.niveauZone(b.x, b.y) > 0)) {
       this.world.cancelConstruction(site);
     }
     const inProgress = this.buildings.filter((b) => !b.complete && !b.dead);
@@ -263,10 +420,10 @@ export class AIPlayer {
     // Le plafond du format de partie (40 en Express), pas celui du Classique.
     const popMax = this.world.popMax;
     if (popRoom <= 3 && player.popCap < popMax) return 'house';
-    if (!this.has('lumbercamp') && this.villagers.length >= 4) return 'lumbercamp';
-    if (!this.has('mill') && this.villagers.length >= 6) return 'mill';
+    if (!this.aDepot('lumbercamp', 'wood') && this.villagers.length >= 4) return 'lumbercamp';
+    if (!this.aDepot('mill') && this.villagers.length >= 6) return 'mill';
     if (!this.has('barracks') && this.villagers.length >= 8) return 'barracks';
-    if (!this.has('miningcamp') && this.villagers.length >= 9) return 'miningcamp';
+    if (!this.aDepot('miningcamp', 'gold') && this.villagers.length >= 9) return 'miningcamp';
     // L'âge visé exige des bâtiments (`requis`, dans AGES) : ils passent avant
     // les fermes, sinon son prix dort en réserve sans pouvoir être dépensé.
     const requis = this.ageTarget && this.batimentPourAge();
@@ -299,7 +456,24 @@ export class AIPlayer {
     return null;
   }
 
-  countFarms() { return this.counts.farm || 0; }
+  /** Les fermes qui comptent : celles d'une zone à éviter (voir releverZones) ne nourrissent plus personne. */
+  countFarms() {
+    if (this.zones.length === 0) return this.counts.farm || 0;
+    return this.buildings.filter((b) => b.type === 'farm' && this.niveauZone(b.x, b.y) === 0).length;
+  }
+
+  /**
+   * Un dépôt de ce type qui serve encore ? Sous les flèches d'un bâtiment
+   * ennemi (voir releverZones), il ne compte plus : on en bâtit un autre
+   * ailleurs — pour un camp, s'il reste de sa ressource hors des zones à
+   * éviter ; sinon il n'aurait rien à recevoir.
+   */
+  aDepot(type, ressource) {
+    if (this.zones.length === 0) return this.has(type);
+    if (this.buildings.some((b) => b.type === type && !this.world.batimentBattu(b))) return true;
+    const tc = this.townCenter;
+    return !!ressource && !(tc && this.world.findNearestResource(tc.x, tc.y, ressource, 32 * TILE, this.index));
+  }
 
   /** Le prochain bâtiment à poser pour mériter l'âge suivant (ses chantiers ouverts comptent déjà), ou null. */
   batimentPourAge() {
@@ -359,6 +533,7 @@ export class AIPlayer {
       }
       for (const c of candidates) {
         if (this.badSpots.has(c.tx + ',' + c.ty)) continue;
+        if (this.niveauZone((c.tx + def.size / 2) * TILE, (c.ty + def.size / 2) * TILE) > 0) continue;
         if (!this.world.canPlace(this.index, type, c.tx, c.ty, true)) continue;
         if (!this.hasRoomAround(c.tx, c.ty, def.size)) continue;
         if (!this.laisseLesAcces(type, c.tx, c.ty)) continue;
@@ -476,6 +651,7 @@ export class AIPlayer {
     // former. La plus proche est la menace — sauf alerte levée faute de combat.
     let threat = this.findThreat();
     if (threat && !this.alerteFondee()) threat = null;
+    this.rappelerAuCamp();
 
     // Production militaire dans tous les bâtiments disponibles.
     for (const b of this.completed) {
@@ -573,6 +749,10 @@ export class AIPlayer {
       const target = this.pickAttackTarget(vague);
       if (target) {
         this.waveCount++;
+        // (Lancée sur un bâtiment qui tire, la vague lui compte pour un assaut : voir pickAttackTarget.)
+        if (target.kind === 'building' && target.complete && target.arrowCount() > 0) {
+          this.assauts[target.id] = (this.assauts[target.id] || 0) + 1;
+        }
         this.armyTarget = Math.min(24, Math.max(3, Math.round(
           (this.difficulty.armyTrigger + this.waveCount * this.difficulty.armyStep) * this.rush)));
         this.attackTimer = (this.difficulty.attackDelay * 0.25 + 20) * this.rush;
@@ -580,7 +760,9 @@ export class AIPlayer {
         // Quand la victoire se joue sur le Centre-Ville, on le prend pour cible
         // explicitement : une attaque-déplacement s'égare sur les villageois et
         // la partie n'aboutit jamais à son objectif.
-        if (this.world.mode.victory === 'towncenter' && target.kind === 'building') {
+        // De même sur un bâtiment qui tire près de la base, ou sur ce qu'il
+        // couvre : aucune troupe ne s'y attaque d'elle-même (voir World.findEnemyNear).
+        if (target.kind === 'building' && (this.world.mode.victory === 'towncenter' || this.niveauZone(target.x, target.y) === 2)) {
           // (Une soigneuse ne « frappe » pas un bâtiment : elle suit la troupe.)
           for (const u of vague) {
             if (u.def.heal) u.moveTo(target.x, target.y + TILE * 3, true);
@@ -600,21 +782,67 @@ export class AIPlayer {
       const auCamp = this.army.filter((u) => u.state === STATE.IDLE);
       this.world.setStance(auCamp, 'defensive');     // au camp, on tient son poste
       for (const u of auCamp) {
-        if (dist2(u.x, u.y, tc.x, tc.y) > (TILE * 11) ** 2) {
+        // (Ni au loin, ni au repos dans une zone à éviter : on s'y fait tirer dessus sans rien rendre.)
+        const expose = this.niveauZone(u.x, u.y) > 0;
+        if (expose || dist2(u.x, u.y, tc.x, tc.y) > (TILE * 11) ** 2) {
           const poste = this.posteAuCamp();
-          u.moveTo(poste.x, poste.y, true);
+          u.moveTo(poste.x, poste.y, !expose);
         }
       }
     }
   }
 
-  /** Un point de regroupement au pied du Centre-Ville. */
+  /**
+   * Un point de regroupement au pied du Centre-Ville — ou ailleurs autour de
+   * lui, si un bâtiment ennemi bat cet endroit (voir releverZones).
+   */
   posteAuCamp() {
     const tc = this.townCenter;
-    return {
+    const poste = {
       x: tc.x + (this.rng.next() - 0.5) * TILE * 6,
       y: tc.y + TILE * 4 + (this.rng.next() - 0.5) * TILE * 4,
     };
+    if (this.niveauZone(poste.x, poste.y) === 0) return poste;
+    // Le plus loin possible des bâtiments qui tirent, en restant près du centre.
+    const map = this.world.map;
+    for (const r of [5, 8, 10.5]) {
+      let best = null, bestD = -1;
+      for (let k = 0; k < 8; k++) {
+        const x = tc.x + Math.cos((k * Math.PI) / 4) * r * TILE, y = tc.y + Math.sin((k * Math.PI) / 4) * r * TILE;
+        const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
+        if (!map.inBounds(tx, ty) || map.isBlocked(tx, ty) || this.niveauZone(x, y) > 0) continue;
+        let d = Infinity;
+        for (const z of this.zones) d = Math.min(d, dist2(x, y, z.x, z.y));
+        if (d > bestD) { bestD = d; best = { x, y }; }
+      }
+      if (best) return best;
+    }
+    return poste;
+  }
+
+  /**
+   * Deux rappels au camp.
+   * Une riposte ne sort pas de la base : la troupe lancée sur un intrus l'est
+   * par un ordre d'attaque, sans borne de poursuite ; dès que sa cible a
+   * quitté la base, elle est rappelée. Avant, deux à cinq soldats suivaient
+   * l'éclaireur du joueur jusque chez lui, puis s'en prenaient à ses ouvriers
+   * et à son Centre-Ville — en Facile, des minutes avant la fin de la trêve.
+   * Et personne ne s'attaque de soi-même à un bâtiment réservé à l'assaut
+   * (voir World.laisseALAssaut) : le soldat qui l'avait pris pour cible avant
+   * qu'il soit relevé — le temps d'une réflexion suffit — est rappelé aussi.
+   */
+  rappelerAuCamp() {
+    if (!this.townCenter) return;
+    for (const u of this.army) {
+      const cible = u.target;
+      if (u.state !== STATE.ATTACK || !cible || cible.dead || cible.isAnimal || cible.playerIndex === this.index) continue;
+      const egare = cible.kind === 'unit'
+        ? !u.autoTarget && !this.intrus.includes(cible)
+        : u.autoTarget && this.world.laisseALAssaut(this.index, cible);
+      if (!egare) continue;
+      const poste = this.posteAuCamp();
+      u.moveTo(poste.x, poste.y);
+    }
   }
 
   /** Les troupes présentes au camp, autour du Centre-Ville : celles qui ne sont pas en campagne. */
@@ -745,15 +973,16 @@ export class AIPlayer {
   }
 
   /**
-   * Un bâtiment ennemi qui tire — une tour, un Centre-Ville occupé — avec un
-   * de ses ouvriers ou de ses bâtiments à portée. Ce n'est pas une alerte : les
-   * ouvriers restent au travail, l'épargne et les vagues suivent leur cours.
+   * Un bâtiment ennemi qui tire dans la base — une tour, un Centre-Ville
+   * occupé (voir releverZones). Ce n'est pas une alerte : les ouvriers restent
+   * au travail, hors de sa portée, l'épargne et les vagues suivent leur cours.
    * Mais l'armée du camp va le raser dès qu'elle en a les moyens, et sans s'y
    * user pour rien : pas d'assaut tant que les dégâts promis (voir
    * degatsPromis) ne couvrent pas ce qu'il lui reste de points de vie ; un
-   * assaut dure au plus ASSAUT_DUREE secondes, après quoi on décroche ; et pas
-   * plus de ASSAUTS_MAX par bâtiment et par âge (un âge de plus, ce sont
-   * d'autres troupes : on retente).
+   * assaut dure au plus ASSAUT_DUREE secondes (jusqu'à ASSAUT_LONG quand le
+   * bâtiment est occupé ailleurs et ne rend pas les coups), après quoi on
+   * décroche ; et pas plus de ASSAUTS_MAX par bâtiment et par âge (un âge de
+   * plus, ce sont d'autres troupes : on retente).
    * @returns {boolean} vrai tant qu'un assaut est en cours : la vague attend.
    */
   assiegerBatimentArme() {
@@ -761,7 +990,12 @@ export class AIPlayer {
     // (Plus de Centre-Ville, plus de camp : l'heure n'est pas aux assauts.)
     if (!this.townCenter) { this.assaut = null; return false; }
     if (this.assautsAge !== this.player.age) { this.assautsAge = this.player.age; this.assauts = {}; }
-    const camp = this.troupesAuCamp().filter((u) => !u.def.heal);
+    // La troupe d'un assaut : les soldats du camp qui n'ont rien d'autre à
+    // faire. Ceux d'une vague qui vient de partir sont encore à deux pas, mais
+    // ils sont en campagne : les rappeler la lui ferait perdre, alors qu'elle
+    // est déjà comptée.
+    const camp = this.troupesAuCamp()
+      .filter((u) => !u.def.heal && (u.state === STATE.IDLE || u.state === STATE.MOVE));
     if (this.assaut) {
       const cible = this.world.byId.get(this.assaut.cible);
       const troupe = cible ? this.army.filter((u) => u.target === cible && u.state === STATE.ATTACK) : [];
@@ -775,35 +1009,52 @@ export class AIPlayer {
         return false;
       }
       // Les troupes sorties de formation entre-temps rejoignent l'assaut.
-      for (const u of camp) {
-        if (u.state === STATE.IDLE || u.state === STATE.MOVE || !u.target) u.attackEntity(cible);
-      }
+      for (const u of camp) u.attackEntity(cible);
       return true;
     }
     const cible = this.batimentArme();
-    if (!cible || this.degatsPromis(camp, cible) < cible.hp * ASSAUT_MARGE) return false;
+    if (!cible) return false;
+    // Occupé sur un de ses bâtiments, il ne rend pas les coups : l'assaut ne
+    // coûte rien, une petite troupe peut y mettre le temps qu'il reste occupé
+    // (ASSAUT_LONG au plus) — et se passer de marge.
+    const occupe = this.occupeEncore(cible);
+    const duree = Math.max(ASSAUT_DUREE, Math.min(ASSAUT_LONG, occupe));
+    if (this.degatsPromis(camp, cible, duree) < cible.hp * (occupe >= duree ? 1 : ASSAUT_MARGE)) return false;
     this.assauts[cible.id] = (this.assauts[cible.id] || 0) + 1;
-    this.assaut = { cible: cible.id, fin: now + ASSAUT_DUREE };
+    this.assaut = { cible: cible.id, fin: now + duree };
     for (const u of camp) u.attackEntity(cible);
     return true;
   }
 
   /**
-   * Le bâtiment ennemi qui tire avec un de ses ouvriers ou de ses bâtiments à
-   * portée — le plus proche de son centre —, ou null. Ceux qui ont déjà eu
-   * leur compte d'assauts à cet âge sont laissés de côté.
+   * Un bâtiment qui tire garde sa cible tant qu'elle tient debout à sa portée
+   * (voir Building.updateDefense). S'il a pris pour cible un bâtiment de la
+   * base, il s'y use une flèche après l'autre et ne se retourne pas contre
+   * les soldats venus le raser : pendant combien de secondes encore ? (0 s'il
+   * ne vise rien de tel.)
+   */
+  occupeEncore(cible) {
+    const vise = cible.target;
+    if (!vise || vise.dead || vise.kind !== 'building' || vise.playerIndex !== this.index) return 0;
+    const parSalve = cible.arrowCount() * computeDamage(cible.def, cible.player, vise);
+    return (vise.hp / parSalve) * cible.def.attackSpeed;
+  }
+
+  /**
+   * Le bâtiment ennemi qui tire dans la base (voir releverZones) — le plus
+   * proche de son centre —, ou null. Ceux qui ont déjà eu leur compte
+   * d'assauts à cet âge sont laissés de côté. De même celui qui ne bat qu'un
+   * gisement au loin : ses ouvriers l'évitent, mais y mener l'armée du camp
+   * serait une vague qui ne dit pas son nom — et, en Facile, avant l'heure.
    */
   batimentArme() {
     const tc = this.townCenter;
     let best = null, bestD = Infinity;
-    for (const b of this.world.buildings) {
-      if (b.dead || b.playerIndex === this.index || !b.complete || b.arrowCount() <= 0) continue;
-      if ((this.assauts[b.id] || 0) >= ASSAUTS_MAX) continue;
-      // La même mesure que le tir du bâtiment (voir World.findEnemyNear).
-      const portee = b.rangePx();
-      const vise = (e) => Math.max(b.edgeDistanceTo(e.x, e.y), e.edgeDistanceTo(b.x, b.y)) <= portee;
-      if (!this.buildings.some(vise) && !this.villagers.some((v) => !v.garrisonedIn && vise(v))) continue;
-      const d = tc ? dist2(b.x, b.y, tc.x, tc.y) : 0;
+    for (const z of this.zones) {
+      if ((this.assauts[z.id] || 0) >= ASSAUTS_MAX || !this.presDeLaBase(z)) continue;
+      const b = this.world.byId.get(z.id);
+      if (!b || b.dead) continue;
+      const d = tc ? dist2(z.x, z.y, tc.x, tc.y) : 0;
       if (d < bestD) { bestD = d; best = b; }
     }
     return best;
@@ -814,14 +1065,17 @@ export class AIPlayer {
    * temps d'un assaut. Il abat ses assaillants un par un, les plus rapides
    * d'abord (ils arrivent les premiers) ; chacun frappe de son arrivée au pied
    * du mur jusqu'à sa mort. Une troupe qui porte aussi loin que lui (la
-   * Catapulte) reste hors d'atteinte et tire jusqu'au bout.
+   * Catapulte) reste hors d'atteinte et tire jusqu'au bout. Et tant qu'il est
+   * occupé sur un bâtiment de la base (voir occupeEncore), personne ne tombe.
+   * @param {number} [duree] la durée de l'assaut, trajet compris.
    */
-  degatsPromis(troupe, cible) {
+  degatsPromis(troupe, cible, duree = ASSAUT_DUREE) {
     const fleches = cible.arrowCount();
     const portee = cible.rangePx();
-    const utile = ASSAUT_DUREE - ASSAUT_MARCHE;
+    const utile = duree - ASSAUT_MARCHE;
     const rangs = troupe.slice().sort((a, b) => b.def.speed - a.def.speed);
-    let t = 0, total = 0;
+    // `t` : l'heure, comptée de l'arrivée au pied du mur, où tombe l'assaillant suivant.
+    let t = Math.max(0, this.occupeEncore(cible) - ASSAUT_MARCHE), total = 0;
     for (const u of rangs) {
       const frappe = computeDamage(u.def, u.player, cible) / u.def.attackSpeed;
       if (u.rangePx() >= portee) { total += frappe * utile; continue; }
@@ -852,8 +1106,11 @@ export class AIPlayer {
     // qui tire n'est une cible que si la vague a de quoi l'abattre (voir
     // degatsPromis), et s'il n'a pas déjà eu son compte d'assauts : une tour
     // posée près de sa base était toujours le bâtiment le plus proche, et
-    // chaque vague allait s'y faire tuer au lieu de marcher sur le joueur.
-    // S'il ne reste que cela, on y va quand même.
+    // chaque vague allait s'y faire tuer au lieu de marcher sur le joueur —
+    // vide aussi, quand rien d'autre ne l'occupe : six miliciens y restaient
+    // pour un tiers de ses points de vie. De même ce qu'il couvre de ses
+    // flèches près de la base : on y viendra quand il sera tombé. S'il ne
+    // reste que cela, on y va quand même.
     const priority = { towncenter: 0.6, barracks: 0.8, archery: 0.8, stable: 0.8, siege: 0.8 };
     // (Seuls comptent les soldats au camp : ceux qui se battent encore au loin
     // arriveraient un par un.)
@@ -864,7 +1121,8 @@ export class AIPlayer {
       const d = tc ? dist2(tc.x, tc.y, b.x, b.y) : 0;
       const score = d * (priority[b.type] || 1);
       const imprenable = b.complete && b.arrowCount() > 0
-        && ((this.assauts[b.id] || 0) >= ASSAUTS_MAX || this.degatsPromis(soldats, b) < b.hp * ASSAUT_MARGE);
+        ? (this.assauts[b.id] || 0) >= ASSAUTS_MAX || this.degatsPromis(soldats, b) < b.hp * ASSAUT_MARGE
+        : this.niveauZone(b.x, b.y) === 2;
       if (imprenable) {
         if (score < tireScore) { tireScore = score; tire = b; }
       } else if (score < bestScore) { bestScore = score; best = b; }

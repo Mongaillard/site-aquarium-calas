@@ -1275,10 +1275,19 @@ export class Unit extends Entity {
     // Examen croissant depuis le nœud courant, arrêté au premier nœud caché :
     // un ou deux tests par tick dans le cas courant. Viser un nœud lointain
     // acquiert ceux d'avant — on n'a plus à passer par leurs cases.
+    // Le chemin contourne les cases que son camp évite (voir World.zoneEvitee) :
+    // couper droit vers un nœud lointain ramènerait l'unité au travers. Le
+    // raccourci ne passe donc par rien de pire que les nœuds qu'il saute.
+    const evite = this.world.zoneEvitee(this.playerIndex);
     const fin = Math.min(last, this.pathIndex + LOOKAHEAD);
-    let target = -1;
+    let target = -1, pire = 0;
     for (let j = this.pathIndex; j <= fin; j++) {
-      if (!map.segmentClear(this.x, this.y, path[j].tx * TILE + TILE / 2, path[j].ty * TILE + TILE / 2, r)) break;
+      const nx = path[j].tx * TILE + TILE / 2, ny = path[j].ty * TILE + TILE / 2;
+      if (!map.segmentClear(this.x, this.y, nx, ny, r)) break;
+      if (evite) {
+        pire = Math.max(pire, evite[map.idx(path[j].tx, path[j].ty)]);
+        if (j > this.pathIndex && !this.world.segmentHorsZone(evite, this.x, this.y, nx, ny, pire)) break;
+      }
       target = j;
     }
     // Rien devant (poussée hors du couloir par ses voisines, ou nœud courant

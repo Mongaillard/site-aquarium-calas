@@ -439,8 +439,10 @@ export const DEFAULT_MODE = 'classique';
  *   petitesVagues : une vague n'emmène que le nombre de soldats qui la
  *                   déclenche (3, puis 5, 7…), le reste de l'armée garde la base.
  * Les `desc`, affichées à l'accueil, disent ce qui a été mesuré en partie
- * (joueur passif, six graines par niveau et par format) : à revoir avec les
- * chiffres ci-dessus.
+ * (joueur passif, de six à trente-cinq graines par niveau et par format) : à
+ * revoir avec les chiffres ci-dessus. En Classique, Difficile lance sa
+ * première vague 44 secondes avant Normal en moyenne (33 graines sur 35) ; en
+ * Express, à la même heure.
  */
 export const DIFFICULTIES = {
   easy: {
@@ -460,7 +462,7 @@ export const DIFFICULTIES = {
     id: 'hard', name: 'Difficile',
     gatherBonus: 1.25, maxVillagers: 26, armyTrigger: 6, armyStep: 5,
     attackDelay: 100,
-    desc: 'L’adversaire récolte plus vite et ses vagues grossissent plus vite ; sa première attaque arrive à la même heure qu’en Normal.',
+    desc: 'L’adversaire récolte plus vite et ses vagues grossissent plus vite ; en Classique, il attaque aussi un peu plus tôt qu’en Normal.',
   },
 };
 
