@@ -491,7 +491,7 @@ export const CIVILISATIONS = {
       stable: { name: 'Enclos des montures', fem: false }, // Écurie était féminin
       siege: { name: 'Atelier des engins' },
       blacksmith: { name: 'Fonderie' },                    // féminin, comme Forge
-      temple: { name: 'Temple du Soleil' },
+      temple: { name: 'Temple du Soleil', desc: 'Forme les Prêtres du Soleil, qui soignent vos troupes ; à l’Âge des Châteaux, invoque l’Hydre.' },
     },
     // type → portrait, seulement une fois le fichier livré (et listé dans sw.js).
     portraits: {

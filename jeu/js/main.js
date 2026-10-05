@@ -21,7 +21,7 @@ import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
 import { setStyleUnites, styleUnites, spriteDe, chargerSprites, chargerCivilisation, prevoirTroupe, etatModeles3d } from './sprites.js';
-import { memoireTroupes, entretenirMemoire, rendreVariantes } from './sprites.js';
+import { memoireTroupes, entretenirMemoire, rendreVariantes, troupesSelonStyle } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
 import { DENSITE } from './modele3d.js';
 
@@ -256,6 +256,9 @@ class Game {
    * Les couples [type, civilisation] qui ont une unité en vie ou en formation,
    * dans les deux camps, vue ou non : leurs images restent en mémoire. (Une
    * file de production porte aussi des technologies : sprites.js les ignore.)
+   * Un corps à terre compte aussi : il est encore dessiné, et partie figée
+   * (pause, écran de fin) il ne vieillit plus — sa troupe déchargée était
+   * relue du cache à l'image suivante, toutes les deux minutes, sans fin.
    */
   troupesEnJeu() {
     const couples = new Map();
@@ -265,6 +268,11 @@ class Game {
     for (const b of this.world.buildings) {
       if (b.dead) continue;
       for (const q of b.queue) couples.set(`${q.id}|${b.player.civ}`, [q.id, b.player.civ]);
+    }
+    for (const fx of this.world.effects) {
+      if (fx.kind !== 'cadavre') continue;
+      const civ = this.world.players[fx.joueur]?.civ;
+      couples.set(`${fx.type}|${civ}`, [fx.type, civ]);
     }
     return [...couples.values()];
   }
@@ -739,11 +747,15 @@ class Game {
     if (filtered.length) this.setSelection(filtered);
   }
 
-  /** Plus aucun ordre en attente d'un appui (attaque, abri, ralliement) : sa consigne s'efface avec lui. */
+  /**
+   * Plus aucun ordre en attente d'un appui (attaque, abri, ralliement) : sa
+   * consigne s'efface avec lui — sauf pendant une pose, dont la consigne a
+   * pris sa place et doit rester tant que le fantôme est là.
+   */
   desarmer() {
     if (!this.attackMoveArmed && !this.rallyArmed && !this.garrisonArmed) return;
     this.attackMoveArmed = false; this.rallyArmed = false; this.garrisonArmed = false;
-    this.ui.setBuildHint('');
+    if (!this.buildMode) this.ui.setBuildHint('');
   }
 
   /**
@@ -754,6 +766,7 @@ class Game {
   lacherSelection() {
     if (this.buildMode) this.cancelBuild();
     this.desarmer();
+    this.ui.setBuildHint('');   // plus rien en main : aucune consigne ne reste
     this.setSelection([]);
   }
 
@@ -818,7 +831,7 @@ class Game {
 
   stopSelection() {
     for (const e of this.selection) if (e.kind === 'unit') e.stop();
-    this.attackMoveArmed = false;
+    this.desarmer();   // l'ordre armé tombe avec sa consigne (« Touchez la zone à attaquer » restait)
     this.ui.refreshSelection(true);
   }
 
@@ -1225,14 +1238,24 @@ class Game {
   setStyleUnites(id) {
     setStyleUnites(id);
     try { localStorage.setItem(STYLE_KEY, styleUnites()); } catch { /* stockage indisponible */ }
+    // Une civilisation qui a ses propres modèles 3D ne suit pas le style : le
+    // message ne doit pas annoncer un changement que l'écran ne montre pas.
+    const moi = this.civ, adverse = this.world.players[1 - this.world.humanIndex].civ;
+    const miennes = troupesSelonStyle(moi), adverses = troupesSelonStyle(adverse);
+    // (Le chevalier d'essai n'habille que le milicien, sous le nom que lui donne la civilisation.)
+    const essai = miennes.includes('militia') ? `${nomDe('militia', moi)} : chevalier d’essai` : null;
     const messages = {
       '3d': 'Personnages : tes modèles 3D animés',
       anime: 'Personnages : marche dessinée',
       peint: 'Personnages : illustration peinte',
-      '3d-precalc': 'Milicien : chevalier d’essai rendu à l’avance',
-      '3d-direct': 'Milicien : chevalier d’essai animé en direct',
+      '3d-precalc': essai ? `${essai} rendu à l’avance` : 'Personnages : marche dessinée',
+      '3d-direct': essai ? `${essai} animé en direct` : 'Personnages : marche dessinée',
     };
-    if (styleUnites() === '3d-direct' && !webglDisponible()) {
+    if (miennes.length === 0) {
+      this.ui.toast(adverses.length === 0
+        ? 'Style : rien ne change, les troupes de cette partie n’ont que leur modèle 3D'
+        : `Style : seules les troupes des ${CIVILISATIONS[adverse].name} changent, les tiennes n’ont que leur modèle 3D`);
+    } else if (styleUnites() === '3d-direct' && !webglDisponible()) {
       this.ui.toast('3D en direct : WebGL indisponible ici — le rendu précalculé le remplace', 'warn');
     } else {
       this.ui.toast(messages[styleUnites()]);
@@ -1295,6 +1318,7 @@ class Game {
     this.ui.hideModal();
     this.ui.closeBuildMenu();
     this.ui.closeWorkerMenu();
+    this.ui.setBuildHint('');   // une consigne en cours (ordre armé, pose) ne suit pas dans la partie suivante
     document.getElementById('hud').classList.add('hidden');
   }
 }

@@ -843,9 +843,15 @@ export class World {
         const restants = this.buildings.filter((b) => !b.dead && b.playerIndex === entity.playerIndex);
         if (!restants.some((b) => b.type === 'towncenter') && restants.some((b) => b.def.trains)) {
           const f = ficheDe('towncenter', owner.civ);
+          const perdu = `${f.name} perdu${f.fem ? 'e' : ''} !`;
+          // Rebâtir demande un villageois, et la garnison vient de périr avec le
+          // bâtiment : sans lui, le conseil serait impossible à suivre.
+          const batisseur = this.units.some((u) => !u.dead && u.playerIndex === entity.playerIndex && u.isVillager);
           this.pushEvent({
             type: 'notice',
-            text: `${f.name} perdu${f.fem ? 'e' : ''} ! Rebâtissez ${f.fem ? 'une' : 'un'} ${f.name} : il ne vous reste que vos bâtiments militaires.`,
+            text: batisseur
+              ? `${perdu} Rebâtissez ${f.fem ? 'une' : 'un'} ${f.name} : il ne vous reste que vos bâtiments militaires.`
+              : `${perdu} Plus aucun ${nomDe('villager', owner.civ).toLowerCase()} pour rebâtir : il ne vous reste que vos troupes et vos bâtiments militaires.`,
           });
         }
       }
@@ -1119,7 +1125,8 @@ export class World {
     const player = this.players[building.playerIndex];
     const next = AGES[player.age + 1];
     payCost(player.resources, next.cost);
-    player.ageProgress = { timeLeft: next.time, total: next.time, building };
+    // Le prix payé est noté, comme pour une file : c'est lui que raser le porteur rend.
+    player.ageProgress = { timeLeft: next.time, total: next.time, building, cost: { ...next.cost } };
     return true;
   }
 
@@ -1203,7 +1210,8 @@ export class World {
     let rembourse = building.queue.length > 0;
     while (building.queue.length > 0) this.cancelProduction(building, building.queue.length - 1);
     if (player && player.ageProgress && player.ageProgress.building === building) {
-      const cost = AGES[player.age + 1].cost;
+      // Le prix payé, pas celui du jour : une partie reprise peut dater d'avant un changement de prix.
+      const cost = player.ageProgress.cost || {};
       for (const key in cost) player.resources[key] += cost[key];
       player.ageProgress = null;
       rembourse = true;
