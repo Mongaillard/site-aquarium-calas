@@ -15,7 +15,7 @@ import {
   AGES, BUILDING_TYPES, UNIT_TYPES, CIVILISATIONS, DIFFICULTIES, GAME_MODES, GAME_SPEEDS, MAP_SIZES,
   TICKS_PER_SECOND, civDe, nomDe, portraitDe,
 } from '../js/config.js';
-import { UI, imageBatiment, illustrationDeFin, resumeReglages } from '../js/ui.js';
+import { UI, imageBatiment, illustrationDeFin, resumeReglages, toucherNouvellePartie, DELAI_EFFACER } from '../js/ui.js';
 import { ficheCiv } from '../js/sprites.js';
 import { readFileSync, existsSync } from 'node:fs';
 
@@ -77,7 +77,7 @@ function fausseInterface(w) {
   }, { get: (o, k) => (k in o ? o[k] : (typeof k === 'symbol' ? undefined : () => {})) });
   faux.nodes = { selection: noeud(), commands: noeud(), buildMenu: { classList: { add() {}, remove() {} } } };
   faux.fenetre = '';
-  faux.showModal = (texte) => { faux.fenetre = texte; return { querySelector: () => ({ addEventListener() {} }), querySelectorAll: () => [] }; };
+  faux.showModal = (texte, options) => { faux.fenetre = texte; faux.options = options; return { querySelector: () => ({ addEventListener() {} }), querySelectorAll: () => [] }; };
   return faux;
 }
 /** Le menu Construire écrit par la vraie interface, sur une fausse liste. */
@@ -135,8 +135,31 @@ console.log('\n--- L’accueil ---');
 
   // « Jouer » sous le pouce, quelle que soit la hauteur de la carte.
   check('main.js : une partie dort — « Nouvelle partie », resté sous le pouce, laisse l’or à « Reprendre »',
-    /play\.textContent = 'Nouvelle partie'; play\.classList\.remove\('primary'\);/.test(main)
-    && /play\.textContent = 'Jouer'; play\.classList\.add\('primary'\);/.test(main));
+    /play\.textContent = arme \? 'Effacer la partie en cours \?' : partieEnAttente \? 'Nouvelle partie' : 'Jouer';/.test(main)
+    && /play\.classList\.toggle\('primary', !partieEnAttente\);/.test(main) && /play\.classList\.toggle\('arme', arme\);/.test(main));
+  // … et il n'efface plus la partie en cours d'un seul toucher.
+  const jouer = (main.match(/getElementById\('btn-play'\)\.addEventListener\('click', \(\) => \{([\s\S]*?)\n  \}\);/) || ['', ''])[1];
+  check('main.js : « Jouer » passe par toucherNouvellePartie, et n’efface la sauvegarde qu’une fois le lancement décidé',
+    /const toucher = toucherNouvellePartie\(partieEnAttente, effacerJusqua, performance\.now\(\)\);/.test(jouer)
+    && /if \(!toucher\.lancer\) \{[^}]*return; \}\s*clearSave\(\);\s*startGame\(/.test(jouer)
+    && (jouer.match(/clearSave\(\)/g) || []).length === 1 && !/confirm\(/.test(main), jouer.replace(/\s+/g, ' ').slice(0, 90));
+  const carteReprise = (main.match(/function refreshResumeCard\(\) \{[\s\S]*?\n\}/) || [''])[0];
+  check('main.js : la carte de reprise dit au bouton si une partie dort, et le désarme quand elle change',
+    /partieEnAttente = !!save;\s*armerNouvellePartie\(0\);/.test(carteReprise)
+    && /function showStartScreen\(\) \{[\s\S]*?refreshResumeCard\(\);/.test(main));
+  const T0 = 50000;
+  const premier = toucherNouvellePartie(true, 0, T0);
+  check('aucune partie ne dort : un toucher lance', toucherNouvellePartie(false, 0, T0).lancer === true && toucherNouvellePartie(false, T0 + 1000, T0).lancer === true);
+  check('une partie dort : le premier toucher arme le bouton pour trois secondes, sans rien lancer',
+    premier.lancer === false && premier.armeJusqua === T0 + DELAI_EFFACER && DELAI_EFFACER === 3000);
+  const second = toucherNouvellePartie(true, premier.armeJusqua, T0 + 800);
+  check('… le second, dans le délai, lance et désarme', second.lancer === true && second.armeJusqua === 0);
+  const tardif = toucherNouvellePartie(true, premier.armeJusqua, T0 + DELAI_EFFACER);
+  check('… passé le délai, il faut recommencer : le toucher réarme', tardif.lancer === false && tardif.armeJusqua === T0 + 2 * DELAI_EFFACER
+    && toucherNouvellePartie(true, premier.armeJusqua, T0 + DELAI_EFFACER + 5000).lancer === false);
+  const arme = regle('.start-actions .btn.arme');
+  check('css : armé, le bouton est rouge et sa question, plus petite, ne fait pas bouger la barre',
+    /border-color:\s*#e0604c/.test(arme) && /font-size:\s*14px/.test(arme) && /line-height:\s*1\.15/.test(arme));
   const actions = regle('.start-actions');
   check('css : la barre « Jouer » colle au bas de l’écran, sur un fond plein',
     /position:\s*sticky/.test(actions) && /bottom:\s*0/.test(actions) && actions.includes('var(--panel-solid)') && actions.includes('var(--safe-bottom)'));
@@ -151,22 +174,31 @@ console.log('\n--- L’accueil ---');
 // ---------------------------------------------------------------------------
 console.log('\n--- Le résumé des réglages ---');
 {
+  // Ce que le joueur lit : les espaces insécables rendues à des espaces ordinaires.
+  const lu = (reglages) => resumeReglages(reglages).replace(/\u00a0/g, ' ');
   const defaut = { civ: 'atlante', civAdverse: 'atlante', mode: 'classique', difficulty: 'normal', mapSize: 'medium', speed: 'normal' };
-  check('les réglages par défaut', resumeReglages(defaut) === 'Atlantes en face · Classique · Normal · carte moyenne · ×1', resumeReglages(defaut));
-  const autre = resumeReglages({ civAdverse: 'solarien', mode: 'express', difficulty: 'hard', mapSize: 'small', speed: 'blitz' });
+  check('les réglages par défaut', lu(defaut) === 'Atlantes en face · Classique · Normal · carte moyenne · ×1', lu(defaut));
+  const autre = lu({ civAdverse: 'solarien', mode: 'express', difficulty: 'hard', mapSize: 'small', speed: 'blitz' });
   check('un autre jeu de réglages', autre === `Solariens en face · Express · ${DIFFICULTIES.hard.name} · carte petite · ×2`, autre);
   check('un réglage inconnu est passé, un peuple inconnu retombe sur les Atlantes',
-    resumeReglages({ civAdverse: 'martien', mode: 'tournoi', difficulty: '', mapSize: 'geante', speed: 'lumiere' }) === 'Atlantes en face'
-    && resumeReglages({}) === 'Atlantes en face');
-  let incomplets = 0, total = 0;
+    lu({ civAdverse: 'martien', mode: 'tournoi', difficulty: '', mapSize: 'geante', speed: 'lumiere' }) === 'Atlantes en face'
+    && lu({}) === 'Atlantes en face');
+  let incomplets = 0, malCoupes = 0, total = 0;
   for (const civAdverse of civs) for (const mode of Object.keys(GAME_MODES)) for (const difficulty of Object.keys(DIFFICULTIES)) {
     for (const mapSize of Object.keys(MAP_SIZES)) for (const v of GAME_SPEEDS) {
       total++;
-      const parts = resumeReglages({ civAdverse, mode, difficulty, mapSize, speed: v.id }).split(' · ');
+      const brut = resumeReglages({ civAdverse, mode, difficulty, mapSize, speed: v.id });
+      const parts = brut.replace(/\u00a0/g, ' ').split(' · ');
       if (parts.length !== 5 || parts.some((p) => !p || /undefined|null/.test(p))) incomplets++;
+      // Les seuls endroits où la ligne peut se replier : les espaces ordinaires. Il y en a une
+      // après chaque point, aucune devant, aucune à l'intérieur d'une mention.
+      const morceaux = brut.split(' ');
+      if (morceaux.length !== 5 || morceaux.some((m) => m.startsWith('·')) || !morceaux.slice(0, -1).every((m) => m.endsWith('\u00a0·'))) malCoupes++;
     }
   }
   check('toutes les combinaisons donnent cinq mentions', incomplets === 0, `${total} combinaisons`);
+  check('la ligne ne se replie qu’entre deux mentions, et jamais un point ne commence une ligne', malCoupes === 0, `${malCoupes} sur ${total}`);
+  check('css : repliée, la ligne se partage en lignes de même longueur', /text-wrap:\s*balance/.test(regle('.reglages-resume')));
 }
 
 // ---------------------------------------------------------------------------
@@ -192,8 +224,16 @@ console.log('\n--- L’habillage ---');
   }
   const themes = civs.map((c) => variable(regle(`body[data-civ="${c}"]`), '--panel-solid') + variable(regle(`body[data-civ="${c}"]`), '--lisere'));
   check('deux peuples, deux habillages', new Set(themes).size === civs.length, themes.join(' / '));
+  // (Cachée pour de bon, elle laissait un écran vide tant que les scripts n'étaient pas arrivés — et à jamais
+  // devant un script d'une version d'avant, qui ne pose pas le peuple.)
+  const attente = regle('body:not([data-civ]) .start-card');
+  const delai = Number((attente.match(/animation:\s*attente-habillage 0s linear ([\d.]+)s both/) || [])[1]);
+  check('la carte d’accueil attend ses couleurs, mais une seconde et demie au plus : elle n’est jamais cachée pour de bon',
+    delai > 0 && delai <= 1.5 && !/visibility/.test(attente)
+    && /@keyframes attente-habillage\s*\{\s*from\s*\{\s*visibility:\s*hidden;\s*\}\s*to\s*\{\s*visibility:\s*visible;\s*\}\s*\}/.test(css)
+    && !/\.start-card[^{]*\{[^}]*visibility:\s*hidden/.test(css), `${delai} s`);
   check('la page attend le jeu pour s’habiller (pas de couleurs d’un peuple à la place d’un autre), puis porte celui que l’on joue',
-    /<body>/.test(html) && /body:not\(\[data-civ\]\) \.start-card\s*\{\s*visibility:\s*hidden/.test(css)
+    /<body>/.test(html)
     && /document\.body\.dataset\.civ = civDe\(civ\);/.test(main)
     && /function showStartScreen\(\) \{[\s\S]*?habiller\(settings\.civ\);/.test(main)
     && /currentGame = new Game\(options\);\s*habiller\(currentGame\.civ\);/.test(main)
@@ -211,9 +251,22 @@ console.log('\n--- L’habillage ---');
     && !regle('.cmd-label').includes('--titre') && !regle('.bc-desc').includes('--titre'));
   // Les cibles de toucher ne bougent pas.
   const cibles = [['.btn', /min-height:\s*48px/], ['.option', /min-height:\s*52px/], ['.cmd', /min-height:\s*62px/],
-    ['#btn-lacher', /width:\s*44px;\s*height:\s*44px/], ['.reglages summary', /min-height:\s*52px/], ['.build-card', /min-height:\s*62px/]];
+    ['#btn-lacher', /width:\s*44px;\s*height:\s*44px/], ['.reglages summary', /min-height:\s*52px/], ['.bc-icon', /min-height:\s*46px/]];
   const petites = cibles.filter(([s, r]) => !r.test(regle(s))).map(([s]) => s);
   check('les cibles de toucher gardent leur taille (44 points au moins)', petites.length === 0 && /#btn-armee\s*\{\s*min-height:\s*44px/.test(css), petites.join(', '));
+  // Menu Construire : la liste est une grille qui défile ; une hauteur minimale posée sur ses cartes
+  // tassait les rangées, et le texte en sortait dès l'Âge Féodal. La hauteur vient de la case de l'icône.
+  const carte = regle('.build-card').replace(/\/\*[\s\S]*?\*\//g, '');
+  check('menu Construire : la hauteur d’une carte suit son texte (aucune hauteur imposée à la carte ni aux rangées)',
+    !/(?:^|[\s;])(?:min-|max-)?height\s*:/.test(carte) && !/grid-(?:auto|template)-rows/.test(regle('.build-list'))
+    && /overflow-y:\s*auto/.test(regle('.build-list')) && /padding:\s*8px 12px 8px 8px/.test(carte), carte.replace(/\s+/g, ' ').slice(0, 80));
+  // Barre du bas : les portraits ne la font pas grandir plus que nécessaire.
+  const pastille = regle('.chip img.visage');
+  const cote = Number((pastille.match(/height:\s*(\d+)px/) || [])[1]);
+  const marges = (pastille.match(/margin:\s*(-?\d+)px 0 (-?\d+)px/) || []).slice(1).map(Number);
+  check('sélection multiple : une pastille à portrait n’est pas plus haute qu’une pastille à pictogramme (17 points d’icône)',
+    cote >= 20 && marges.length === 2 && cote + marges[0] + marges[1] <= 17 && /padding:\s*5px 9px/.test(regle('.chip')), `${cote} px, marges ${marges.join(' et ')}`);
+  check('la barre du bas garde sa marge d’origine sous son bord franc', /padding:\s*8px calc\(8px \+ var\(--safe-right\)\)/.test(regle('#bottombar')) && /top:\s*8px/.test(regle('#btn-lacher')));
   check('rien dans la feuille de style que la page embarquée refuserait (ni « data: » ni « blob: »)', !/data:|blob:/.test(css));
   check('aucun emoji dans la page', !/\p{Extended_Pictographic}/u.test(html));
 }
@@ -316,6 +369,21 @@ essai('écran de fin', () => {
     && faux.fenetre.includes(`<img class="fin-illustration tombe" src="${palais}"`) && faux.fenetre.includes('Défaite'));
   check('le chevalier a quitté les écrans de fin, pour les deux peuples',
     !/heros\.webp|defaite\.webp|'heros'|'defaite'/.test(ui) && !/heros|defaite\.webp/.test(gagne + faux.fenetre));
+  check('l’écran de fin se déclare tel à sa fenêtre', !!faux.options && faux.options.fin === true && faux.options.wide === true);
+  const vraie = Object.create(UI.prototype);
+  vraie.nodes = { modal: { innerHTML: '', classList: { add() {}, remove() {} } } };
+  vraie.showModal('<p>fin</p>', { wide: true, fin: true });
+  const carteFin = vraie.nodes.modal.innerHTML;
+  vraie.showModal('<p>pause</p>');
+  check('… qui porte alors la classe « fin » — et elle seule : pause, aide et crédits gardent leur défilement',
+    /^<div class="modal-card wide fin">/.test(carteFin) && /^<div class="modal-card ">/.test(vraie.nodes.modal.innerHTML)
+    && (ui.match(/fin: true/g) || []).length === 1);
+  const collants = regle('.modal-card.fin .modal-actions');
+  check('css : « Nouvelle partie » et « Menu principal » collent au bas de la carte de fin, sur son fond',
+    /position:\s*sticky/.test(collants) && /bottom:\s*0/.test(collants) && collants.includes('var(--panel-solid)')
+    && /padding-bottom:\s*0/.test(regle('.modal-card.fin')));
+  const court = (css.match(/@media \(max-height: (\d+)px\) \{ \.fin-illustration \{ height: (\d+)px; \} \}/) || []).slice(1).map(Number);
+  check('css : sur un écran court, la capitale laisse la place au tableau des scores', court.length === 2 && court[0] >= 667 && court[1] < 132 && court[1] >= 60, court.join(' / '));
   check('css : debout elle est dorée, tombée elle est éteinte',
     /drop-shadow\(0 0 20px rgba\(232, 182, 76/.test(regle('.fin-illustration.debout')) && /grayscale/.test(regle('.fin-illustration.tombe')));
 });

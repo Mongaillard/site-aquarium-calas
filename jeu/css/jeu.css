@@ -42,8 +42,12 @@
    cibles de toucher ne bougent pas.
    Atlantes : bleu profond, liseré de marbre. Solariens : brun chaud, liseré d'or.
    Avant que le jeu soit chargé, la page n'en porte aucun : un fond neutre, celui
-   de l'écran de lancement, et la carte d'accueil attend d'avoir ses couleurs. */
-body:not([data-civ]) .start-card { visibility: hidden; }
+   de l'écran de lancement, et la carte d'accueil attend d'avoir ses couleurs —
+   une grosse seconde, pas plus. Au-delà (réseau lent, ou script d'une version
+   d'avant resté en cache, qui ne pose jamais le peuple), elle se montre telle
+   quelle : un accueil neutre vaut mieux qu'un écran vide où rien ne se touche. */
+body:not([data-civ]) .start-card { animation: attente-habillage 0s linear 1.2s both; }
+@keyframes attente-habillage { from { visibility: hidden; } to { visibility: visible; } }
 body[data-civ="atlante"] {
   --bg: #0c1f2b;
   --panel: rgba(12, 33, 46, 0.93);
@@ -171,8 +175,10 @@ html, body {
 .portrait.batiment { padding: 0; overflow: hidden; background: var(--fond-vignette); }
 .portrait.batiment img, .portrait.batiment canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
 
-/* Écran de fin : la capitale du joueur — debout et dorée, ou éteinte. */
+/* Écran de fin : la capitale du joueur — debout et dorée, ou éteinte. Plus
+   petite sur un écran court, où le tableau des scores a besoin de la place. */
 .fin-illustration { display: block; height: 132px; width: auto; margin: -2px auto 8px; }
+@media (max-height: 700px) { .fin-illustration { height: 72px; } }
 .fin-illustration.debout { filter: drop-shadow(0 0 20px rgba(232, 182, 76, .5)) drop-shadow(0 8px 10px rgba(0, 0, 0, .5)); }
 .fin-illustration.tombe { filter: grayscale(.9) brightness(.58) drop-shadow(0 8px 10px rgba(0, 0, 0, .55)); }
 
@@ -290,7 +296,8 @@ html, body {
 }
 .reglages[open] summary::after { margin-top: -2px; transform: rotate(225deg); }
 .reglages-titre { display: block; font-weight: 650; font-size: 15px; }
-.reglages-resume { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+/* (Si le résumé se replie, c'est en lignes de même longueur : pas un « ×1 » seul sur la seconde.) */
+.reglages-resume { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.35; color: var(--muted); text-wrap: balance; }
 .reglages > h2, .reglages > .options { margin-left: 12px; margin-right: 12px; }
 .reglages > h2:first-of-type { margin-top: 6px; }
 .reglages > .options:last-child { margin-bottom: 12px; }
@@ -311,6 +318,18 @@ html, body {
 }
 /* « Nouvelle partie » et « Comment jouer » côte à côte sur 375 points : moins de marge, pas de retour à la ligne. */
 .start-actions .btn { padding-left: 8px; padding-right: 8px; }
+/* « Nouvelle partie » touché alors qu'une partie dort : il demande confirmation,
+   en rouge comme « Détruire » armé, et en plus petit pour que sa question tienne
+   sans faire bouger la barre sous le pouce. */
+.start-actions .btn.arme {
+  border-color: #e0604c;
+  background: rgba(224, 96, 76, .3);
+  color: #ffd9d2;
+  font-size: 14px;
+  line-height: 1.15;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
 /* Le palmarès du format et de la difficulté choisis : une ligne discrète sous « Jouer ». */
 .palmares { margin: 10px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
 
@@ -601,7 +620,7 @@ ul.help a { color: var(--gold); }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  padding: 8px calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
   /* Un panneau plein à bord franc, au liseré du peuple : plus de dégradé qui se dissout dans la carte. */
   background: linear-gradient(0deg, var(--panel-solid) 0%, var(--panel) 100%);
   border-top: 2px solid var(--lisere);
@@ -620,7 +639,7 @@ ul.help a { color: var(--gold); }
    du bas, qui lui laisse sa place. */
 #btn-lacher {
   position: absolute;
-  top: 10px;
+  top: 8px;
   right: calc(8px + var(--safe-right));
   width: 44px; height: 44px;
 }
@@ -729,7 +748,10 @@ img.visage {
   box-shadow: 0 0 0 1px var(--lisere);
 }
 .qicon img.visage { width: 23px; height: 23px; border-radius: 4px; }
-.chip img.visage { width: 24px; height: 24px; border-radius: 4px; }
+/* Sur une pastille, le portrait mord sur les marges : elle garde la hauteur
+   d'une pastille à pictogramme, et une armée de dix troupes ne coûte pas une
+   rangée de carte en plus. */
+.chip img.visage { width: 23px; height: 23px; margin: -3px 0 -3px -4px; border-radius: 4px; }
 .cmd-label { font-size: 11px; font-weight: 600; text-align: center; line-height: 1.15; }
 .cmd-cost { font-size: 10px; color: var(--muted); white-space: nowrap; }
 
@@ -768,7 +790,9 @@ img.visage {
   align-items: center;
   gap: 10px;
   padding: 8px 12px 8px 8px;
-  min-height: 62px;
+  /* Pas de hauteur minimale ici : la liste est une grille qui défile, et ses
+     rangées se tasseraient à cette hauteur dès qu'elle dépasse — le texte
+     sortait des cartes. La case de l'icône donne la hauteur (voir .bc-icon). */
   border-radius: var(--angle);
   border: 1px solid var(--border);
   background: var(--fond-bouton);
@@ -778,7 +802,7 @@ img.visage {
   cursor: pointer;
 }
 .build-card.disabled { opacity: .45; }
-.bc-icon { font-size: 26px; display: flex; align-items: center; justify-content: center; color: var(--gold); }
+.bc-icon { font-size: 26px; display: flex; align-items: center; justify-content: center; min-height: 46px; color: var(--gold); }
 /* La vignette d'une carte : l'illustration du bâtiment, celle que l'on posera sur la carte. */
 .bc-icon.vignette { width: 52px; height: 46px; }
 .bc-icon.vignette img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .5)); }
@@ -805,6 +829,18 @@ img.visage {
 /* Les précisions du menu de pause : sous leurs réglages, en retrait. */
 .modal-card .hint { margin: 8px 0 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .modal-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+/* Écran de fin : « Nouvelle partie » et « Menu principal » restent à l'écran
+   quand le tableau dépasse (petit téléphone, téléphone couché) — ils collent au
+   bas de la carte, sur son fond. La marge du bas passe de la carte aux boutons,
+   comme à l'accueil : collés, ils descendent jusqu'à son bord. */
+.modal-card.fin { padding-bottom: 0; }
+.modal-card.fin .modal-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 8px -20px 0;
+  padding: 10px 20px 20px;
+  background: linear-gradient(180deg, transparent 0, var(--panel-solid) 10px);
+}
 
 .scores { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .scores th, .scores td { padding: 7px 6px; text-align: right; border-bottom: 1px solid var(--border); }

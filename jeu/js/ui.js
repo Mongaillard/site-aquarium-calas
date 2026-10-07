@@ -96,6 +96,9 @@ export function illustrationDeFin(result, civ) {
 /**
  * Les réglages repliés de l'accueil, en une ligne : « Solariens en face ·
  * Classique · Normal · carte moyenne · ×1 ». Un réglage inconnu est passé.
+ * Les espaces sont insécables à l'intérieur d'une mention et devant le point
+ * qui la suit : si la ligne se replie, c'est entre deux mentions, et jamais
+ * un point ne commence une ligne.
  */
 export function resumeReglages(reglages) {
   const vitesse = GAME_SPEEDS.find((v) => v.id === reglages.speed);
@@ -106,7 +109,22 @@ export function resumeReglages(reglages) {
     DIFFICULTIES[reglages.difficulty]?.name,
     carte && `carte ${carte.name.toLowerCase()}`,
     vitesse && vitesse.short,
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).map((mention) => mention.replace(/ /g, '\u00a0')).join('\u00a0· ');
+}
+
+/** « Nouvelle partie » touché alors qu'une partie dort : le temps laissé au second toucher, comme pour « Détruire ». */
+export const DELAI_EFFACER = 3000;
+
+/**
+ * Un toucher sur « Jouer » : lancer, ou demander confirmation ? Sans partie à
+ * reprendre, on lance. Quand une partie dort, la lancer l'efface : le premier
+ * toucher arme le bouton (il demande « Effacer la partie en cours ? ») et seul
+ * un second, avant `armeJusqua`, lance pour de bon. Passé ce délai, tout est
+ * à refaire. Rend ce qu'il faut faire et la nouvelle échéance (0 : désarmé).
+ */
+export function toucherNouvellePartie(partieEnCours, armeJusqua, maintenant) {
+  if (!partieEnCours || maintenant < armeJusqua) return { lancer: true, armeJusqua: 0 };
+  return { lancer: false, armeJusqua: maintenant + DELAI_EFFACER };
 }
 
 // --- Alerte d'attaque et armée : la logique, sans DOM (vérifiée sous node) ---
@@ -960,7 +978,7 @@ export class UI {
   ecoute() { return { signal: this.game.ecouteurs?.signal }; }
 
   showModal(html, options = {}) {
-    this.nodes.modal.innerHTML = `<div class="modal-card ${options.wide ? 'wide' : ''}">${html}</div>`;
+    this.nodes.modal.innerHTML = `<div class="modal-card ${options.wide ? 'wide' : ''}${options.fin ? ' fin' : ''}">${html}</div>`;
     this.nodes.modal.classList.remove('hidden');
     return this.nodes.modal;
   }
@@ -1178,7 +1196,7 @@ export class UI {
       <div class="modal-actions">
         <button class="btn primary" data-act="again">Nouvelle partie</button>
         <button class="btn" data-act="menu">Menu principal</button>
-      </div>`, { wide: true });
+      </div>`, { wide: true, fin: true });   // « fin » : ces deux boutons restent à l'écran (voir la feuille de style)
     modal.querySelector('[data-act="again"]').addEventListener('click', () => this.game.restart(), this.ecoute());
     modal.querySelector('[data-act="menu"]').addEventListener('click', () => this.game.quitToMenu(), this.ecoute());
   }
