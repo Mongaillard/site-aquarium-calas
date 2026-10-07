@@ -19,7 +19,7 @@ import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourL
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
-import { UI, FoyersAttaque, toucherArmee, resumeReglages } from './ui.js';
+import { UI, FoyersAttaque, toucherArmee, resumeReglages, toucherNouvellePartie } from './ui.js';
 import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
@@ -1491,22 +1491,47 @@ function refreshPalmares() {
   node.classList.toggle('hidden', !resume);
 }
 
+/**
+ * « Jouer » quand une partie dort : la lancer efface l'autre, et le bouton est
+ * resté sous le pouce. Il s'arme au premier toucher et n'efface qu'au second
+ * (voir toucherNouvellePartie) ; passé le délai, il se désarme tout seul.
+ */
+let partieEnAttente = false;   // la carte « Reprendre » est affichée
+let effacerJusqua = 0;         // « Nouvelle partie » armé jusqu'à cet instant (0 : au repos)
+let minuterieEffacer = 0;
+
+/** Le bouton dit ce qu'il fait : « Jouer », « Nouvelle partie » quand une partie dort — sans l'or, laissé à « Reprendre » —, et sa question quand il est armé. */
+function refreshJouer() {
+  const play = document.getElementById('btn-play');
+  if (!play) return;
+  const arme = partieEnAttente && performance.now() < effacerJusqua;
+  play.textContent = arme ? 'Effacer la partie en cours ?' : partieEnAttente ? 'Nouvelle partie' : 'Jouer';
+  play.classList.toggle('primary', !partieEnAttente);
+  play.classList.toggle('arme', arme);
+}
+
+/** Arme « Nouvelle partie » jusqu'à l'instant donné, ou le désarme (0). */
+function armerNouvellePartie(jusqua) {
+  clearTimeout(minuterieEffacer);
+  effacerJusqua = jusqua;
+  if (jusqua) minuterieEffacer = setTimeout(() => armerNouvellePartie(0), Math.max(0, jusqua - performance.now()));
+  refreshJouer();
+}
+
 /** Carte « reprendre » : n'apparaît que s'il y a vraiment une partie en cours. */
 function refreshResumeCard() {
   const box = document.getElementById('resume-box');
   if (!box) return;
   const save = loadSave();
-  const play = document.getElementById('btn-play');
+  // La carte change : le bouton du bas redit ce qu'il fait (« Jouer », ou
+  // « Nouvelle partie » quand une partie dort), et s'il était armé, il ne le reste pas.
+  partieEnAttente = !!save;
+  armerNouvellePartie(0);
   if (!save) {
     box.classList.add('hidden');
     box.innerHTML = '';
-    if (play) { play.textContent = 'Jouer'; play.classList.add('primary'); }
     return;
   }
-  // Le bouton dit clairement ce qu'il fait quand une partie dort déjà — et
-  // laisse l'or à « Reprendre » : resté sous le pouce, il efface la partie en
-  // cours, il ne doit pas se toucher par réflexe.
-  if (play) { play.textContent = 'Nouvelle partie'; play.classList.remove('primary'); }
   const mode = GAME_MODES[save.mode] || GAME_MODES[DEFAULT_MODE];
   const player = save.players[save.humanIndex || 0];
   const age = AGES[player ? player.age : 0];
@@ -1679,9 +1704,13 @@ function setupStartScreen() {
   });
 
   document.getElementById('btn-play').addEventListener('click', () => {
-    // Pas de boîte de confirmation : le bouton s'intitule « Nouvelle partie »
-    // quand une partie dort, et la carte de reprise est juste au-dessus. Une
-    // fenêtre modale native peut d'ailleurs être bloquée selon l'hébergement.
+    // Une partie dort : deux touchers pour l'effacer, comme « Détruire » en
+    // partie. Pas de boîte de confirmation : une fenêtre modale native peut
+    // être bloquée selon l'hébergement.
+    const toucher = toucherNouvellePartie(partieEnAttente, effacerJusqua, performance.now());
+    armerNouvellePartie(toucher.armeJusqua);
+    if (!toucher.lancer) { audio.resume(); audio.play('click'); return; }
+    // (Si c'était une partie classée, l'effacer compte comme un abandon.)
     abandonnerPartieClasseeEnCours();
     clearSave();
     startGame(avecProgression({
