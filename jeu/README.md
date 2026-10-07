@@ -283,9 +283,9 @@ inactif, `H` pour revenir au Centre-Ville.
 - **3 âges** : Âge Sombre → Âge Féodal → Âge des Châteaux, chacun débloquant
   bâtiments, unités et technologies — et chacun demandant des bâtiments
   terminés en plus de son prix.
-- **14 unités** : villageois, milicien, lancier, Atlante, Champion, archer,
-  Arbalétrier, Archer monté, éclaireur, cavalier, bélier, Catapulte, Prêtresse
-  et Hydre. Chaque unité a des bonus contre
+- **17 unités** : villageois, milicien, lancier, Atlante, Champion, archer,
+  Arbalétrier, Archer monté, éclaireur, cavalier, bélier, Catapulte, Prêtresse,
+  Hydre, Pavoisier, Frondeur et Sapeur. Chaque unité a des bonus contre
   une catégorie (le lancier mange la cavalerie, le cavalier fond sur les archers,
   le bélier démolit les bâtiments).
   - La **Prêtresse** (Temple, Âge Féodal) ne se bat pas : elle soigne d'elle-même
@@ -302,6 +302,15 @@ inactif, `H` pour revenir au Centre-Ville.
   - L'**Hydre**, monstre à sept têtes, s'invoque au Temple à l'Âge des Châteaux
     (200 de nourriture, 200 d'or) : elle encaisse comme une escouade, mord
     jusqu'à trois ennemis par coup, et occupe trois places de population.
+  - Le **Pavoisier** (caserne, Âge Féodal) : un fantassin derrière un grand
+    bouclier — une flèche d'archer ou de tour ne lui ôte qu'un point de vie.
+    Lent, il frappe peu.
+  - Le **Frondeur** (archerie, Âge Féodal) : un tireur sans or, dont la pierre
+    porte +6 contre les archers, les arbalétriers et les archers montés (un
+    bonus par type de cible, `bonusType` : l'Archer monté est de la cavalerie).
+  - Le **Sapeur** (caserne, Âge des Châteaux) : rapide, +25 contre les
+    bâtiments et +8 contre les engins de siège ; 35 points de vie, sans armure.
+    Ces trois-là se débloquent aux ligues 6 à 8 (voir le classement).
 - **13 bâtiments** : Centre-Ville, maisons, moulin, camps de dépôt, fermes,
   caserne, archerie, écurie, atelier de siège, forge, Temple de l'Hydre (dès
   l'Âge Féodal), tour de guet.
@@ -332,11 +341,13 @@ Facile). L'IA ne pose
 jamais un bâtiment qui murerait un des siens ni qui couperait un passage.
 
 À l'Âge des Châteaux elle bâtit aussi un Temple et forme toutes les troupes du
-jeu. Les unités chères ne sortiraient jamais si les fantassins buvaient l'or au
-fur et à mesure : elle en « commande » donc une à la fois et met son prix de
-côté — une Hydre tant qu'elle en a moins de deux, puis un engin de siège
-(catapulte et bélier en alternance), et deux Prêtresses au plus pour soigner
-l'armée. Attaquée chez elle, elle lâche l'épargne et forme ce qu'elle peut.
+jeu — sauf le Pavoisier, le Frondeur et le Sapeur, qu'elle ne forme que si la
+partie les lui donne (voir le classement). Les unités chères ne sortiraient
+jamais si les fantassins buvaient l'or au fur et à mesure : elle en « commande »
+donc une à la fois et met son prix de côté — une Hydre tant qu'elle en a moins
+de deux, puis un engin de siège (catapulte et bélier en alternance), et deux
+Prêtresses au plus pour soigner l'armée. Attaquée chez elle, elle lâche
+l'épargne et forme ce qu'elle peut.
 
 ## Les réglages d'octobre 2026
 
@@ -618,10 +629,36 @@ coût ne changent. En partie classée, une troupe joue à son niveau **dans la
 limite du plafond de la ligue**, et l'ouvrier monte d'office à ce plafond :
 l'économie n'est jamais inégale. En partie libre, elle joue à son niveau réel.
 
-**Quatre troupes se débloquent** — Atlante, Archer monté, Catapulte, Hydre — en
-atteignant une ligue ou après un nombre de parties jouées. Tant qu'une troupe
-n'est pas débloquée, son bouton reste visible sous cadenas, et l'ordinateur ne
-la forme pas non plus.
+**Sept troupes se débloquent**, en atteignant une ligue ou après un nombre de
+parties jouées. Tant qu'une troupe n'est pas débloquée, son bouton reste visible
+sous cadenas, et l'ordinateur ne la forme pas non plus.
+
+| Troupe | Ligue, ou parties | Ce qu'elle apporte | Sa faiblesse | Ce qui la bat |
+|---|---|---|---|---|
+| **Atlante** (caserne, Féodal) | 2, ou 10 | un fantassin robuste, +6 contre la cavalerie | il coûte de l'or, et n'a de bonus que contre la cavalerie | le Champion, à coût égal |
+| **Archer monté** (archerie, Châteaux) | 3, ou 25 | la portée d'un archer, les jambes d'un cheval : il harcèle et s'esquive | cher, et c'est de la cavalerie | les lanciers, les frondeurs |
+| **Catapulte** (atelier de siège, Châteaux) | 4, ou 50 | un boulet de zone, de loin : bâtiments et troupes à l'arrêt | lente, sans défense au contact ; une troupe en marche esquive, et le boulet blesse aussi son camp | Champions et Cavaliers au contact, les sapeurs |
+| **Hydre** (Temple, Châteaux) | 5, ou 80 | elle encaisse comme une escouade et mord trois ennemis par coup | 400 de ressources, 45 s de formation, trois places de population | rien à coût égal : dix Champions ou neuf Cavaliers tiennent tête à trois Hydres |
+| **Pavoisier** (caserne, Féodal) | 6, ou 130 | un mur contre les archers et les tours : armure de 6 contre les flèches | lent (0,85) et il frappe peu (4) | Cavaliers, Champions, et la Catapulte quand il tient la ligne |
+| **Frondeur** (archerie, Féodal) | 7, ou 180 | un tireur sans or, +6 contre archers, arbalétriers et archers montés | portée de 4, 30 points de vie, et 3 de dégâts hors de son bonus | toute troupe de mêlée : miliciens, Cavaliers |
+| **Sapeur** (caserne, Châteaux) | 8, ou 250 | rapide (1,3), +25 contre les bâtiments, +8 contre les engins de siège | 35 points de vie, aucune armure | tout soldat : un archer seul l'abat, cinq miliciens en abattent quatre sans perte |
+
+Les trois dernières sont des hypothèses de départ, mesurées en duels à prix
+égal (`node test/troupes-nouvelles.test.js`, qui écrit les temps) : sept
+frondeurs battent six archers en neuf secondes, mais quatre perdent contre
+trois miliciens ; un Pavoisier tient 34 s sous le tir de quatre archers, un
+milicien 4 s, et sept pavoisiers battent dix archers sans perdre un homme ;
+cinq sapeurs rasent une caserne en 15 s, deux béliers en 48 s. À +25, le Sapeur
+démolit donc trois fois plus vite que le bélier pour le même prix : c'est le
+réglage à surveiller.
+
+**L'ordinateur ne forme pas ces trois-là de lui-même** : sa composition d'armée
+n'a pas changé. La partie les lui donne par l'option `troupesEnPlus` de `World`
+(une liste par camp, gardée par la sauvegarde) : en partie classée, celles que
+la ligue du joueur offre ; en partie libre, celles que le joueur a débloquées.
+Il les mêle alors à sa rotation, dès que l'âge et le bâtiment le permettent.
+Les quatre premières, qui sont dans son ordinaire, lui sont au contraire
+interdites (`troupesInterdites`) tant que la ligue ne les offre pas.
 
 Ce qui ne se contourne pas : une défaite d'avant deux minutes (abandon, ou
 bâtiment principal rasé de sa propre main) coûte ses points mais ne compte ni
@@ -634,18 +671,21 @@ seuils, tables des coffres en pour-mille, coûts, améliorations, force de
 l'ordinateur) ; **les règles** dans `js/progression.js`, des fonctions pures
 sur un profil ordinaire, sans stockage, sans horloge et sans hasard caché — le
 même code pourra tourner sur un serveur qui fait foi ; **dans la partie**,
-`World` reçoit `niveaux`, `troupesInterdites` et `recolteAdverse`, et sans ces
-options elle est celle d'avant au caractère près ; **les écrans** dans
-`js/progression-ecrans.js` et `css/progression.css`. Le profil est rangé dans le
-navigateur (`aem.progression.v1`) et, quand la page est servie par un hôte qui
-prête une base par personne, il y est gardé aussi (`js/rangement-durable.js`) :
-le plus avancé des deux l'emporte au lancement.
+`World` reçoit `niveaux`, `troupesInterdites`, `troupesEnPlus` et
+`recolteAdverse`, et sans ces options elle est celle d'avant au caractère près ;
+**les écrans** dans `js/progression-ecrans.js` et `css/progression.css`. Le
+profil est rangé dans le navigateur (`aem.progression.v1`) et, quand la page est
+servie par un hôte qui prête une base par personne, il y est gardé aussi
+(`js/rangement-durable.js`) : le plus avancé des deux l'emporte au lancement.
 
 Ce qui n'existe pas encore : le serveur (rien n'est vérifié ailleurs que sur
 l'appareil, et rien ne s'achète), le jeu entre joueurs, les saisons (le moteur
-sait finir une saison, rien ne décide quand), les trois troupes nouvelles
-prévues aux ligues 6 à 8. Tests : `node test/progression.test.js`,
-`node test/progression-partie.test.js`, `node test/rangement-durable.test.js`.
+sait finir une saison, rien ne décide quand). Le Pavoisier, le Frondeur et le
+Sapeur n'ont pas encore leur modèle 3D ni leur portrait : en partie ils gardent
+le corps dessiné au code des unités sans illustration, et dans l'interface leur
+pictogramme (un pavois, une fronde, une pioche). Tests :
+`node test/progression.test.js`, `node test/progression-partie.test.js`,
+`node test/rangement-durable.test.js`, `node test/troupes-nouvelles.test.js`.
 
 ## Architecture
 
@@ -702,7 +742,7 @@ chemin sont mises en file avec un budget par tick pour éviter les à-coups.
 
 ```bash
 cd jeu
-npm test                  # sans écran : 1 494 vérifications en seize fichiers — deux IA jouent 16 minutes, sauvegarde comprise, puis les réglages d'octobre (test/reglages-*.test.js), la direction artistique (test/da-*.test.js) et le classement (test/progression*.test.js, test/rangement-durable.test.js)
+npm test                  # sans écran : 1 638 vérifications en dix-sept fichiers — deux IA jouent 16 minutes, sauvegarde comprise, puis les réglages d'octobre (test/reglages-*.test.js), la direction artistique (test/da-*.test.js), le classement (test/progression*.test.js, test/rangement-durable.test.js) et les trois troupes des ligues 6 à 8 (test/troupes-nouvelles.test.js)
 npm run test:navigateur   # Chromium (Playwright) : 213 vérifications — chargement, gestes, rendu, images/s
 ```
 

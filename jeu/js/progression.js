@@ -67,6 +67,8 @@ const NB_LIGUES = R.ligues.length;
 const EXISTANTES = Object.keys(R.troupes).filter((type) => !R.troupes[type].aVenir);
 const DE_BASE = EXISTANTES.filter((type) => !R.troupes[type].gratuite);
 const AVANCEES = EXISTANTES.filter((type) => R.troupes[type].gratuite);
+/** Parmi elles, celles que l'ordinateur ne forme que si la partie les lui donne (voir reglagesDePartie). */
+const EN_PLUS = AVANCEES.filter((type) => R.troupes[type].enPlus);
 const ORIGINES = ['ligue', 'parties', 'achat'];   // d'une troupe avancée ; une troupe de base est « base »
 const ORIGINES_DE_COFFRE = ['victoire', 'bataille', 'promotion', 'semaine', 'saison'];
 const ISSUES = ['victoire', 'defaite', 'egalite', 'abandon', 'abandonAdverse', 'annulee'];
@@ -872,6 +874,13 @@ export function debloquerParAchat(profil, type, preuve) {
  *     niveau réel, l'adversaire reste celui que le joueur a réglé.
  * Dans les deux cas, le joueur ne forme pas les troupes qu'il n'a pas
  * débloquées, et l'ordinateur ne lui oppose pas une troupe hors de sa portée.
+ *
+ * Deux listes le disent, une par camp chacune. `troupesInterdites` : ce qu'un
+ * camp ne peut pas former. `troupesEnPlus` : les troupes `enPlus` des réglages
+ * (celles des ligues 6 à 8), que l'ordinateur ne forme jamais de lui-même —
+ * il les reçoit ici, celles de la ligue en partie classée, celles que le
+ * joueur a débloquées en partie libre. Rien pour le joueur : il forme ce qu'il
+ * veut de ce qui ne lui est pas interdit.
  */
 export function reglagesDePartie(profil, mode = 'classe') {
   const p = migrerProfil(profil);
@@ -883,15 +892,23 @@ export function reglagesDePartie(profil, mode = 'classe') {
   }
   const aDebloquer = AVANCEES.filter((type) => !p.debloquees[type]);
   // (En partie libre, ce que le joueur n'a pas débloqué, l'ordinateur ne le forme pas non plus.)
-  if (!classe) return { niveaux: [niveauxDuJoueur, {}], troupesInterdites: [aDebloquer, aDebloquer] };
+  if (!classe) {
+    return {
+      niveaux: [niveauxDuJoueur, {}],
+      troupesInterdites: [aDebloquer, aDebloquer],
+      troupesEnPlus: [[], EN_PLUS.filter((type) => p.debloquees[type])],
+    };
+  }
   const adversaire = R.echelle[p.ligue - 1];
   const niveauxAdverses = {};
   if (adversaire.niveau > 1) for (const type of EXISTANTES) niveauxAdverses[type] = adversaire.niveau;
+  const offerte = (type) => R.troupes[type].gratuite.ligue <= p.ligue;
   return {
     difficulty: adversaire.difficulte,
     recolteAdverse: adversaire.recolte,
     niveaux: [niveauxDuJoueur, niveauxAdverses],
-    troupesInterdites: [aDebloquer, AVANCEES.filter((type) => R.troupes[type].gratuite.ligue > p.ligue)],
+    troupesInterdites: [aDebloquer, AVANCEES.filter((type) => !offerte(type))],
+    troupesEnPlus: [[], EN_PLUS.filter(offerte)],
   };
 }
 

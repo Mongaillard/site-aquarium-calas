@@ -83,6 +83,9 @@ export function computeDamage(attackerDef, player, target) {
     const cls = target.combatClass;
     if (attackerDef.bonus[cls]) atk += attackerDef.bonus[cls];
   }
+  // Le bonus contre un type précis s'ajoute à celui de la classe : le Frondeur
+  // vise l'Archer monté, qui est de la cavalerie. Sans ce champ, rien ne change.
+  if (attackerDef.bonusType && attackerDef.bonusType[target.type]) atk += attackerDef.bonusType[target.type];
   const armor = type === 'melee' ? target.meleeArmor() : target.pierceArmor();
   return Math.max(1, atk - armor);
 }

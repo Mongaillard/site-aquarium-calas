@@ -1,7 +1,8 @@
 // Les niveaux des troupes dans la partie : chaque camp reçoit ses niveaux à la
 // création du monde (options.niveaux), ses troupes en portent les statistiques,
 // et la sauvegarde les garde. La garantie qui compte : sans niveaux, ou avec
-// tout au niveau 1, la partie est exactement celle d'avant.
+// tout au niveau 1, la partie est exactement celle d'avant. De même sans
+// troupes interdites ni troupes en plus (voir aussi test/troupes-nouvelles.test.js).
 // Lancement : node test/progression-partie.test.js
 
 import { World } from '../js/game.js';
@@ -69,11 +70,14 @@ console.log('=== Niveaux des troupes dans la partie ===\n--- Au niveau 1, la par
     const autres = {
       'aucune troupe interdite': { troupesInterdites: [[], []] },
       'interdites illisibles': { troupesInterdites: [['licorne', 'villager'], 'toutes'], recolteAdverse: 'vite' },
+      'aucune troupe en plus': { troupesEnPlus: [[], []] },
+      'en plus illisibles': { troupesEnPlus: [['licorne', 'villager', 'deer', 'constructor'], 'toutes'] },
     };
     for (const [quoi, plus] of Object.entries(autres)) {
       check(`${nom} — ${quoi} : même partie, au caractère près`, etat(partie({ ...options, ...plus }, minutes)) === reference);
     }
     check(`${nom} — la sauvegarde ne parle pas de troupes interdites`, !reference.includes('interdites'));
+    check(`${nom} — … ni de troupes en plus`, !reference.includes('enPlus'));
     for (const [quoi, niveaux] of Object.entries(variantes)) {
       check(`${nom} — ${quoi} : même partie, au caractère près`, etat(partie({ ...options, niveaux }, minutes)) === reference);
     }
@@ -118,7 +122,7 @@ console.log('\n--- Ce qu’un niveau change, et pour qui ---');
   const max = new World({ seed: 7, niveaux: [tout, tout] });
   const intacts = ['range', 'attackSpeed', 'cost', 'trainTime', 'pop', 'los', 'radius', 'meleeArmor', 'pierceArmor', 'class', 'attackType', 'from', 'age'];
   const touches = Object.keys(tout).filter((t) => intacts.some((c) => !egal(max.defTroupe(t, 0)[c], UNIT_TYPES[t][c])));
-  check('au niveau maximum, ni la portée, ni la cadence, ni le coût, ni l’armure ne bougent', touches.length === 0 && Object.keys(tout).length === 14, touches.join(', '));
+  check('au niveau maximum, ni la portée, ni la cadence, ni le coût, ni l’armure ne bougent', touches.length === 0 && Object.keys(tout).length === 17, touches.join(', '));
   check('au-delà du maximum, le niveau est ramené au maximum', new World({ seed: 7, niveaux: [{ militia: 99 }] }).players[0].niveaux.militia === PROGRESSION.niveauMax);
 }
 
@@ -185,7 +189,11 @@ console.log('\n--- La sauvegarde ---');
 // 5. Les troupes à débloquer
 // ---------------------------------------------------------------------------
 console.log('\n--- Les troupes à débloquer ---');
+// Les quatre que l'ordinateur forme de lui-même, et qu'on lui interdit ; les
+// trois des ligues 6 à 8, qu'il ne forme que si la partie les lui donne.
 const AVANCEES = ['triton', 'horseArcher', 'catapult', 'hydra'];
+const NOUVELLES = ['pavoisier', 'frondeur', 'sapeur'];
+const SEPT = [...AVANCEES, ...NOUVELLES];
 {
   /** Un camp à l'Âge des Châteaux, riche, logé, avec tous ses bâtiments militaires debout. */
   function equiper(w, joueur) {
@@ -237,6 +245,7 @@ const AVANCEES = ['triton', 'horseArcher', 'catapult', 'hydra'];
   };
   const libre = forme([]), bride = forme(AVANCEES);
   check('sans interdit, l’ordinateur forme des troupes avancées', AVANCEES.some((t) => libre.has(t)), [...libre].join(' '));
+  check('… mais aucune des trois nouvelles : elles ne sont pas dans son ordinaire', NOUVELLES.every((t) => !libre.has(t)));
   check('avec les quatre interdites, il n’en forme aucune — et forme le reste', AVANCEES.every((t) => !bride.has(t)) && bride.has('knight'), [...bride].join(' '));
   const sansCatapulte = forme(['catapult']);
   check('sans catapulte, ses engins sont des béliers', !sansCatapulte.has('catapult') && sansCatapulte.has('ram'), [...sansCatapulte].join(' '));
@@ -253,7 +262,7 @@ console.log('\n--- Du profil à la partie, et retour ---');
 {
   const neuf = reglagesDePartie(profilNeuf());
   check('profil neuf, partie classée : ordinateur facile, tout au niveau 1, aucune troupe avancée de part et d’autre',
-    egal(neuf, { difficulty: 'easy', recolteAdverse: 0.8, niveaux: [{}, {}], troupesInterdites: [AVANCEES, AVANCEES] }), JSON.stringify(neuf));
+    egal(neuf, { difficulty: 'easy', recolteAdverse: 0.8, niveaux: [{}, {}], troupesInterdites: [SEPT, SEPT], troupesEnPlus: [[], []] }), JSON.stringify(neuf));
 
   // Ligue 5 (Argent, plafond 3), un milicien poussé au niveau 5.
   const argent = regulariser({ ...profilNeuf(), elo: 780 }).profil;
@@ -263,19 +272,25 @@ console.log('\n--- Du profil à la partie, et retour ---');
   check('… l’ouvrier est au plafond, monté d’office', classe.niveaux[0].villager === 3 && argent.troupes.villager.niveau === 3);
   check('… l’ordinateur est difficile, récolte à 1,25, toutes ses troupes au niveau 3',
     classe.difficulty === 'hard' && classe.recolteAdverse === 1.25
-    && Object.keys(classe.niveaux[1]).length === 14 && Object.values(classe.niveaux[1]).every((n) => n === 3));
-  check('… et les quatre troupes avancées sont permises aux deux camps', egal(classe.troupesInterdites, [[], []]));
+    && Object.keys(classe.niveaux[1]).length === 17 && Object.values(classe.niveaux[1]).every((n) => n === 3));
+  check('… et les quatre troupes avancées de la ligue sont permises aux deux camps — pas les trois des ligues 6 à 8',
+    egal(classe.troupesInterdites, [NOUVELLES, NOUVELLES]) && egal(classe.troupesEnPlus, [[], []]));
   check('ligue 5, partie libre : le milicien joue à son niveau réel, l’adversaire n’est pas touché',
     libre.niveaux[0].militia === 5 && egal(libre.niveaux[1], {}) && libre.difficulty === undefined && libre.recolteAdverse === undefined);
   check('profil neuf, partie libre : ce que le joueur n’a pas débloqué, l’ordinateur ne le forme pas non plus',
-    egal(reglagesDePartie(profilNeuf(), 'libre'), { niveaux: [{}, {}], troupesInterdites: [AVANCEES, AVANCEES] }));
+    egal(reglagesDePartie(profilNeuf(), 'libre'), { niveaux: [{}, {}], troupesInterdites: [SEPT, SEPT], troupesEnPlus: [[], []] }));
   const bronze = reglagesDePartie(regulariser({ ...profilNeuf(), elo: 300 }).profil);
   check('ligue 3 : le joueur a l’Atlante et l’Archer monté, l’ordinateur aussi, pas la Catapulte ni l’Hydre',
-    egal(bronze.troupesInterdites, [['catapult', 'hydra'], ['catapult', 'hydra']]) && bronze.difficulty === 'normal');
+    egal(bronze.troupesInterdites, [['catapult', 'hydra', ...NOUVELLES], ['catapult', 'hydra', ...NOUVELLES]]) && bronze.difficulty === 'normal');
   const achat = regulariser({ ...profilNeuf(), elo: 300 }).profil;
   achat.debloquees.hydra = 'achat';
   check('une troupe achetée se forme avant sa ligue ; l’ordinateur, lui, attend la ligue',
-    egal(reglagesDePartie(achat).troupesInterdites, [['catapult'], ['catapult', 'hydra']]));
+    egal(reglagesDePartie(achat).troupesInterdites, [['catapult', ...NOUVELLES], ['catapult', 'hydra', ...NOUVELLES]]));
+  // Les trois nouvelles : interdites tant que la ligue ne les offre pas, puis
+  // données EN PLUS à l'ordinateur, qui ne les forme pas de lui-même.
+  const orichalque = reglagesDePartie(regulariser({ ...profilNeuf(), elo: 2400 }).profil);
+  check('ligue 8 : plus rien d’interdit, et l’ordinateur reçoit les trois nouvelles en plus',
+    egal(orichalque.troupesInterdites, [[], []]) && egal(orichalque.troupesEnPlus, [[], NOUVELLES]));
   check('les réglages comptent une ligne par ligue, de plus en plus forte',
     PROGRESSION.echelle.length === PROGRESSION.ligues.length
     && PROGRESSION.echelle.every((e, i) => DIFFICULTIES[e.difficulte] && e.niveau === PROGRESSION.ligues[i].plafond && (i === 0 || e.recolte > PROGRESSION.echelle[i - 1].recolte)));

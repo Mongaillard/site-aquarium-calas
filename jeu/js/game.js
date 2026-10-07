@@ -44,6 +44,17 @@ function niveauxLus(donnes) {
   return niveaux;
 }
 
+/**
+ * Une liste de troupes donnée à une partie (interdites, en plus) : les types
+ * que le jeu connaît, sans l'ouvrier ni les animaux. Tout le reste — liste
+ * illisible, type inconnu — est ignoré.
+ */
+function troupesLues(liste) {
+  const connue = (type) => typeof type === 'string' && Object.prototype.hasOwnProperty.call(UNIT_TYPES, type)
+    && UNIT_TYPES[type].class !== 'villager' && UNIT_TYPES[type].class !== 'animal';
+  return new Set(Array.isArray(liste) ? liste.filter(connue) : []);
+}
+
 function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
   return {
     index, name, isAI,
@@ -57,6 +68,11 @@ function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
     // Les troupes que ce camp ne peut pas former : celles qu'il n'a pas encore
     // débloquées (voir canTrain). Vide, tout se forme comme avant.
     interdites: new Set(),
+    // Les troupes que ce camp AJOUTE à ce que son intelligence artificielle
+    // forme d'habitude (voir AIPlayer.manageMilitary) : les trois des ligues 6
+    // à 8, qu'elle ne forme jamais d'elle-même. Vide, elle forme ce qu'elle a
+    // toujours formé. Sans effet pour qui joue à la main : il forme ce qu'il veut.
+    enPlus: new Set(),
     // Réaffectation automatique des villageois quand un gisement s'épuise.
     // Toujours active pour l'IA ; côté joueur c'est un choix, désactivé par
     // défaut : les ouvriers sont affectés à la main.
@@ -124,10 +140,12 @@ export class World {
     this.players.forEach((joueur, i) => { joueur.niveaux = niveauxLus(niveaux[i]); });
     // Les troupes à débloquer : jamais l'ouvrier, sans lui il n'y a pas de partie.
     const interdites = Array.isArray(options.troupesInterdites) ? options.troupesInterdites : [];
-    this.players.forEach((joueur, i) => {
-      const liste = Array.isArray(interdites[i]) ? interdites[i] : [];
-      joueur.interdites = new Set(liste.filter((type) => UNIT_TYPES[type] && UNIT_TYPES[type].class !== 'villager' && UNIT_TYPES[type].class !== 'animal'));
-    });
+    this.players.forEach((joueur, i) => { joueur.interdites = troupesLues(interdites[i]); });
+    // Les troupes en plus : celles que la partie permet à l'ordinateur de former
+    // au-delà de son ordinaire. Une troupe à la fois interdite et en plus reste
+    // interdite (voir canTrain).
+    const enPlus = Array.isArray(options.troupesEnPlus) ? options.troupesEnPlus : [];
+    this.players.forEach((joueur, i) => { joueur.enPlus = troupesLues(enPlus[i]); });
     // La force de l'ordinateur en partie classée suit la ligue : sa récolte
     // peut être donnée à part de sa difficulté (voir PROGRESSION.echelle).
     if (options.recolteAdverse > 0) this.players[1].mods.gatherRate = options.recolteAdverse;

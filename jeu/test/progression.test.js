@@ -70,10 +70,10 @@ function profilA(elo) {
   p.coffres = [];
   return p;
 }
-/** Un profil neuf où les quatre troupes avancées sont débloquées. */
+/** Un profil neuf où les sept troupes avancées sont débloquées. */
 function toutDebloque() {
   const p = profilNeuf();
-  for (const type of ['triton', 'horseArcher', 'catapult', 'hydra']) p.debloquees[type] = 'ligue';
+  for (const type of ['triton', 'horseArcher', 'catapult', 'hydra', 'pavoisier', 'frondeur', 'sapeur']) p.debloquees[type] = 'ligue';
   return p;
 }
 const avecCoffre = (profil, ...types) => ({ ...profil, coffres: types.map((type) => ({ type, origine: 'victoire' })) });
@@ -88,10 +88,11 @@ function aleaEcrit(...nombres) {
 const R = PROGRESSION;
 const QUATORZE = ['villager', 'militia', 'spearman', 'archer', 'scout', 'knight', 'champion', 'crossbowman',
   'priest', 'ram', 'triton', 'horseArcher', 'catapult', 'hydra'];
-const NOUVELLES = ['pavoisier', 'frondeur', 'sapeur'];
+const NOUVELLES = ['pavoisier', 'frondeur', 'sapeur'];   // celles des ligues 6 à 8, arrivées après les quatorze
+const DIX_SEPT = [...QUATORZE, ...NOUVELLES];
 const COMMUNES = ['villager', 'militia', 'spearman', 'archer', 'scout'];
 const RARES = ['knight', 'champion', 'crossbowman', 'priest', 'ram'];
-const EPIQUES = ['triton', 'horseArcher', 'catapult', 'hydra'];
+const EPIQUES = ['triton', 'horseArcher', 'catapult', 'hydra', ...NOUVELLES];
 
 console.log('=== Moteur de progression ===\n');
 
@@ -134,17 +135,24 @@ console.log('--- Les réglages ---');
   const categorie = (nom) => Object.keys(R.troupes).filter((t) => R.troupes[t].categorie === nom);
   check('catégories : cinq communes', egal(categorie('commune'), COMMUNES));
   check('… cinq rares', egal(categorie('rare'), RARES));
-  check('… les épiques : quatre troupes avancées, puis les trois nouvelles', egal(categorie('epique'), [...EPIQUES, ...NOUVELLES]));
+  check('… les épiques : quatre troupes avancées, puis les trois nouvelles', egal(categorie('epique'), EPIQUES) && EPIQUES.length === 7);
   const formables = Object.keys(UNIT_TYPES).filter((t) => UNIT_TYPES[t].class !== 'animal').sort();
-  check('les troupes du jeu sont les quatorze de js/config.js',
-    egal(Object.keys(R.troupes).filter((t) => !R.troupes[t].aVenir).sort(), formables) && egal([...QUATORZE].sort(), formables),
+  check('les troupes du jeu sont les dix-sept de js/config.js',
+    egal(Object.keys(R.troupes).sort(), formables) && egal([...DIX_SEPT].sort(), formables) && formables.length === 17,
     formables.join(', '));
-  check('les trois nouvelles sont « à venir », absentes du jeu',
-    NOUVELLES.every((t) => R.troupes[t].aVenir === true && !UNIT_TYPES[t]) && Object.keys(R.troupes).filter((t) => R.troupes[t].aVenir).length === 3);
-  check('… avec leurs statistiques de départ',
-    egal(R.troupes.pavoisier.depart, { cost: { food: 60, gold: 40 }, hp: 70, attack: 4, contact: true, speed: 0.85, pierceArmor: 6 })
-    && egal(R.troupes.frondeur.depart, { cost: { food: 30, wood: 30 }, hp: 30, attack: 3, range: 4, speed: 1.05, bonusContre: { archer: 6, horseArcher: 6 } })
-    && egal(R.troupes.sapeur.depart, { cost: { food: 50, gold: 40 }, hp: 35, attack: 3, contact: true, speed: 1.3, bonus: { building: 25, siege: 8 } }));
+  check('les trois nouvelles existent dans le jeu : plus aucune troupe n’est « à venir »',
+    NOUVELLES.every((t) => R.troupes[t].aVenir === undefined && !!UNIT_TYPES[t]) && Object.keys(R.troupes).every((t) => !R.troupes[t].aVenir));
+  // Ce que le document leur donnait au départ, lu désormais là où vivent les
+  // statistiques de toutes les troupes : js/config.js.
+  const depart = (t, champs) => Object.fromEntries(champs.map((c) => [c, UNIT_TYPES[t][c]]));
+  check('… avec leurs statistiques de départ, rangées dans js/config.js et plus dans les réglages',
+    egal(depart('pavoisier', ['cost', 'hp', 'attack', 'speed', 'pierceArmor']), { cost: { food: 60, gold: 40 }, hp: 70, attack: 4, speed: 0.85, pierceArmor: 6 })
+    && egal(depart('frondeur', ['cost', 'hp', 'attack', 'range', 'speed', 'bonus', 'bonusType']),
+      { cost: { food: 30, wood: 30 }, hp: 30, attack: 3, range: 4, speed: 1.05, bonus: { archer: 6 }, bonusType: { horseArcher: 6 } })
+    && egal(depart('sapeur', ['cost', 'hp', 'attack', 'speed', 'bonus']), { cost: { food: 50, gold: 40 }, hp: 35, attack: 3, speed: 1.3, bonus: { building: 25, siege: 8 } })
+    && NOUVELLES.every((t) => R.troupes[t].depart === undefined && R.troupes[t].nom === undefined));
+  check('… elles seules sont « en plus » : l’ordinateur ne les forme que si la partie les lui donne',
+    egal(Object.keys(R.troupes).filter((t) => R.troupes[t].enPlus), NOUVELLES) && NOUVELLES.every((t) => R.troupes[t].enPlus === true));
 
   check('coûts en fragments : 20, 60, 150, 400 — 6, 20, 50, 130 — 3, 8, 20, 50',
     egal(R.couts, { commune: [20, 60, 150, 400], rare: [6, 20, 50, 130], epique: [3, 8, 20, 50] }));
@@ -230,13 +238,14 @@ console.log('\n--- Le profil ---');
     p.version === VERSION_PROFIL && p.version === 1 && p.elo === 0 && p.ligue === 1 && p.plusHauteLigue === 1
     && p.parties === 0 && p.victoires === 0 && p.defaites === 0 && p.egalites === 0 && p.pointsDeBataille === 0
     && p.eclats === 0 && p.saison === 1 && egal(p.promotions, []) && egal(p.coffres, []) && egal(p.journal, []));
-  check('… les quatorze troupes au niveau 1, sans fragment',
-    egal(Object.keys(p.troupes), QUATORZE) && QUATORZE.every((t) => egal(p.troupes[t], { niveau: 1, fragments: 0 })));
+  check('… les dix-sept troupes au niveau 1, sans fragment',
+    egal(Object.keys(p.troupes), DIX_SEPT) && DIX_SEPT.every((t) => egal(p.troupes[t], { niveau: 1, fragments: 0 })));
   check('… les dix troupes de base débloquées d’office, les avancées verrouillées',
     egal(p.debloquees, Object.fromEntries([...COMMUNES, ...RARES].map((t) => [t, 'base']))));
   check('… ses compteurs du jour : coffres de bois, abandons précoces',
     p.jour.coffresBois === 0 && p.jour.abandonsPrecoces === 0 && p.jour.date === '' && p.rechercheFermeeJusqua === 0);
-  check('… aucune trace des troupes à venir', NOUVELLES.every((t) => !(t in p.troupes) && !(t in p.debloquees)));
+  check('… les trois nouvelles y sont, verrouillées comme les autres avancées',
+    NOUVELLES.every((t) => egal(p.troupes[t], { niveau: 1, fragments: 0 }) && !(t in p.debloquees)));
   const autre = profilNeuf();
   autre.troupes.archer.niveau = 3; autre.coffres.push({ type: 'or', origine: 'promotion' });
   check('deux profils neufs ne partagent rien', p.troupes.archer.niveau === 1 && p.coffres.length === 0 && egal(profilNeuf(), p));
@@ -247,7 +256,7 @@ console.log('\n--- Le profil ---');
   for (let n = 0; n < 45; n++) {
     riche = appliquerResultat(riche, partie(alea() < 0.7 ? 'victoire' : 'defaite', { jour: jourDe(Math.floor(n / 3)), instant: 1000 + n })).profil;
     while (riche.coffres.length > 2) riche = ouvrirCoffre(riche, 0, alea).profil;
-    for (const type of QUATORZE) { const r = ameliorer(riche, type); if (!r.erreur) riche = r.profil; }
+    for (const type of DIX_SEPT) { const r = ameliorer(riche, type); if (!r.erreur) riche = r.profil; }
   }
   riche = finDeSaison(riche).profil;
   const texte = JSON.stringify(riche);
@@ -266,7 +275,7 @@ console.log('\n--- Le profil ---');
   check('… et la partie continue de la même façon sur l’original et sur la copie relue', egal(suite(riche), suite(relu)));
   check('un profil qui a vécu reste un profil valide', egal(migrerProfil(riche), riche) && riche.parties === 45 && riche.saison === 2
     && riche.debloquees.hydra === 'achat' && riche.ligue > 1 && riche.journal.length === R.profil.journal
-    && QUATORZE.some((t) => riche.troupes[t].niveau > 1) && riche.coffres.length > 0,
+    && DIX_SEPT.some((t) => riche.troupes[t].niveau > 1) && riche.coffres.length > 0,
     `ligue ${riche.ligue}, ${riche.elo} points, ${riche.operations} opérations`);
 
   // N'importe quoi en entrée.
@@ -283,7 +292,7 @@ console.log('\n--- Le profil ---');
   }
   check('migrerProfil ne lève jamais d’erreur, quoi qu’on lui donne', leve === null && rendus.length === abimes.length, `${abimes.length} entrées abîmées`);
   check('… et rend toujours un profil valide, qui tient en JSON',
-    rendus.every((r) => egal(migrerProfil(r), r) && egal(JSON.parse(JSON.stringify(r)), r) && r.version === 1 && egal(Object.keys(r.troupes), QUATORZE)));
+    rendus.every((r) => egal(migrerProfil(r), r) && egal(JSON.parse(JSON.stringify(r)), r) && r.version === 1 && egal(Object.keys(r.troupes), DIX_SEPT)));
   check('… ce qui n’est pas un profil donne un profil neuf', [undefined, null, 42, 'profil', [], {}].every((x) => egal(migrerProfil(x), profilNeuf())));
   check('… un objet illisible aussi', egal(migrerProfil(piege), profilNeuf()));
 
@@ -302,12 +311,15 @@ console.log('\n--- Le profil ---');
     JSON.stringify({ elo: repare.elo, ligue: repare.ligue, parties: repare.parties, points: repare.pointsDeBataille }));
   check('… promotions sans doublon ni intrus, coffres inconnus écartés',
     egal(repare.promotions, [2, 3]) && egal(repare.coffres, [{ type: 'or', origine: 'promotion' }, { type: 'bois', origine: 'autre' }]));
-  check('… niveaux et fragments ramenés dans leurs bornes, troupes inconnues ou à venir écartées',
+  check('… niveaux et fragments ramenés dans leurs bornes, troupes inconnues écartées',
     egal(repare.troupes.archer, { niveau: 5, fragments: 0 }) && egal(repare.troupes.knight, { niveau: 2, fragments: 7 })
-    && egal(Object.keys(repare.troupes), QUATORZE));
+    && egal(Object.keys(repare.troupes), DIX_SEPT) && !('dragon' in repare.troupes));
   check('… une troupe de base reste débloquée, une origine invalide ne débloque rien',
     repare.debloquees.villager === 'base' && repare.debloquees.hydra === 'achat' && !('triton' in repare.debloquees)
-    && !('catapult' in repare.debloquees) && !('pavoisier' in repare.debloquees) && !('dragon' in repare.debloquees));
+    && !('catapult' in repare.debloquees) && !('dragon' in repare.debloquees));
+  check('… le Pavoisier, qui existe désormais, se relit comme toute troupe avancée : son niveau, ses fragments, son achat',
+    egal(repare.troupes.pavoisier, { niveau: 4, fragments: 9 }) && repare.debloquees.pavoisier === 'achat'
+    && !('frondeur' in repare.debloquees) && !('sapeur' in repare.debloquees));
   check('… date illisible effacée, compteurs du jour bornés', repare.jour.date === '' && repare.jour.coffresBois === 2 && repare.jour.abandonsPrecoces === 0
     && egal(repare.semaine, { numero: 0, jours: 7, coffre: false }) && repare.rechercheFermeeJusqua === 0);
   check('… journal ramené à sa taille, sans rien qui ne tienne pas en JSON',
@@ -495,12 +507,50 @@ console.log('\n--- Troupes avancées gratuites ---');
   check('une troupe déjà débloquée ne l’est pas une seconde fois',
     gagnee.profil.ligue === 2 && gagnee.profil.debloquees.triton === 'parties' && parType(gagnee.evenements, 'troupeDebloquee').length === 0);
 
+
+  // Les trois nouvelles : comme les quatre autres, la ligue OU les parties.
+  const suite = jouer(longue.profil, 'D'.repeat(170), { jour: jourDe(5) });
+  check('les trois nouvelles par le nombre de parties : le Pavoisier à 130, le Frondeur à 180, le Sapeur à 250',
+    egal(parType(suite.evenements, 'troupeDebloquee').map((x) => [x.troupe, x.origine]), NOUVELLES.map((t) => [t, 'parties']))
+    && suite.profil.parties === 250 && suite.profil.ligue === 1 && NOUVELLES.every((t) => suite.profil.debloquees[t] === 'parties'));
+  const a129 = jouer(longue.profil, 'D'.repeat(49)).profil, a179 = jouer(a129, 'D'.repeat(50)).profil, a249 = jouer(a179, 'D'.repeat(70)).profil;
+  check('… pas une partie plus tôt',
+    a129.parties === 129 && !a129.debloquees.pavoisier && jouer(a129, 'D').profil.debloquees.pavoisier === 'parties'
+    && a179.parties === 179 && !a179.debloquees.frondeur && jouer(a179, 'D').profil.debloquees.frondeur === 'parties'
+    && a249.parties === 249 && !a249.debloquees.sapeur && jouer(a249, 'D').profil.debloquees.sapeur === 'parties');
+  const enLigue = (elo) => regulariser({ ...profilNeuf(), elo }).profil;
+  check('… par la ligue : rien en ligue 5, le Pavoisier en 6, le Frondeur en 7, le Sapeur en 8',
+    egal([750, 1150, 1650, 2300].map((elo) => NOUVELLES.filter((t) => enLigue(elo).debloquees[t] === 'ligue')),
+      [[], ['pavoisier'], ['pavoisier', 'frondeur'], NOUVELLES])
+    && egal([1149, 1649, 2299].map((elo) => NOUVELLES.filter((t) => enLigue(elo).debloquees[t])), [[], ['pavoisier'], ['pavoisier', 'frondeur']]));
+  const promue = appliquerResultat(profilA(1120), partie('victoire'));
+  check('… la victoire qui fait entrer en ligue 6 annonce le Pavoisier',
+    promue.profil.ligue === 6 && egal(parType(promue.evenements, 'troupeDebloquee'), [{ type: 'troupeDebloquee', troupe: 'pavoisier', origine: 'ligue' }]));
+
   const sommet = regulariser({ ...profilNeuf(), elo: 4200, parties: 600, victoires: 400, defaites: 200 });
-  check('les trois nouvelles ne se débloquent jamais tant qu’elles sont « à venir » : ni en ligue 10, ni après 600 parties',
-    sommet.profil.ligue === 10 && egal(Object.keys(sommet.profil.debloquees).sort(), [...QUATORZE].sort())
-    && NOUVELLES.every((t) => !(t in sommet.profil.debloquees) && !(t in sommet.profil.troupes))
-    && parType(sommet.evenements, 'troupeDebloquee').every((x) => QUATORZE.includes(x.troupe)));
-  check('… les ligues 6, 7 et 8 donnent quand même leur coffre', coffresDe(sommet.profil, 'or') === 6 && coffresDe(sommet.profil, 'legendaire') === 3);
+  check('en ligue 10, les sept troupes avancées sont débloquées, par la ligue : plus rien à débloquer',
+    sommet.profil.ligue === 10 && egal(Object.keys(sommet.profil.debloquees).sort(), [...DIX_SEPT].sort())
+    && EPIQUES.every((t) => sommet.profil.debloquees[t] === 'ligue')
+    && egal(parType(sommet.evenements, 'troupeDebloquee').map((x) => x.troupe), EPIQUES));
+  check('… les ligues 6, 7 et 8 donnent aussi leur coffre', coffresDe(sommet.profil, 'or') === 6 && coffresDe(sommet.profil, 'legendaire') === 3);
+
+  // Un profil rangé avant l'arrivée des trois troupes : ni leur niveau, ni leur
+  // déblocage n'y figurent.
+  const ancien = (elo, parties = 0) => {
+    const q = regulariser({ ...profilNeuf(), elo, parties, defaites: parties }).profil;
+    for (const t of NOUVELLES) { delete q.troupes[t]; delete q.debloquees[t]; }
+    return JSON.parse(JSON.stringify(q));
+  };
+  const relu = migrerProfil(ancien(800));
+  check('un profil d’avant les trois troupes se relit sans erreur : elles y entrent au niveau 1, verrouillées',
+    relu.ligue === 5 && egal(Object.keys(relu.troupes), DIX_SEPT) && NOUVELLES.every((t) => egal(relu.troupes[t], { niveau: 1, fragments: 0 }) && !(t in relu.debloquees))
+    && relu.debloquees.hydra === 'ligue' && egal(regulariser(ancien(800)).evenements, []));
+  const reluHaut = regulariser(ancien(1700)), reluVieux = regulariser(ancien(0, 200));
+  check('… et reçoit celles dont il remplit déjà la condition : la ligue 7, ou 200 parties jouées',
+    egal(parType(reluHaut.evenements, 'troupeDebloquee').map((x) => [x.troupe, x.origine]), [['pavoisier', 'ligue'], ['frondeur', 'ligue']])
+    && !reluHaut.profil.debloquees.sapeur
+    && egal(parType(reluVieux.evenements, 'troupeDebloquee').map((x) => [x.troupe, x.origine]), [['pavoisier', 'parties'], ['frondeur', 'parties']])
+    && !reluVieux.profil.debloquees.sapeur);
 }
 
 // ---------------------------------------------------------------------------
@@ -640,8 +690,16 @@ console.log('\n--- Ouvrir un coffre ---');
   const hautes = ouvrirCoffre(avecCoffre(toutDebloque(), 'bois'), 0, aleaEcrit(0.9705, 0, 0.9999, 0.9999, 0, 0));
   check('les bornes de la table : 799 commune, 800 et 969 rare, 970 et 999 épique, 0 commune',
     egal(limites.tirages.map((t) => t.tiree), ['commune', 'rare', 'rare']) && egal(hautes.tirages.map((t) => t.tiree), ['epique', 'epique', 'commune']));
-  check('… avec une troupe épique débloquée, l’épique donne 1 fragment d’épique',
-    hautes.tirages[0].troupe === 'triton' && hautes.tirages[0].fragments === 1 && hautes.tirages[1].troupe === 'hydra');
+  check('… avec les épiques débloquées, l’épique donne 1 fragment d’épique : de la première, l’Atlante, à la dernière, le Sapeur',
+    hautes.tirages[0].troupe === 'triton' && hautes.tirages[0].fragments === 1 && hautes.tirages[1].troupe === 'sapeur' && hautes.tirages[1].fragments === 1);
+  const epique = (profil, nombre) => ouvrirCoffre(avecCoffre(profil, 'bois'), 0, aleaEcrit(0.99, nombre)).tirages[0].troupe;
+  check('… les sept épiques se partagent le tirage à parts égales, les trois nouvelles comprises',
+    egal([0, 1, 2, 3, 4, 5, 6].map((i) => epique(toutDebloque(), (i + 0.5) / 7)), EPIQUES));
+  const sansLesNouvelles = toutDebloque();
+  for (const t of NOUVELLES) delete sansLesNouvelles.debloquees[t];
+  check('… verrouillées, les trois nouvelles ne sortent pas : le tirage épique reste entre les quatre autres',
+    egal([0, 1, 2, 3].map((i) => epique(sansLesNouvelles, (i + 0.5) / 4)), ['triton', 'horseArcher', 'catapult', 'hydra'])
+    && epique(sansLesNouvelles, 0.9999) === 'hydra');
   check('… on ouvre le coffre désigné, les autres attendent', limites.profil.coffres.length === 1
     && ouvrirCoffre(avecCoffre(profilNeuf(), 'bois', 'or', 'argent'), 1, aleaEcrit()).coffre === 'or'
     && egal(ouvrirCoffre(avecCoffre(profilNeuf(), 'bois', 'or', 'argent'), 1, aleaEcrit()).profil.coffres.map((c) => c.type), ['bois', 'argent']));
@@ -673,17 +731,23 @@ console.log('\n--- Ouvrir un coffre ---');
     && perdu.tirages[1].troupe === 'knight' && perdu.tirages[2].troupe === 'triton' && perdu.profil.eclats === 0
     && perdu.evenements[0].eclats === 0);
   const resteLHydre = toutDebloque();
-  for (const t of QUATORZE) if (t !== 'hydra') resteLHydre.troupes[t].niveau = 5;
+  for (const t of DIX_SEPT) if (t !== 'hydra') resteLHydre.troupes[t].niveau = 5;
   const versLHydre = ouvrirCoffre(avecCoffre(resteLHydre, 'bois'), 0, aleaEcrit(0.1, 0, 0.9, 0, 0.99, 0));
   check('tout au maximum sauf l’Hydre : chaque tirage finit sur elle, avec la quantité des épiques',
     versLHydre.tirages.every((t) => t.troupe === 'hydra' && t.categorie === 'epique' && t.fragments === 1 && t.eclats === 0)
     && versLHydre.profil.troupes.hydra.fragments === 3 && versLHydre.profil.eclats === 0);
   const toutMax = toutDebloque();
-  for (const t of QUATORZE) toutMax.troupes[t].niveau = 5;
+  for (const t of DIX_SEPT) toutMax.troupes[t].niveau = 5;
   const eclats = ouvrirCoffre(avecCoffre(toutMax, 'legendaire'), 0, aleaDeGraine(4));
   check('tout au maximum : le coffre entier devient des éclats, aucun fragment',
     eclats.tirages.length === 10 && eclats.tirages.every((t) => t.troupe === null && t.fragments === 0 && t.eclats === 16)
-    && eclats.profil.eclats === 160 && QUATORZE.every((t) => eclats.profil.troupes[t].fragments === 0));
+    && eclats.profil.eclats === 160 && DIX_SEPT.every((t) => eclats.profil.troupes[t].fragments === 0));
+  const resteUneNouvelle = toutDebloque();
+  for (const t of DIX_SEPT) if (t !== 'frondeur') resteUneNouvelle.troupes[t].niveau = 5;
+  const versLeFrondeur = ouvrirCoffre(avecCoffre(resteUneNouvelle, 'legendaire'), 0, aleaDeGraine(4));
+  check('tout au maximum sauf le Frondeur : pas un éclat tant qu’une nouvelle peut encore monter',
+    versLeFrondeur.tirages.every((t) => t.troupe === 'frondeur' && t.fragments === 4 && t.eclats === 0)
+    && versLeFrondeur.profil.eclats === 0 && versLeFrondeur.profil.troupes.frondeur.fragments === 40);
 
   // Tirages garantis.
   const or = ouvrirCoffre(avecCoffre(toutDebloque(), 'or'), 0, aleaEcrit(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
@@ -794,15 +858,15 @@ console.log('\n--- 20 000 coffres par type ---');
         `${(garanties.rare / N * 100).toFixed(1)} %`);
     }
   }
-  check('seules les quatorze troupes du jeu sortent des coffres — jamais une troupe à venir',
-    sortis.size === 14 && QUATORZE.every((t) => sortis.has(t)) && NOUVELLES.every((t) => !sortis.has(t)));
+  check('les dix-sept troupes du jeu sortent des coffres, les trois nouvelles comprises — et rien d’autre',
+    sortis.size === 17 && DIX_SEPT.every((t) => sortis.has(t)));
   const ecartMax = (categorie) => {
     const parts = Object.values(partsDesTroupes[categorie]);
     const total = somme(parts);
     return Math.max(...parts.map((n) => Math.abs(n / total - 1 / parts.length)));
   };
   check('dans une catégorie, chaque troupe a la même chance (à un point près)',
-    Object.keys(partsDesTroupes.commune).length === 5 && Object.keys(partsDesTroupes.rare).length === 5 && Object.keys(partsDesTroupes.epique).length === 4
+    Object.keys(partsDesTroupes.commune).length === 5 && Object.keys(partsDesTroupes.rare).length === 5 && Object.keys(partsDesTroupes.epique).length === 7
     && ecartMax('commune') < 0.01 && ecartMax('rare') < 0.01 && ecartMax('epique') < 0.01,
     `écarts ${(ecartMax('commune') * 100).toFixed(2)} / ${(ecartMax('rare') * 100).toFixed(2)} / ${(ecartMax('epique') * 100).toFixed(2)} points`);
 }
@@ -818,9 +882,10 @@ console.log('\n--- Améliorer ---');
     return p;
   };
   check('une troupe non débloquée ne s’améliore pas, même avec ses fragments',
-    ameliorer(avec('triton', 50), 'triton').erreur === 'verrouillee' && ameliorer(avec('hydra', 50), 'hydra').erreur === 'verrouillee');
-  check('une troupe inconnue ou à venir non plus',
-    ['dragon', 'pavoisier', 'constructor', '__proto__', undefined, 3].every((t) => ameliorer(profilNeuf(), t).erreur === 'inconnue'));
+    ameliorer(avec('triton', 50), 'triton').erreur === 'verrouillee' && ameliorer(avec('hydra', 50), 'hydra').erreur === 'verrouillee'
+    && NOUVELLES.every((t) => ameliorer(avec(t, 50), t).erreur === 'verrouillee'));
+  check('une troupe inconnue non plus',
+    ['dragon', 'constructor', '__proto__', undefined, 3].every((t) => ameliorer(profilNeuf(), t).erreur === 'inconnue'));
   const court = ameliorer(avec('archer', 19), 'archer');
   check('il manque un fragment : refus, avec ce qu’il manque', egal(court, { erreur: 'fragments', cout: 20, fragments: 19, manque: 1 }));
   const depart = geler(avec('archer', 25));
@@ -845,10 +910,14 @@ console.log('\n--- Améliorer ---');
   check('rare : 6, 20, 50, 130 — 206 en tout', egal(rare.couts, [6, 20, 50, 130]) && egal(rare.p.troupes.knight, { niveau: 5, fragments: 0 }));
   const epique = escalier('catapult', 81, toutDebloque());
   check('épique : 3, 8, 20, 50 — 81 en tout', egal(epique.couts, [3, 8, 20, 50]) && egal(epique.p.troupes.catapult, { niveau: 5, fragments: 0 }));
+  check('… les trois nouvelles au même prix : 81 fragments mènent chacune au niveau 5, pas un de moins',
+    NOUVELLES.every((t) => egal(escalier(t, 81, toutDebloque()).couts, [3, 8, 20, 50]) && egal(escalier(t, 81, toutDebloque()).p.troupes[t], { niveau: 5, fragments: 0 })
+      && escalier(t, 80, toutDebloque()).p.troupes[t].niveau === 4));
   check('au niveau maximum, on ne monte plus', ameliorer(avec('archer', 9999, 5), 'archer').erreur === 'niveauMax');
   check('coutAmelioration : le prix du niveau suivant, rien au niveau maximum',
     coutAmelioration('archer', 1) === 20 && coutAmelioration('ram', 3) === 50 && coutAmelioration('hydra', 4) === 50
-    && coutAmelioration('archer', 5) === null && coutAmelioration('dragon', 1) === null && coutAmelioration('pavoisier', 1) === null);
+    && coutAmelioration('archer', 5) === null && coutAmelioration('dragon', 1) === null
+    && egal(NOUVELLES.map((t) => [1, 2, 3, 4, 5].map((n) => coutAmelioration(t, n))), [[3, 8, 20, 50, null], [3, 8, 20, 50, null], [3, 8, 20, 50, null]]));
 }
 
 // ---------------------------------------------------------------------------
@@ -878,7 +947,11 @@ console.log('\n--- Niveau effectif ---');
   check('amical « niveaux réels » : le niveau réel', niveauEffectif(p, 'archer', { mode: 'amical', egaux: false }) === 4
     && niveauEffectif(p, 'villager', { mode: 'amical', egaux: false }) === 5);
   check('une troupe que le profil ne connaît pas joue au niveau 1',
-    niveauEffectif(p, 'deer') === 1 && niveauEffectif(p, 'pavoisier', { mode: 'classe' }) === 1 && niveauEffectif(p, 'constructor') === 1);
+    niveauEffectif(p, 'deer') === 1 && niveauEffectif(p, 'dragon', { mode: 'classe' }) === 1 && niveauEffectif(p, 'constructor') === 1);
+  p.troupes.pavoisier.niveau = 4;
+  check('une nouvelle troupe suit la règle des autres : son niveau, plafonné par la ligue en classé',
+    niveauEffectif(p, 'pavoisier', { mode: 'classe' }) === 3 && niveauEffectif(p, 'pavoisier', { mode: 'classe', ligue: 7 }) === 4
+    && niveauEffectif(p, 'pavoisier') === 4 && niveauEffectif(p, 'frondeur', { mode: 'classe' }) === 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -888,13 +961,14 @@ console.log('\n--- Définition au niveau ---');
 {
   const origine = JSON.stringify(UNIT_TYPES);
   const au = (type, niveau) => definitionAuNiveau(UNIT_TYPES[type], type, niveau);
-  const identiques = QUATORZE.filter((t) => egal(au(t, 1), UNIT_TYPES[t]) && JSON.stringify(au(t, 1)) === JSON.stringify(UNIT_TYPES[t]));
-  check('au niveau 1, les quatorze troupes sont identiques à UNIT_TYPES, champ par champ', identiques.length === 14,
-    `${identiques.length} sur 14`);
-  check('… sans champ ajouté ni retiré', QUATORZE.every((t) => egal(Object.keys(au(t, 1)), Object.keys(UNIT_TYPES[t]))));
+  const identiques = DIX_SEPT.filter((t) => egal(au(t, 1), UNIT_TYPES[t]) && JSON.stringify(au(t, 1)) === JSON.stringify(UNIT_TYPES[t]));
+  check('au niveau 1, les dix-sept troupes sont identiques à UNIT_TYPES, champ par champ', identiques.length === 17,
+    `${identiques.length} sur 17`);
+  check('… sans champ ajouté ni retiré', DIX_SEPT.every((t) => egal(Object.keys(au(t, 1)), Object.keys(UNIT_TYPES[t]))));
   check('… et c’est une NOUVELLE définition, qui ne partage rien avec l’originale',
-    QUATORZE.every((t) => au(t, 1) !== UNIT_TYPES[t] && au(t, 1).cost !== UNIT_TYPES[t].cost)
-    && au('villager', 1).gather !== UNIT_TYPES.villager.gather && au('spearman', 3).bonus !== UNIT_TYPES.spearman.bonus);
+    DIX_SEPT.every((t) => au(t, 1) !== UNIT_TYPES[t] && au(t, 1).cost !== UNIT_TYPES[t].cost)
+    && au('villager', 1).gather !== UNIT_TYPES.villager.gather && au('spearman', 3).bonus !== UNIT_TYPES.spearman.bonus
+    && au('frondeur', 3).bonusType !== UNIT_TYPES.frondeur.bonusType);
   check('… les animaux, qui n’ont pas de niveau, ressortent tels quels', egal(au('deer', 1), UNIT_TYPES.deer) && egal(au('pig', 4), UNIT_TYPES.pig));
 
   // L'ouvrier.
@@ -934,30 +1008,35 @@ console.log('\n--- Définition au niveau ---');
   check('archer monté : 60 PV et 5 dégâts → 72 et 6', cinq('horseArcher').hp === 72 && cinq('horseArcher').attack === 6);
   check('catapulte : 70 PV et 26 dégâts → 84 et 31,2', cinq('catapult').hp === 84 && proche(cinq('catapult').attack, 31.2) && cinq('catapult').bonus.building === 34);
   check('Hydre : 280 PV et 11 dégâts → 336 et 13,2', cinq('hydra').hp === 336 && proche(cinq('hydra').attack, 13.2) && cinq('hydra').morsures === 3);
+  check('Pavoisier : 70 PV et 4 dégâts → 84 et 4,8 ; son armure contre les flèches reste à 6',
+    cinq('pavoisier').hp === 84 && proche(cinq('pavoisier').attack, 4.8) && [1, 2, 3, 4, 5].every((n) => au('pavoisier', n).pierceArmor === 6 && au('pavoisier', n).meleeArmor === 1));
+  check('Frondeur : 30 PV et 3 dégâts → 36 et 3,6 ; ni sa portée ni ses bonus contre les tireurs ne bougent',
+    cinq('frondeur').hp === 36 && proche(cinq('frondeur').attack, 3.6)
+    && [1, 2, 3, 4, 5].every((n) => au('frondeur', n).range === 4 && egal(au('frondeur', n).bonus, { archer: 6 }) && egal(au('frondeur', n).bonusType, { horseArcher: 6 })));
+  check('Sapeur : 35 PV et 3 dégâts → 42 et 3,6 ; ses bonus contre les bâtiments et les engins ne bougent pas',
+    cinq('sapeur').hp === 42 && proche(cinq('sapeur').attack, 3.6) && [1, 2, 3, 4, 5].every((n) => egal(au('sapeur', n).bonus, { building: 25, siege: 8 })));
 
   check('règle générale : +5 % de dégâts par niveau',
     egal([1, 2, 3, 4, 5].map((n) => au('militia', n).attack), [5, 5.25, 5.5, 5.75, 6])
-    && ['knight', 'champion', 'crossbowman', 'triton', 'horseArcher', 'catapult', 'hydra', 'archer'].every((t) =>
+    && ['knight', 'champion', 'crossbowman', 'triton', 'horseArcher', 'catapult', 'hydra', 'archer', ...NOUVELLES].every((t) =>
       [1, 2, 3, 4, 5].every((n) => proche(au(t, n).attack, UNIT_TYPES[t].attack * (1 + 0.05 * (n - 1))))));
-  const militaires = QUATORZE.filter((t) => t !== 'villager');
+  const militaires = DIX_SEPT.filter((t) => t !== 'villager');
   check('… +5 % de points de vie par niveau, arrondis à l’entier : ils restent des entiers',
     egal([1, 2, 3, 4, 5].map((n) => au('militia', n).hp), [45, 47, 50, 52, 54])
     && militaires.every((t) => [1, 2, 3, 4, 5].every((n) => Number.isInteger(au(t, n).hp) && Math.abs(au(t, n).hp - UNIT_TYPES[t].hp * (1 + 0.05 * (n - 1))) <= 0.5)));
-  const fixes = ['range', 'attackSpeed', 'cost', 'trainTime', 'meleeArmor', 'pierceArmor', 'los', 'radius', 'class', 'attackType', 'from', 'age', 'pop', 'splash', 'morsures', 'name', 'id'];
+  const fixes = ['range', 'attackSpeed', 'cost', 'trainTime', 'meleeArmor', 'pierceArmor', 'los', 'radius', 'class', 'attackType', 'from', 'age', 'pop', 'splash', 'morsures', 'bonusType', 'name', 'id'];
   check('ni la portée, ni la cadence, ni le coût, ni le temps de formation ne changent, pour aucune troupe à aucun niveau',
-    QUATORZE.every((t) => [1, 2, 3, 4, 5].every((n) => fixes.every((champ) => egal(au(t, n)[champ], UNIT_TYPES[t][champ])))));
+    DIX_SEPT.every((t) => [1, 2, 3, 4, 5].every((n) => fixes.every((champ) => egal(au(t, n)[champ], UNIT_TYPES[t][champ])))));
   const monte = (type, lire) => [2, 3, 4, 5].every((n) => lire(au(type, n)) >= lire(au(type, n - 1)));
   check('une troupe ne perd jamais rien en montant de niveau',
-    QUATORZE.every((t) => monte(t, (d) => d.hp) && monte(t, (d) => d.attack) && monte(t, (d) => d.speed)));
+    DIX_SEPT.every((t) => monte(t, (d) => d.hp) && monte(t, (d) => d.attack) && monte(t, (d) => d.speed)));
   check('un niveau hors bornes est ramené dans les bornes',
     egal(au('militia', 99), au('militia', 5)) && egal(au('militia', 0), au('militia', 1)) && egal(au('militia', -3), au('militia', 1))
     && egal(au('militia', 2.9), au('militia', 2)) && egal(au('militia', undefined), au('militia', 1)) && egal(au('militia', '4'), au('militia', 1)));
   check('une troupe inconnue des réglages ressort telle quelle, à tout niveau',
     egal(definitionAuNiveau(UNIT_TYPES.militia, 'dragon', 5), UNIT_TYPES.militia) && egal(definitionAuNiveau(UNIT_TYPES.deer, 'deer', 5), UNIT_TYPES.deer));
   check('le même calcul donne deux fois le même résultat, au bit près',
-    QUATORZE.every((t) => [1, 2, 3, 4, 5].every((n) => JSON.stringify(au(t, n)) === JSON.stringify(au(t, n)))));
-  check('le jour où elles existeront, les nouvelles troupes suivront la règle générale',
-    definitionAuNiveau(R.troupes.pavoisier.depart, 'pavoisier', 5).hp === 84 && proche(definitionAuNiveau(R.troupes.sapeur.depart, 'sapeur', 5).attack, 3.6));
+    DIX_SEPT.every((t) => [1, 2, 3, 4, 5].every((n) => JSON.stringify(au(t, n)) === JSON.stringify(au(t, n)))));
   check('UNIT_TYPES n’a pas été modifié', JSON.stringify(UNIT_TYPES) === origine);
 }
 
@@ -1099,9 +1178,16 @@ console.log('\n--- Achat ---');
     && !('hydra' in neuf.debloquees) && a.profil.journal[0].op === 'achat');
   check('une troupe déjà débloquée ne s’achète pas', debloquerParAchat(a.profil, 'hydra', { valide: true }).erreur === 'dejaDebloquee'
     && debloquerParAchat(profilA(800), 'hydra', { valide: true }).erreur === 'dejaDebloquee');
-  check('une troupe de base n’est pas en vente, une troupe à venir pas encore, une inconnue jamais',
-    debloquerParAchat(neuf, 'archer', { valide: true }).erreur === 'pasEnVente' && debloquerParAchat(neuf, 'sapeur', { valide: true }).erreur === 'aVenir'
+  check('une troupe de base n’est pas en vente, une inconnue jamais',
+    debloquerParAchat(neuf, 'archer', { valide: true }).erreur === 'pasEnVente'
     && debloquerParAchat(neuf, 'dragon', { valide: true }).erreur === 'inconnue' && debloquerParAchat(neuf, 'constructor', { valide: true }).erreur === 'inconnue');
+  check('les trois nouvelles s’achètent comme les autres avancées : sur preuve, une seule fois',
+    NOUVELLES.every((t) => {
+      const achat = debloquerParAchat(neuf, t, { valide: true });
+      return debloquerParAchat(neuf, t, {}).erreur === 'preuve' && !achat.erreur && achat.profil.debloquees[t] === 'achat'
+        && egal(achat.evenements, [{ type: 'troupeDebloquee', troupe: t, origine: 'achat' }])
+        && debloquerParAchat(achat.profil, t, { valide: true }).erreur === 'dejaDebloquee';
+    }) && debloquerParAchat(profilA(1200), 'pavoisier', { valide: true }).erreur === 'dejaDebloquee');
 
   // Achetée ou gagnée : la même troupe.
   const achetee = migrerProfil(a.profil);
@@ -1201,20 +1287,25 @@ console.log('\n--- Simulation : 400 parties ---');
       proche(m.ligue, ligue, 0.8) && proche(m.commune, commune, 0.35) && proche(m.rare, rare, 0.35),
       `ligue ${m.ligue.toFixed(2)}, communes ${m.commune.toFixed(2)}, rares ${m.rare.toFixed(2)}`);
   }
-  // Le tableau compte sept épiques, dont les trois nouvelles ; le jeu n'en a
-  // encore que quatre, qui se partagent les mêmes fragments : elles montent un
-  // peu plus vite, d'où la marge plus large. Et une fois communes et rares au
-  // maximum, leurs tirages montent aux épiques : à 400 parties elles y sont.
-  check('… les épiques dans l’ordre de grandeur du tableau : 2,8 – 3,0 – 3,3 (à un niveau près, pour quatre troupes au lieu de sept), puis au maximum',
-    ['60', '120', '240'].every((jalon) => proche(releves[jalon].epique, TABLEAU[jalon][3], 1)) && releves['400'].epique >= TABLEAU['400'][3],
+  // Le tableau compte sept épiques, les trois nouvelles comprises : le jeu les
+  // a désormais toutes, et la marge est celle des communes et des rares. Une
+  // fois communes et rares au maximum, leurs tirages montent aux épiques : à
+  // 400 parties elles y sont, au-dessus des 3,6 du tableau.
+  check('… les épiques comme au tableau, sept troupes comprises : 2,8 – 3,0 – 3,3, puis au maximum',
+    ['60', '120', '240'].every((jalon) => proche(releves[jalon].epique, TABLEAU[jalon][3], 0.35)) && releves['400'].epique >= TABLEAU['400'][3],
     Object.keys(TABLEAU).map((jalon) => releves[jalon].epique.toFixed(2)).join(' – '));
   check('… la progression ne recule jamais d’un jalon au suivant',
     ['ligue', 'commune', 'rare', 'epique'].every((c) => releves[60][c] <= releves[120][c] && releves[120][c] <= releves[240][c] && releves[240][c] <= releves[400][c]));
   check('… à deux parties par jour, le plafond des coffres de bois ne joue jamais', plafonnes === 0);
   check('… l’ouvrier n’est jamais sous le plafond de sa ligue', ouvriersSousPlafond === 0);
-  check('… les troupes de base finissent au niveau maximum ; ce qui déborde ensuite devient des éclats',
-    finaux.every((p) => [...COMMUNES, ...RARES].every((t) => p.troupes[t].niveau === 5) && p.eclats > 0 && NOUVELLES.every((t) => !(t in p.debloquees))),
+  check('… les troupes de base finissent au niveau maximum, les sept avancées sont débloquées ; ce qui déborde ensuite devient des éclats',
+    finaux.every((p) => [...COMMUNES, ...RARES].every((t) => p.troupes[t].niveau === 5) && p.eclats > 0 && EPIQUES.every((t) => p.debloquees[t])),
     `éclats en fin de parcours : ${Math.round(somme(finaux.map((p) => p.eclats)) / JOUEURS)} en moyenne`);
+  // Le Sapeur n'arrive qu'en ligue 8, ou à la 250e partie : à 240 parties,
+  // seuls ceux qui ont atteint la ligue 8 l'ont déjà.
+  check('… les trois nouvelles arrivent en cours de route, et montent comme les autres',
+    finaux.every((p) => NOUVELLES.every((t) => p.troupes[t].niveau > 1)),
+    NOUVELLES.map((t) => `${t} ${(somme(finaux.map((p) => p.troupes[t].niveau)) / JOUEURS).toFixed(2)}`).join(', '));
   check(`… les ${JOUEURS} profils sont encore valides au bout de 400 parties`, valides === JOUEURS);
 }
 

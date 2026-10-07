@@ -242,9 +242,14 @@ export const PROGRESSION = figer({
   //                pose : écrit un champ qui n'existe pas au niveau 1.
   //              Ni la portée, ni la cadence, ni le coût, ni le temps de
   //              formation ne changent jamais.
+  //  enPlus    : l'ordinateur ne forme pas cette troupe de lui-même ; la
+  //              partie la lui donne, quand la ligue du joueur l'offre ou que
+  //              le joueur l'a débloquée (World, option `troupesEnPlus`, voir
+  //              reglagesDePartie). Les quatre premières troupes avancées,
+  //              elles, sont dans son ordinaire : on les lui interdit.
   //  aVenir    : la troupe n'existe pas encore dans le jeu — jamais tirée,
   //              jamais débloquée, jamais vendue tant que ce drapeau est là.
-  //  depart    : ses statistiques de départ (H), en attendant sa définition
+  //              Aucune ne le porte aujourd'hui.
   troupes: {
     // Communes (base)
     villager: {
@@ -284,25 +289,13 @@ export const PROGRESSION = figer({
     catapult: { categorie: 'epique', gratuite: { ligue: 4, parties: 50 }, prixCentimes: 199, ameliorations: PV_ET_DEGATS },
     hydra: { categorie: 'epique', gratuite: { ligue: 5, parties: 80 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS },
 
-    // Les trois nouvelles. `contact` : troupe de mêlée, sa portée exacte reste
-    // à fixer. `bonus` se lit par classe, comme dans js/config.js ;
-    // `bonusContre` par troupe, faute de classe qui dise « archers et archers
-    // montés » (l'archer monté est de la cavalerie). Sans indication, elles
-    // suivent la règle générale : points de vie et dégâts (choix).
-    pavoisier: {
-      categorie: 'epique', gratuite: { ligue: 6, parties: 130 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS,
-      aVenir: true, nom: 'Pavoisier',
-      depart: { cost: { food: 60, gold: 40 }, hp: 70, attack: 4, contact: true, speed: 0.85, pierceArmor: 6 },
-    },
-    frondeur: {
-      categorie: 'epique', gratuite: { ligue: 7, parties: 180 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS,
-      aVenir: true, nom: 'Frondeur',
-      depart: { cost: { food: 30, wood: 30 }, hp: 30, attack: 3, range: 4, speed: 1.05, bonusContre: { archer: 6, horseArcher: 6 } },
-    },
-    sapeur: {
-      categorie: 'epique', gratuite: { ligue: 8, parties: 250 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS,
-      aVenir: true, nom: 'Sapeur',
-      depart: { cost: { food: 50, gold: 40 }, hp: 35, attack: 3, contact: true, speed: 1.3, bonus: { building: 25, siege: 8 } },
-    },
+    // Les trois des ligues 6 à 8. Leurs statistiques sont dans js/config.js,
+    // comme celles des autres (Pavoisier : le mur contre les flèches ;
+    // Frondeur : le tireur qui chasse les tireurs ; Sapeur : bâtiments et
+    // engins). Sans indication, elles suivent la règle générale : points de
+    // vie et dégâts (choix).
+    pavoisier: { categorie: 'epique', gratuite: { ligue: 6, parties: 130 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS, enPlus: true },
+    frondeur: { categorie: 'epique', gratuite: { ligue: 7, parties: 180 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS, enPlus: true },
+    sapeur: { categorie: 'epique', gratuite: { ligue: 8, parties: 250 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS, enPlus: true },
   },
 });

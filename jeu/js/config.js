@@ -90,6 +90,8 @@ export const AGES = [
 //  class    : catégorie utilisée pour les bonus de dégâts
 //  attackType: 'melee' ou 'pierce' (confronté à l'armure correspondante)
 //  bonus    : dégâts supplémentaires contre une catégorie
+//  bonusType: dégâts supplémentaires contre un TYPE précis, en plus de `bonus`
+//             (voir computeDamage) — quand la catégorie ne dit pas la cible
 
 export const UNIT_TYPES = {
   villager: {
@@ -237,6 +239,45 @@ export const UNIT_TYPES = {
     from: 'siege', age: 2,
     desc: 'Lance des boulets de loin : dégâts de zone, redoutable contre les bâtiments et les troupes à l’arrêt. Un soldat ou un rang en marche l’esquive (pas une colonne profonde), et le boulet blesse aussi vos hommes. Lente, sans défense au corps à corps.',
   },
+  // Les trois troupes des ligues 6 à 8 (voir js/progression-config.js). Leurs
+  // valeurs sont des hypothèses de départ, à régler. L'ordinateur ne les forme
+  // pas de lui-même : seulement quand la partie les lui donne (World, option
+  // `troupesEnPlus`) — sans elle, une partie est celle d'avant.
+  //
+  // Le Pavoisier : un mur. Son grand bouclier arrête les flèches des archers et
+  // des tours (armure perforante 6) ; il avance lentement et frappe peu.
+  pavoisier: {
+    id: 'pavoisier', name: 'Pavoisier', icon: 'pavoisier', class: 'infantry',
+    cost: { food: 60, gold: 40 }, trainTime: 20, hp: 70, speed: 0.85,
+    attack: 4, attackType: 'melee', range: 0.8, attackSpeed: 2.0,
+    meleeArmor: 1, pierceArmor: 6, los: 5, radius: 10,
+    from: 'barracks', age: 1,
+    desc: 'Fantassin au grand bouclier : un mur contre les flèches des archers et des tours. Lent, il frappe peu — cavaliers, champions et catapultes l’enfoncent.',
+  },
+  // Le Frondeur : le tireur du pauvre, sans or. Ses pierres valent peu, sauf
+  // contre les tireurs d'en face — les archers par leur classe, l'Archer monté
+  // par son type : il est de la cavalerie, d'où `bonusType`.
+  frondeur: {
+    id: 'frondeur', name: 'Frondeur', icon: 'frondeur', class: 'archer',
+    cost: { food: 30, wood: 30 }, trainTime: 16, hp: 30, speed: 1.05,
+    attack: 3, attackType: 'pierce', range: 4, attackSpeed: 2.0,
+    bonus: { archer: 6 }, bonusType: { horseArcher: 6 },
+    meleeArmor: 0, pierceArmor: 1, los: 6, radius: 8,
+    projectile: true,
+    from: 'archery', age: 1,
+    desc: 'Tireur bon marché : ses pierres abattent les archers et les archers montés. Portée courte, et rien pour se défendre au corps à corps.',
+  },
+  // Le Sapeur : il court aux murs et aux engins, et ne tient pas sous les
+  // coups — 35 points de vie, aucune armure.
+  sapeur: {
+    id: 'sapeur', name: 'Sapeur', icon: 'sapeur', class: 'infantry',
+    cost: { food: 50, gold: 40 }, trainTime: 18, hp: 35, speed: 1.3,
+    attack: 3, attackType: 'melee', range: 0.8, attackSpeed: 2.0,
+    bonus: { building: 25, siege: 8 },
+    meleeArmor: 0, pierceArmor: 0, los: 5, radius: 9,
+    from: 'barracks', age: 2,
+    desc: 'Rapide, il sape les bâtiments et brise les engins de siège. Très fragile : tout soldat l’abat en quelques coups.',
+  },
   // Les animaux vivent sur la carte : ni produits, ni comptés dans la
   // population, sans camp (voir Animal, entities.js). `food` est ce que rend
   // leur carcasse ; un animal `sauvage` fuit quand on le frappe, un
@@ -306,13 +347,13 @@ export const BUILDING_TYPES = {
   barracks: {
     id: 'barracks', name: 'Caserne', icon: 'barracks', fem: true,
     cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
-    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['militia', 'spearman', 'triton', 'champion'], age: 0,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['militia', 'spearman', 'triton', 'champion', 'pavoisier', 'sapeur'], age: 0,
     desc: 'Forme l’infanterie.',
   },
   archery: {
     id: 'archery', name: 'Archerie', icon: 'archery', fem: true,
     cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
-    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['archer', 'crossbowman', 'horseArcher'], age: 1,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['archer', 'crossbowman', 'horseArcher', 'frondeur'], age: 1,
     desc: 'Forme les tireurs : archers, puis arbalétriers et archers montés à l’Âge des Châteaux.',
   },
   stable: {

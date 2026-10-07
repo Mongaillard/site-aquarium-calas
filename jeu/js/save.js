@@ -63,9 +63,11 @@ function serializePlayer(p) {
   return {
     civ: p.civ,
     // Les niveaux des troupes, seulement s'il y en a : une partie où tout est
-    // au niveau 1 se sauvegarde comme avant.
+    // au niveau 1 se sauvegarde comme avant. De même pour les troupes
+    // interdites et pour celles que le camp forme en plus.
     ...(Object.keys(p.niveaux || {}).length ? { niveaux: { ...p.niveaux } } : {}),
     ...(p.interdites && p.interdites.size ? { interdites: [...p.interdites] } : {}),
+    ...(p.enPlus && p.enPlus.size ? { enPlus: [...p.enPlus] } : {}),
     resources: { ...p.resources },
     age: p.age,
     ageProgress: p.ageProgress
@@ -238,6 +240,8 @@ export function restoreWorld(data) {
     // Champ absent (sauvegarde d'avant les niveaux, ou partie sans niveaux) : tout au niveau 1.
     niveaux: (data.players || []).map((j) => j && j.niveaux),
     troupesInterdites: (data.players || []).map((j) => j && j.interdites),
+    // (Champ absent : l'ordinateur ne forme rien de plus que son ordinaire.)
+    troupesEnPlus: (data.players || []).map((j) => j && j.enPlus),
   });
   world.time = data.time || 0;
   world.humanIndex = data.humanIndex || 0;

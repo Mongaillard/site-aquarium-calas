@@ -693,7 +693,11 @@ export class AIPlayer {
       if (!b.def.trains || b.type === 'towncenter') continue;
       if (b.queue.length >= 2) continue;
       if (player.pop >= player.popCap) break;
-      let options = b.def.trains.filter((t) => roster.includes(t) && UNIT_TYPES[t].age <= player.age && !player.interdites.has(t));
+      // Sa composition d'armée, plus ce que la partie lui donne en plus (les
+      // troupes des ligues 6 à 8, voir World, `troupesEnPlus`) : elles entrent
+      // dans la même rotation, sous les mêmes réserves. Sans rien en plus, la
+      // liste est celle d'avant.
+      let options = b.def.trains.filter((t) => (roster.includes(t) || player.enPlus.has(t)) && UNIT_TYPES[t].age <= player.age && !player.interdites.has(t));
       // Une Prêtresse soigne une armée qui existe : pas avant quatre soldats,
       // jamais plus de deux (celles en formation comprises).
       if (options.includes('priest')) {
