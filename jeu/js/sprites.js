@@ -1042,6 +1042,10 @@ const TEXTURES = {
  * calme que les bâtiments, et le socle s'y fond quand même (essayé de 200 à
  * 214 de rouge : plus sombre, le socle refait une tache claire) — et on
  * resserre le contraste : un grain de photo éclairci d'un tiers crierait.
+ * Les troupes ocre s'y détachent moins que sur l'herbe sombre : c'est leur
+ * anneau de camp et leur ombre qui les portent. Sept autres sables essayés
+ * sous ces troupes (plus sombres, plus pâles, moins saturés, grain plus
+ * calme) : aucun ne les détache mieux, à trois points d'écart de couleur près.
  */
 const DERIVEES = {
   sandOr: { de: 'sand', vers: [210, 165, 87], contraste: 0.7 },

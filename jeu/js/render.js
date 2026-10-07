@@ -90,6 +90,9 @@ const TEINTE_HAUT_FOND = 'rgba(150, 225, 225, 0.42)';
 const TEINTE_ECUME = 'rgba(240, 252, 255, 0.9)';
 const TRONCON = 8;                 // cases de côté d'un tronçon de sol pré-rendu
 const TRONCONS_MAX = 40;           // tronçons gardés en cache (≈ 1,1 Mo chacun en fin)
+// Tronçons PÉRIMÉS (le sol a changé dessous) refaits dans une même image :
+// les autres restent affichés tels quels et attendent leur tour.
+const RECUISSONS_PAR_IMAGE = 1;
 // Recouvrement entre tronçons voisins, en pixels monde : à zoom fractionnaire,
 // deux images posées bord à bord laissent une couture anticrénelée ; en les
 // faisant se chevaucher sur les MÊMES texels, il n'y a plus de bord à voir.
@@ -697,6 +700,7 @@ export class Renderer {
     if (decorPret !== this.decorCuit) { this.decorCuit = decorPret; this.troncons.clear(); }
     this.suivreSol();
     this.oublierTronconsModifies();
+    this.cuissons = 0;   // tronçons cuits dans cette image (voir troncon)
     const zoom = this.camera.zoom;
     // Le niveau fin (2 px par pixel monde) sert dès le zoom 0,75, comme
     // toujours — et dès 0,5 sur une toile à trois pixels par point, sinon le
@@ -753,7 +757,7 @@ export class Renderer {
    * Le terrain change rarement — un gisement d'or épuisé laisse de la terre —,
    * mais un tronçon en cache garderait l'ancien sol. Les tronçons qui couvrent
    * la case, à deux cases près (fondu et ondulation des lisières, décor voisin),
-   * sont oubliés aux deux niveaux : ils seront refaits à la prochaine demande.
+   * sont périmés aux deux niveaux : ils seront refaits, un par image.
    */
   oublierTronconsModifies() {
     const map = this.world.map;
@@ -761,18 +765,26 @@ export class Renderer {
     if (!modifies || modifies.size === 0) return;
     for (const i of modifies) {
       const tx = i % map.w, ty = Math.floor(i / map.w);
-      this.oublierTroncons((tx - 2) * TILE, (ty - 2) * TILE, (tx + 3) * TILE, (ty + 3) * TILE);
+      this.perimerTroncons((tx - 2) * TILE, (ty - 2) * TILE, (tx + 3) * TILE, (ty + 3) * TILE);
     }
     modifies.clear();
   }
 
-  /** Oublie, aux deux niveaux, les tronçons de sol qui touchent ce rectangle monde. */
-  oublierTroncons(x0, y0, x1, y1) {
+  /**
+   * Périme, aux deux niveaux, les tronçons de sol qui touchent ce rectangle
+   * monde. Un tronçon périmé n'est pas oublié : il reste affiché tel quel
+   * jusqu'à ce que son tour vienne d'être refait (voir troncon) — un bâtiment
+   * posé à cheval sur quatre tronçons les faisait tous recuire dans la même
+   * image, et cela se sentait. Sa cour arrive une à trois images plus tard.
+   */
+  perimerTroncons(x0, y0, x1, y1) {
     const taille = TRONCON * TILE, r = RECOUVREMENT;
     for (let cy = Math.floor((y0 - r) / taille); cy <= Math.floor((y1 + r) / taille); cy++) {
       for (let cx = Math.floor((x0 - r) / taille); cx <= Math.floor((x1 + r) / taille); cx++) {
-        this.troncons.delete(`0:${cx}:${cy}`);
-        this.troncons.delete(`1:${cx}:${cy}`);
+        for (let niveau = 0; niveau < 2; niveau++) {
+          const toile = this.troncons.get(`${niveau}:${cx}:${cy}`);
+          if (toile) toile.perime = true;
+        }
       }
     }
   }
@@ -781,13 +793,20 @@ export class Renderer {
    * Le sol apparent et le filtre du décor (decor.js) suivent les bâtiments que
    * le joueur CONNAÎT : les siens, et ceux de l'adversaire qu'il voit ou qu'il
    * a vus — un sol qui changerait sous le brouillard trahirait un chantier.
-   * À chaque image, une signature (une multiplication par bâtiment) ; le reste
-   * n'est refait que lorsqu'un bâtiment est posé, tombe ou se découvre, et
-   * seuls les tronçons de sol touchés sont oubliés. La carte n'est pas modifiée.
+   * À chaque image, deux signatures (quelques opérations par bâtiment) : les
+   * bâtiments du monde, et ceux de l'adversaire que l'on voit à l'instant. Le
+   * reste n'est refait que lorsqu'un bâtiment est posé, tombe, entre dans la
+   * vue ou en sort, et seuls les tronçons de sol touchés sont périmés. (La
+   * seconde signature suffit à suivre le brouillard ; le relevé de toutes les
+   * vingt images, plus bas, retire la cour d'un bâtiment adverse sorti de la
+   * vue une fois son délai passé — DELAI_COUR, decor.js.)
+   * La carte n'est pas modifiée.
    */
   suivreSol() {
     const world = this.world, map = world.map;
     const neuve = this.solCarte !== map;
+    const vues = this.signatureVues();
+    if (vues !== this.vuesRelevees) { this.vuesRelevees = vues; this.signatureBatiments = null; }   // comme un bâtiment posé ou tombé
     let signature = world.buildings.length;
     for (const b of world.buildings) signature = (Math.imul(signature, 31) + b.id) | 0;
     // (Le brouillard vient de bouger — majBrouillard l'a noté en le relevant —
@@ -797,24 +816,41 @@ export class Renderer {
     if (!neuve && signature === this.signatureBatiments && !brouillardBouge && this.frame % 20) return;
     this.signatureBatiments = signature;
     if (neuve) { this.solCarte = map; this.connus = new Map(); this.sol = null; this.decor = null; this.solBase = solDeBase(map, world.players); }
-    const change = releverBatiments(this.connus, world.buildings, world.humanIndex,
-      (b) => this.isEntityVisible(b), (id) => { const b = world.byId.get(id); return !!b && !b.dead; });
+    const debout = (id) => { const b = world.byId.get(id); return !!b && !b.dead; };
+    const change = releverBatiments(this.connus, world.buildings, world.humanIndex, (b) => this.isEntityVisible(b), debout, this.horloge || 0);
     if (!change && !neuve) return;
     const batiments = [...this.connus.values()];
+    // Connus mais tombés hors de vue : oubliés quand on reverra l'endroit (voir signatureVues).
+    this.tombes = batiments.filter((c) => !debout(c.id));
     const avant = this.sol;
     this.sol = solApparent(this.solBase, map, batiments, world.players);
     if (avant) {
       for (let i = 0; i < avant.length; i++) {
         if (avant[i] === this.sol[i]) continue;
         const tx = i % map.w, ty = (i - tx) / map.w;
-        this.oublierTroncons((tx - 2) * TILE, (ty - 2) * TILE, (tx + 3) * TILE, (ty + 3) * TILE);
+        this.perimerTroncons((tx - 2) * TILE, (ty - 2) * TILE, (tx + 3) * TILE, (ty + 3) * TILE);
         this.minimapDirty = true;
       }
     } else this.minimapDirty = true;
     // Une pièce cuite que le filtre vient de cacher ou de rendre : son tronçon est à refaire.
-    for (const d of filtrerDecor(this.decorCarte(), batiments, world.players, map.startPositions)) {
-      if (!neuve) this.oublierTroncons(d.x - 2 * TILE, d.y - 3 * TILE, d.x + 2 * TILE, d.y + TILE);
+    for (const d of filtrerDecor(this.decorCarte(), batiments, map.startPositions, this.sol)) {
+      if (!neuve) this.perimerTroncons(d.x - 2 * TILE, d.y - 3 * TILE, d.x + 2 * TILE, d.y + TILE);
     }
+  }
+
+  /**
+   * Ce que l'on voit, à l'instant, des bâtiments adverses — et de la place de
+   * ceux qui sont tombés hors de vue : un nombre, qui change dès que l'un
+   * d'eux entre dans la vue ou en sort.
+   */
+  signatureVues() {
+    const humain = this.world.humanIndex;
+    let s = 0;
+    for (const b of this.world.buildings) {
+      if (b.playerIndex !== humain && this.isEntityVisible(b)) s = (Math.imul(s, 31) + b.id + 1) | 0;
+    }
+    if (this.tombes) for (const c of this.tombes) if (this.isEntityVisible(c)) s = (Math.imul(s, 31) - c.id) | 0;
+    return s;
   }
 
   /** Rend la mémoire des tronçons de sol en cache (tous, ou ceux d'un niveau : « 0: », « 1: »). */
@@ -835,6 +871,16 @@ export class Renderer {
     if (!this.troncons) this.troncons = new Map();
     const cache = this.troncons;
     let c = cache.get(cle);
+    // Périmé : refait sur une toile neuve si l'image n'a encore rien cuit,
+    // sinon affiché tel quel — son tour viendra à l'image suivante.
+    if (c && c.perime && this.cuissons < RECUISSONS_PAR_IMAGE) {
+      const vieux = c;
+      this.cuissons++;
+      try { c = this.rendreTroncon(cx, cy, niveau === 0 ? 2 : 1, nappes); } catch { return null; }
+      cache.delete(cle); cache.set(cle, c);
+      vieux.width = vieux.height = 0;
+      return c;
+    }
     if (c) { cache.delete(cle); cache.set(cle, c); return c; }   // le plus récent en dernier
     if (cache.size >= (this.tronconsMax || TRONCONS_MAX)) {
       // Le plus ancien sort, et sa toile est rendue tout de suite (Safari
@@ -845,6 +891,7 @@ export class Renderer {
       if (vieux) vieux.width = vieux.height = 0;
     }
     try { c = this.rendreTroncon(cx, cy, niveau === 0 ? 2 : 1, nappes); } catch { return null; }
+    this.cuissons++;
     cache.set(cle, c);
     return c;
   }
@@ -2537,10 +2584,14 @@ export class Renderer {
     const ctx = this.minimapTerrainCtx;
     const img = ctx.createImageData(map.w, map.h);
     const data = img.data;
+    // Le désert y est plus sourd que dans le monde, et le point d'or plus vif
+    // qu'il ne l'était : sur un sable de la couleur du monde, l'or d'un
+    // Solarien ne se voyait presque plus (écart de couleur 19 ; ici 45, comme
+    // sur le sable des rivages).
     const palette = {
       [TERRAIN.GRASS]: [74, 98, 23], [TERRAIN.GRASS_DARK]: [92, 97, 35],
       [TERRAIN.DIRT]: [128, 90, 58], [TERRAIN.SAND]: [161, 121, 84],
-      [TERRAIN.WATER]: [15, 101, 132], [SOL_SABLE_OR]: [210, 165, 87],
+      [TERRAIN.WATER]: [15, 101, 132], [SOL_SABLE_OR]: [176, 138, 74],
     };
     for (let i = 0; i < map.w * map.h; i++) {
       const c = palette[solEn(this.sol, map, i)] || [90, 130, 70];   // le sol apparent : le désert d'un départ solarien s'y lit
@@ -2549,7 +2600,7 @@ export class Renderer {
     }
     for (const res of map.resources.values()) {
       const o = (res.ty * map.w + res.tx) * 4;
-      const c = res.type === 'wood' ? [42, 94, 47] : res.type === 'gold' ? [242, 193, 78] : [209, 67, 74];
+      const c = res.type === 'wood' ? [42, 94, 47] : res.type === 'gold' ? [255, 214, 64] : [209, 67, 74];
       data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2];
     }
     ctx.putImageData(img, 0, 0);
