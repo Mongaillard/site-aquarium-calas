@@ -1236,5 +1236,38 @@ console.log('\n--- Le barème sur la durée ---');
   check('à une victoire sur deux, il monte de 7,5 points par partie', proche(moitie, 7.5, 0.4), `+${moitie.toFixed(3)}`);
 }
 
+// ---------------------------------------------------------------------------
+// Abandons à la chaîne, et classement joué contre l'ordinateur
+// ---------------------------------------------------------------------------
+console.log('\n--- Abandons à la chaîne, classement contre l’ordinateur ---');
+{
+  // Douze abandons dès la première seconde, sur quatre jours : ils coûtent
+  // leurs points et rien d'autre.
+  let p = profilA(60);   // ligue 1 : l'Atlante n'est pas encore offert par la ligue
+  const evenements = [];
+  for (let i = 0; i < 12; i++) {
+    const r = appliquerResultat(p, partie('abandon', { duree: 1, jour: jourDe(Math.floor(i / 3)) }));
+    p = r.profil;
+    evenements.push(...r.evenements);
+  }
+  check('douze abandons précoces coûtent leurs points, jusqu’au plancher', p.elo === 0 && p.defaites === 12 && p.abandonsPrecoces === 12);
+  check('… sans avancer vers le coffre d’argent', p.pointsDeBataille === 0 && coffresDe(p, 'argent') === 0);
+  check('… sans débloquer la troupe promise après dix parties', !p.debloquees.triton && parType(evenements, 'troupeDebloquee').length === 0);
+  check('… et sans compter pour le coffre de la semaine', p.semaine.jours === 0 && coffresDe(p, 'or') === 0);
+  const jouees = jouer(profilNeuf(), 'DDDDDDDDDD');
+  check('dix défaites jouées jusqu’au bout, elles, débloquent la troupe', jouees.profil.debloquees.triton === 'parties' && jouees.profil.abandonsPrecoces === 0);
+  const relu = migrerProfil(JSON.parse(JSON.stringify(p)));
+  check('le compteur des abandons précoces survit à un aller-retour', relu.abandonsPrecoces === 12);
+  check('… et ne dépasse jamais le nombre de défaites', migrerProfil({ ...profilNeuf(), defaites: 3, abandonsPrecoces: 50 }).abandonsPrecoces === 3);
+
+  // Tant que le jeu entre joueurs n'existe pas, le classement se joue contre
+  // l'ordinateur : la partie compte à toutes les ligues.
+  const haut = appliquerResultat(profilA(780), partie('victoire', { contreOrdinateur: 'echelle' }));
+  check('classement joué contre l’ordinateur : la victoire compte au-delà de la ligue 4',
+    haut.profil.elo === 810 && parType(haut.evenements, 'elo')[0].classee === true);
+  const bas = appliquerResultat(profilA(780), partie('defaite', { contreOrdinateur: 'echelle' }));
+  check('… et la défaite aussi', bas.profil.elo === 765);
+}
+
 console.log(`\n${failures === 0 ? 'Tous les tests passent' : failures + ' test(s) en échec'}`);
 process.exit(failures === 0 ? 0 : 1);

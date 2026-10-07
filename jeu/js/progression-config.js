@@ -172,15 +172,15 @@ export const PROGRESSION = figer({
   //  bois   : un par victoire, `parJourAuPlus` dans la journée (H)
   //  argent : un tous les `tousLes` points de bataille. Une défaite fait donc
   //    avancer vers le coffre. `abandonPrecoce` : ce que vaut un abandon avant
-  //    abandon.precoceAvant — une défaite, d'après le document ; mettre 0 si
-  //    des abandons en série servent à remplir le coffre.
+  //    abandon.precoceAvant — rien : sinon dix abandons à la première seconde
+  //    donneraient un coffre.
   //  or     : un par semaine où l'on a joué `joursJoues` jours (H). La semaine
   //    court du lundi au dimanche (choix) : `decalage` est ce qu'il faut ajouter
   //    au nombre de jours depuis le 1er janvier 1970, un jeudi, pour qu'elle
   //    commence un lundi.
   sources: {
     bois: { parJourAuPlus: 5 },
-    argent: { tousLes: 10, victoire: 2, defaite: 1, egalite: 1, abandonPrecoce: 1 },
+    argent: { tousLes: 10, victoire: 2, defaite: 1, egalite: 1, abandonPrecoce: 0 },
     or: { joursJoues: 3, joursParSemaine: 7, decalage: 3 },
   },
 

@@ -116,6 +116,9 @@ function semaineDe(jour) {
  *   promotions      : les ligues dont la récompense a déjà été donnée
  *   parties…        : compteurs bruts ; un abandon compte comme une défaite,
  *                     une partie annulée ne compte pas
+ *   abandonsPrecoces: parmi les défaites, les abandons d'avant
+ *                     abandon.precoceAvant — ils coûtent leurs points mais ne
+ *                     font avancer ni vers une troupe, ni vers un coffre
  *   pointsDeBataille: ce qui est acquis vers le prochain coffre d'argent
  *   coffres         : ceux qui attendent d'être ouverts, `{ type, origine }`
  *   troupes         : niveau et fragments de chaque troupe du jeu
@@ -138,7 +141,7 @@ export function profilNeuf() {
     ligue: 1,
     plusHauteLigue: 1,
     promotions: [],
-    parties: 0, victoires: 0, defaites: 0, egalites: 0,
+    parties: 0, victoires: 0, defaites: 0, egalites: 0, abandonsPrecoces: 0,
     pointsDeBataille: 0,
     coffres: [],
     troupes,
@@ -173,6 +176,7 @@ function lireProfil(o) {
   p.defaites = entier(o.defaites, 0, GRAND, 0);
   p.egalites = entier(o.egalites, 0, GRAND, 0);
   p.parties = Math.max(entier(o.parties, 0, GRAND, 0), p.victoires + p.defaites + p.egalites);
+  p.abandonsPrecoces = entier(o.abandonsPrecoces, 0, p.defaites, 0);
   p.pointsDeBataille = entier(o.pointsDeBataille, 0, R.sources.argent.tousLes - 1, 0);
   if (Array.isArray(o.coffres)) {
     for (const coffre of o.coffres) {
@@ -277,12 +281,16 @@ function monterOuvrier(p, evenements) {
   ouvrier.niveau = plafond;
 }
 
-/** Débloque les troupes avancées dont la condition gratuite est remplie : la ligue, sinon le nombre de parties. */
+/**
+ * Débloque les troupes avancées dont la condition gratuite est remplie : la
+ * ligue, sinon le nombre de parties — les parties vraiment jouées : sans cela,
+ * abandonner à la chaîne dès la première seconde débloquerait tout.
+ */
 function debloquerGratuites(p, evenements) {
   for (const type of AVANCEES) {
     if (p.debloquees[type]) continue;
     const { ligue, parties } = R.troupes[type].gratuite;
-    const origine = p.plusHauteLigue >= ligue ? 'ligue' : p.parties >= parties ? 'parties' : null;
+    const origine = p.plusHauteLigue >= ligue ? 'ligue' : p.parties - p.abandonsPrecoces >= parties ? 'parties' : null;
     if (!origine) continue;
     p.debloquees[type] = origine;
     evenements.push({ type: 'troupeDebloquee', troupe: type, origine });
@@ -382,12 +390,18 @@ function compterLeJour(p, evenements) {
  *   pointsDeBataille, rechercheFermee.
  *
  * Les règles :
- *   - un abandon est une défaite ;
+ *   - un abandon est une défaite ; avant abandon.precoceAvant il coûte ses
+ *     points mais ne compte ni comme une partie jouée (troupes gratuites, jour
+ *     joué de la semaine) ni vers le coffre d'argent ;
  *   - l'abandon de l'adversaire est une victoire, sauf avant
  *     abandon.precoceAvant : la partie est alors annulée pour celui qui
  *     reste, ni points ni coffre ;
- *   - contre l'ordinateur, la partie ne compte pour l'Elo que jusqu'à la ligue
- *     recherche.ordinateurClasseJusqua ; au-delà, elle ne rapporte que des coffres ;
+ *   - contre l'ordinateur venu remplacer un adversaire introuvable
+ *     (`contreOrdinateur: true`), la partie ne compte pour l'Elo que jusqu'à la
+ *     ligue recherche.ordinateurClasseJusqua ; au-delà, elle ne rapporte que
+ *     des coffres. Tant que le jeu entre joueurs n'existe pas, le classement se
+ *     joue contre l'ordinateur : c'est alors `contreOrdinateur: 'echelle'`, et
+ *     la partie compte à toutes les ligues ;
  *   - la promotion est immédiate au seuil, sa récompense ne se donne qu'une fois ;
  *   - pas de rétrogradation dans les premières ligues, puis seulement sous
  *     seuil − marge ;
@@ -415,6 +429,7 @@ export function appliquerResultat(profil, partie) {
 
   p.parties++;
   p[COMPTEURS[issue]]++;
+  if (abandon && precoce) p.abandonsPrecoces++;
 
   // Le score, puis la ligue qui en découle.
   const classee = partie.contreOrdinateur !== true || p.ligue <= R.recherche.ordinateurClasseJusqua;
@@ -442,7 +457,7 @@ export function appliquerResultat(profil, partie) {
   p.pointsDeBataille -= coffresDArgent * argent.tousLes;
   evenements.push({ type: 'pointsDeBataille', gagnes, total: p.pointsDeBataille, pour: argent.tousLes });
   for (let i = 0; i < coffresDArgent; i++) donnerCoffre(p, 'argent', 'bataille', evenements);
-  compterLeJour(p, evenements);
+  if (!(abandon && precoce)) compterLeJour(p, evenements);
 
   // Trop d'abandons précoces dans la journée : la recherche se ferme.
   if (abandon && precoce) {
