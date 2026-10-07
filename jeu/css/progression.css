@@ -187,7 +187,11 @@
 .cmd-verrou { position: absolute; top: 3px; right: 3px; }
 .cmd-verrou svg { fill: var(--gold); }
 
-@media (max-width: 360px) {
-  .prog-bandeau-texte small { font-size: 10.5px; }
+/* Téléphone étroit : la ligue garde toute la largeur, coffres et troupes passent dessous, côte à côte. */
+@media (max-width: 400px) {
+  .prog-bandeau { flex-wrap: wrap; gap: 6px; }
+  .prog-bandeau-ligue { flex-basis: 100%; }
+  .prog-bandeau-actions { display: flex; flex: 1; }
+  .prog-bandeau-actions .btn { flex: 1; justify-content: center; }
   .prog-grille { gap: 6px; }
 }

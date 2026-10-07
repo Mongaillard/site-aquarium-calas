@@ -702,7 +702,9 @@ export class UI {
             icon: u.icon, troupe: unitType, label: nomDe(unitType, this.game.civ), cost: costLabel(u.cost), time: u.trainTime,
             // Une troupe pas encore débloquée : montrée, sous cadenas (voir js/progression.js).
             verrou: this.world.players[this.world.humanIndex].interdites.has(unitType),
-            check: () => this.world.canTrain(b, unitType),
+            check: () => (this.world.players[this.world.humanIndex].interdites.has(unitType)
+              ? { ok: false, reason: `${nomDe(unitType, this.game.civ)} : troupe à débloquer — vois « Troupes » à l’accueil` }
+              : this.world.canTrain(b, unitType)),
             action: () => this.game.trainUnit(b, unitType),
           });
         }
