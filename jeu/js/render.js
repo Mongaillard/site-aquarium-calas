@@ -13,8 +13,8 @@ import {
   rendu3dDirect, etatModeles3d,
 } from './sprites.js';
 import { Rendu3D } from './rendu3d.js';
-import { TERRAIN, BLOCK } from './map.js';
-import { planterDecor, ECHELLE_DECOR } from './decor.js';
+import { TERRAIN } from './map.js';
+import { planterDecor, ECHELLE_DECOR, SOL_SABLE_OR, solEn, solPlein, solDeBase, solApparent, releverBatiments, filtrerDecor, caseArbre } from './decor.js';
 import { STATE, villagerTask } from './entities.js';
 import { clamp, dist, bruitPeriodique } from './utils.js';
 
@@ -38,18 +38,27 @@ const TERRAIN_COLORS = {
   [TERRAIN.DIRT]: ['#805a3a', '#835d3d', '#7d5737'],
   [TERRAIN.SAND]: ['#a17954', '#a47c57', '#9e7651'],
   [TERRAIN.WATER]: ['#0f6584', '#116886', '#0d6282'],
+  [SOL_SABLE_OR]: ['#d2a557', '#d4a759', '#d0a355'],
 };
 
 // Nappe de sol par terrain, et priorité : là où deux terrains se rencontrent,
 // le plus prioritaire se pose par-dessus (l'herbe sur la terre, l'eau sur tout).
+// Le sol peint est le sol APPARENT (decor.js) : celui de la carte, plus le
+// sable doré des peuples du désert, un sol que la carte ne connaît pas. Il
+// passe SOUS tous les autres (priorité -1) : les cinq sols de la carte gardent
+// leur rang, et l'herbe revient sur le bord d'une cour comme sur la terre.
 const NAPPES = {
   [TERRAIN.GRASS]: 'grass', [TERRAIN.GRASS_DARK]: 'grassDark',
   [TERRAIN.DIRT]: 'dirt', [TERRAIN.SAND]: 'sand', [TERRAIN.WATER]: 'water',
+  [SOL_SABLE_OR]: 'sandOr',
 };
 const PRIORITE = {
-  [TERRAIN.DIRT]: 0, [TERRAIN.SAND]: 1, [TERRAIN.GRASS]: 2, [TERRAIN.GRASS_DARK]: 3, [TERRAIN.WATER]: 4,
+  [SOL_SABLE_OR]: -1, [TERRAIN.DIRT]: 0, [TERRAIN.SAND]: 1, [TERRAIN.GRASS]: 2, [TERRAIN.GRASS_DARK]: 3, [TERRAIN.WATER]: 4,
 };
-const TERRAIN_PAR_PRIORITE = [TERRAIN.DIRT, TERRAIN.SAND, TERRAIN.GRASS, TERRAIN.GRASS_DARK, TERRAIN.WATER];
+const PRIORITE_MIN = -1, PRIORITE_MAX = 4;
+const TERRAIN_PAR_PRIORITE = {
+  [-1]: SOL_SABLE_OR, 0: TERRAIN.DIRT, 1: TERRAIN.SAND, 2: TERRAIN.GRASS, 3: TERRAIN.GRASS_DARK, 4: TERRAIN.WATER,
+};
 // Les lisières entre terrains : la frontière n'est pas le bord des cases mais
 // une courbe qui passe entre leurs centres, ondulée par un bruit et fondue sur
 // FONDU pixels monde (voir couverturesTroncon).
@@ -452,6 +461,7 @@ export class Renderer {
     const atlas = spriteDe('decor');
     const decorPret = !!(atlas && atlas.pret && this.decorActif);
     if (decorPret !== this.decorCuit) { this.decorCuit = decorPret; this.troncons.clear(); }
+    this.suivreSol();
     this.oublierTronconsModifies();
     const zoom = this.camera.zoom;
     // Le niveau fin (2 px par pixel monde) sert dès le zoom 0,75, comme
@@ -517,14 +527,58 @@ export class Renderer {
     if (!modifies || modifies.size === 0) return;
     for (const i of modifies) {
       const tx = i % map.w, ty = Math.floor(i / map.w);
-      for (let cy = Math.floor((ty - 2) / TRONCON); cy <= Math.floor((ty + 2) / TRONCON); cy++) {
-        for (let cx = Math.floor((tx - 2) / TRONCON); cx <= Math.floor((tx + 2) / TRONCON); cx++) {
-          this.troncons.delete(`0:${cx}:${cy}`);
-          this.troncons.delete(`1:${cx}:${cy}`);
-        }
-      }
+      this.oublierTroncons((tx - 2) * TILE, (ty - 2) * TILE, (tx + 3) * TILE, (ty + 3) * TILE);
     }
     modifies.clear();
+  }
+
+  /** Oublie, aux deux niveaux, les tronçons de sol qui touchent ce rectangle monde. */
+  oublierTroncons(x0, y0, x1, y1) {
+    const taille = TRONCON * TILE, r = RECOUVREMENT;
+    for (let cy = Math.floor((y0 - r) / taille); cy <= Math.floor((y1 + r) / taille); cy++) {
+      for (let cx = Math.floor((x0 - r) / taille); cx <= Math.floor((x1 + r) / taille); cx++) {
+        this.troncons.delete(`0:${cx}:${cy}`);
+        this.troncons.delete(`1:${cx}:${cy}`);
+      }
+    }
+  }
+
+  /**
+   * Le sol apparent et le filtre du décor (decor.js) suivent les bâtiments que
+   * le joueur CONNAÎT : les siens, et ceux de l'adversaire qu'il voit ou qu'il
+   * a vus — un sol qui changerait sous le brouillard trahirait un chantier.
+   * À chaque image, une signature (une multiplication par bâtiment) ; le reste
+   * n'est refait que lorsqu'un bâtiment est posé, tombe ou se découvre, et
+   * seuls les tronçons de sol touchés sont oubliés. La carte n'est pas modifiée.
+   */
+  suivreSol() {
+    const world = this.world, map = world.map;
+    const neuve = this.solCarte !== map;
+    let signature = world.buildings.length;
+    for (const b of world.buildings) signature = (Math.imul(signature, 31) + b.id) | 0;
+    // (Le brouillard vient de bouger, ou un tiers de seconde a passé : un
+    // bâtiment adverse a pu entrer dans la vue.)
+    if (!neuve && signature === this.signatureBatiments && !world.fog.dirty && this.frame % 20) return;
+    this.signatureBatiments = signature;
+    if (neuve) { this.solCarte = map; this.connus = new Map(); this.sol = null; this.decor = null; this.solBase = solDeBase(map, world.players); }
+    const change = releverBatiments(this.connus, world.buildings, world.humanIndex,
+      (b) => this.isEntityVisible(b), (id) => { const b = world.byId.get(id); return !!b && !b.dead; });
+    if (!change && !neuve) return;
+    const batiments = [...this.connus.values()];
+    const avant = this.sol;
+    this.sol = solApparent(this.solBase, map, batiments, world.players);
+    if (avant) {
+      for (let i = 0; i < avant.length; i++) {
+        if (avant[i] === this.sol[i]) continue;
+        const tx = i % map.w, ty = (i - tx) / map.w;
+        this.oublierTroncons((tx - 2) * TILE, (ty - 2) * TILE, (tx + 3) * TILE, (ty + 3) * TILE);
+        this.minimapDirty = true;
+      }
+    } else this.minimapDirty = true;
+    // Une pièce cuite que le filtre vient de cacher ou de rendre : son tronçon est à refaire.
+    for (const d of filtrerDecor(this.decorCarte(), batiments, world.players, map.startPositions)) {
+      if (!neuve) this.oublierTroncons(d.x - 2 * TILE, d.y - 3 * TILE, d.x + 2 * TILE, d.y + TILE);
+    }
   }
 
   /** Rend la mémoire des tronçons de sol en cache (tous, ou ceux d'un niveau : « 0: », « 1: »). */
@@ -647,25 +701,25 @@ export class Renderer {
    * aucun sable ne transparaît.
    */
   couverturesTroncon(X0, Y0, cote) {
-    const map = this.world.map;
+    const map = this.world.map, sol = this.sol;
     const n = cote / RES_MASQUE;
     // Les cases dont les centres encadrent le carré, une couronne de plus ; le
     // bord de la carte se prolonge.
     const tx0 = Math.floor(X0 / TILE) - 2, ty0 = Math.floor(Y0 / TILE) - 2;
     const cols = Math.ceil(cote / TILE) + 5;   // deux couronnes : le rivage regarde 32 px au-delà
-    const prio = new Uint8Array(cols * cols);
+    const prio = new Int8Array(cols * cols);
     let vus = 0;
     for (let j = 0; j < cols; j++) {
       const ty = clamp(ty0 + j, 0, map.h - 1);
       for (let i = 0; i < cols; i++) {
         const tx = clamp(tx0 + i, 0, map.w - 1);
-        const p = PRIORITE[map.terrain[ty * map.w + tx]];
+        const p = PRIORITE[solEn(sol, map, ty * map.w + tx)];
         prio[j * cols + i] = p;
-        vus |= 1 << p;
+        vus |= 1 << (p - PRIORITE_MIN);
       }
     }
     const presents = [];
-    for (let p = 0; p < TERRAIN_PAR_PRIORITE.length; p++) if (vus & (1 << p)) presents.push(p);
+    for (let p = PRIORITE_MIN; p <= PRIORITE_MAX; p++) if (vus & (1 << (p - PRIORITE_MIN))) presents.push(p);
     const masques = [null], etendues = [null];
     if (presents.length === 1) return { presents, masques, etendues, rivage: null };
     // Un ImageData neuf par masque : WebKit a déjà servi des pixels périmés
@@ -811,7 +865,7 @@ export class Renderer {
       for (let tx = view.x0; tx <= view.x1; tx++) {
         const i = row + tx;
         if (!this.world.fog.explored[i]) continue;
-        const variants = this.atlas[map.terrain[i]];
+        const variants = this.atlas[solEn(this.sol, map, i)];
         const img = variants[map.variant[i] % variants.length];
         ctx.drawImage(img, tx * TILE, ty * TILE);
       }
@@ -852,6 +906,7 @@ export class Renderer {
     const y0 = Math.max(0, Math.floor(Y0 / TILE) - 2), y1 = Math.min(map.h - 1, Math.floor((Y0 + cote) / TILE) + 1);
     for (let ty = y0; ty <= y1; ty++) {
       for (const d of decor.cuits[ty]) {
+        if (d.cache) continue;   // sous un bâtiment, ou de l'herbe dans une cour de sable (filtrerDecor)
         const w = d.piece.w * ECHELLE_DECOR * d.echelle, h = d.piece.h * ECHELLE_DECOR * d.echelle;
         if (d.x + w / 2 < X0 || d.x - w / 2 > X0 + cote || d.y < Y0 || d.y - h > Y0 + cote) continue;
         this.dessinerPiece(d, atlas, ctx);
@@ -860,13 +915,17 @@ export class Renderer {
   }
 
   /**
-   * Le décor de la carte — rivages et campagne — se déduit de la carte
-   * (decor.js) ; il est planté une fois par carte et gardé.
+   * Le décor de la carte — rivages et campagne — se déduit de la carte et du
+   * sol de base de la partie (decor.js) : dans le désert d'un départ solarien,
+   * galets, agaves et touffes sèches au lieu des fleurs des prés. Il est planté
+   * une fois par carte et gardé ; ce que les bâtiments en cachent est tenu à
+   * jour par suivreSol.
    */
   decorCarte() {
     const map = this.world.map;
+    if (this.solCarte !== map) this.suivreSol();   // (qui plante le décor)
     if (!this.decor || this.decor.carte !== map) {
-      this.decor = planterDecor(map);
+      this.decor = planterDecor(map, solPlein(this.solBase.sol, map));
       this.decor.carte = map;
     }
     return this.decor;
@@ -930,7 +989,10 @@ export class Renderer {
     const k = (0.8 + 0.2 * Math.min(1, ratio)) * jitter;
     const h = hauteurMonde * k, w = (cellW / cellH) * h;
     const cx = res.tx * TILE + TILE / 2, base = (res.ty + 1) * TILE + 3;
-    this.ctx.drawImage(sprite.variantes.bleu, (res.variant % sprite.def.cases) * cellW, 0, cellW, cellH, cx - w / 2, base - h, w, h);
+    // Un arbre du désert solarien : ni sapin ni saule (caseArbre). Seule l'image change.
+    const zone = res.type === 'wood' && this.solBase ? this.solBase.zone[res.ty * this.world.map.w + res.tx] : 0;
+    const colonne = res.type === 'wood' ? caseArbre(res.variant, zone, sprite.def.cases) : res.variant % sprite.def.cases;
+    this.ctx.drawImage(sprite.variantes.bleu, colonne * cellW, 0, cellW, cellH, cx - w / 2, base - h, w, h);
   }
 
   drawTree(x, y, res) {
@@ -1067,15 +1129,13 @@ export class Renderer {
     if (atlas && atlas.pret) {
       const map = this.world.map, explored = this.world.fog.explored;
       const decor = this.decorCarte();
-      // Une ferme ne bloque pas ses cases (on y marche) : son emprise écarte
-      // quand même le décor debout, sinon rochers et buissons poussent sur elle.
-      const fermes = this.world.buildings.filter((b) => !b.dead && b.def.walkable);
-      const sousUneFerme = (tx, ty) => fermes.some((b) => tx >= b.tx && tx < b.tx + b.size && ty >= b.ty && ty < b.ty + b.size);
+      // Rien sur un bâtiment, une ferme, un chantier ni leur parvis, et la
+      // place du départ reste nette : le drapeau `cache` de chaque pièce est
+      // tenu par suivreSol (filtrerDecor), pas recalculé ici.
       for (let ty = Math.max(0, view.y0 - 1); ty <= Math.min(map.h - 1, view.y1 + 3); ty++) {
         for (const d of decor.debout[ty]) {
-          if (d.tx < view.x0 - 3 || d.tx > view.x1 + 3) continue;
-          const i = d.ty * map.w + d.tx;
-          if (!explored[i] || (map.blocked[i] & BLOCK.BUILDING) || sousUneFerme(d.tx, d.ty)) continue;
+          if (d.cache || d.tx < view.x0 - 3 || d.tx > view.x1 + 3) continue;
+          if (!explored[d.ty * map.w + d.tx]) continue;
           list.push({ kind: 'decor', d, sprite: atlas });
         }
       }
@@ -2184,10 +2244,10 @@ export class Renderer {
     const palette = {
       [TERRAIN.GRASS]: [74, 98, 23], [TERRAIN.GRASS_DARK]: [92, 97, 35],
       [TERRAIN.DIRT]: [128, 90, 58], [TERRAIN.SAND]: [161, 121, 84],
-      [TERRAIN.WATER]: [15, 101, 132],
+      [TERRAIN.WATER]: [15, 101, 132], [SOL_SABLE_OR]: [210, 165, 87],
     };
     for (let i = 0; i < map.w * map.h; i++) {
-      const c = palette[map.terrain[i]] || [90, 130, 70];
+      const c = palette[solEn(this.sol, map, i)] || [90, 130, 70];   // le sol apparent : le désert d'un départ solarien s'y lit
       const o = i * 4;
       data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = 255;
     }
