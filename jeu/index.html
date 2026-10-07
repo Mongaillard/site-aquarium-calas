@@ -21,32 +21,37 @@
 <div id="start-screen" class="screen">
   <div class="start-card">
     <div class="start-head">
-      <img class="hero" src="assets/heros.webp" alt="" width="130" height="277" decoding="async">
-      <div>
-        <h1>Âge des Empires <em>Mobile</em></h1>
-        <p class="tagline">Récoltez, bâtissez, traversez les âges et écrasez l'adversaire — au doigt.</p>
-      </div>
+      <h1>Âge des Empires <em>Mobile</em></h1>
+      <p class="tagline">Récoltez, bâtissez, traversez les âges et écrasez l'adversaire — au doigt.</p>
     </div>
 
     <div id="resume-box" class="resume-box hidden"></div>
 
     <h2>Votre civilisation</h2>
-    <div id="civ-options" class="options duo"></div>
+    <div id="civ-options" class="options duo peuples"></div>
 
-    <h2>Civilisation adverse</h2>
-    <div id="civ-adverse-options" class="options duo"></div>
+    <!-- Tout ce qui se règle une fois pour toutes : replié, résumé en une ligne. -->
+    <details id="reglages" class="reglages">
+      <summary>
+        <span class="reglages-titre">Réglages de la partie</span>
+        <span id="reglages-resume" class="reglages-resume"></span>
+      </summary>
 
-    <h2>Format de partie</h2>
-    <div id="mode-options" class="options"></div>
+      <h2>Civilisation adverse</h2>
+      <div id="civ-adverse-options" class="options duo"></div>
 
-    <h2>Difficulté</h2>
-    <div id="difficulty-options" class="options"></div>
+      <h2>Format de partie</h2>
+      <div id="mode-options" class="options"></div>
 
-    <h2>Taille de la carte</h2>
-    <div id="map-options" class="options row"></div>
+      <h2>Difficulté</h2>
+      <div id="difficulty-options" class="options"></div>
 
-    <h2>Vitesse de jeu</h2>
-    <div id="speed-options" class="options row"></div>
+      <h2>Taille de la carte</h2>
+      <div id="map-options" class="options row"></div>
+
+      <h2>Vitesse de jeu</h2>
+      <div id="speed-options" class="options row"></div>
+    </details>
 
     <div class="start-actions">
       <button id="btn-play" class="btn primary large">Jouer</button>

@@ -17,10 +17,63 @@
   --warn: #e0b93c;
   --error: #e06a5b;
   --radius: 12px;
+  /* Les angles de l'habillage en partie : doux, plus de pastilles en gélule. */
+  --angle: 8px;
+  /* Titres et noms : des caractères de titre déjà présents sur le téléphone,
+     rien à télécharger. Tout le reste garde la police du système, plus lisible en petit. */
+  --titre: "Palatino", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --creme: #f6e7c4;
+  /* Ce qui change d'un peuple à l'autre (voir plus bas) ; ici, l'habillage neutre. */
+  --lisere: #aab6c2;
+  --lueur: #2c3e50;
+  --fond-bouton: linear-gradient(180deg, #243142 0%, #1a2330 100%);
+  --fond-portrait: linear-gradient(180deg, #2a3646, #18212c);
+  --fond-vignette: radial-gradient(circle at 50% 70%, #6f8f48, #3f5527);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* --- Habillage par peuple ---------------------------------------------------
+   Le corps de la page porte le peuple choisi à l'accueil, puis celui que l'on
+   joue (data-civ, posé par js/main.js). Seule la matière change — fonds,
+   liseré, texte secondaire ; l'or reste l'accent commun, les tailles et les
+   cibles de toucher ne bougent pas.
+   Atlantes : bleu profond, liseré de marbre. Solariens : brun chaud, liseré d'or.
+   Avant que le jeu soit chargé, la page n'en porte aucun : un fond neutre, celui
+   de l'écran de lancement, et la carte d'accueil attend d'avoir ses couleurs. */
+body:not([data-civ]) .start-card { visibility: hidden; }
+body[data-civ="atlante"] {
+  --bg: #0c1f2b;
+  --panel: rgba(12, 33, 46, 0.93);
+  --panel-solid: #11303f;
+  --border: rgba(244, 224, 189, 0.26);
+  --muted: #a4bcc8;
+  --lisere: #d9c9a3;
+  --lueur: #1d566e;
+  --fond-bouton: linear-gradient(180deg, #1b4256 0%, #10303f 100%);
+}
+body[data-civ="solarien"] {
+  --bg: #1f1409;
+  --panel: rgba(36, 23, 10, 0.93);
+  --panel-solid: #2c1c0c;
+  --border: rgba(255, 225, 149, 0.30);
+  --muted: #c8b596;
+  --lisere: #e8c983;
+  --lueur: #6b4418;
+  --fond-bouton: linear-gradient(180deg, #4a3014 0%, #2c1c0c 100%);
+}
+/* Le fond d'un portrait suit le peuple de ce qu'il montre (un adversaire
+   garde le sien) : la mer ou le grès derrière une troupe, l'herbe ou le sable
+   sous un bâtiment. */
+body[data-civ="atlante"], .portrait[data-civ="atlante"] {
+  --fond-portrait: linear-gradient(180deg, #2f7f9a, #123d51);
+  --fond-vignette: radial-gradient(circle at 50% 70%, #6f8f48, #3f5527);
+}
+body[data-civ="solarien"], .portrait[data-civ="solarien"] {
+  --fond-portrait: linear-gradient(180deg, #cf9145, #6a3d14);
+  --fond-vignette: radial-gradient(circle at 50% 70%, #dcb96f, #94702f);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -68,67 +121,67 @@ html, body {
   inset: 0;
   z-index: 40;
   display: flex;
-  /* `align-items: center` rognait le haut de la carte dès qu'elle dépassait
-     l'écran : le titre devenait inatteignable, même en faisant défiler. Des
-     marges automatiques centrent quand ça tient, et laissent défiler sinon. */
-  align-items: flex-start;
-  justify-content: center;
-  padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom));
+  flex-direction: column;
+  align-items: center;
+  /* Centrer la carte par l'alignement du conteneur rognait son haut dès
+     qu'elle dépassait l'écran : le titre devenait inatteignable, même en
+     faisant défiler. Des marges automatiques centrent quand ça tient, et
+     laissent défiler sinon. */
+  padding: calc(12px + var(--safe-top)) 12px 0;
   background:
-    radial-gradient(1200px 600px at 50% -10%, #2c3e50 0%, transparent 60%),
-    linear-gradient(160deg, #16202b 0%, #0f161e 100%);
+    radial-gradient(1200px 600px at 50% -10%, var(--lueur) 0%, transparent 60%),
+    var(--bg);
   overflow-y: auto;
 }
+/* La marge du bas est un élément, pas un retrait du conteneur : la barre
+   « Jouer », collante, descend ainsi jusqu'au vrai bord de l'écran. */
+.screen::after { content: ""; flex: 0 0 calc(12px + var(--safe-bottom)); }
 
 .start-card {
+  flex: 0 0 auto;
   width: min(560px, 100%);
-  margin: auto;
-  background: var(--panel);
+  margin: auto 0;
+  /* Fond plein : la barre « Jouer », collée en bas, s'y fond (voir .start-actions). */
+  background: var(--panel-solid);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 22px 20px 18px;
+  border-radius: 16px;
+  padding: 18px 16px 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
 }
 
 .start-card h1 {
   margin: 0 0 6px;
-  font-size: clamp(24px, 6vw, 34px);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  font-family: var(--titre);
+  font-size: clamp(22px, 7vw, 36px);
+  line-height: 1.12;
+  letter-spacing: 0.01em;
+  color: var(--creme);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .45);
 }
 .start-card h1 em { color: var(--gold); font-style: normal; }
-.crest { font-size: 1.1em; margin-right: 6px; }
 
-.tagline { margin: 0 0 18px; color: var(--muted); font-size: 15px; line-height: 1.45; }
+.start-head { text-align: center; }
+.tagline { margin: 0 0 4px; color: var(--muted); font-size: 14px; line-height: 1.4; }
 
-/* Le chevalier de l'écran d'accueil : décoratif, il s'efface si la place manque. */
-.start-head { display: flex; align-items: flex-start; gap: 14px; }
-.start-head > div { min-width: 0; }
-.hero {
-  flex: 0 0 auto;
-  height: 132px;
-  width: auto;
-  margin-top: 2px;
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .55));
-  image-rendering: auto;
-}
-@media (max-width: 360px) { .hero { height: 104px; } }
-
-/* Portrait peint dans le panneau de sélection. */
-.portrait.illustre { padding: 0; overflow: hidden; background: linear-gradient(180deg, #2a3646, #18212c); }
+/* Portrait d'une troupe dans le panneau de sélection : son rendu, sur la couleur de son peuple. */
+.portrait.illustre { padding: 0; overflow: hidden; background: var(--fond-portrait); }
 .portrait.illustre img, .portrait.illustre canvas { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
 .portrait.illustre img.adverse { filter: hue-rotate(155deg) saturate(1.35); }
+/* Portrait d'un bâtiment : son illustration entière, celle de la carte, sur le sol de son peuple. */
+.portrait.batiment { padding: 0; overflow: hidden; background: var(--fond-vignette); }
+.portrait.batiment img, .portrait.batiment canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
 
-/* Écran de fin : le chevalier debout, ou à terre. */
-.fin-illustration { display: block; height: 130px; width: auto; margin: -4px auto 6px; filter: drop-shadow(0 8px 14px rgba(0,0,0,.5)); }
-.fin-illustration.tombe { height: auto; width: 140px; }   /* source petite : on évite de trop l'agrandir */
+/* Écran de fin : la capitale du joueur — debout et dorée, ou éteinte. */
+.fin-illustration { display: block; height: 132px; width: auto; margin: -2px auto 8px; }
+.fin-illustration.debout { filter: drop-shadow(0 0 20px rgba(232, 182, 76, .5)) drop-shadow(0 8px 10px rgba(0, 0, 0, .5)); }
+.fin-illustration.tombe { filter: grayscale(.9) brightness(.58) drop-shadow(0 8px 10px rgba(0, 0, 0, .55)); }
 
 .start-card h2 {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
-  margin: 18px 0 8px;
+  margin: 14px 0 8px;
 }
 
 .options { display: grid; gap: 8px; }
@@ -146,13 +199,14 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 20px;
-  padding: 14px;
+  margin: 12px 0 4px;
+  padding: 12px;
   border-radius: var(--radius);
   border: 1px solid var(--gold-dark);
   background: rgba(232, 182, 76, 0.10);
 }
 .resume-info { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+#ligne-temoin { margin-top: 8px; }
 .btn.ghost { background: none; border-color: transparent; color: var(--muted); }
 .btn.small { min-height: 36px; padding: 6px 10px; font-size: 13px; font-weight: 500; }
 .modal-sub { margin: 16px 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
@@ -180,7 +234,83 @@ html, body {
 .option-name { font-weight: 650; font-size: 15px; }
 .option-desc { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
 
-.start-actions { display: flex; gap: 10px; margin-top: 22px; }
+/* Le choix du peuple : sa capitale, sur ses couleurs. Les deux images tiennent
+   dans le même carré, posées sur sa base : même largeur, comme sur la carte.
+   La tuile choisie est cerclée d'or, l'autre s'efface un peu. */
+.options.peuples { gap: 10px; }
+.option.peuple {
+  gap: 2px;
+  padding: 8px 8px 10px;
+  border: 2px solid rgba(255, 255, 255, .16);
+  color: #fff;
+}
+.option.peuple[data-civ="atlante"] { background: linear-gradient(180deg, #1c5068 0%, #10303f 100%); }
+.option.peuple[data-civ="solarien"] { background: linear-gradient(180deg, #8a5a22 0%, #3a2410 100%); }
+.option.peuple img {
+  width: clamp(72px, 15vh, 140px);
+  height: clamp(72px, 15vh, 140px);
+  max-width: 100%;
+  object-fit: contain;
+  object-position: 50% 100%;
+  filter: drop-shadow(0 5px 5px rgba(0, 0, 0, .45));
+  pointer-events: none;
+}
+.option.peuple .option-name { font-family: var(--titre); font-size: 18px; font-weight: 700; letter-spacing: .01em; }
+.option.peuple .option-desc { color: rgba(255, 255, 255, .78); }
+.option.peuple:not(.active) { opacity: .72; }
+.option.peuple.active { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5), 0 6px 16px rgba(0, 0, 0, .4); }
+
+/* Les réglages qu'on ne touche pas à chaque partie : repliés, résumés en une ligne. */
+.reglages {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.04);
+}
+.reglages summary {
+  position: relative;
+  display: block;
+  min-height: 52px;
+  padding: 8px 40px 9px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+.reglages summary::-webkit-details-marker { display: none; }
+/* Le chevron : deux traits, qui se retournent quand le bloc est ouvert. */
+.reglages summary::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 8px; height: 8px;
+  margin-top: -7px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+}
+.reglages[open] summary::after { margin-top: -2px; transform: rotate(225deg); }
+.reglages-titre { display: block; font-weight: 650; font-size: 15px; }
+.reglages-resume { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+.reglages > h2, .reglages > .options { margin-left: 12px; margin-right: 12px; }
+.reglages > h2:first-of-type { margin-top: 6px; }
+.reglages > .options:last-child { margin-bottom: 12px; }
+
+/* « Jouer » reste sous le pouce : la barre colle au bas de l'écran tant que la
+   carte dépasse (réglages dépliés, petit téléphone, partie à reprendre), et
+   retrouve sa place dès qu'on y arrive. Son fond est celui de la carte, plein
+   jusqu'au bord : ce qui défile dessous ne se voit pas sous les boutons. */
+.start-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  margin: 4px -16px 0;
+  padding: 12px 16px calc(10px + var(--safe-bottom));
+  background: linear-gradient(180deg, transparent 0, var(--panel-solid) 10px);
+}
+/* « Nouvelle partie » et « Comment jouer » côte à côte sur 375 points : moins de marge, pas de retour à la ligne. */
+.start-actions .btn { padding-left: 8px; padding-right: 8px; }
 /* Le palmarès du format et de la difficulté choisis : une ligne discrète sous « Jouer ». */
 .palmares { margin: 10px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
 
@@ -205,12 +335,12 @@ html, body {
 .btn.large { font-size: 17px; min-height: 54px; }
 .btn.danger { border-color: rgba(224, 106, 91, .5); color: #ffb4a8; }
 
-.howto { margin-top: 16px; }
+.howto { margin-top: 12px; }
 .howto ul, ul.help { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .howto b, ul.help b { color: var(--text); }
 .credits-auteurs { display: block; margin-top: 3px; font-size: 11px; line-height: 1.5; color: rgba(159,176,192,.75); }
 ul.help a { color: var(--gold); }
-.credits { margin: 16px 0 0; font-size: 12px; color: rgba(159, 176, 192, .65); text-align: center; }
+.credits { margin: 10px 0 0; font-size: 12px; color: var(--muted); opacity: .7; text-align: center; }
 
 /* --- HUD ------------------------------------------------------------------ */
 
@@ -230,7 +360,7 @@ ul.help a { color: var(--gold); }
   justify-content: space-between;
   gap: 8px;
   padding: calc(6px + var(--safe-top)) calc(8px + var(--safe-right)) 6px calc(8px + var(--safe-left));
-  background: linear-gradient(180deg, rgba(15, 21, 28, .95) 0%, rgba(15, 21, 28, .55) 70%, transparent 100%);
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel) 45%, transparent 100%);
 }
 
 .top-left { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -240,9 +370,10 @@ ul.help a { color: var(--gold); }
   align-items: center;
   gap: 3px;
   padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, .5);
+  border-radius: var(--angle);
+  background: var(--panel-solid);
   border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
@@ -258,7 +389,9 @@ ul.help a { color: var(--gold); }
   font-size: 11.5px;
   white-space: nowrap;
 }
-#age-label { color: var(--gold); font-weight: 650; }
+#age-label { color: var(--gold); font-family: var(--titre); font-size: 12.5px; font-weight: 700; letter-spacing: .01em; }
+/* (Le nom de l'âge est rogné s'il manque de place : sa marge du haut garde l'accent de « Âge ».) */
+#age-label { padding-top: 3px; margin-top: -3px; }
 #age-box .sep { color: var(--muted); }
 #game-timer { color: var(--muted); font-variant-numeric: tabular-nums; }
 .age-progress { width: 54px; height: 3px; background: rgba(255,255,255,.2); border-radius: 2px; overflow: hidden; }
@@ -277,9 +410,10 @@ ul.help a { color: var(--gold); }
 .icon-btn {
   width: 38px; height: 38px;
   color: var(--text);
-  border-radius: 10px;
+  border-radius: var(--angle);
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, .42);
+  background: var(--panel-solid);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
   color: var(--text);
   font-size: 16px;
   cursor: pointer;
@@ -291,13 +425,15 @@ ul.help a { color: var(--gold); }
   position: absolute;
   top: calc(50px + var(--safe-top));
   right: calc(8px + var(--safe-right));
-  padding: 4px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, .5);
-  border: 1px solid var(--border);
+  /* Un cadre franc au liseré du peuple : la mini-carte ne se perd plus dans le noir du brouillard. */
+  padding: 2px;
+  border-radius: var(--angle);
+  background: var(--panel-solid);
+  border: 2px solid var(--lisere);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
   line-height: 0;
 }
-#minimap { width: 104px; height: 104px; border-radius: 6px; touch-action: none; }
+#minimap { width: 104px; height: 104px; border-radius: 4px; touch-action: none; }
 
 #alerts {
   position: absolute;
@@ -313,8 +449,8 @@ ul.help a { color: var(--gold); }
 }
 .toast {
   padding: 8px 12px;
-  border-radius: 10px;
-  background: rgba(16, 22, 30, .93);
+  border-radius: var(--angle);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-left: 3px solid var(--muted);
   font-size: 13px;
@@ -341,7 +477,7 @@ ul.help a { color: var(--gold); }
   width: max-content;   /* sinon `left: 50%` la bride à une demi-largeur d'écran */
   pointer-events: none;   /* simple consigne : le doigt doit atteindre la carte dessous */
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: var(--angle);
   background: rgba(232, 182, 76, .92);
   color: #241a05;
   font-size: 13px;
@@ -374,9 +510,10 @@ ul.help a { color: var(--gold); }
   gap: 4px;
   min-height: 34px;
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: var(--angle);
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, .55);
+  background: var(--panel-solid);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 1px 3px rgba(0, 0, 0, .45);
   color: var(--text);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -417,9 +554,9 @@ ul.help a { color: var(--gold); }
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: var(--radius);
+  border-radius: var(--angle);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, .05);
+  background: var(--fond-bouton);
 }
 .worker-row .wr-label {
   display: flex; align-items: center; gap: 8px;
@@ -433,7 +570,7 @@ ul.help a { color: var(--gold); }
 .worker-row .wr-count { min-width: 26px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .wr-btn {
   width: 40px; height: 40px;
-  border-radius: 10px;
+  border-radius: var(--angle);
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, .08);
   color: var(--text);
@@ -447,7 +584,7 @@ ul.help a { color: var(--gold); }
 .switch-row {
   display: flex; align-items: flex-start; gap: 10px;
   padding: 10px;
-  border-radius: var(--radius);
+  border-radius: var(--angle);
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, .04);
   cursor: pointer;
@@ -464,8 +601,11 @@ ul.help a { color: var(--gold); }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
-  background: linear-gradient(0deg, rgba(15, 21, 28, .97) 60%, rgba(15, 21, 28, .0) 100%);
+  padding: 10px calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  /* Un panneau plein à bord franc, au liseré du peuple : plus de dégradé qui se dissout dans la carte. */
+  background: linear-gradient(0deg, var(--panel-solid) 0%, var(--panel) 100%);
+  border-top: 2px solid var(--lisere);
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, .6), 0 -10px 24px rgba(0, 0, 0, .35);
 }
 
 #selection-panel {
@@ -480,7 +620,7 @@ ul.help a { color: var(--gold); }
    du bas, qui lui laisse sa place. */
 #btn-lacher {
   position: absolute;
-  top: 8px;
+  top: 10px;
   right: calc(8px + var(--safe-right));
   width: 44px; height: 44px;
 }
@@ -494,14 +634,16 @@ ul.help a { color: var(--gold); }
   display: grid;
   place-items: center;
   font-size: 24px;
-  border-radius: 10px;
+  border-radius: var(--angle);
   background: rgba(0, 0, 0, .45);
+  /* Le cadre porte la couleur du camp, doublé d'un filet au liseré du peuple. */
   border: 2px solid var(--team, var(--border));
+  box-shadow: 0 0 0 1px var(--lisere), 0 2px 6px rgba(0, 0, 0, .5);
   flex-shrink: 0;
 }
 #selection-panel .info { min-width: 0; flex: 1; max-width: 340px; }
-#selection-panel .name { font-size: 14.5px; font-weight: 650; }
-#selection-panel .name .enemy { color: var(--error); font-weight: 500; font-size: 12px; }
+#selection-panel .name { font-family: var(--titre); font-size: 16.5px; font-weight: 700; letter-spacing: .01em; line-height: 1.15; }
+#selection-panel .name .enemy { color: var(--error); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 500; font-size: 12px; }
 #selection-panel .hp { height: 4px; border-radius: 2px; background: rgba(255,255,255,.18); margin: 4px 0 3px; overflow: hidden; }
 #selection-panel .hp span { display: block; height: 100%; background: var(--good); }
 #selection-panel .stats { font-size: 11.5px; color: var(--muted); }
@@ -512,9 +654,10 @@ ul.help a { color: var(--gold); }
 .chip {
   display: flex; align-items: center; gap: 4px;
   padding: 5px 9px;
-  border-radius: 8px;
-  background: rgba(255,255,255,.07);
+  border-radius: var(--angle);
+  background: var(--fond-bouton);
   border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
   color: var(--text);
   font-size: 13px;
   cursor: pointer;
@@ -523,9 +666,9 @@ ul.help a { color: var(--gold); }
 .queue { display: flex; gap: 4px; margin-left: auto; }
 .queue-item {
   width: 38px; height: 38px;
-  border-radius: 8px;
+  border-radius: var(--angle);
   border: 1px solid var(--border);
-  background: rgba(0,0,0,.4);
+  background: var(--fond-bouton);
   color: var(--text);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px;
@@ -555,21 +698,38 @@ ul.help a { color: var(--gold); }
   align-items: center;
   justify-content: center;
   gap: 2px;
-  border-radius: 10px;
+  border-radius: var(--angle);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, .07);
+  /* Un bouton taillé dans la matière du peuple, avec son arête claire en haut. */
+  background: var(--fond-bouton);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 0 rgba(0, 0, 0, .5);
   color: var(--text);
   cursor: pointer;
 }
 .cmd:active { transform: scale(0.97); }
 .cmd.disabled { opacity: .42; }
-.cmd.toggled { border-color: var(--gold); background: rgba(232, 182, 76, .2); }
-.cmd.highlight { border-color: var(--gold); background: linear-gradient(180deg, rgba(232,182,76,.28), rgba(232,182,76,.12)); }
+/* Les états s'ajoutent en voile sur le fond du peuple. */
+.cmd.toggled { border-color: var(--gold); background: linear-gradient(rgba(232, 182, 76, .24), rgba(232, 182, 76, .24)), var(--fond-bouton); }
+.cmd.highlight { border-color: var(--gold); background: linear-gradient(180deg, rgba(232,182,76,.3), rgba(232,182,76,.12)), var(--fond-bouton); }
 /* « Détruire » armé : un second appui rase le bâtiment. */
-.cmd.danger { border-color: #e0604c; background: rgba(224, 96, 76, .28); color: #ffd9d2; }
+.cmd.danger { border-color: #e0604c; background: linear-gradient(rgba(224, 96, 76, .32), rgba(224, 96, 76, .32)), var(--fond-bouton); color: #ffd9d2; }
 .cmd.compact { min-width: 54px; padding: 6px 4px; }
 .cmd.compact .cmd-label { font-size: 9.5px; }
-.cmd-icon { font-size: 19px; line-height: 1; display: flex; }
+.cmd-icon { font-size: 19px; line-height: 1; display: flex; align-items: center; min-height: 28px; }
+/* Une troupe se reconnaît à son visage : son portrait remplace le pictogramme
+   sur le bouton qui la forme, dans la file et sur la pastille de sélection.
+   (Pictogramme ou portrait, la case de l'icône a la même hauteur : les noms
+   restent alignés d'un bouton à l'autre.) */
+img.visage {
+  width: 28px; height: 28px;
+  border-radius: 5px;
+  object-fit: cover;
+  object-position: top center;
+  background: var(--fond-portrait);
+  box-shadow: 0 0 0 1px var(--lisere);
+}
+.qicon img.visage { width: 23px; height: 23px; border-radius: 4px; }
+.chip img.visage { width: 24px; height: 24px; border-radius: 4px; }
 .cmd-label { font-size: 11px; font-weight: 600; text-align: center; line-height: 1.15; }
 .cmd-cost { font-size: 10px; color: var(--muted); white-space: nowrap; }
 
@@ -591,34 +751,39 @@ ul.help a { color: var(--gold); }
   display: flex;
   flex-direction: column;
   background: var(--panel-solid);
-  border-top: 1px solid var(--border);
-  border-radius: 18px 18px 0 0;
+  border-top: 2px solid var(--lisere);
+  border-radius: 14px 14px 0 0;
   padding: 10px 12px calc(12px + var(--safe-bottom));
   /* Le panneau des ouvriers n'a pas de liste défilante : en paysage, ses
      dernières lignes et la bascule sortaient de l'écran, inatteignables. */
   overflow-y: auto;
 }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.sheet-head h2 { margin: 0; font-size: 17px; }
+.sheet-head h2 { margin: 0; font-family: var(--titre); font-size: 19px; letter-spacing: .01em; }
 
 .build-list { overflow-y: auto; display: grid; gap: 8px; grid-template-columns: 1fr; }
 .build-card {
   display: grid;
-  grid-template-columns: 44px 1fr auto;
+  grid-template-columns: 52px 1fr auto;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
+  padding: 8px 12px 8px 8px;
+  min-height: 62px;
+  border-radius: var(--angle);
   border: 1px solid var(--border);
-  background: rgba(255,255,255,.05);
+  background: var(--fond-bouton);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 0 rgba(0, 0, 0, .5);
   color: var(--text);
   text-align: left;
   cursor: pointer;
 }
 .build-card.disabled { opacity: .45; }
 .bc-icon { font-size: 26px; display: flex; align-items: center; justify-content: center; color: var(--gold); }
+/* La vignette d'une carte : l'illustration du bâtiment, celle que l'on posera sur la carte. */
+.bc-icon.vignette { width: 52px; height: 46px; }
+.bc-icon.vignette img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .5)); }
 .bc-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.bc-name { font-weight: 650; font-size: 14.5px; }
+.bc-name { font-family: var(--titre); font-weight: 700; font-size: 16px; letter-spacing: .01em; }
 .bc-desc { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
 .bc-cost { font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
@@ -629,13 +794,16 @@ ul.help a { color: var(--gold); }
   overflow-y: auto;
   background: var(--panel-solid);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-top: 2px solid var(--lisere);
+  border-radius: 14px;
   padding: 20px;
   box-shadow: 0 20px 50px rgba(0,0,0,.5);
 }
 .modal-card.wide { width: min(520px, 100%); }
-.modal-card h2 { margin: 0 0 6px; font-size: 20px; }
+.modal-card h2 { margin: 0 0 6px; font-family: var(--titre); font-size: 23px; letter-spacing: .01em; }
 .modal-card .subtitle { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+/* Les précisions du menu de pause : sous leurs réglages, en retrait. */
+.modal-card .hint { margin: 8px 0 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .modal-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
 
 .scores { width: 100%; border-collapse: collapse; font-size: 13.5px; }
@@ -652,7 +820,7 @@ ul.help a { color: var(--gold); }
 
 @media (min-width: 720px) {
   .build-list { grid-template-columns: 1fr 1fr; }
-  .sheet { border-radius: 18px; max-width: 720px; margin: 0 auto 16px; border: 1px solid var(--border); }
+  .sheet { border-radius: 14px; max-width: 720px; margin: 0 auto 16px; border: 1px solid var(--border); border-top: 2px solid var(--lisere); }
   #build-menu, #worker-menu { align-items: center; justify-content: center; }
   #minimap { width: 150px; height: 150px; }
   .cmd { min-width: 84px; min-height: 70px; }
@@ -672,7 +840,8 @@ ul.help a { color: var(--gold); }
   .portrait { width: 38px; height: 38px; font-size: 20px; }
   .cmd { min-height: 54px; min-width: 66px; }
   .cmd.compact { min-width: 48px; }
-  .cmd-icon { font-size: 17px; }
+  .cmd-icon { font-size: 17px; min-height: 22px; }
+  .cmd-icon img.visage { width: 22px; height: 22px; }
   #minimap { width: 84px; height: 84px; }
   .res { padding: 4px 7px; font-size: 12px; }
 }
