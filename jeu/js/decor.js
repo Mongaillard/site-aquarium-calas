@@ -30,8 +30,11 @@ export const STYLE = { LAC: 0, MARE: 1 };
 /**
  * Le sable doré du désert : un sol de plus que ceux de la carte (TERRAIN), qui
  * n'existe qu'à l'affichage. Autour du départ d'un peuple du désert, RAYON_DESERT
- * cases de sable puis COURONNE_TERRE cases de terre avant l'herbe ; à
- * RAYON_PLACE cases du départ, le décor debout laisse la place nette.
+ * cases de sable, puis une bande de terre avant l'herbe, large de zéro à
+ * TERRE_MAX cases selon l'endroit (une couronne de largeur égale se lisait de
+ * loin comme un anneau au compas) ; les arbres, eux, restent ceux du désert
+ * sur COURONNE_TERRE cases. À RAYON_PLACE cases du départ, le décor debout
+ * laisse la place nette.
  * Un sol apparent ne recopie pas la carte : il vaut SOL_CARTE partout où il
  * n'a rien à dire, et la carte se lit alors telle qu'elle est à l'instant.
  */
@@ -40,6 +43,7 @@ export const SOL_CARTE = 255;
 export const ZONE = { PRE: 0, COURONNE: 1, DESERT: 2 };
 export const RAYON_DESERT = 15;
 export const COURONNE_TERRE = 4;
+export const TERRE_MAX = 6;
 export const RAYON_PLACE = 5.5;
 const PEUPLES_DU_DESERT = new Set(['solarien']);
 /** Ce que l'image d'un bâtiment dépasse de son emprise vers le sud (la ligne de sol est à 93 % de sa hauteur). */
@@ -322,11 +326,13 @@ export function solPlein(sol, map) {
 
 /**
  * Le sol de base d'une partie : autour du départ de chaque peuple du désert,
- * un disque de sable doré puis une couronne de terre ; partout ailleurs, la
+ * un disque de sable doré puis une bande de terre ; partout ailleurs, la
  * carte (SOL_CARTE). Le bord du disque ondule (trois lobes et cinq, tirés de
- * la graine) : un cercle au compas se verrait. L'eau reste de l'eau. Rend
- * aussi la `zone` de chaque case (ZONE), que suivent les arbres. Ne modifie
- * pas la carte.
+ * la graine) : un cercle au compas se verrait. La bande de terre s'élargit et
+ * se resserre le long du bord (largeurTerre), jusqu'à disparaître : par
+ * endroits, l'herbe touche le sable. L'eau reste de l'eau. Rend aussi la
+ * `zone` de chaque case (ZONE), que suivent les arbres : une couronne
+ * régulière, elle — un sapin au ras du sable jurerait. Ne modifie pas la carte.
  */
 export function solDeBase(map, joueurs) {
   const { w, h, terrain } = map;
@@ -338,23 +344,35 @@ export function solDeBase(map, joueurs) {
     if (!depart || !peupleDuDesert(j.civ)) continue;
     const phase = (k) => hacher(j.index, k, graine, 7) * Math.PI * 2;
     const p1 = phase(1), p2 = phase(2), p3 = phase(3);
-    const portee = RAYON_DESERT + COURONNE_TERRE + 4;
+    const phases = [phase(4), phase(5), phase(6)];
+    const portee = RAYON_DESERT + Math.max(COURONNE_TERRE, TERRE_MAX) + 4;
     for (let ty = Math.max(0, depart.ty - portee); ty <= Math.min(h - 1, depart.ty + portee); ty++) {
       for (let tx = Math.max(0, depart.tx - portee); tx <= Math.min(w - 1, depart.tx + portee); tx++) {
         const i = ty * w + tx;
         if (terrain[i] === TERRAIN.WATER) continue;
         const dx = tx - depart.tx, dy = ty - depart.ty, a = Math.atan2(dy, dx), d = Math.hypot(dx, dy);
         const sable = RAYON_DESERT + 1.5 * Math.sin(3 * a + p1) + 0.9 * Math.sin(5 * a + p2);
-        const terre = sable + COURONNE_TERRE + 1.1 * Math.sin(4 * a + p3);
-        if (d <= sable) { sol[i] = SOL_SABLE_OR; zone[i] = ZONE.DESERT; }
-        else if (d <= terre && zone[i] === ZONE.PRE) {
-          zone[i] = ZONE.COURONNE;
-          if (terrain[i] === TERRAIN.GRASS || terrain[i] === TERRAIN.GRASS_DARK) sol[i] = TERRAIN.DIRT;
-        }
+        const couronne = sable + COURONNE_TERRE + 1.1 * Math.sin(4 * a + p3);
+        if (d <= sable) { sol[i] = SOL_SABLE_OR; zone[i] = ZONE.DESERT; continue; }
+        if (zone[i] === ZONE.DESERT) continue;                       // le désert d'un autre départ
+        if (d <= couronne) zone[i] = ZONE.COURONNE;
+        const herbe = terrain[i] === TERRAIN.GRASS || terrain[i] === TERRAIN.GRASS_DARK;
+        if (herbe && d <= sable + largeurTerre(a, phases)) sol[i] = TERRAIN.DIRT;
       }
     }
   }
   return { sol, zone };
+}
+
+/**
+ * La largeur de la bande de terre autour d'un désert, en cases, dans la
+ * direction `a` (radians) : trois ondes de périodes différentes autour de la
+ * moitié de TERRE_MAX, bornées de zéro à TERRE_MAX. Là où elle tombe à zéro,
+ * l'herbe touche le sable.
+ */
+export function largeurTerre(a, phases) {
+  const onde = 0.8 * Math.sin(2 * a + phases[0]) + 0.6 * Math.sin(5 * a + phases[1]) + 0.4 * Math.sin(9 * a + phases[2]);
+  return Math.max(0, Math.min(TERRE_MAX, TERRE_MAX / 2 * (1 + onde)));
 }
 
 /**
@@ -389,14 +407,17 @@ export function courBatiment(b) {
  * Le sol apparent : le sol de base, et sous chaque bâtiment d'un peuple du
  * désert sa cour de sable doré — où qu'il soit posé, son socle peint ne fait
  * plus une galette sur un pré. `batiments` : ceux que le joueur connaît
- * ({ type, tx, ty, size, playerIndex }). Un tableau neuf à chaque appel, de
- * la même forme que le sol de base (SOL_CARTE là où la carte décide).
+ * ({ type, tx, ty, size, playerIndex, enVue }). La cour va avec l'image du
+ * bâtiment : celui d'un adversaire sorti de la vue n'est plus dessiné, et sa
+ * cour non plus (`enVue` faux) — une tache de sable sans rien dessus ferait
+ * un fantôme. Un tableau neuf à chaque appel, de la même forme que le sol de
+ * base (SOL_CARTE là où la carte décide).
  */
 export function solApparent(base, map, batiments, joueurs) {
   const { w, h, terrain } = map;
   const sol = Uint8Array.from(base.sol);
   for (const b of batiments) {
-    if (b.dead || !peupleDuDesert(joueurs[b.playerIndex]?.civ)) continue;
+    if (b.dead || b.enVue === false || !peupleDuDesert(joueurs[b.playerIndex]?.civ)) continue;
     const c = courBatiment(b);
     for (let ty = Math.max(0, c.ty0); ty <= Math.min(h - 1, c.ty1); ty++) {
       for (let tx = Math.max(0, c.tx0); tx <= Math.min(w - 1, c.tx1); tx++) {
@@ -409,24 +430,29 @@ export function solApparent(base, map, batiments, joueurs) {
 
 /**
  * Tient à jour les bâtiments que le joueur CONNAÎT (`connus` : identifiant →
- * { type, tx, ty, size, playerIndex }) : les siens, et ceux des autres dès
- * qu'il les voit. Un bâtiment adverse tombé reste connu tant qu'on n'a pas
+ * { type, tx, ty, size, playerIndex, enVue }) : les siens, et ceux des autres
+ * dès qu'il les voit. Un bâtiment adverse tombé reste connu tant qu'on n'a pas
  * revu l'endroit. Le sol apparent et le décor ne suivent que ceux-là : une
  * cour de sable apparue sous le brouillard trahirait un chantier adverse.
+ * `enVue` : le bâtiment est-il dessiné à l'instant ? (Les siens, toujours ;
+ * ceux d'un adversaire, tant qu'on les voit.)
  * `voit(b)` : ce bâtiment est-il en vue ? `debout(id)` : existe-t-il encore ?
- * Rend vrai si la liste a changé.
+ * Rend ce qui a changé : 0 rien, CHANGE.VUE un bâtiment connu est entré dans
+ * la vue ou en est sorti (son sol est à refaire), CHANGE.LISTE la liste même
+ * (le sol, et ce que les bâtiments cachent du décor).
  */
+export const CHANGE = { VUE: 1, LISTE: 2 };
 export function releverBatiments(connus, batiments, humain, voit, debout) {
-  let change = false;
+  let change = 0;
   for (const b of batiments) {
     if (b.dead || connus.has(b.id) || (b.playerIndex !== humain && !voit(b))) continue;
-    connus.set(b.id, { kind: 'building', id: b.id, type: b.type, tx: b.tx, ty: b.ty, size: b.size, playerIndex: b.playerIndex });
-    change = true;
+    connus.set(b.id, { kind: 'building', id: b.id, type: b.type, tx: b.tx, ty: b.ty, size: b.size, playerIndex: b.playerIndex, enVue: true });
+    change |= CHANGE.LISTE;
   }
   for (const c of connus.values()) {
-    if (debout(c.id) || (c.playerIndex !== humain && !voit(c))) continue;
-    connus.delete(c.id);
-    change = true;
+    const enVue = c.playerIndex === humain || voit(c);
+    if (enVue && !debout(c.id)) { connus.delete(c.id); change |= CHANGE.LISTE; continue; }
+    if (enVue !== c.enVue) { c.enVue = enVue; change |= CHANGE.VUE; }
   }
   return change;
 }
@@ -464,7 +490,7 @@ export function filtrerDecor(decor, batiments, joueurs, departs) {
     if (b.dead) continue;
     const z = zoneImage(b);
     z.tx0 = b.tx; z.ty0 = b.ty; z.tx1 = b.tx + b.size - 1; z.ty1 = b.ty + b.size - 1;   // l'emprise, en cases
-    if (peupleDuDesert(joueurs[b.playerIndex]?.civ)) {
+    if (b.enVue !== false && peupleDuDesert(joueurs[b.playerIndex]?.civ)) {   // (la cour va avec l'image : voir solApparent)
       const c = courBatiment(b);
       z.cour = { x0: c.tx0 * TILE, y0: c.ty0 * TILE, x1: (c.tx1 + 1) * TILE, y1: (c.ty1 + 1) * TILE, dans: c.dans };
     }
