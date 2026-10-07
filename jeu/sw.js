@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v54';
+const CACHE = 'age-empires-mobile-v55';
 const ASSETS = [
   './',
   './index.html',
@@ -99,7 +99,6 @@ const ASSETS = [
   './assets/solariens/camp-mineurs.webp',
   './assets/solariens/ferme.webp',
   './assets/solariens/tour-guet.webp',
-  './assets/heros.webp',
   './assets/milicien-marche.webp',
   './assets/villageois.webp',
   './assets/eclaireur.webp',
@@ -130,7 +129,6 @@ const ASSETS = [
   './assets/chevalier.webp',
   './assets/lancier.png',
   './assets/portrait-milicien.webp',
-  './assets/defaite.webp',
 ];
 
 self.addEventListener('install', (event) => {

@@ -541,6 +541,57 @@ riposte ; une tour vide qui ne menace aucun de ses bâtiments peut rester debout
 Une armée tombée nettement sous son plancher est complétée avant d'épargner pour
 l'âge suivant. Tests : `node test/reglages-ia.test.js`.
 
+## La direction artistique d'octobre 2026
+
+Un principe : **les bâtiments et les arbres sont la référence** — un dessin à
+l'encre, trait sombre, ombres peintes, lumière venue d'en haut à gauche — et
+tout le reste s'en rapproche. On ne touche ni aux bâtiments, ni à la taille des
+troupes, ni aux règles : chaque lot vérifie que la même partie donne le même
+état avant et après.
+
+**Le brouillard** est une brume bleu nuit au bord fondu, plus un noir en marches
+d'escalier : un masque à trois points par case (`FOG_K`), lissé, repeint par
+blocs de huit cases là où il a changé, et qui déborde de la carte pour que le
+hors-carte ait la même teinte. Ce qui n'a jamais été vu reste opaque ; ce qui a
+été vu garde un voile aussi sombre qu'avant (`BROUILLARD` dans `js/render.js`).
+La mini-carte porte le même.
+
+**Le sol et le décor de chaque peuple.** Un Solarien démarre dans son désert :
+une quinzaine de cases de sable doré autour du palais, puis une bande de terre
+avant l'herbe ; chacun de ses bâtiments posé plus loin a sa cour de sable. Près
+de lui, cyprès, oliviers et pins parasols remplacent sapins et saules — ce sont
+les mêmes arbres pour les règles, seule l'image change. Plus aucun rocher ni
+buisson sur un bâtiment, son parvis ou un chantier ; les fleurs sont de petits
+massifs dessinés ; l'or reste lisible sur la mini-carte du désert. Tout cela
+est de l'affichage (`solDeBase`, `solApparent`, `filtrerDecor` dans
+`js/decor.js`) : la carte que lisent les règles n'est pas modifiée, et le sol
+ne change sous un bâtiment adverse qu'une fois ce bâtiment vu.
+
+**Les troupes** ont le trait des bâtiments : contour sombre, ombres marquées,
+côté gauche plus clair (`REGLAGE` dans `js/modele3d.js`, cuisson version 9 :
+elles se recuisent une fois à la première ouverture). Chacune a une ombre au
+sol, en bas à droite, et un anneau de camp franc — bleu ou rouge — posé sous les
+jambes de toutes les troupes, à la place de la pastille pâle. Le panache du
+Milicien suit le camp, l'Hydre adverse est d'un seul rouge, bélier et catapulte
+sont en bois, le cochon est assombri. Les toits des bâtiments atlantes adverses
+passent au rouge en entier.
+
+**L'accueil et l'habillage.** On choisit son peuple sur l'image de sa capitale,
+et toute l'interface prend ses couleurs (`body[data-civ]` dans `css/jeu.css`) :
+bleu profond à liseré marbre pour les Atlantes, brun chaud à liseré or pour les
+Solariens. Le bouton Jouer se voit sans défiler ; les autres réglages sont
+repliés, résumés sur une ligne. Quand une partie dort, « Nouvelle partie »
+demande deux touchers. En partie, la barre du bas est un panneau plein, le menu
+Construire montre l'illustration de chaque bâtiment, les boutons de formation
+le portrait de la troupe, et les écrans de fin la capitale du joueur.
+
+Ce qui reste à dessiner : des palmiers et des végétaux du désert, les engins
+(ils n'ont changé que de couleur), le portrait du Milicien, l'icône de
+l'application. Rien n'a été mesuré sur un iPhone : tout a été jugé sur des
+captures à la taille du téléphone. Tests : `node test/da-brouillard.test.js`,
+`node test/da-desert.test.js`, `node test/da-troupes.test.js`,
+`node test/da-accueil.test.js`.
+
 ## Classement, ligues, coffres et niveaux des troupes
 
 Une partie se lance **classée** ou **libre** (réglages de l'accueil). Classée,
@@ -651,7 +702,7 @@ chemin sont mises en file avec un budget par tick pour éviter les à-coups.
 
 ```bash
 cd jeu
-npm test                  # sans écran : 802 vérifications en neuf fichiers — deux IA jouent 16 minutes, sauvegarde comprise, puis les réglages d'octobre (test/reglages-*.test.js)
+npm test                  # sans écran : 1 494 vérifications en seize fichiers — deux IA jouent 16 minutes, sauvegarde comprise, puis les réglages d'octobre (test/reglages-*.test.js), la direction artistique (test/da-*.test.js) et le classement (test/progression*.test.js, test/rangement-durable.test.js)
 npm run test:navigateur   # Chromium (Playwright) : 213 vérifications — chargement, gestes, rendu, images/s
 ```
 

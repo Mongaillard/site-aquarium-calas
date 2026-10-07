@@ -141,7 +141,8 @@ console.log('\n--- L’accueil ---');
   const jouer = (main.match(/getElementById\('btn-play'\)\.addEventListener\('click', \(\) => \{([\s\S]*?)\n  \}\);/) || ['', ''])[1];
   check('main.js : « Jouer » passe par toucherNouvellePartie, et n’efface la sauvegarde qu’une fois le lancement décidé',
     /const toucher = toucherNouvellePartie\(partieEnAttente, effacerJusqua, performance\.now\(\)\);/.test(jouer)
-    && /if \(!toucher\.lancer\) \{[^}]*return; \}\s*clearSave\(\);\s*startGame\(/.test(jouer)
+    // (Entre la décision et l'effacement, seulement le décompte d'une partie classée abandonnée.)
+    && /if \(!toucher\.lancer\) \{[^}]*return; \}\s*(?:\/\/[^\n]*\n\s*)?abandonnerPartieClasseeEnCours\(\);\s*clearSave\(\);\s*startGame\(/.test(jouer)
     && (jouer.match(/clearSave\(\)/g) || []).length === 1 && !/confirm\(/.test(main), jouer.replace(/\s+/g, ' ').slice(0, 90));
   const carteReprise = (main.match(/function refreshResumeCard\(\) \{[\s\S]*?\n\}/) || [''])[0];
   check('main.js : la carte de reprise dit au bouton si une partie dort, et le désarme quand elle change',
