@@ -308,7 +308,7 @@ inactif, `H` pour revenir au Centre-Ville.
   - Le **Frondeur** (archerie, Âge Féodal) : un tireur sans or, dont la pierre
     porte +6 contre les archers, les arbalétriers et les archers montés (un
     bonus par type de cible, `bonusType` : l'Archer monté est de la cavalerie).
-  - Le **Sapeur** (caserne, Âge des Châteaux) : rapide, +25 contre les
+  - Le **Sapeur** (caserne, Âge des Châteaux) : rapide, +10 contre les
     bâtiments et +8 contre les engins de siège ; 35 points de vie, sans armure.
     Ces trois-là se débloquent aux ligues 6 à 8 (voir le classement).
 - **13 bâtiments** : Centre-Ville, maisons, moulin, camps de dépôt, fermes,
@@ -641,16 +641,18 @@ sous cadenas, et l'ordinateur ne la forme pas non plus.
 | **Hydre** (Temple, Châteaux) | 5, ou 80 | elle encaisse comme une escouade et mord trois ennemis par coup | 400 de ressources, 45 s de formation, trois places de population | rien à coût égal : dix Champions ou neuf Cavaliers tiennent tête à trois Hydres |
 | **Pavoisier** (caserne, Féodal) | 6, ou 130 | un mur contre les archers et les tours : armure de 6 contre les flèches | lent (0,85) et il frappe peu (4) | Cavaliers, Champions, et la Catapulte quand il tient la ligne |
 | **Frondeur** (archerie, Féodal) | 7, ou 180 | un tireur sans or, +6 contre archers, arbalétriers et archers montés | portée de 4, 30 points de vie, et 3 de dégâts hors de son bonus | toute troupe de mêlée : miliciens, Cavaliers |
-| **Sapeur** (caserne, Châteaux) | 8, ou 250 | rapide (1,3), +25 contre les bâtiments, +8 contre les engins de siège | 35 points de vie, aucune armure | tout soldat : un archer seul l'abat, cinq miliciens en abattent quatre sans perte |
+| **Sapeur** (caserne, Châteaux) | 8, ou 250 | rapide (1,3), +10 contre les bâtiments, +8 contre les engins de siège | 35 points de vie, aucune armure | tout soldat, et les tours : un archer seul l'abat, cinq miliciens en abattent quatre sans perte, une tour tue cinq sapeurs avant de tomber |
 
 Les trois dernières sont des hypothèses de départ, mesurées en duels à prix
 égal (`node test/troupes-nouvelles.test.js`, qui écrit les temps) : sept
 frondeurs battent six archers en neuf secondes, mais quatre perdent contre
 trois miliciens ; un Pavoisier tient 34 s sous le tir de quatre archers, un
 milicien 4 s, et sept pavoisiers battent dix archers sans perdre un homme ;
-cinq sapeurs rasent une caserne en 15 s, deux béliers en 48 s. À +25, le Sapeur
-démolit donc trois fois plus vite que le bélier pour le même prix : c'est le
-réglage à surveiller.
+cinq sapeurs rasent une caserne en 31 s, deux béliers en 48 s — une fois et
+demie plus vite pour le même prix, et rendus sur place deux fois plus tôt —,
+mais une tour leur prend leurs cinq hommes là où le bélier ne perd personne.
+(La première valeur essayée, +25, rasait la caserne en 15 s : trois fois plus
+vite que le bélier ; elle a été ramenée à +10.)
 
 **L'ordinateur ne forme pas ces trois-là de lui-même** : sa composition d'armée
 n'a pas changé. La partie les lui donne par l'option `troupesEnPlus` de `World`

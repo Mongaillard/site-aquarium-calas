@@ -201,7 +201,7 @@ console.log('\n--- Statistiques, bâtiment, pictogramme ---');
       id: 'sapeur', name: 'Sapeur', icon: 'sapeur', class: 'infantry',
       cost: { food: 50, gold: 40 }, trainTime: 18, hp: 35, speed: 1.3,
       attack: 3, attackType: 'melee', range: 0.8, attackSpeed: 2.0,
-      bonus: { building: 25, siege: 8 },
+      bonus: { building: 10, siege: 8 },
       meleeArmor: 0, pierceArmor: 0, los: 5, radius: 9, from: 'barracks', age: 2,
     },
   };
@@ -374,19 +374,22 @@ console.log('\n--- Le Sapeur contre les bâtiments et les engins ---');
   }
   const dit = (b) => `${nomDe(b, 'atlante')} (${releve[b].sapeurs.pv} PV) : sapeurs ${releve[b].sapeurs.duree.toFixed(1)} s, ${releve[b].sapeurs.morts} mort(s) — `
     + `béliers ${releve[b].beliers.duree.toFixed(1)} s, ${releve[b].beliers.morts} mort(s) — ×${(releve[b].beliers.duree / releve[b].sapeurs.duree).toFixed(1)}`;
-  for (const batiment of Object.keys(releve)) {
-    const r = releve[batiment];
-    check(`à prix égal, les sapeurs rasent ${batiment === 'tower' ? 'une tour' : batiment === 'barracks' ? 'une caserne' : 'un Centre-Ville'} avant les béliers`,
-      r.sapeurs.rase && r.beliers.rase && r.sapeurs.duree < r.beliers.duree, dit(batiment));
+  // Un bâtiment sans défense : les sapeurs vont plus vite, sans aller jusqu'au
+  // double (à +25 c'était le triple). Une tour : elle leur prend des hommes,
+  // et le bélier, cuirassé contre les flèches, n'y laisse personne.
+  for (const batiment of ['barracks', 'towncenter']) {
+    const r = releve[batiment], gain = r.beliers.duree / r.sapeurs.duree;
+    check(`à prix égal, les sapeurs rasent ${batiment === 'barracks' ? 'une caserne' : 'un Centre-Ville'} avant les béliers, sans aller deux fois plus vite`,
+      r.sapeurs.rase && r.beliers.rase && gain > 1.2 && gain < 2, dit(batiment));
   }
-  check('… mais la tour leur prend un homme, et aucun bélier', releve.tower.sapeurs.morts >= 1 && releve.tower.beliers.morts === 0);
+  check('contre une tour, les sapeurs y laissent des hommes, les béliers aucun', releve.tower.sapeurs.morts >= 2 && releve.tower.beliers.morts === 0 && releve.tower.beliers.rase, dit('tower'));
   const coup = (() => { const w = monde({ mapSize: 'medium' }); const b = batir(w, 'barracks', 1); const c = centreDe(w);
     return [computeDamage(UNIT_TYPES.sapeur, w.players[0], b), computeDamage(UNIT_TYPES.ram, w.players[0], b),
       computeDamage(UNIT_TYPES.sapeur, w.players[0], w.spawnUnit(1, 'ram', c.x + 150, c.y + 150)),
       computeDamage(UNIT_TYPES.sapeur, w.players[0], w.spawnUnit(1, 'catapult', c.x + 150, c.y + 150)),
       computeDamage(UNIT_TYPES.sapeur, w.players[0], w.spawnUnit(1, 'militia', c.x + 150, c.y + 150))]; })();
-  check('un coup de sapeur : 26 sur une caserne (37 pour le bélier, deux fois plus lent), 9 sur un bélier, 11 sur une catapulte, 2 sur un milicien',
-    egal(coup, [26, 37, 9, 11, 2]), coup.join(', '));
+  check('un coup de sapeur : 11 sur une caserne (37 pour le bélier, deux fois plus lent), 9 sur un bélier, 11 sur une catapulte, 2 sur un milicien',
+    egal(coup, [11, 37, 9, 11, 2]), coup.join(', '));
   const engins = duel(SAPEURS, BELIERS);
   check('cinq sapeurs brisent deux béliers', engins.vA === engins.n, engins.texte);
   const catapulte = duel([['sapeur', 3]], [['catapult', 1]]);

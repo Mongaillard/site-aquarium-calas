@@ -273,7 +273,13 @@ export const UNIT_TYPES = {
     id: 'sapeur', name: 'Sapeur', icon: 'sapeur', class: 'infantry',
     cost: { food: 50, gold: 40 }, trainTime: 18, hp: 35, speed: 1.3,
     attack: 3, attackType: 'melee', range: 0.8, attackSpeed: 2.0,
-    bonus: { building: 25, siege: 8 },
+    // +10 contre les bâtiments : à prix égal, une fois et demie plus vite que
+    // le bélier sur un bâtiment sans défense — et bien plus vite rendu sur
+    // place —, mais une tour lui prend ses hommes là où le bélier ne craint
+    // rien. À +25 (première valeur essayée), cinq sapeurs rasaient une caserne
+    // trois fois plus vite que deux béliers, et huit le bâtiment principal
+    // d'une partie Express en dix secondes.
+    bonus: { building: 10, siege: 8 },
     meleeArmor: 0, pierceArmor: 0, los: 5, radius: 9,
     from: 'barracks', age: 2,
     desc: 'Rapide, il sape les bâtiments et brise les engins de siège. Très fragile : tout soldat l’abat en quelques coups.',
