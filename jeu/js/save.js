@@ -656,11 +656,18 @@ export function lireProgression() {
   return regulariser(migrerProfil(rangee)).profil;
 }
 
+/** Appelé après chaque écriture réussie, avec le profil rangé : le rangement durable s'y branche (js/rangement-durable.js). */
+let apresEcriture = null;
+export function quandLaProgressionSEcrit(fonction) { apresEcriture = typeof fonction === 'function' ? fonction : null; }
+
 /** Range le profil. Renvoie false si le navigateur refuse (mode privé, quota) : rien n'est alors retenu. */
 export function ecrireProgression(profil) {
   const store = storage();
   if (!store) return false;
-  try { store.setItem(PROGRESSION_KEY, JSON.stringify(migrerProfil(profil))); return true; } catch { return false; }
+  const range = migrerProfil(profil);
+  try { store.setItem(PROGRESSION_KEY, JSON.stringify(range)); } catch { return false; }
+  if (apresEcriture) { try { apresEcriture(range); } catch { /* le second rangement ne doit jamais gêner le premier */ } }
+  return true;
 }
 
 // --- Palmarès ------------------------------------------------------------------

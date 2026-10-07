@@ -11,8 +11,9 @@ import { World } from './game.js';
 import {
   saveGame, loadSave, clearSave, restoreWorld,
   lirePalmares, lignePalmares, inscrireAuPalmares, resumePalmares,
-  lireProgression, ecrireProgression,
+  lireProgression, ecrireProgression, quandLaProgressionSEcrit,
 } from './save.js';
+import { brancher as brancherRangementDurable } from './rangement-durable.js';
 import { appliquerResultat, reglagesDePartie, issueDePartie } from './progression.js';
 import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal } from './progression-ecrans.js';
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
@@ -1687,6 +1688,13 @@ function setupStartScreen() {
 }
 
 installerProgression({ quandLeProfilChange: refreshLigue });
+// Là où la page offre un rangement par personne, le profil y est gardé aussi :
+// s'il y est plus avancé qu'ici (autre appareil, stockage effacé), il revient.
+brancherRangementDurable({ hote: window.claude, lire: lireProgression, ecrire: ecrireProgression }).then((rangement) => {
+  if (!rangement) return;
+  quandLaProgressionSEcrit(rangement.recopier);
+  if (rangement.adopte && !currentGame) refreshLigue();
+}).catch(() => { /* sans rangement durable, le navigateur suffit */ });
 setupStartScreen();
 showStartScreen();
 // Les illustrations se chargent — et les unités en 3D se cuisent — pendant

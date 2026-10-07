@@ -22,6 +22,7 @@ const ASSETS = [
   './js/progression.js',
   './js/progression-config.js',
   './js/progression-ecrans.js',
+  './js/rangement-durable.js',
   './css/progression.css',
   './js/render.js',
   // Importés par render.js et sprites.js : sans eux, le graphe de modules
