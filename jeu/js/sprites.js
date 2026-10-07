@@ -957,6 +957,10 @@ export function chargerSprites() {
 // pour qu'un échantillon qui déborde de la période (les débordements de
 // lisière) reste dans l'image. Une version demi-taille sert au zoom arrière :
 // sans elle, réduire 384 texels sur 96 pixels scintille au défilement.
+//
+// Le « sable doré » du désert (sandOr) n'a pas d'image à lui : c'est la nappe
+// de sable, reteintée une fois au chargement vers l'or des socles peints sous
+// les bâtiments solariens (voir DERIVEES). Le sable des rivages reste brun.
 // ---------------------------------------------------------------------------
 
 export const TEXEL = 0.5;          // pixels monde par texel, à zoom 1
@@ -968,7 +972,58 @@ const TEXTURES = {
   sand: 'assets/sol-sable.webp',
   water: 'assets/sol-eau.webp',
 };
+/**
+ * Nappes tirées d'une autre. Le sable doré : la nappe de sable est brune
+ * (161, 121, 83 en moyenne) ; le bord des socles solariens, mesuré sur les
+ * treize images de assets/solariens, est à (225, 172, 78) en médiane, son
+ * sable nu à (244, 191, 100). On vise un peu en dessous — le sol reste plus
+ * calme que les bâtiments, et le socle s'y fond quand même (essayé de 200 à
+ * 214 de rouge : plus sombre, le socle refait une tache claire) — et on
+ * resserre le contraste : un grain de photo éclairci d'un tiers crierait.
+ */
+const DERIVEES = {
+  sandOr: { de: 'sand', vers: [210, 165, 87], contraste: 0.7 },
+};
 const nappes = new Map();
+
+/**
+ * Reteinte les pixels RGBA d'une nappe, sur place : la couleur moyenne devient
+ * `vers`, et chaque pixel garde son écart à la moyenne, mis à l'échelle de la
+ * nouvelle couleur puis resserré de `contraste`. Pure : se teste sans navigateur.
+ */
+export function reteinterNappe(data, vers, contraste = 1) {
+  const n = data.length / 4, moyenne = [0, 0, 0];
+  for (let i = 0; i < data.length; i += 4) { moyenne[0] += data[i]; moyenne[1] += data[i + 1]; moyenne[2] += data[i + 2]; }
+  for (let c = 0; c < 3; c++) {
+    const m = moyenne[c] / n || 1, gain = (vers[c] / m) * contraste;
+    for (let i = c; i < data.length; i += 4) data[i] = Math.max(0, Math.min(255, Math.round(vers[c] + (data[i] - m) * gain)));
+  }
+  return data;
+}
+
+/** L'image d'une nappe dérivée : la nappe d'origine recopiée, puis reteintée. */
+function nappeDerivee(image, { vers, contraste }) {
+  const c = document.createElement('canvas');
+  c.width = image.width; c.height = image.height;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(image, 0, 0);
+  const pixels = g.getImageData(0, 0, c.width, c.height);
+  reteinterNappe(pixels.data, vers, contraste);
+  // Sur un canvas neuf, écrit une seule fois : c'est lui que les niveaux recopient.
+  const sortie = document.createElement('canvas');
+  sortie.width = c.width; sortie.height = c.height;
+  sortie.getContext('2d').putImageData(pixels, 0, 0);
+  c.width = c.height = 0;
+  return sortie;
+}
+
+function niveauxNappe(image) {
+  const n = image.width;
+  return [
+    { canvas: nappeRepliee(image, n, MARGE), n, marge: MARGE, texel: TEXEL },
+    { canvas: nappeRepliee(image, n / 2, MARGE / 2), n: n / 2, marge: MARGE / 2, texel: TEXEL * 2 },
+  ];
+}
 
 function nappeRepliee(image, n, marge) {
   const c = document.createElement('canvas');
@@ -987,12 +1042,15 @@ function chargerTexture(cle) {
   const image = new Image();
   image.decoding = 'async';
   image.onload = () => {
-    const n = image.width;
-    entree.niveaux = [
-      { canvas: nappeRepliee(image, n, MARGE), n, marge: MARGE, texel: TEXEL },
-      { canvas: nappeRepliee(image, n / 2, MARGE / 2), n: n / 2, marge: MARGE / 2, texel: TEXEL * 2 },
-    ];
+    entree.niveaux = niveauxNappe(image);
     entree.pret = true;
+    for (const [derivee, regle] of Object.entries(DERIVEES)) {
+      if (regle.de !== cle) continue;
+      // Lecture des pixels refusée (rare) : le désert garde le sable d'origine.
+      let teinte = image;
+      try { teinte = nappeDerivee(image, regle); } catch { /* nappe d'origine */ }
+      nappes.set(derivee, { pret: true, niveaux: niveauxNappe(teinte) });
+    }
   };
   image.onerror = () => { nappes.set(cle, { pret: false, absent: true }); };
   image.src = TEXTURES[cle];

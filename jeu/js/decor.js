@@ -13,6 +13,12 @@
 // le sol : de l'herbe, des fleurs, des buissons et du couvre-sol sur les prés,
 // des cailloux, des agaves, des pampas et des touffes sèches sur la terre et le
 // sable, des fougères et un peu plus de tout au pied des forêts.
+//
+// Le SOL APPARENT, enfin : chaque peuple a le sien sous ses bâtiments. La carte
+// (map.terrain) n'y change rien — c'est le rendu qui peint du sable doré autour
+// du départ d'un peuple du désert et sous chacun de ses bâtiments ; le décor et
+// les arbres suivent ce sol-là (solDeBase, solApparent, caseArbre), et ce que
+// les bâtiments recouvrent n'est pas dessiné (filtrerDecor).
 // ---------------------------------------------------------------------------
 import { TILE } from './config.js';
 import { TERRAIN } from './map.js';
@@ -21,6 +27,23 @@ import { PIECES_DECOR } from './decor-pieces.js';
 export const ECHELLE_DECOR = 0.5;    // pixels monde par pixel d'atlas (atlas à 2×)
 export const MARE_MAX = 40;          // cases d'eau : au-delà, c'est un lac
 export const STYLE = { LAC: 0, MARE: 1 };
+/**
+ * Le sable doré du désert : un sol de plus que ceux de la carte (TERRAIN), qui
+ * n'existe qu'à l'affichage. Autour du départ d'un peuple du désert, RAYON_DESERT
+ * cases de sable puis COURONNE_TERRE cases de terre avant l'herbe ; à
+ * RAYON_PLACE cases du départ, le décor debout laisse la place nette.
+ * Un sol apparent ne recopie pas la carte : il vaut SOL_CARTE partout où il
+ * n'a rien à dire, et la carte se lit alors telle qu'elle est à l'instant.
+ */
+export const SOL_SABLE_OR = 5;
+export const SOL_CARTE = 255;
+export const ZONE = { PRE: 0, COURONNE: 1, DESERT: 2 };
+export const RAYON_DESERT = 15;
+export const COURONNE_TERRE = 4;
+export const RAYON_PLACE = 5.5;
+const PEUPLES_DU_DESERT = new Set(['solarien']);
+/** Ce que l'image d'un bâtiment dépasse de son emprise vers le sud (la ligne de sol est à 93 % de sa hauteur). */
+const DEBORD_SUD = 12;
 /**
  * Les classes CUITES dans le sol : peintes une fois dans les tronçons de sol
  * mis en cache, sous tout le reste — galets, nénuphars, fleurs, touffes
@@ -33,6 +56,26 @@ const FLEURS = ['fleurBleu', 'fleurJaune', 'fleurRose', 'fleurBlanc'];
 
 const PAR_CLASSE = {};
 for (const p of PIECES_DECOR) (PAR_CLASSE[p.classe] ||= []).push(p);
+/**
+ * Les fleurs de l'atlas (« eau-mare-59 » et ses reteintes) sont des amas de
+ * quelques pixels purs, magenta, cyan, jaune : à côté d'un monde dessiné, on
+ * les prend pour des défauts d'affichage. On sème à leur place les massifs
+ * fleuris de la planche des ornements, de la même main que les buissons et
+ * les arbres, en petit (voir ECHELLE_FLEUR) et cuits dans le sol.
+ */
+const MASSIFS = {
+  fleurBleu: ['ornement-03', 'ornement-10', 'ornement-18'],
+  fleurJaune: ['ornement-06', 'ornement-19'],
+  fleurRose: ['ornement-09', 'buissons-3'],
+  fleurBlanc: ['ornement-02', 'ornement-08', 'ornement-17'],
+};
+for (const [classe, noms] of Object.entries(MASSIFS)) {
+  const massifs = noms.map((nom) => PIECES_DECOR.find((p) => p.nom === nom)).filter(Boolean);
+  if (massifs.length) PAR_CLASSE[classe] = massifs.map((p) => ({ ...p, classe }));
+}
+const ECHELLE_FLEUR = 0.5;           // un massif de 36 px monde devient une touffe de fleurs de 18
+/** Les classes des prés : rien de tout cela ne pousse sur le sable d'une cour. */
+const VERTES = new Set([...FLEURS, 'herbe', 'couvre', 'buisson', 'fougere']);
 
 /** Hachage d'une case et d'un rang → [0, 1), identique partout. */
 export function hacher(x, y, graine, k) {
@@ -83,17 +126,18 @@ function poser(decor, h, tx, ty, classe, u, x, y, miroir, echelle) {
   const p = piece(classe, u);
   if (!p) return;
   const liste = CUITES.has(classe) ? decor.cuits : decor.debout;
-  liste[Math.max(0, Math.min(h - 1, Math.floor(y / TILE)))].push({ x, y, piece: p, miroir, echelle, tx, ty });
+  liste[Math.max(0, Math.min(h - 1, Math.floor(y / TILE)))].push({ x, y, piece: p, miroir, echelle, tx, ty, verte: VERTES.has(classe), cache: false });
   decor.total++;
 }
 
 /**
  * Le rivage. Chaque pièce : { x, y } monde de son pied, `piece` de l'atlas,
  * `miroir`, `echelle`, et sa case { tx, ty }. `corps` (plansDEau) peut être
- * fourni pour ne pas le recalculer.
+ * fourni pour ne pas le recalculer ; `sol` est le sol sur lequel on plante —
+ * celui de la carte, ou le sol de base d'une partie (solDeBase).
  */
-export function planterRivage(map, corps = plansDEau(map)) {
-  const { w, h, terrain } = map;
+export function planterRivage(map, corps = plansDEau(map), sol = map.terrain) {
+  const { w, h } = map, terrain = sol;
   const graine = map.seed | 0;
   const decor = decorVide(h);
   decor.corps = corps;
@@ -133,6 +177,7 @@ export function planterRivage(map, corps = plansDEau(map)) {
       const pRoc = mare ? 0.66 : 0.58, pAmas = mare ? 0.16 : 0.06;
       const pHerbe = mare ? 0.55 : 0.45, pRoseau = mare ? 0.6 : 0;
       const pre = terrain[i] === TERRAIN.GRASS || terrain[i] === TERRAIN.GRASS_DARK;
+      const desert = terrain[i] === SOL_SABLE_OR;
       // Autour d'une mare, des fougères côté terre ; sur une plage, une pampa.
       if (mare && pre && r(28) < 0.14) poser(decor, h, tx, ty, 'fougere', r(29), cx - nx * (8 + r(80) * 8) + tx_ * (r(81) * 20 - 10), cy - ny * (8 + r(80) * 8) + ty_ * (r(81) * 20 - 10), r(82) < 0.5, 0.85 + r(83) * 0.3);
       else if (!mare && !pre && r(28) < 0.08) poser(decor, h, tx, ty, 'pampa', r(29), cx - nx * (6 + r(80) * 8) + tx_ * (r(81) * 20 - 10), cy - ny * (6 + r(80) * 8) + ty_ * (r(81) * 20 - 10), r(82) < 0.5, 0.85 + r(83) * 0.3);
@@ -155,10 +200,10 @@ export function planterRivage(map, corps = plansDEau(map)) {
           poser(decor, h, tx, ty, 'galet', r(30 + k), cx + r(40 + k) * 24 - 12 + nx * 2, cy + r(50 + k) * 24 - 12 + ny * 2, r(60 + k) < 0.5, 0.8 + r(70 + k) * 0.4);
         }
       }
-      // Une fleur dans l'herbe, autour des mares.
-      if (mare && r(23) < 0.25) {
+      // Des fleurs dans l'herbe, autour des mares (pas dans le désert).
+      if (mare && !desert && r(23) < 0.25) {
         const a = -(8 + r(24) * 8), b = r(25) * 20 - 10;
-        poser(decor, h, tx, ty, FLEURS[Math.floor(r(27) * FLEURS.length) % FLEURS.length], r(26), cx + nx * a + tx_ * b, cy + ny * a + ty_ * b, false, 1);
+        poser(decor, h, tx, ty, FLEURS[Math.floor(r(27) * FLEURS.length) % FLEURS.length], r(26), cx + nx * a + tx_ * b, cy + ny * a + ty_ * b, false, ECHELLE_FLEUR);
       }
     }
   }
@@ -170,8 +215,8 @@ export function planterRivage(map, corps = plansDEau(map)) {
  * occupées par une ressource. Probabilités par case selon le sol ; au pied
  * d'une forêt (une case voisine porte un arbre) tout est un peu plus dense.
  */
-export function planterCampagne(map) {
-  const { w, h, terrain } = map;
+export function planterCampagne(map, sol = map.terrain) {
+  const { w, h } = map, terrain = sol;
   const graine = map.seed | 0;
   const decor = decorVide(h);
   const eau = (x, y) => x >= 0 && y >= 0 && x < w && y < h && terrain[y * w + x] === TERRAIN.WATER;
@@ -195,15 +240,20 @@ export function planterCampagne(map) {
       const cx = tx * TILE + TILE / 2, cy = ty * TILE + TILE / 2;
       const pre = t === TERRAIN.GRASS || t === TERRAIN.GRASS_DARK;
       const sombre = t === TERRAIN.GRASS_DARK;
+      const desert = t === SOL_SABLE_OR;
       // Probabilités par sol : herbe, fleurs, buisson, rocher, galets, amas,
       // couvre-sol, fougère, agave, pampa.
       let pHerbe, pFleurs, pBuisson, pRoc, pGalets, pAmas, pCouvre = 0, pFougere = 0, pAgave = 0, pPampa = 0;
       if (pre) { pHerbe = sombre ? 0.07 : 0.05; pFleurs = sombre ? 0.025 : 0.035; pBuisson = sombre ? 0.03 : 0.02; pRoc = 0.008; pGalets = 0.015; pAmas = 0.002; pCouvre = 0.012; }
       else if (t === TERRAIN.DIRT) { pHerbe = 0.06; pFleurs = 0; pBuisson = 0; pRoc = 0.06; pGalets = 0.12; pAmas = 0.006; pAgave = 0.02; pPampa = 0.015; }
       else { pHerbe = 0.04; pFleurs = 0; pBuisson = 0; pRoc = 0.03; pGalets = 0.10; pAmas = 0.003; pAgave = 0.03; pPampa = 0.025; }
+      // Le désert d'un départ : moins de pampas vertes, plus de touffes sèches.
+      if (desert) { pHerbe = 0.06; pPampa = 0.012; }
       // Au pied d'une forêt : fougères, couvre-sol, plus d'herbe, des buissons
       // (même sur la terre), quelques rochers ; les fleurs restent aux prés.
-      if (foret) { pHerbe += 0.10; pBuisson += pre ? 0.05 : 0.03; pRoc += 0.02; pFougere += 0.10; pCouvre += 0.06; if (pre) pFleurs += 0.02; }
+      // Dans le désert, rien de vert : des touffes sèches, des agaves, des rochers.
+      if (foret && desert) { pHerbe += 0.08; pAgave += 0.04; pRoc += 0.02; }
+      else if (foret) { pHerbe += 0.10; pBuisson += pre ? 0.05 : 0.03; pRoc += 0.02; pFougere += 0.10; pCouvre += 0.06; if (pre) pFleurs += 0.02; }
       const dans = (k) => r(k) * 22 - 11;          // une position dans la case, à l'écart des bords
 
       if (r(1) < pHerbe) poser(decor, h, tx, ty, pre ? 'herbe' : 'touffe', r(2), cx + dans(3), cy + dans(4) + 4, r(5) < 0.5, 0.8 + r(6) * 0.35);
@@ -220,12 +270,13 @@ export function planterCampagne(map) {
         for (let k = 0; k < nb; k++) poser(decor, h, tx, ty, 'galet', r(30 + k), cx + dans(40 + k), cy + dans(50 + k), r(60 + k) < 0.5, 0.8 + r(70 + k) * 0.4);
       }
       if (r(21) < pFleurs) {
-        // Un bouquet : deux à quatre fleurs d'une même couleur, serrées.
+        // Un massif de fleurs d'une couleur, et une fois sur trois un second,
+        // plus petit, à son côté.
         const couleur = FLEURS[Math.floor(r(22) * FLEURS.length) % FLEURS.length];
-        const nb = 2 + Math.floor(r(23) * 3), ox = dans(24) * 0.6, oy = dans(25) * 0.6;
+        const nb = r(23) < 0.34 ? 2 : 1, ox = dans(24) * 0.6, oy = dans(25) * 0.6;
         for (let k = 0; k < nb; k++) {
-          const ang = r(80 + k) * Math.PI * 2, ray = 3 + r(90 + k) * 8;
-          poser(decor, h, tx, ty, couleur, r(100 + k), cx + ox + Math.cos(ang) * ray, cy + oy + Math.sin(ang) * ray * 0.7, r(110 + k) < 0.5, 0.85 + r(120 + k) * 0.3);
+          const ang = r(80 + k) * Math.PI * 2, ray = k ? 9 + r(90 + k) * 4 : 0;
+          poser(decor, h, tx, ty, couleur, r(100 + k), cx + ox + Math.cos(ang) * ray, cy + oy + 4 + Math.sin(ang) * ray * 0.7, r(110 + k) < 0.5, ECHELLE_FLEUR * (k ? 0.8 : 0.9 + r(120 + k) * 0.2));
         }
       }
     }
@@ -233,11 +284,14 @@ export function planterCampagne(map) {
   return decor;
 }
 
-/** Tout le décor d'une carte : le rivage, puis la campagne, par ligne. */
-export function planterDecor(map) {
+/**
+ * Tout le décor d'une carte : le rivage, puis la campagne, par ligne. `sol` :
+ * le sol sur lequel on plante (par défaut celui de la carte).
+ */
+export function planterDecor(map, sol = map.terrain) {
   const corps = plansDEau(map);
-  const rivage = planterRivage(map, corps);
-  const campagne = planterCampagne(map);
+  const rivage = planterRivage(map, corps, sol);
+  const campagne = planterCampagne(map, sol);
   const decor = decorVide(map.h);
   for (let ty = 0; ty < map.h; ty++) {
     decor.debout[ty] = rivage.debout[ty].concat(campagne.debout[ty]);
@@ -247,4 +301,200 @@ export function planterDecor(map) {
   decor.rivage = rivage.total; decor.campagne = campagne.total;
   decor.mares = rivage.mares; decor.lacs = rivage.lacs; decor.corps = corps;
   return decor;
+}
+
+// ---------------------------------------------------------------------------
+// Le sol apparent, et ce que les bâtiments cachent du décor.
+// ---------------------------------------------------------------------------
+
+/** Ce peuple vit-il sur le sable ? */
+export function peupleDuDesert(civ) { return PEUPLES_DU_DESERT.has(civ); }
+
+/** Le sol d'une case : celui du sol apparent s'il en dit quelque chose, sinon celui de la carte. */
+export function solEn(sol, map, i) {
+  return sol && sol[i] !== SOL_CARTE ? sol[i] : map.terrain[i];
+}
+
+/** Un sol apparent mis à plat : un sol par case, pour planter le décor. */
+export function solPlein(sol, map) {
+  return Uint8Array.from(map.terrain, (t, i) => (sol[i] !== SOL_CARTE ? sol[i] : t));
+}
+
+/**
+ * Le sol de base d'une partie : autour du départ de chaque peuple du désert,
+ * un disque de sable doré puis une couronne de terre ; partout ailleurs, la
+ * carte (SOL_CARTE). Le bord du disque ondule (trois lobes et cinq, tirés de
+ * la graine) : un cercle au compas se verrait. L'eau reste de l'eau. Rend
+ * aussi la `zone` de chaque case (ZONE), que suivent les arbres. Ne modifie
+ * pas la carte.
+ */
+export function solDeBase(map, joueurs) {
+  const { w, h, terrain } = map;
+  const sol = new Uint8Array(w * h).fill(SOL_CARTE);
+  const zone = new Uint8Array(w * h);
+  const graine = map.seed | 0;
+  for (const j of joueurs) {
+    const depart = map.startPositions[j.index];
+    if (!depart || !peupleDuDesert(j.civ)) continue;
+    const phase = (k) => hacher(j.index, k, graine, 7) * Math.PI * 2;
+    const p1 = phase(1), p2 = phase(2), p3 = phase(3);
+    const portee = RAYON_DESERT + COURONNE_TERRE + 4;
+    for (let ty = Math.max(0, depart.ty - portee); ty <= Math.min(h - 1, depart.ty + portee); ty++) {
+      for (let tx = Math.max(0, depart.tx - portee); tx <= Math.min(w - 1, depart.tx + portee); tx++) {
+        const i = ty * w + tx;
+        if (terrain[i] === TERRAIN.WATER) continue;
+        const dx = tx - depart.tx, dy = ty - depart.ty, a = Math.atan2(dy, dx), d = Math.hypot(dx, dy);
+        const sable = RAYON_DESERT + 1.5 * Math.sin(3 * a + p1) + 0.9 * Math.sin(5 * a + p2);
+        const terre = sable + COURONNE_TERRE + 1.1 * Math.sin(4 * a + p3);
+        if (d <= sable) { sol[i] = SOL_SABLE_OR; zone[i] = ZONE.DESERT; }
+        else if (d <= terre && zone[i] === ZONE.PRE) {
+          zone[i] = ZONE.COURONNE;
+          if (terrain[i] === TERRAIN.GRASS || terrain[i] === TERRAIN.GRASS_DARK) sol[i] = TERRAIN.DIRT;
+        }
+      }
+    }
+  }
+  return { sol, zone };
+}
+
+/**
+ * Ce dont l'image d'un bâtiment déborde de son emprise à l'est et à l'ouest,
+ * en pixels monde : elle est dessinée sur 172 px pour le Centre-Ville, 158
+ * pour les 3×3 et 108 pour les 2×2 (sprites.js, `largeurMonde`).
+ */
+export function debordImage(type, size) {
+  return type === 'towncenter' ? 38 : size >= 3 ? 31 : 22;
+}
+
+/** Le rectangle monde que couvre l'image d'un bâtiment posé (ou de son chantier), toits exceptés. */
+export function zoneImage(b) {
+  const d = debordImage(b.type, b.size);
+  return { x0: b.tx * TILE - d, y0: b.ty * TILE, x1: (b.tx + b.size) * TILE + d, y1: (b.ty + b.size) * TILE + DEBORD_SUD };
+}
+
+/**
+ * La cour d'un bâtiment : son emprise et les cases où son image déborde (une
+ * case, deux pour le Centre-Ville), coins coupés — le socle peint est un
+ * losange, une cour carrée ferait une dalle. `dans(tx, ty)` dit si la case en est.
+ */
+export function courBatiment(b) {
+  const m = Math.ceil(debordImage(b.type, b.size) / TILE);
+  const tx0 = b.tx - m, ty0 = b.ty - m, tx1 = b.tx + b.size - 1 + m, ty1 = b.ty + b.size - 1 + m;
+  const hors = (v, a, z) => Math.max(0, a + m - v, v - (z - m));   // de combien la case sort de l'emprise
+  const dans = (tx, ty) => tx >= tx0 && tx <= tx1 && ty >= ty0 && ty <= ty1 && hors(tx, tx0, tx1) + hors(ty, ty0, ty1) <= m;
+  return { tx0, ty0, tx1, ty1, dans };
+}
+
+/**
+ * Le sol apparent : le sol de base, et sous chaque bâtiment d'un peuple du
+ * désert sa cour de sable doré — où qu'il soit posé, son socle peint ne fait
+ * plus une galette sur un pré. `batiments` : ceux que le joueur connaît
+ * ({ type, tx, ty, size, playerIndex }). Un tableau neuf à chaque appel, de
+ * la même forme que le sol de base (SOL_CARTE là où la carte décide).
+ */
+export function solApparent(base, map, batiments, joueurs) {
+  const { w, h, terrain } = map;
+  const sol = Uint8Array.from(base.sol);
+  for (const b of batiments) {
+    if (b.dead || !peupleDuDesert(joueurs[b.playerIndex]?.civ)) continue;
+    const c = courBatiment(b);
+    for (let ty = Math.max(0, c.ty0); ty <= Math.min(h - 1, c.ty1); ty++) {
+      for (let tx = Math.max(0, c.tx0); tx <= Math.min(w - 1, c.tx1); tx++) {
+        if (c.dans(tx, ty) && terrain[ty * w + tx] !== TERRAIN.WATER) sol[ty * w + tx] = SOL_SABLE_OR;
+      }
+    }
+  }
+  return sol;
+}
+
+/**
+ * Tient à jour les bâtiments que le joueur CONNAÎT (`connus` : identifiant →
+ * { type, tx, ty, size, playerIndex }) : les siens, et ceux des autres dès
+ * qu'il les voit. Un bâtiment adverse tombé reste connu tant qu'on n'a pas
+ * revu l'endroit. Le sol apparent et le décor ne suivent que ceux-là : une
+ * cour de sable apparue sous le brouillard trahirait un chantier adverse.
+ * `voit(b)` : ce bâtiment est-il en vue ? `debout(id)` : existe-t-il encore ?
+ * Rend vrai si la liste a changé.
+ */
+export function releverBatiments(connus, batiments, humain, voit, debout) {
+  let change = false;
+  for (const b of batiments) {
+    if (b.dead || connus.has(b.id) || (b.playerIndex !== humain && !voit(b))) continue;
+    connus.set(b.id, { kind: 'building', id: b.id, type: b.type, tx: b.tx, ty: b.ty, size: b.size, playerIndex: b.playerIndex });
+    change = true;
+  }
+  for (const c of connus.values()) {
+    if (debout(c.id) || (c.playerIndex !== humain && !voit(c))) continue;
+    connus.delete(c.id);
+    change = true;
+  }
+  return change;
+}
+
+/** Planche des arbres : cyprès, sapin, olivier, pin parasol, saule, arbre noueux. Dans le désert, le sapin devient cyprès et le saule olivier. */
+const ARBRES_DU_DESERT = [0, 0, 2, 3, 2, 5];
+/**
+ * La case de la planche des arbres pour cette variante. Près d'un départ du
+ * désert (zone non nulle), ni sapin ni saule. La ressource, elle, ne change
+ * pas — seule l'image.
+ */
+export function caseArbre(variante, zone, cases = 6) {
+  const c = variante % cases;
+  return zone && cases === ARBRES_DU_DESERT.length ? ARBRES_DU_DESERT[c] : c;
+}
+
+/**
+ * Ce que les bâtiments cachent du décor (drapeau `cache` de chaque pièce) :
+ *  - rien sous l'image d'un bâtiment ou d'un chantier (zoneImage) : une pièce
+ *    dont le corps y entre n'est pas dessinée, un rocher devant un parvis
+ *    compris ;
+ *  - rien de vert (herbe, fleurs, buissons) dans la cour de sable d'un
+ *    bâtiment du désert ;
+ *  - aucune pièce debout à moins de RAYON_PLACE cases d'un départ : la place
+ *    reste nette.
+ * Le décor n'est qu'affichage (les unités le traversent) : c'est un filtre, à
+ * refaire quand un bâtiment est posé ou tombe, jamais à chaque image. Rend
+ * les pièces cuites dont le drapeau a changé — leurs tronçons de sol sont à
+ * refaire.
+ */
+export function filtrerDecor(decor, batiments, joueurs, departs) {
+  const h = decor.debout.length;
+  const parLigne = Array.from({ length: h }, () => []);
+  for (const b of batiments) {
+    if (b.dead) continue;
+    const z = zoneImage(b);
+    z.tx0 = b.tx; z.ty0 = b.ty; z.tx1 = b.tx + b.size - 1; z.ty1 = b.ty + b.size - 1;   // l'emprise, en cases
+    if (peupleDuDesert(joueurs[b.playerIndex]?.civ)) {
+      const c = courBatiment(b);
+      z.cour = { x0: c.tx0 * TILE, y0: c.ty0 * TILE, x1: (c.tx1 + 1) * TILE, y1: (c.ty1 + 1) * TILE, dans: c.dans };
+    }
+    // (Une ligne de plus de chaque côté : une pièce plantée au bord de sa case peut avoir le pied dans la voisine.)
+    const haut = z.cour ? z.cour.y0 : z.y0, bas = z.cour ? z.cour.y1 : z.y1;
+    for (let ty = Math.max(0, Math.floor(haut / TILE) - 1); ty <= Math.min(h - 1, Math.floor(bas / TILE) + 1); ty++) parLigne[ty].push(z);
+  }
+  const places = departs.map((p) => ({ x: p.tx * TILE + TILE / 2, y: p.ty * TILE + TILE / 2 }));
+  const rayon = RAYON_PLACE * TILE;
+  const changes = [];
+  const passer = (lignes, debout) => {
+    for (let ty = 0; ty < h; ty++) {
+      for (const d of lignes[ty]) {
+        // Le corps de la pièce : les trois quarts de sa largeur, le bas de sa
+        // hauteur — les coins et le sommet d'une case d'atlas sont vides.
+        const l = d.piece.w * ECHELLE_DECOR * d.echelle * 0.36, ht = d.piece.h * ECHELLE_DECOR * d.echelle * 0.7;
+        let cache = false;
+        if (debout) for (const p of places) if (Math.hypot(d.x - p.x, d.y - p.y) <= rayon) { cache = true; break; }
+        for (let ly = Math.max(0, Math.floor((d.y - ht) / TILE)); ly <= ty && !cache; ly++) {
+          for (const z of parLigne[ly]) {
+            if (d.x + l > z.x0 && d.x - l < z.x1 && d.y > z.y0 && d.y - ht < z.y1) { cache = true; break; }
+            if (d.tx >= z.tx0 && d.tx <= z.tx1 && d.ty >= z.ty0 && d.ty <= z.ty1) { cache = true; break; }   // sa case est sous l'emprise
+            if (d.verte && z.cour && z.cour.dans(Math.floor(d.x / TILE), Math.floor(d.y / TILE))) { cache = true; break; }
+          }
+        }
+        if (cache !== d.cache) { d.cache = cache; if (!debout) changes.push(d); }
+      }
+    }
+  };
+  passer(decor.debout, true);
+  passer(decor.cuits, false);
+  return changes;
 }
