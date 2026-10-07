@@ -1,5 +1,7 @@
 // Direction artistique, lot « brouillard » : la brume bleu nuit au bord fondu.
 // Lancement : node test/da-brouillard.test.js
+// (À ajouter au script « test » de package.json à l'intégration : « npm test »
+// ne le lance pas encore.)
 //
 // Sous node, on ne voit pas l'écran. On vérifie donc ce qui se calcule : le
 // masque (ses poids, son bord, sa marge), sa mise à jour par morceaux — qui
@@ -200,6 +202,31 @@ console.log('=== Direction artistique : le brouillard ===');
   const ondulation = Math.max(...ecarts.map((v) => Math.abs(v - moyen)));
   check('une lisière en diagonale reste droite : plus de marches d’escalier',
     ondulation < 0.08, `ondulation ${ondulation.toFixed(3)} case (des marches d’une case : 0,35)`);
+
+  // Le repli, si un téléphone peinait : deux points par case. Avec un rayon de
+  // 1, pas de 2 — le rayon se compte en points, le bord s'étalerait d'autant.
+  const bordDe = (k2, rayon) => {
+    const d = peindre(brouillard(w, h, (tx) => (tx < 20 ? 0 : 2)), w, h, k2, rayon);
+    const ligne = [];
+    for (let x = 0; x < w * k2; x++) ligne.push(opacite(d, x, 20 * k2));
+    const seuil = (s) => { for (let x = 1; x < ligne.length; x++) if (ligne[x] >= s) return x - 1 + (s - ligne[x - 1]) / (ligne[x] - ligne[x - 1]); return NaN; };
+    const e = peindre(brouillard(w, h, (tx, ty) => (tx + ty < 40 ? 0 : 2)), w, h, k2, rayon);
+    const dist = [];
+    for (let y = 8 * k2; y < 32 * k2; y++) {
+      let x = 1;
+      while (x < w * k2 && opacite(e, x, y) < 127.5) x++;
+      const a = opacite(e, x - 1, y), b = opacite(e, x, y);
+      dist.push((x - 1 + (127.5 - a) / (b - a) + 0.5 + y + 0.5 - 40 * k2) / k2 / Math.SQRT2);
+    }
+    const milieu = dist.reduce((s, v) => s + v, 0) / dist.length;
+    return { largeur: (seuil(0.9 * 255) - seuil(0.1 * 255)) / k2, ondulation: Math.max(...dist.map((v) => Math.abs(v - milieu))), points: d.masque.W * d.masque.H };
+  };
+  const leger = bordDe(2, 1), large = bordDe(2, 2), retenu = droit.masque.W * droit.masque.H;
+  check('le repli à deux points par case et rayon 1 : un bord d’une case et demie, toujours sans escalier, pour un masque deux fois plus léger',
+    leger.largeur > 1.1 && leger.largeur < 2.1 && leger.ondulation < 0.08 && leger.points * 2 < retenu,
+    `${leger.largeur.toFixed(2)} cases, ondulation ${leger.ondulation.toFixed(3)} case, ${(retenu / leger.points).toFixed(2)} fois moins de points`);
+  check('deux points par case en gardant le rayon de 2 : le bord s’étalerait trop — les deux réglages vont ensemble',
+    large.largeur > 2.1, `${large.largeur.toFixed(2)} cases`);
 
   // Trois états côte à côte : le voile de l'exploré tient entre les deux fondus.
   const trois = peindre(brouillard(w, h, (tx) => (tx < 12 ? 0 : tx < 28 ? 1 : 2)), w, h);

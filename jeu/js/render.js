@@ -80,7 +80,10 @@ const RECOUVREMENT = 8;
 // FOG_RAYON (en points) : le bord s'étale sur une case et demie environ, et
 // l'escalier des cases disparaît. (Quatre points par case et un rayon de 3
 // donnent la même image à trois niveaux sur 255 près, pour presque le double
-// de calcul et de mémoire.)
+// de calcul et de mémoire. S'il fallait alléger pour un téléphone : 2 points
+// ET un rayon de 1, masque 2,25 fois plus petit pour un bord à peine plus
+// étroit ; le rayon se compte en points : 2 points en gardant le rayon de 2
+// étaleraient le bord sur près de trois cases.)
 // Ce qui n'a jamais été vu est opaque : à 94 %, les lacs de toute la carte se
 // devinaient, mini-carte comprise. Ce qui a été vu, hors de vue, garde un voile
 // qui assombrit autant que l'ancien voile noir (une herbe y garde 58 % de sa
