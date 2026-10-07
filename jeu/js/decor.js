@@ -45,6 +45,14 @@ export const RAYON_DESERT = 15;
 export const COURONNE_TERRE = 4;
 export const TERRE_MAX = 6;
 export const RAYON_PLACE = 5.5;
+export const TROU_MAX = 2;           // largeur, en cases, d'une bande d'herbe comblée entre deux cours de sable
+export const ILOT_MAX = 12;          // cases d'un îlot d'herbe enfermé entre des cours, comblé lui aussi
+/**
+ * Secondes pendant lesquelles la cour d'un bâtiment adverse reste après sa
+ * sortie de la vue : une troupe en limite de portée le fait entrer et sortir
+ * sans cesse, et le sol clignoterait (sept tronçons à refaire à chaque fois).
+ */
+export const DELAI_COUR = 1.5;
 const PEUPLES_DU_DESERT = new Set(['solarien']);
 /** Ce que l'image d'un bâtiment dépasse de son emprise vers le sud (la ligne de sol est à 93 % de sa hauteur). */
 const DEBORD_SUD = 12;
@@ -77,7 +85,7 @@ for (const [classe, noms] of Object.entries(MASSIFS)) {
   const massifs = noms.map((nom) => PIECES_DECOR.find((p) => p.nom === nom)).filter(Boolean);
   if (massifs.length) PAR_CLASSE[classe] = massifs.map((p) => ({ ...p, classe }));
 }
-const ECHELLE_FLEUR = 0.5;           // un massif de 36 px monde devient une touffe de fleurs de 18
+const ECHELLE_FLEUR = 0.64;          // un massif de 36 px monde devient une touffe de fleurs de 23
 /** Les classes des prés : rien de tout cela ne pousse sur le sable d'une cour. */
 const VERTES = new Set([...FLEURS, 'herbe', 'couvre', 'buisson', 'fougere']);
 
@@ -391,15 +399,19 @@ export function zoneImage(b) {
 }
 
 /**
- * La cour d'un bâtiment : son emprise et les cases où son image déborde (une
- * case, deux pour le Centre-Ville), coins coupés — le socle peint est un
- * losange, une cour carrée ferait une dalle. `dans(tx, ty)` dit si la case en est.
+ * La cour d'un bâtiment : son emprise et les cases où son image pose quelque
+ * chose au sol — une case à l'est, à l'ouest et au sud (deux pour le
+ * Centre-Ville), coins du sud coupés : le socle peint est un losange, une cour
+ * carrée ferait une dalle. Rien au nord : les toits n'y posent rien, et une
+ * rangée de sable derrière le bâtiment grossissait la tache sur un pré.
+ * `dans(tx, ty)` dit si la case en est.
  */
 export function courBatiment(b) {
   const m = Math.ceil(debordImage(b.type, b.size) / TILE);
-  const tx0 = b.tx - m, ty0 = b.ty - m, tx1 = b.tx + b.size - 1 + m, ty1 = b.ty + b.size - 1 + m;
-  const hors = (v, a, z) => Math.max(0, a + m - v, v - (z - m));   // de combien la case sort de l'emprise
-  const dans = (tx, ty) => tx >= tx0 && tx <= tx1 && ty >= ty0 && ty <= ty1 && hors(tx, tx0, tx1) + hors(ty, ty0, ty1) <= m;
+  const est = b.tx + b.size - 1, sud = b.ty + b.size - 1;
+  const tx0 = b.tx - m, ty0 = b.ty, tx1 = est + m, ty1 = sud + m;
+  // (De combien la case sort de l'emprise, de côté et vers le sud.)
+  const dans = (tx, ty) => tx >= tx0 && tx <= tx1 && ty >= ty0 && ty <= ty1 && Math.max(0, b.tx - tx, tx - est) + Math.max(0, ty - sud) <= m;
   return { tx0, ty0, tx1, ty1, dans };
 }
 
@@ -410,22 +422,72 @@ export function courBatiment(b) {
  * ({ type, tx, ty, size, playerIndex, enVue }). La cour va avec l'image du
  * bâtiment : celui d'un adversaire sorti de la vue n'est plus dessiné, et sa
  * cour non plus (`enVue` faux) — une tache de sable sans rien dessus ferait
- * un fantôme. Un tableau neuf à chaque appel, de la même forme que le sol de
- * base (SOL_CARTE là où la carte décide).
+ * un fantôme. Entre deux cours voisines (ou une cour et le désert), une
+ * bande d'herbe d'une ou deux cases est comblée, puis les îlots que cela
+ * enferme (ILOT_MAX cases au plus) : un village posé sur un pré se lit comme
+ * une seule cour, pas comme des pastilles autour d'un trou sombre. Un tableau
+ * neuf à chaque appel, de la même forme que le sol de base (SOL_CARTE là où
+ * la carte décide).
  */
 export function solApparent(base, map, batiments, joueurs) {
   const { w, h, terrain } = map;
   const sol = Uint8Array.from(base.sol);
+  const cours = [];
   for (const b of batiments) {
     if (b.dead || b.enVue === false || !peupleDuDesert(joueurs[b.playerIndex]?.civ)) continue;
     const c = courBatiment(b);
+    cours.push(c);
     for (let ty = Math.max(0, c.ty0); ty <= Math.min(h - 1, c.ty1); ty++) {
       for (let tx = Math.max(0, c.tx0); tx <= Math.min(w - 1, c.tx1); tx++) {
         if (c.dans(tx, ty) && terrain[ty * w + tx] !== TERRAIN.WATER) sol[ty * w + tx] = SOL_SABLE_OR;
       }
     }
   }
+  // Les bandes, jugées sur les cours seules (une case comblée n'en comble pas
+  // une autre), puis les îlots qu'elles ont enfermés.
+  const sable = (tx, ty) => tx >= 0 && ty >= 0 && tx < w && ty < h && sol[ty * w + tx] === SOL_SABLE_OR;
+  const autour = (c, marge, voir) => {
+    for (let ty = Math.max(0, c.ty0 - marge); ty <= Math.min(h - 1, c.ty1 + marge); ty++) {
+      for (let tx = Math.max(0, c.tx0 - marge); tx <= Math.min(w - 1, c.tx1 + marge); tx++) {
+        if (sol[ty * w + tx] !== SOL_SABLE_OR && terrain[ty * w + tx] !== TERRAIN.WATER) voir(tx, ty);
+      }
+    }
+  };
+  const combles = [];
+  for (const c of cours) autour(c, TROU_MAX, (tx, ty) => { if (entreDeux(sable, tx, ty, 1, 0) || entreDeux(sable, tx, ty, 0, 1)) combles.push(ty * w + tx); });
+  for (const i of combles) sol[i] = SOL_SABLE_OR;
+  for (const c of cours) autour(c, TROU_MAX + 1, (tx, ty) => { for (const i of ilot(sol, map, tx, ty)) sol[i] = SOL_SABLE_OR; });
   return sol;
+}
+
+/**
+ * L'îlot de cette case : les cases sans sable doré qui se touchent par un
+ * côté, si elles sont ILOT_MAX au plus — sinon rien, ce n'est pas un îlot
+ * mais le pré. L'eau en fait partie et reste de l'eau : elle n'est pas rendue.
+ */
+function ilot(sol, map, tx, ty) {
+  const { w, h, terrain } = map;
+  const vus = new Set([ty * w + tx]), file = [ty * w + tx];
+  for (let k = 0; k < file.length; k++) {
+    const i = file[k], x = i % w, y = (i - x) / w;
+    for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+      const n = ny * w + nx;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h || vus.has(n) || sol[n] === SOL_SABLE_OR) continue;
+      if (file.length >= ILOT_MAX) return [];
+      vus.add(n); file.push(n);
+    }
+  }
+  return file.filter((i) => terrain[i] !== TERRAIN.WATER);
+}
+
+/** La case est-elle prise entre deux cases de sable, dans la direction donnée, à TROU_MAX cases de large au plus ? */
+function entreDeux(sable, tx, ty, dx, dy) {
+  for (let avant = 1; avant <= TROU_MAX; avant++) {
+    if (!sable(tx - dx * avant, ty - dy * avant)) continue;
+    for (let apres = 1; avant + apres - 1 <= TROU_MAX; apres++) if (sable(tx + dx * apres, ty + dy * apres)) return true;
+    return false;
+  }
+  return false;
 }
 
 /**
@@ -434,35 +496,43 @@ export function solApparent(base, map, batiments, joueurs) {
  * dès qu'il les voit. Un bâtiment adverse tombé reste connu tant qu'on n'a pas
  * revu l'endroit. Le sol apparent et le décor ne suivent que ceux-là : une
  * cour de sable apparue sous le brouillard trahirait un chantier adverse.
- * `enVue` : le bâtiment est-il dessiné à l'instant ? (Les siens, toujours ;
- * ceux d'un adversaire, tant qu'on les voit.)
+ * `enVue` : sa cour est-elle à peindre ? Les siens, toujours ; ceux d'un
+ * adversaire, tant qu'on les voit et DELAI_COUR secondes encore après leur
+ * sortie de la vue (`maintenant` : l'heure du rendu, en secondes).
  * `voit(b)` : ce bâtiment est-il en vue ? `debout(id)` : existe-t-il encore ?
- * Rend ce qui a changé : 0 rien, CHANGE.VUE un bâtiment connu est entré dans
- * la vue ou en est sorti (son sol est à refaire), CHANGE.LISTE la liste même
+ * Rend ce qui a changé : 0 rien, CHANGE.VUE la cour d'un bâtiment connu est à
+ * peindre ou à retirer (son sol est à refaire), CHANGE.LISTE la liste même
  * (le sol, et ce que les bâtiments cachent du décor).
  */
 export const CHANGE = { VUE: 1, LISTE: 2 };
-export function releverBatiments(connus, batiments, humain, voit, debout) {
+export function releverBatiments(connus, batiments, humain, voit, debout, maintenant = 0) {
   let change = 0;
   for (const b of batiments) {
     if (b.dead || connus.has(b.id) || (b.playerIndex !== humain && !voit(b))) continue;
-    connus.set(b.id, { kind: 'building', id: b.id, type: b.type, tx: b.tx, ty: b.ty, size: b.size, playerIndex: b.playerIndex, enVue: true });
+    connus.set(b.id, { kind: 'building', id: b.id, type: b.type, tx: b.tx, ty: b.ty, size: b.size, playerIndex: b.playerIndex, enVue: true, sortie: null });
     change |= CHANGE.LISTE;
   }
   for (const c of connus.values()) {
-    const enVue = c.playerIndex === humain || voit(c);
-    if (enVue && !debout(c.id)) { connus.delete(c.id); change |= CHANGE.LISTE; continue; }
+    const vu = c.playerIndex === humain || voit(c);
+    if (vu && !debout(c.id)) { connus.delete(c.id); change |= CHANGE.LISTE; continue; }
+    if (vu) c.sortie = null;
+    else if (c.sortie === null) c.sortie = maintenant;
+    const enVue = vu || maintenant - c.sortie < DELAI_COUR;
     if (enVue !== c.enVue) { c.enVue = enVue; change |= CHANGE.VUE; }
   }
   return change;
 }
 
-/** Planche des arbres : cyprès, sapin, olivier, pin parasol, saule, arbre noueux. Dans le désert, le sapin devient cyprès et le saule olivier. */
-const ARBRES_DU_DESERT = [0, 0, 2, 3, 2, 5];
+/**
+ * Planche des arbres : cyprès, sapin, olivier, pin parasol, saule, arbre
+ * noueux. Dans le désert, trois seulement : le sapin devient cyprès, le saule
+ * olivier, et le pin parasol (une ombrelle bleu-vert) arbre noueux.
+ */
+const ARBRES_DU_DESERT = [0, 0, 2, 5, 2, 5];
 /**
  * La case de la planche des arbres pour cette variante. Près d'un départ du
- * désert (zone non nulle), ni sapin ni saule. La ressource, elle, ne change
- * pas — seule l'image.
+ * désert (zone non nulle) : cyprès, olivier ou arbre noueux. La ressource,
+ * elle, ne change pas — seule l'image.
  */
 export function caseArbre(variante, zone, cases = 6) {
   const c = variante % cases;
@@ -474,8 +544,8 @@ export function caseArbre(variante, zone, cases = 6) {
  *  - rien sous l'image d'un bâtiment ou d'un chantier (zoneImage) : une pièce
  *    dont le corps y entre n'est pas dessinée, un rocher devant un parvis
  *    compris ;
- *  - rien de vert (herbe, fleurs, buissons) dans la cour de sable d'un
- *    bâtiment du désert ;
+ *  - rien de vert (herbe, fleurs, buissons) sur le sable d'une cour : `sol`
+ *    est le sol apparent du moment (solApparent), cours et trous comblés ;
  *  - aucune pièce debout à moins de RAYON_PLACE cases d'un départ : la place
  *    reste nette.
  * Le décor n'est qu'affichage (les unités le traversent) : c'est un filtre, à
@@ -483,21 +553,21 @@ export function caseArbre(variante, zone, cases = 6) {
  * les pièces cuites dont le drapeau a changé — leurs tronçons de sol sont à
  * refaire.
  */
-export function filtrerDecor(decor, batiments, joueurs, departs) {
-  const h = decor.debout.length;
+export function filtrerDecor(decor, batiments, departs, sol = null) {
+  const h = decor.debout.length, w = sol ? sol.length / h : 0;
   const parLigne = Array.from({ length: h }, () => []);
   for (const b of batiments) {
     if (b.dead) continue;
     const z = zoneImage(b);
     z.tx0 = b.tx; z.ty0 = b.ty; z.tx1 = b.tx + b.size - 1; z.ty1 = b.ty + b.size - 1;   // l'emprise, en cases
-    if (b.enVue !== false && peupleDuDesert(joueurs[b.playerIndex]?.civ)) {   // (la cour va avec l'image : voir solApparent)
-      const c = courBatiment(b);
-      z.cour = { x0: c.tx0 * TILE, y0: c.ty0 * TILE, x1: (c.tx1 + 1) * TILE, y1: (c.ty1 + 1) * TILE, dans: c.dans };
-    }
     // (Une ligne de plus de chaque côté : une pièce plantée au bord de sa case peut avoir le pied dans la voisine.)
-    const haut = z.cour ? z.cour.y0 : z.y0, bas = z.cour ? z.cour.y1 : z.y1;
-    for (let ty = Math.max(0, Math.floor(haut / TILE) - 1); ty <= Math.min(h - 1, Math.floor(bas / TILE) + 1); ty++) parLigne[ty].push(z);
+    for (let ty = Math.max(0, Math.floor(z.y0 / TILE) - 1); ty <= Math.min(h - 1, Math.floor(z.y1 / TILE) + 1); ty++) parLigne[ty].push(z);
   }
+  // Le pied d'une pièce verte est-il sur le sable doré ? (Dans le désert d'un départ, rien de vert n'est planté.)
+  const surSable = (d) => {
+    const tx = Math.floor(d.x / TILE), ty = Math.floor(d.y / TILE);
+    return tx >= 0 && ty >= 0 && tx < w && ty < h && sol[ty * w + tx] === SOL_SABLE_OR;
+  };
   const places = departs.map((p) => ({ x: p.tx * TILE + TILE / 2, y: p.ty * TILE + TILE / 2 }));
   const rayon = RAYON_PLACE * TILE;
   const changes = [];
@@ -507,13 +577,12 @@ export function filtrerDecor(decor, batiments, joueurs, departs) {
         // Le corps de la pièce : les trois quarts de sa largeur, le bas de sa
         // hauteur — les coins et le sommet d'une case d'atlas sont vides.
         const l = d.piece.w * ECHELLE_DECOR * d.echelle * 0.36, ht = d.piece.h * ECHELLE_DECOR * d.echelle * 0.7;
-        let cache = false;
-        if (debout) for (const p of places) if (Math.hypot(d.x - p.x, d.y - p.y) <= rayon) { cache = true; break; }
+        let cache = d.verte && sol !== null && surSable(d);
+        if (debout && !cache) for (const p of places) if (Math.hypot(d.x - p.x, d.y - p.y) <= rayon) { cache = true; break; }
         for (let ly = Math.max(0, Math.floor((d.y - ht) / TILE)); ly <= ty && !cache; ly++) {
           for (const z of parLigne[ly]) {
             if (d.x + l > z.x0 && d.x - l < z.x1 && d.y > z.y0 && d.y - ht < z.y1) { cache = true; break; }
             if (d.tx >= z.tx0 && d.tx <= z.tx1 && d.ty >= z.ty0 && d.ty <= z.ty1) { cache = true; break; }   // sa case est sous l'emprise
-            if (d.verte && z.cour && z.cour.dans(Math.floor(d.x / TILE), Math.floor(d.y / TILE))) { cache = true; break; }
           }
         }
         if (cache !== d.cache) { d.cache = cache; if (!debout) changes.push(d); }

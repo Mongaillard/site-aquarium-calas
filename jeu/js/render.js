@@ -563,8 +563,9 @@ export class Renderer {
    * bâtiments du monde, et ceux de l'adversaire que l'on voit à l'instant. Le
    * reste n'est refait que lorsqu'un bâtiment est posé, tombe, entre dans la
    * vue ou en sort, et seuls les tronçons de sol touchés sont périmés. (La
-   * seconde signature suffit à suivre le brouillard ; le test de `fog.dirty`
-   * et le filet de vingt images, plus bas, ne sont plus qu'une ceinture.)
+   * seconde signature suffit à suivre le brouillard ; le relevé de toutes les
+   * vingt images, plus bas, retire la cour d'un bâtiment adverse sorti de la
+   * vue une fois son délai passé — DELAI_COUR, decor.js.)
    * La carte n'est pas modifiée.
    */
   suivreSol() {
@@ -580,7 +581,7 @@ export class Renderer {
     this.signatureBatiments = signature;
     if (neuve) { this.solCarte = map; this.connus = new Map(); this.sol = null; this.decor = null; this.solBase = solDeBase(map, world.players); }
     const debout = (id) => { const b = world.byId.get(id); return !!b && !b.dead; };
-    const change = releverBatiments(this.connus, world.buildings, world.humanIndex, (b) => this.isEntityVisible(b), debout);
+    const change = releverBatiments(this.connus, world.buildings, world.humanIndex, (b) => this.isEntityVisible(b), debout, this.horloge || 0);
     if (!change && !neuve) return;
     const batiments = [...this.connus.values()];
     // Connus mais tombés hors de vue : oubliés quand on reverra l'endroit (voir signatureVues).
@@ -596,7 +597,7 @@ export class Renderer {
       }
     } else this.minimapDirty = true;
     // Une pièce cuite que le filtre vient de cacher ou de rendre : son tronçon est à refaire.
-    for (const d of filtrerDecor(this.decorCarte(), batiments, world.players, map.startPositions)) {
+    for (const d of filtrerDecor(this.decorCarte(), batiments, map.startPositions, this.sol)) {
       if (!neuve) this.perimerTroncons(d.x - 2 * TILE, d.y - 3 * TILE, d.x + 2 * TILE, d.y + TILE);
     }
   }
@@ -2287,10 +2288,14 @@ export class Renderer {
     const ctx = this.minimapTerrainCtx;
     const img = ctx.createImageData(map.w, map.h);
     const data = img.data;
+    // Le désert y est plus sourd que dans le monde, et le point d'or plus vif
+    // qu'il ne l'était : sur un sable de la couleur du monde, l'or d'un
+    // Solarien ne se voyait presque plus (écart de couleur 19 ; ici 45, comme
+    // sur le sable des rivages).
     const palette = {
       [TERRAIN.GRASS]: [74, 98, 23], [TERRAIN.GRASS_DARK]: [92, 97, 35],
       [TERRAIN.DIRT]: [128, 90, 58], [TERRAIN.SAND]: [161, 121, 84],
-      [TERRAIN.WATER]: [15, 101, 132], [SOL_SABLE_OR]: [210, 165, 87],
+      [TERRAIN.WATER]: [15, 101, 132], [SOL_SABLE_OR]: [176, 138, 74],
     };
     for (let i = 0; i < map.w * map.h; i++) {
       const c = palette[solEn(this.sol, map, i)] || [90, 130, 70];   // le sol apparent : le désert d'un départ solarien s'y lit
@@ -2299,7 +2304,7 @@ export class Renderer {
     }
     for (const res of map.resources.values()) {
       const o = (res.ty * map.w + res.tx) * 4;
-      const c = res.type === 'wood' ? [42, 94, 47] : res.type === 'gold' ? [242, 193, 78] : [209, 67, 74];
+      const c = res.type === 'wood' ? [42, 94, 47] : res.type === 'gold' ? [255, 214, 64] : [209, 67, 74];
       data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2];
     }
     ctx.putImageData(img, 0, 0);
