@@ -541,12 +541,68 @@ riposte ; une tour vide qui ne menace aucun de ses bâtiments peut rester debout
 Une armée tombée nettement sous son plancher est complétée avant d'épargner pour
 l'âge suivant. Tests : `node test/reglages-ia.test.js`.
 
+## Classement, ligues, coffres et niveaux des troupes
+
+Une partie se lance **classée** ou **libre** (réglages de l'accueil). Classée,
+elle compte : une victoire rapporte 30 points d'« Elo », une défaite en coûte
+15, jamais sous zéro. Le score fait monter de ligue — dix ligues, de Bois à
+Légendes, à seuils de plus en plus écartés. Tant que le jeu entre joueurs
+n'existe pas, l'adversaire d'une partie classée est l'ordinateur, et sa force
+suit la ligue : sa difficulté, sa vitesse de récolte et le niveau de ses
+troupes (table `echelle` des réglages).
+
+**Les coffres** se gagnent en jouant — bois à chaque victoire classée (cinq par
+jour au plus), argent tous les dix points de bataille (une victoire en vaut
+deux, une défaite un), or à chaque nouvelle ligue et pour trois jours joués dans
+la semaine, légendaire aux ligues 5, 8 et 10. Un coffre contient un nombre fixe
+de tirages : chacun choisit une catégorie selon une table affichée au joueur,
+puis une troupe débloquée de cette catégorie, à chances égales, et donne un
+nombre fixe de **fragments**. Aucun coffre ne se vend.
+
+**Les fragments montent le niveau d'une troupe**, de 1 à 5 : +5 % de points de
+vie et de dégâts par niveau pour la plupart, la récolte pour l'ouvrier (+12,5 %
+aux niveaux 2 et 3, puis le chargement et la vitesse de chantier), le soin pour
+la prêtresse, la vitesse pour l'éclaireur. Ni la portée, ni la cadence, ni le
+coût ne changent. En partie classée, une troupe joue à son niveau **dans la
+limite du plafond de la ligue**, et l'ouvrier monte d'office à ce plafond :
+l'économie n'est jamais inégale. En partie libre, elle joue à son niveau réel.
+
+**Quatre troupes se débloquent** — Atlante, Archer monté, Catapulte, Hydre — en
+atteignant une ligue ou après un nombre de parties jouées. Tant qu'une troupe
+n'est pas débloquée, son bouton reste visible sous cadenas, et l'ordinateur ne
+la forme pas non plus.
+
+Ce qui ne se contourne pas : une défaite d'avant deux minutes (abandon, ou
+bâtiment principal rasé de sa propre main) coûte ses points mais ne compte ni
+vers un coffre ni vers une troupe ; une partie classée quittée — nouvelle
+partie, sauvegarde jetée — compte comme un abandon ; chaque partie classée
+porte un identifiant et ne se compte qu'une fois.
+
+Où c'est : **tous les réglages** dans `js/progression-config.js` (barème,
+seuils, tables des coffres en pour-mille, coûts, améliorations, force de
+l'ordinateur) ; **les règles** dans `js/progression.js`, des fonctions pures
+sur un profil ordinaire, sans stockage, sans horloge et sans hasard caché — le
+même code pourra tourner sur un serveur qui fait foi ; **dans la partie**,
+`World` reçoit `niveaux`, `troupesInterdites` et `recolteAdverse`, et sans ces
+options elle est celle d'avant au caractère près ; **les écrans** dans
+`js/progression-ecrans.js` et `css/progression.css`. Le profil est rangé dans le
+navigateur (`aem.progression.v1`) et, quand la page est servie par un hôte qui
+prête une base par personne, il y est gardé aussi (`js/rangement-durable.js`) :
+le plus avancé des deux l'emporte au lancement.
+
+Ce qui n'existe pas encore : le serveur (rien n'est vérifié ailleurs que sur
+l'appareil, et rien ne s'achète), le jeu entre joueurs, les saisons (le moteur
+sait finir une saison, rien ne décide quand), les trois troupes nouvelles
+prévues aux ligues 6 à 8. Tests : `node test/progression.test.js`,
+`node test/progression-partie.test.js`, `node test/rangement-durable.test.js`.
+
 ## Architecture
 
 ```
 jeu/
 ├── index.html            page unique
 ├── css/jeu.css           interface (DOM), pensée « pouce d'abord »
+├── css/progression.css   classement, coffres, collection
 ├── js/
 │   ├── config.js         données de jeu et équilibrage
 │   ├── utils.js          maths, RNG déterministe, tas binaire, grille spatiale, bruit
@@ -555,7 +611,11 @@ jeu/
 │   ├── entities.js       unités (machine à états), animaux, bâtiments, projectiles
 │   ├── game.js           le monde : ordres, économie, combat, troupeau, brouillard, victoire
 │   ├── ai.js             l'adversaire
-│   ├── save.js           sauvegarde et reprise
+│   ├── save.js           sauvegarde et reprise, palmarès, profil du joueur
+│   ├── progression-config.js  classement, ligues, coffres, niveaux : tous les réglages
+│   ├── progression.js    … et toutes les règles, en fonctions pures
+│   ├── progression-ecrans.js  bandeau de ligue, coffres, probabilités, collection
+│   ├── rangement-durable.js   second rangement du profil, là où la page en offre un
 │   ├── render.js         Canvas 2D : sol en tronçons, entités, brouillard, minimap
 │   ├── sprites.js        atlas d'illustrations, couleur d'équipe, textures de sol
 │   ├── decor.js          plantation du décor (rivages, campagne)
@@ -578,8 +638,9 @@ jeu/
 ```
 
 Choix structurant : **la simulation ne dépend pas du navigateur**. `config`,
-`utils`, `map`, `pathfinding`, `entities`, `game`, `ai` et `save` — ainsi que
-`decor` et `decor-pieces`, que le test headless vérifie — tournent tels quels
+`utils`, `map`, `pathfinding`, `entities`, `game`, `ai`, `save` et
+`progression` — ainsi que `decor` et `decor-pieces`, que le test headless
+vérifie — tournent tels quels
 sous Node, ce qui permet de tester des parties entières sans rendu.
 
 La boucle est à **pas fixe** (20 ticks/s) avec rattrapage plafonné ; le rendu
