@@ -61,6 +61,9 @@ function serializeProjectile(pr) {
 function serializePlayer(p) {
   return {
     civ: p.civ,
+    // Les niveaux des troupes, seulement s'il y en a : une partie où tout est
+    // au niveau 1 se sauvegarde comme avant.
+    ...(Object.keys(p.niveaux || {}).length ? { niveaux: { ...p.niveaux } } : {}),
     resources: { ...p.resources },
     age: p.age,
     ageProgress: p.ageProgress
@@ -230,6 +233,8 @@ export function restoreWorld(data) {
     difficulty: data.difficulty, restoring: true,
     // Champ absent (sauvegarde d'avant les civilisations) : Atlantes.
     civs: (data.players || []).map((j) => j && j.civ),
+    // Champ absent (sauvegarde d'avant les niveaux, ou partie sans niveaux) : tout au niveau 1.
+    niveaux: (data.players || []).map((j) => j && j.niveaux),
   });
   world.time = data.time || 0;
   world.humanIndex = data.humanIndex || 0;
