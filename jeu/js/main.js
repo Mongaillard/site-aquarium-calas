@@ -15,13 +15,13 @@ import {
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
-import { UI, FoyersAttaque, toucherArmee } from './ui.js';
+import { UI, FoyersAttaque, toucherArmee, resumeReglages } from './ui.js';
 import { AudioEngine } from './audio.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
 import { setStyleUnites, styleUnites, spriteDe, chargerSprites, chargerCivilisation, prevoirTroupe, etatModeles3d } from './sprites.js';
-import { memoireTroupes, entretenirMemoire, rendreVariantes, troupesSelonStyle } from './sprites.js';
+import { memoireTroupes, entretenirMemoire, rendreVariantes, troupesSelonStyle, ficheCiv } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
 import { DENSITE } from './modele3d.js';
 
@@ -1359,13 +1359,41 @@ function afficherIncident() {
   ligne.textContent = phraseIncident(incidentAccueil);
 }
 
+/**
+ * L'habillage prend les couleurs d'un peuple : celui qu'on choisit à l'accueil,
+ * puis celui qu'on joue (une partie reprise garde le sien). Tout le reste se
+ * passe dans la feuille de style, sous body[data-civ] — qui attend ce premier
+ * appel pour montrer la carte d'accueil.
+ */
+function habiller(civ) {
+  document.body.dataset.civ = civDe(civ);
+  // La barre du navigateur suit, là où il en dessine une.
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const fond = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+  if (meta && fond) meta.content = fond;
+}
+
+/** La capitale d'un peuple, pour sa tuile de l'accueil : son image propre, à défaut le Centre-Ville atlante. */
+function capitaleDe(civ) {
+  const propre = ficheCiv('towncenter', civ);
+  return propre ? propre.src : 'assets/centre-ville.webp';
+}
+
+/** Les réglages repliés, résumés sur leur ligne. */
+function refreshReglages() {
+  const node = document.getElementById('reglages-resume');
+  if (node) node.textContent = resumeReglages(settings);
+}
+
 function showStartScreen() {
   currentGame = null;
+  habiller(settings.civ);
   document.getElementById('start-screen').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');
   refreshResumeCard();
   afficherIncident();
   refreshPalmares();
+  refreshReglages();
 }
 
 /**
@@ -1391,11 +1419,13 @@ function refreshResumeCard() {
   if (!save) {
     box.classList.add('hidden');
     box.innerHTML = '';
-    if (play) play.textContent = 'Jouer';
+    if (play) { play.textContent = 'Jouer'; play.classList.add('primary'); }
     return;
   }
-  // Le bouton dit clairement ce qu'il fait quand une partie dort déjà.
-  if (play) play.textContent = 'Nouvelle partie';
+  // Le bouton dit clairement ce qu'il fait quand une partie dort déjà — et
+  // laisse l'or à « Reprendre » : resté sous le pouce, il efface la partie en
+  // cours, il ne doit pas se toucher par réflexe.
+  if (play) { play.textContent = 'Nouvelle partie'; play.classList.remove('primary'); }
   const mode = GAME_MODES[save.mode] || GAME_MODES[DEFAULT_MODE];
   const player = save.players[save.humanIndex || 0];
   const age = AGES[player ? player.age : 0];
@@ -1434,6 +1464,7 @@ function startGame(options) {
   incidentAccueil = null;
   try { marquerIncidentsLus(); } catch { /* stockage indisponible */ }
   currentGame = new Game(options);
+  habiller(currentGame.civ);
   window.__jeu = currentGame;   // pratique pour déboguer depuis la console
 }
 
@@ -1470,10 +1501,12 @@ function setupStartScreen() {
     (b) => b.classList.toggle('active', b === btn));
 
   // Civilisations : la sienne, puis celle de l'adversaire (mêmes règles, autres images, autres noms).
-  const choixCiv = (idBoite, cle) => {
+  // La sienne se choisit sur l'image de sa capitale, et l'accueil en prend aussitôt les couleurs.
+  const choixCiv = (idBoite, cle, illustre) => {
     const box = document.getElementById(idBoite);
     box.innerHTML = Object.values(CIVILISATIONS).map((c) => `
-    <button class="option compact ${c.id === settings[cle] ? 'active' : ''}" data-civ="${c.id}">
+    <button class="option compact ${illustre ? 'peuple ' : ''}${c.id === settings[cle] ? 'active' : ''}" data-civ="${c.id}">
+      ${illustre ? `<img src="${capitaleDe(c.id)}" alt="" decoding="async">` : ''}
       <span class="option-name">${c.name}</span>
       <span class="option-desc">${c.desc}</span>
     </button>`).join('');
@@ -1482,13 +1515,15 @@ function setupStartScreen() {
         settings[cle] = btn.dataset.civ;
         storeSetup(settings);
         activate(box, btn);
+        if (illustre) habiller(settings[cle]);
+        refreshReglages();
         chargerCivilisation(settings[cle]);   // ses images arrivent pendant que le joueur finit de choisir
         audio.resume(); audio.play('click');
       });
     });
   };
-  choixCiv('civ-options', 'civ');
-  choixCiv('civ-adverse-options', 'civAdverse');
+  choixCiv('civ-options', 'civ', true);
+  choixCiv('civ-adverse-options', 'civAdverse', false);
 
   modeBox.querySelectorAll('[data-mode]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -1500,6 +1535,7 @@ function setupStartScreen() {
       mapBox.querySelectorAll('[data-map]').forEach(
         (b) => b.classList.toggle('active', b.dataset.map === settings.mapSize));
       refreshPalmares();
+      refreshReglages();
       audio.resume(); audio.play('click');
     });
   });
@@ -1509,6 +1545,7 @@ function setupStartScreen() {
       storeSpeed(settings.speed);
       storeSetup(settings);
       activate(speedBox, btn);
+      refreshReglages();
       audio.resume(); audio.play('click');
     });
   });
@@ -1519,6 +1556,7 @@ function setupStartScreen() {
       storeSetup(settings);
       difficultyBox.querySelectorAll('.option').forEach((b) => b.classList.toggle('active', b === btn));
       refreshPalmares();
+      refreshReglages();
       audio.resume(); audio.play('click');
     });
   });
@@ -1527,6 +1565,7 @@ function setupStartScreen() {
       settings.mapSize = btn.dataset.map;
       storeSetup(settings);
       mapBox.querySelectorAll('.option').forEach((b) => b.classList.toggle('active', b === btn));
+      refreshReglages();
       audio.resume(); audio.play('click');
     });
   });
@@ -1543,7 +1582,10 @@ function setupStartScreen() {
     });
   });
   document.getElementById('btn-howto').addEventListener('click', () => {
-    document.getElementById('howto').classList.toggle('hidden');
+    const aide = document.getElementById('howto');
+    aide.classList.toggle('hidden');
+    // La liste s'ouvre sous les boutons, souvent hors de l'écran : on l'y amène.
+    if (!aide.classList.contains('hidden')) aide.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 }
 

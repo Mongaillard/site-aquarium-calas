@@ -9,10 +9,11 @@ import {
   AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES, GAME_SPEEDS,
   ficheDe, nomDe, portraitDe,
 } from './config.js';
-import { TILE } from './config.js';
+import { TILE, CIVILISATIONS, GAME_MODES, DIFFICULTIES, MAP_SIZES, civDe } from './config.js';
 import { formatNumber, formatTime, costLabel, canAfford } from './utils.js';
 import { iconeSVG, ICONES_LICENCE } from './icones.js';
 import { STYLES, etatModeles3d, portraitAdverse } from './sprites.js';
+import { ficheCiv, spriteDe, imagePourJoueur } from './sprites.js';
 import { resumeIncident } from './save.js';
 
 const el = (id) => document.getElementById(id);
@@ -40,6 +41,72 @@ function teinterPortrait(img, type) {
   };
   if (img.complete && img.naturalWidth) poser();
   else img.addEventListener('load', poser, { once: true });
+}
+
+// --- Les images du jeu dans l'interface ---------------------------------------
+
+/**
+ * L'illustration d'un bâtiment dans cette civilisation : le fichier même que
+ * la carte dessine. Null pour tout le reste (une troupe, un type inconnu) et
+ * tant que l'image atlante n'est pas arrivée : l'appelant garde le pictogramme.
+ */
+export function imageBatiment(type, civ) {
+  if (!BUILDING_TYPES[type]) return null;
+  const propre = ficheCiv(type, civ);
+  if (propre) return propre.src;
+  const sprite = spriteDe(type);   // atlante : chargé dès l'accueil, avec le reste de la carte
+  return sprite ? sprite.def.src : null;
+}
+
+/**
+ * La même illustration aux couleurs d'un camp, en petit, pour le cadre du
+ * portrait — ou null quand l'image d'origine fait déjà l'affaire (le camp
+ * bleu) ou n'est pas prête. Une toile par bâtiment et par camp, gardée : le
+ * panneau se reconstruit à chaque coup reçu.
+ */
+const vignettesDeCamp = new Map();
+function vignetteDeCamp(type, civ, joueur) {
+  const cle = `${type}|${civ}|${joueur}`;
+  if (vignettesDeCamp.has(cle)) return vignettesDeCamp.get(cle);
+  const sprite = spriteDe(type, civ);
+  const propre = ficheCiv(type, civ);
+  if (!sprite || (propre && sprite.def !== propre)) return null;   // l'image de ce peuple est encore en route
+  const source = imagePourJoueur(sprite, joueur);
+  if (!source || !source.getContext) return null;
+  const cote = 138;   // le cadre fait 46 points : trois pixels par point
+  const toile = document.createElement('canvas');
+  toile.width = toile.height = cote;
+  const echelle = Math.min(cote / source.width, cote / source.height);
+  const l = source.width * echelle, h = source.height * echelle;
+  toile.getContext('2d').drawImage(source, (cote - l) / 2, (cote - h) / 2, l, h);
+  vignettesDeCamp.set(cle, toile);
+  return toile;
+}
+
+/**
+ * L'image de l'écran de fin : la capitale du joueur — debout pour une
+ * victoire, éteinte pour une défaite. Rien pour une égalité.
+ */
+export function illustrationDeFin(result, civ) {
+  if (!result || result.winner === -1) return null;
+  const src = imageBatiment('towncenter', civ);
+  return src ? { src, classe: result.victory ? 'debout' : 'tombe' } : null;
+}
+
+/**
+ * Les réglages repliés de l'accueil, en une ligne : « Solariens en face ·
+ * Classique · Normal · carte moyenne · ×1 ». Un réglage inconnu est passé.
+ */
+export function resumeReglages(reglages) {
+  const vitesse = GAME_SPEEDS.find((v) => v.id === reglages.speed);
+  const carte = MAP_SIZES[reglages.mapSize];
+  return [
+    `${CIVILISATIONS[civDe(reglages.civAdverse)].name} en face`,
+    GAME_MODES[reglages.mode]?.name,
+    DIFFICULTIES[reglages.difficulty]?.name,
+    carte && `carte ${carte.name.toLowerCase()}`,
+    vitesse && vitesse.short,
+  ].filter(Boolean).join(' · ');
 }
 
 // --- Alerte d'attaque et armée : la logique, sans DOM (vérifiée sous node) ---
@@ -463,6 +530,8 @@ export class UI {
       // L'affichage suit la civilisation du PROPRIÉTAIRE (ennemi compris) ; les règles restent lues sur def.
       const fiche = ficheDe(first.type, first.player.civ);
       const portrait = portraitDe(first.type, first.player.civ);
+      // Un bâtiment a pour portrait sa propre illustration, celle de la carte.
+      const vignette = first.kind === 'building' ? imageBatiment(first.type, first.player.civ) : null;
       const rows = [];
       if (first.kind === 'unit' && first.isAnimal) {
         rows.push(`${ic('food')} ${def.food} de nourriture`);
@@ -497,11 +566,12 @@ export class UI {
         }
       }
       node.innerHTML = `
-        <div class="portrait${portrait ? ' illustre' : ''}" style="--team:${first.player.color.main}">${
+        <div class="portrait${portrait ? ' illustre' : vignette ? ' batiment' : ''}" data-civ="${first.player.civ}" style="--team:${first.player.color.main}">${
           portrait
             // Un portrait peint est bleu : l'adversaire le porte en rouge —
             // voir teinterPortrait, plutôt qu'une seconde image à télécharger.
             ? `<img src="${portrait}" alt="" class="${mine ? '' : 'ennemi'}">`
+            : vignette ? `<img src="${vignette}" alt="" decoding="sync">`
             : iconeSVG(def.icon, 30)}</div>
         <div class="info">
           <div class="name">${fiche.name}${mine ? '' : first.isAnimal && first.playerIndex < 0 ? ' <span class="enemy">(sauvage)</span>' : ' <span class="enemy">(ennemi)</span>'}</div>
@@ -510,6 +580,9 @@ export class UI {
         </div>`;
       const portraitEnnemi = node.querySelector('.portrait img.ennemi');
       if (portraitEnnemi) teinterPortrait(portraitEnnemi, first.type);
+      // Le bâtiment d'un autre camp que le bleu : sa toile recolorée, comme sur la carte.
+      const duCamp = vignette && vignetteDeCamp(first.type, first.player.civ, first.playerIndex);
+      if (duCamp) node.querySelector('.portrait img').replaceWith(duCamp);
       if (first.kind === 'building' && first.queue.length > 0) {
         node.insertAdjacentHTML('beforeend', this.renderQueue(first));
         // Les boutons de la file sont recréés à chaque rendu du panneau (le
@@ -528,7 +601,7 @@ export class UI {
     for (const e of selection) counts[e.type] = (counts[e.type] || 0) + 1;
     const chips = Object.entries(counts).map(([type, count]) => {
       const def = UNIT_TYPES[type] || BUILDING_TYPES[type];
-      return `<button class="chip" data-filter="${type}">${iconeSVG(def.icon, 17)}<span>${count}</span></button>`;
+      return `<button class="chip" data-filter="${type}">${this.visage(type, first.player.civ, def.icon, 17)}<span>${count}</span></button>`;
     }).join('');
     node.innerHTML = `<div class="multi"><div class="multi-title">${selection.length} unités sélectionnées</div>
       <div class="chips">${chips}</div></div>`;
@@ -537,12 +610,22 @@ export class UI {
     });
   }
 
+  /**
+   * Ce qui représente une troupe sur un petit bouton (formation, file, pastille
+   * de sélection) : son portrait dans ce peuple — le même que dans le cadre du
+   * panneau. À défaut (technologie, troupe sans portrait), son pictogramme.
+   */
+  visage(type, civ, icone, taille) {
+    const portrait = UNIT_TYPES[type] ? portraitDe(type, civ) : null;
+    return portrait ? `<img class="visage" src="${portrait}" alt="" decoding="sync">` : iconeSVG(icone, taille);
+  }
+
   renderQueue(building) {
     const items = building.queue.map((item, index) => {
       const def = UNIT_TYPES[item.id] || TECHS[item.id];
       const ratio = 1 - item.timeLeft / item.total;
       return `<button class="queue-item" data-cancel="${index}" title="Annuler">
-        <span class="qicon">${iconeSVG(def.icon, 17)}</span>
+        <span class="qicon">${this.visage(item.id, building.player.civ, def.icon, 17)}</span>
         <span class="qbar"><span style="width:${Math.round(ratio * 100)}%"></span></span>
       </button>`;
     }).join('');
@@ -616,7 +699,7 @@ export class UI {
         for (const unitType of def.trains || []) {
           const u = UNIT_TYPES[unitType];
           buttons.push({
-            icon: u.icon, label: nomDe(unitType, this.game.civ), cost: costLabel(u.cost), time: u.trainTime,
+            icon: u.icon, troupe: unitType, label: nomDe(unitType, this.game.civ), cost: costLabel(u.cost), time: u.trainTime,
             check: () => this.world.canTrain(b, unitType),
             action: () => this.game.trainUnit(b, unitType),
           });
@@ -684,7 +767,7 @@ export class UI {
       if (b.danger) classes.push('danger');
       const title = b.title ? ` title="${b.title}"` : '';
       return `<button class="${classes.join(' ')}" data-cmd="${i}"${title} ${state.ok ? '' : `data-reason="${state.reason}"`}>
-        <span class="cmd-icon">${iconeSVG(b.icon, 22)}</span>
+        <span class="cmd-icon">${b.troupe ? this.visage(b.troupe, this.game.civ, b.icon, 22) : iconeSVG(b.icon, 22)}</span>
         <span class="cmd-label">${b.label}</span>
         ${b.cost ? `<span class="cmd-cost">${b.cost}</span>` : ''}
       </button>`;
@@ -750,8 +833,9 @@ export class UI {
     const player = this.world.players[this.world.humanIndex];
     const list = el('build-list');
     const available = Object.values(BUILDING_TYPES).filter((def) => (def.age || 0) <= player.age);
-    list.innerHTML = available.map((def) => { const f = ficheDe(def.id, this.game.civ); return `<button class="build-card" data-type="${def.id}">
-        <span class="bc-icon">${iconeSVG(def.icon, 26)}</span>
+    // La vignette, c'est l'illustration du bâtiment dans le peuple du joueur ; à défaut, son pictogramme.
+    list.innerHTML = available.map((def) => { const f = ficheDe(def.id, this.game.civ), image = imageBatiment(def.id, this.game.civ); return `<button class="build-card" data-type="${def.id}">
+        <span class="bc-icon${image ? ' vignette' : ''}">${image ? `<img src="${image}" alt="" decoding="async">` : iconeSVG(def.icon, 26)}</span>
         <span class="bc-body">
           <span class="bc-name">${f.name}</span>
           <span class="bc-desc">${f.desc}</span>
@@ -1081,10 +1165,10 @@ export class UI {
           <td><b>${exact(result.scores[enemy.index])}</b></td></tr>` : ''}
       </table>
       ${result.detail ? '<p class="fin-note">Score : la moitié des ressources récoltées, le prix de ce qui est encore debout, et deux fois le prix de ce qui a été abattu chez l’autre.</p>' : ''}`;
-    // (Le héros debout et le héros à terre sont des chevaliers atlantes : pas d'illustration pour une autre civilisation, en attendant la sienne.)
-    const illustration = egalite || player.civ !== 'atlante' ? ''
-      : `<img class="fin-illustration${result.victory ? '' : ' tombe'}"
-             src="assets/${result.victory ? 'heros' : 'defaite'}.webp" alt="" decoding="async">`;
+    // La capitale du joueur, telle que la carte la dessine : debout ou éteinte, pour les deux peuples.
+    const image = illustrationDeFin(result, player.civ);
+    const illustration = image
+      ? `<img class="fin-illustration ${image.classe}" src="${image.src}" alt="" decoding="async">` : '';
     const modal = this.showModal(`
       ${illustration}
       <h2>${title}</h2>
