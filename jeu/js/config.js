@@ -472,9 +472,13 @@ export const MAP_SIZES = {
   large: { id: 'large', name: 'Grande', tiles: 120 },
 };
 
+// `main` est la couleur de l'anneau de camp sous chaque troupe (et du point de
+// la mini-carte, du cadre des portraits) : un bleu et un rouge FRANCS, qui se
+// lisent sur l'herbe à vingt-trois points de haut — le rouge de l'adversaire
+// ne doit pas tirer sur le rose.
 export const PLAYER_COLORS = [
-  { main: '#3b82f6', light: '#93c5fd', dark: '#1d4ed8', name: 'Bleu' },
-  { main: '#ef4444', light: '#fca5a5', dark: '#b91c1c', name: 'Rouge' },
+  { main: '#2f6fe8', light: '#93c5fd', dark: '#1d4ed8', name: 'Bleu' },
+  { main: '#e3261c', light: '#fca5a5', dark: '#b91c1c', name: 'Rouge' },
 ];
 
 // --- Civilisations ------------------------------------------------------------

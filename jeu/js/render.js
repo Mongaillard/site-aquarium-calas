@@ -18,15 +18,23 @@ import { planterDecor, ECHELLE_DECOR, SOL_SABLE_OR, solEn, solPlein, solDeBase, 
 import { STATE, villagerTask } from './entities.js';
 import { clamp, dist, bruitPeriodique } from './utils.js';
 
-// Essai de direction artistique, par l'adresse de la page (sans effet sinon) :
-// `omb` = force de l'ombre portée sous les troupes (0 à 0,5), `soc=anneau` =
-// le socle de camp réduit à un anneau.
-const ESSAI_RENDU = { ombre: 0, socle: 'disque' };
-if (typeof location !== 'undefined' && location.search) {
-  const q = new URLSearchParams(location.search);
-  if (q.has('omb') && Number.isFinite(parseFloat(q.get('omb')))) ESSAI_RENDU.ombre = Math.max(0, Math.min(0.6, parseFloat(q.get('omb'))));
-  if (q.get('soc') === 'anneau') ESSAI_RENDU.socle = 'anneau';
-}
+// Les troupes posées dans le monde. Bâtiments et arbres ont leur ombre peinte
+// au pied, du côté opposé à la lumière (elle vient d'en haut à gauche) : chaque
+// troupe et chaque animal en reçoit une du même côté — une ellipse sombre à
+// bord fondu, décalée en bas à droite, à la taille de son empreinte au sol.
+// La marque de camp est un anneau de couleur franche posé sur cette empreinte,
+// cerné d'un filet d'encre et à peine rempli : l'ombre se voit dedans, et le
+// camp se lit d'un coup d'œil sur l'herbe claire comme sur l'herbe sombre.
+const OMBRE_FORCE = 0.42;          // opacité au cœur de l'ombre
+const OMBRE_DECALAGE = 0.3;        // vers la droite et vers le bas, en demi-axes de l'empreinte
+const APLAT = 0.46;                // hauteur d'une empreinte pour sa largeur (le sol est vu de biais)
+const ANNEAU_TRAIT = 1.5;          // épaisseur de l'anneau de camp, en pixels monde
+const ANNEAU_VOILE = 0.18;         // opacité de son remplissage
+const ANNEAU_ENCRE = 'rgba(8, 14, 6, 0.42)';   // le filet sombre qui le cerne (0,6 px de chaque côté)
+// Demi-largeur de l'empreinte, en rayons de l'unité : de face, puis ce que le
+// profil y ajoute (un cheval, un engin ou l'Hydre sont longs ; un homme, non).
+const EMPREINTE_A_PIED = [1.05, 0];
+const EMPREINTES = { cavalry: [1.05, 0.5], siege: [1.4, 0.35], monster: [1.5, 0.45], animal: [1, 0.45] };
 
 // Variantes volontairement proches : un écart trop marqué transforme la
 // prairie en damier et fatigue l'œil sur un petit écran.
@@ -1376,11 +1384,21 @@ export class Renderer {
     this.preparer3d(list);
     const rang = (e) => (e.kind === 'building' ? e.ty * TILE + 8 : e.kind === 'vegetation' ? (e.ty + 1) * TILE - 6 : e.kind === 'decor' ? e.d.y - 1 : e.y);
     list.sort((a, b) => rang(a) - rang(b));
-    for (const e of list) {
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
       if (e.kind === 'building') this.drawBuilding(e);
       else if (e.kind === 'vegetation') this.dessinerVegetation(e.res, e.sprite);
       else if (e.kind === 'decor') this.dessinerPiece(e.d, e.sprite);
-      else this.drawUnit(e);
+      else {
+        // Les ombres de toute une suite de troupes d'abord : dans une mêlée,
+        // aucune ne tombe sur les jambes de la voisine. Elles restent à leur
+        // place dans l'ordre du peintre : posées sur le parvis d'un bâtiment
+        // déjà dessiné, cachées par l'arbre qui vient après.
+        if (i === 0 || list[i - 1].kind !== 'unit') {
+          for (let j = i; j < list.length && list[j].kind === 'unit'; j++) this.dessinerOmbre(list[j]);
+        }
+        this.drawUnit(e);
+      }
     }
   }
 
@@ -1648,22 +1666,19 @@ export class Renderer {
     const ctx = this.ctx;
     const color = u.player.color;
     const r = u.radius;
-    // Le corps monte à chaque appui et se balance ; l'ombre, elle, reste au sol.
+    // Le corps monte à chaque appui et se balance ; l'ombre, elle, reste au sol (voir dessinerOmbre).
     // (Une unité rendue en 3D a déjà son état pour cette image : voir preparer3d.)
     const anim = u._anim3d && u._anim3d.image === this.frame ? u._anim3d.anim : this.unitAnim(u);
     const x = u.x + anim.marche * r * 0.09;
     const y = u.y - Math.abs(anim.marche) * r * 0.18;
 
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
-    ctx.beginPath();
-    ctx.ellipse(u.x, u.y + r * 0.55, r * 0.75, r * 0.32, 0, 0, Math.PI * 2);
-    ctx.fill();
-
     if (u.selected) {
+      // Autour de l'anneau de camp, à la taille de l'empreinte (voir dessinerSocle).
+      const rx = this.empreinte(u) + 2.5;
       ctx.strokeStyle = u.playerIndex === this.world.humanIndex ? '#ffffff' : '#ff8080';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(u.x, u.y + r * 0.5, r * 0.95, r * 0.45, 0, 0, Math.PI * 2);
+      ctx.ellipse(u.x, u.y + r * 0.45 - 1, rx, rx * APLAT, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -1881,47 +1896,78 @@ export class Renderer {
   }
 
   /**
-   * Socle aux couleurs du joueur : de loin, une armure reste une tache
-   * sombre, et l'appartenance doit se lire d'un coup d'œil. C'est la
-   * solution d'AoE, et elle vaut mieux qu'un personnage repeint en entier.
-   * Un animal sauvage n'a pas de camp : pas de socle.
+   * Demi-largeur de l'empreinte au sol d'une unité, en pixels monde : son
+   * rayon, élargi pour ce qui est long (cavalerie, engins, Hydre, animaux)
+   * d'autant plus qu'on le voit de profil. Le cap est celui que l'on AFFICHE
+   * (lissé, voir vueDe) quand la troupe en a un : l'empreinte ne tremble pas
+   * avec le cap de la simulation.
+   */
+  empreinte(u) {
+    const e = EMPREINTES[u.def.class] || EMPREINTE_A_PIED;
+    if (!e[1]) return u.radius * e[0];
+    const v = u._vue3d;
+    const profil = v ? Math.abs(v.x) / (Math.hypot(v.x, v.y) || 1) : Math.abs(Math.cos(u.facing));
+    return u.radius * (e[0] + e[1] * profil);
+  }
+
+  /**
+   * L'image de l'ombre portée : une ellipse sombre à bord fondu, peinte une
+   * fois, que chaque troupe étire à la taille de son empreinte (un dégradé
+   * fabriqué à chaque troupe et à chaque image coûterait bien plus).
+   */
+  imageOmbre() {
+    if (this.ombreTroupe !== undefined) return this.ombreTroupe;
+    this.ombreTroupe = null;   // toile refusée : pas d'ombre, et l'on ne réessaie pas à chaque image
+    const c = document.createElement('canvas');
+    c.width = 96; c.height = 48;
+    const g = c.getContext('2d');
+    if (!g) return null;
+    const d = g.createRadialGradient(48, 48, 0, 48, 48, 48);
+    d.addColorStop(0, `rgba(8, 14, 6, ${OMBRE_FORCE})`);
+    d.addColorStop(0.55, `rgba(8, 14, 6, ${OMBRE_FORCE * 0.86})`);
+    d.addColorStop(1, 'rgba(8, 14, 6, 0)');
+    g.scale(1, 0.5);
+    g.fillStyle = d;
+    g.fillRect(0, 0, 96, 96);
+    this.ombreTroupe = c;
+    return c;
+  }
+
+  /**
+   * L'ombre portée d'une troupe ou d'un animal, du même côté que celle des
+   * bâtiments dessinés : en bas à droite. Elle reste au sol, sous l'unité, et
+   * déborde un peu de l'empreinte — son bord fondu compris.
+   */
+  dessinerOmbre(u) {
+    const image = this.imageOmbre();
+    if (!image) return;
+    const rx = this.empreinte(u), ry = rx * APLAT;
+    const cx = u.x + rx * OMBRE_DECALAGE, cy = u.y + u.radius * 0.45 + ry * OMBRE_DECALAGE;
+    this.ctx.drawImage(image, cx - rx * 1.3, cy - ry * 1.3, rx * 2.6, ry * 2.6);
+  }
+
+  /**
+   * La marque de camp : un anneau de couleur franche sur l'empreinte de
+   * l'unité, à peine rempli pour que l'ombre se voie dedans. De loin, une
+   * armure reste une tache sombre, et l'appartenance doit se lire d'un coup
+   * d'œil : c'est la solution d'AoE, et elle vaut mieux qu'un personnage
+   * repeint en entier. Un animal sauvage n'a pas de camp : pas d'anneau.
    */
   dessinerSocle(u, x, y) {
-    const ctx = this.ctx;
-    const sol = y + u.radius * 0.45;
-    if (ESSAI_RENDU.ombre > 0) {
-      // Ombre portée, du même côté que celle des bâtiments dessinés (en bas à droite).
-      const r = u.radius;
-      const cx = x + r * 0.3, cy = sol + r * 0.02;
-      const d = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.05);
-      d.addColorStop(0, `rgba(10, 16, 8, ${ESSAI_RENDU.ombre})`);
-      d.addColorStop(0.6, `rgba(10, 16, 8, ${ESSAI_RENDU.ombre * 0.8})`);
-      d.addColorStop(1, 'rgba(10, 16, 8, 0)');
-      ctx.save();
-      ctx.translate(cx, cy); ctx.scale(1, 0.42); ctx.translate(-cx, -cy);
-      ctx.fillStyle = d;
-      ctx.beginPath(); ctx.arc(cx, cy, r * 1.05, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
     if (u.isAnimal && u.playerIndex < 0) return;
-    if (ESSAI_RENDU.socle === 'anneau') {
-      ctx.strokeStyle = u.player.color.main;
-      ctx.globalAlpha = 0.95;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.ellipse(x, sol - 1, u.radius * 0.78, u.radius * 0.34, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      return;
-    }
-    ctx.fillStyle = u.player.color.main;
-    ctx.globalAlpha = 0.55;
+    const ctx = this.ctx;
+    const rx = this.empreinte(u), sol = y + u.radius * 0.45;
     ctx.beginPath();
-    ctx.ellipse(x, sol - 1, u.radius * 0.78, u.radius * 0.34, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, sol - 1, rx, rx * APLAT, 0, 0, Math.PI * 2);
+    ctx.fillStyle = u.player.color.main;
+    ctx.globalAlpha = ANNEAU_VOILE;
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = u.player.color.light;
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = ANNEAU_ENCRE;
+    ctx.lineWidth = ANNEAU_TRAIT + 1.2;
+    ctx.stroke();
+    ctx.strokeStyle = u.player.color.main;
+    ctx.lineWidth = ANNEAU_TRAIT;
     ctx.stroke();
   }
 
