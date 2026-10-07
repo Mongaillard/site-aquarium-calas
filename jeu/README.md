@@ -683,9 +683,18 @@ servie par un hôte qui prête une base par personne, il y est gardé aussi
 Ce qui n'existe pas encore : le serveur (rien n'est vérifié ailleurs que sur
 l'appareil, et rien ne s'achète), le jeu entre joueurs, les saisons (le moteur
 sait finir une saison, rien ne décide quand). Le Pavoisier, le Frondeur et le
-Sapeur n'ont pas encore leur modèle 3D ni leur portrait : en partie ils gardent
-le corps dessiné au code des unités sans illustration, et dans l'interface leur
-pictogramme (un pavois, une fronde, une pioche). Tests :
+Sapeur ont leur modèle 3D et leur portrait dans les deux peuples (les gestes du
+milicien ; le pavois, la fronde ou la pioche à la place de l'épée et du
+bouclier — voir `MODELES` dans `js/modele3d.js`) ; la pierre du Frondeur est
+un galet, pas une flèche (`drawProjectiles`).
+
+**Essayer une troupe verrouillée.** La fiche d'une troupe pas encore débloquée
+porte un bouton « Essayer en partie libre » : une partie libre, avec les
+réglages de l'accueil, où trois exemplaires attendent le joueur près de son
+centre et où il peut la former (option `essai` de `World` : leurs places de
+population sont offertes ; `essayerTroupe` dans `js/main.js`). Elle ne compte
+ni au classement ni au palmarès, l'ordinateur n'y gagne rien, et une partie
+qui dort n'est effacée qu'au second toucher. Tests :
 `node test/progression.test.js`, `node test/progression-partie.test.js`,
 `node test/rangement-durable.test.js`, `node test/troupes-nouvelles.test.js`.
 

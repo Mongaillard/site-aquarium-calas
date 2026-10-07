@@ -67,6 +67,9 @@ export const PORTRAITS = {
   crossbowman: 'assets/portrait-arbaletrier.webp',
   horseArcher: 'assets/portrait-archer-monte.webp',
   ram: 'assets/portrait-belier.webp',
+  pavoisier: 'assets/portrait-pavoisier.webp',
+  frondeur: 'assets/portrait-frondeur.webp',
+  sapeur: 'assets/portrait-sapeur.webp',
 };
 
 export const RESOURCE_ICONS = { food: 'food', wood: 'wood', gold: 'gold' };
@@ -572,6 +575,9 @@ export const CIVILISATIONS = {
       priest: 'assets/portrait-sol-pretre.webp',
       ram: 'assets/portrait-sol-belier.webp',
       catapult: 'assets/portrait-sol-catapulte.webp',
+      pavoisier: 'assets/portrait-sol-pavoisier.webp',
+      frondeur: 'assets/portrait-sol-frondeur.webp',
+      sapeur: 'assets/portrait-sol-sapeur.webp',
     },
   },
 };

@@ -20,6 +20,7 @@ const ORIGINES = { victoire: 'Victoire', bataille: 'Points de bataille', promoti
 
 let civ = DEFAULT_CIV;          // le peuple dont on montre les noms et les portraits
 let surChangement = () => {};   // l'accueil se redessine quand le profil change
+let surEssai = null;            // lance une partie d'essai (main.js) ; absent : pas de bouton
 
 const nombre = (v, decimales = 2) => Number(v).toLocaleString('fr-FR', { maximumFractionDigits: decimales });
 const pluriel = (n, mot, mots = mot + 's') => `${nombre(n)} ${n > 1 ? mots : mot}`;
@@ -242,7 +243,7 @@ const STATISTIQUES = [
   ['Contre les bâtiments', (d) => (d.bonus && d.bonus.building) || null, '', '+'],
 ];
 
-function ecranFiche(type, profil, message = '') {
+function ecranFiche(type, profil, message = '', { confirmerEssai = false } = {}) {
   if (!TROUPES.includes(type)) return ecranTroupes(profil);
   const t = profil.troupes[type], reglage = R.troupes[type], debloquee = !!profil.debloquees[type];
   const v = versLeNiveauSuivant(profil, type);
@@ -261,8 +262,16 @@ function ecranFiche(type, profil, message = '') {
   let pied;
   if (!debloquee) {
     const g = reglage.gratuite;
+    // L'essai : une partie libre où trois exemplaires attendent près du centre.
+    // Une partie qui dort serait effacée : il faut alors toucher deux fois.
+    const essai = !surEssai ? '' : `
+      <div class="modal-actions">
+        <button class="btn ${confirmerEssai ? 'danger' : ''}" data-act="essayer" data-arg="${type}" ${confirmerEssai ? 'data-i="1"' : ''}>${confirmerEssai
+    ? 'Toucher encore : la partie en cours sera effacée' : 'Essayer en partie libre'}</button>
+      </div>
+      <p class="hint">Trois t’attendent près de ton centre. Une partie d’essai ne compte ni au classement ni au palmarès.</p>`;
     pied = `<p class="prog-annonce">${iconeSVG('cadenas', 14, 'inline')} Offerte en ${ligueEnPhrase(g.ligue)}, ou après ${g.parties} parties classées jouées
-      (tu en as joué ${profil.parties - profil.abandonsPrecoces}).</p>`;
+      (tu en as joué ${profil.parties - profil.abandonsPrecoces}).</p>${essai}`;
   } else if (!v) {
     pied = '<p class="prog-annonce">Niveau maximum atteint.</p>';
   } else {
@@ -321,6 +330,12 @@ function agir(act, arg, i) {
     retenir(r.profil);
     return ecranOuverture(r, r.profil);
   }
+  if (act === 'essayer') {
+    if (!surEssai || profil.debloquees[arg]) return ecranFiche(arg, profil);
+    // (main.js répond « confirmer » quand une partie dort : second toucher demandé.)
+    if (surEssai(arg, i === '1') === 'confirmer') return ecranFiche(arg, profil, '', { confirmerEssai: true });
+    return fermerProgression();
+  }
   if (act === 'ameliorer') {
     const r = ameliorer(profil, arg);
     if (r.erreur) return ecranFiche(arg, profil);
@@ -344,8 +359,9 @@ export function reglerPeuple(nouveau) { civ = nouveau || DEFAULT_CIV; }
  * À appeler une fois : pose les écouteurs. Tout bouton qui porte `data-ecran`
  * (dans l'accueil, l'écran de fin ou les écrans eux-mêmes) ouvre cet écran.
  */
-export function installerProgression({ quandLeProfilChange = () => {} } = {}) {
+export function installerProgression({ quandLeProfilChange = () => {}, quandOnEssaie = null } = {}) {
   surChangement = quandLeProfilChange;
+  surEssai = quandOnEssaie;
   document.addEventListener('click', (ev) => {
     const cible = ev.target.closest ? ev.target.closest('[data-ecran], #progression [data-act]') : null;
     if (!cible) {

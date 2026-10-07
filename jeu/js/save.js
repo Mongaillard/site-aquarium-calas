@@ -219,6 +219,8 @@ export function serializeWorld(world, extra = {}) {
     units: vivants(world.units).map(serializeUnit),
     projectiles: world.projectiles.filter((pr) => !pr.dead).map(serializeProjectile),
     ais: world.ais.map(serializeAI),
+    // (Champ écrit pour une partie d'essai seulement : les sauvegardes des autres parties ne changent pas.)
+    ...(world.essai ? { essai: world.essai } : {}),
     ...extra,
   };
 }
@@ -242,6 +244,8 @@ export function restoreWorld(data) {
     troupesInterdites: (data.players || []).map((j) => j && j.interdites),
     // (Champ absent : l'ordinateur ne forme rien de plus que son ordinaire.)
     troupesEnPlus: (data.players || []).map((j) => j && j.enPlus),
+    // (Partie d'essai : la troupe essayée, pour ses places de population offertes.)
+    essai: data.essai,
   });
   world.time = data.time || 0;
   world.humanIndex = data.humanIndex || 0;

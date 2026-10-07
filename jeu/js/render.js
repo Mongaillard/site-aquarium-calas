@@ -2311,6 +2311,14 @@ export class Renderer {
         ctx.beginPath(); ctx.arc(p.x - 1.2, p.y - 7.2 - haut, 1.6, 0, Math.PI * 2); ctx.fill();
         continue;
       }
+      if (p.source && p.source.type === 'frondeur') {
+        // La pierre d'une fronde : un galet sombre et son reflet, pas un trait de flèche.
+        ctx.fillStyle = '#4f4a43';
+        ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#a39a8c';
+        ctx.beginPath(); ctx.arc(p.x - 0.7, p.y - 0.8, 0.9, 0, Math.PI * 2); ctx.fill();
+        continue;
+      }
       const a = p.angle || 0;
       ctx.beginPath();
       ctx.moveTo(p.x - Math.cos(a) * 7, p.y - Math.sin(a) * 7);

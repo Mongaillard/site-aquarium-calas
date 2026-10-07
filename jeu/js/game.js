@@ -49,6 +49,9 @@ function niveauxLus(donnes) {
  * que le jeu connaît, sans l'ouvrier ni les animaux. Tout le reste — liste
  * illisible, type inconnu — est ignoré.
  */
+/** Combien d'exemplaires de la troupe une partie d'essai pose au départ. */
+export const ESSAI_NOMBRE = 3;
+
 function troupesLues(liste) {
   const connue = (type) => typeof type === 'string' && Object.prototype.hasOwnProperty.call(UNIT_TYPES, type)
     && UNIT_TYPES[type].class !== 'villager' && UNIT_TYPES[type].class !== 'animal';
@@ -149,6 +152,12 @@ export class World {
     // La force de l'ordinateur en partie classée suit la ligue : sa récolte
     // peut être donnée à part de sa difficulté (voir PROGRESSION.echelle).
     if (options.recolteAdverse > 0) this.players[1].mods.gatherRate = options.recolteAdverse;
+    // Partie d'essai : trois exemplaires de cette troupe attendent le joueur
+    // près de son centre (voir setupStartingPositions). Jamais l'ouvrier. Leurs
+    // places de population sont offertes (recomputePopulation) : sans cela le
+    // joueur partirait au plafond, sans pouvoir former un ouvrier.
+    this.essai = UNIT_TYPES[options.essai] && options.essai !== 'villager' ? options.essai : null;
+    this.placesOffertes = this.essai ? ESSAI_NOMBRE * (UNIT_TYPES[this.essai].pop || 1) : 0;
     // « La nature » : le camp des animaux sauvages, qui n'est pas un joueur.
     this.gaia = makePlayer(-1, 'Nature', false);
     this.gaia.color = { main: '#8b7d66', light: '#c2b59f', dark: '#5c5142', name: 'Nature' };
@@ -199,6 +208,13 @@ export class World {
           spawn.y + Math.sin(angle) * TILE * 1.6);
       }
       this.spawnUnit(index, 'scout', spawn.x + TILE * 2.5, spawn.y + TILE * 1.2);
+      // La troupe à l'essai : trois, en arc à l'opposé de l'éclaireur.
+      if (this.essai && index === this.humanIndex) {
+        for (let i = 0; i < ESSAI_NOMBRE; i++) {
+          const angle = Math.PI * (0.6 + 0.15 * i);
+          this.spawnUnit(index, this.essai, spawn.x + Math.cos(angle) * TILE * 2.6, spawn.y + Math.sin(angle) * TILE * 2.6);
+        }
+      }
     });
     this.addAI(1);
     this.spawnHerds();
@@ -1028,7 +1044,7 @@ export class World {
       this.players[b.playerIndex].popCap += b.def.popBonus;
     }
     const marge = this.mode.popStart || 0;
-    for (const p of this.players) p.popCap = Math.min(this.popMax, p.popCap + marge);
+    for (const p of this.players) p.popCap = Math.min(this.popMax, p.popCap + marge + (p.index === this.humanIndex ? this.placesOffertes : 0));
   }
 
   /** Un villageois vient de se retrouver sans travail (gisement épuisé). */

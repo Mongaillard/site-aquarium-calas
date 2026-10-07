@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v55';
+const CACHE = 'age-empires-mobile-v56';
 const ASSETS = [
   './',
   './index.html',
@@ -64,6 +64,12 @@ const ASSETS = [
   './assets/modeles/sol-pretre.json',
   './assets/modeles/sol-belier.json',
   './assets/modeles/sol-catapulte.json',
+  './assets/modeles/pavoisier.json',
+  './assets/modeles/frondeur.json',
+  './assets/modeles/sapeur.json',
+  './assets/modeles/sol-pavoisier.json',
+  './assets/modeles/sol-frondeur.json',
+  './assets/modeles/sol-sapeur.json',
   './assets/portrait-hydre.webp',
   './assets/portrait-pretresse.webp',
   './assets/portrait-cavalier.webp',
@@ -86,6 +92,12 @@ const ASSETS = [
   './assets/portrait-sol-pretre.webp',
   './assets/portrait-sol-belier.webp',
   './assets/portrait-sol-catapulte.webp',
+  './assets/portrait-pavoisier.webp',
+  './assets/portrait-frondeur.webp',
+  './assets/portrait-sapeur.webp',
+  './assets/portrait-sol-pavoisier.webp',
+  './assets/portrait-sol-frondeur.webp',
+  './assets/portrait-sol-sapeur.webp',
   './assets/solariens/centre-ville.webp',
   './assets/solariens/caserne.webp',
   './assets/solariens/archerie.webp',

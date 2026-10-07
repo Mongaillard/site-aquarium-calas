@@ -275,6 +275,10 @@ const ALTERNATIVES = {
   priest: { '3d': 'priestAtelier', anime: 'priestAtelier', peint: 'priestAtelier', '3d-precalc': 'priestAtelier', '3d-direct': 'priestAtelier' },
   // L'Hydre aussi : pas de planche dessinée, son modèle dans tous les styles.
   hydra: { '3d': 'hydraAtelier', anime: 'hydraAtelier', peint: 'hydraAtelier', '3d-precalc': 'hydraAtelier', '3d-direct': 'hydraAtelier' },
+  // Pavoisier, Frondeur et Sapeur (ligues 6 à 8) n'existent qu'en 3D.
+  pavoisier: { '3d': 'pavoisierAtelier', anime: 'pavoisierAtelier', peint: 'pavoisierAtelier', '3d-precalc': 'pavoisierAtelier', '3d-direct': 'pavoisierAtelier' },
+  frondeur: { '3d': 'frondeurAtelier', anime: 'frondeurAtelier', peint: 'frondeurAtelier', '3d-precalc': 'frondeurAtelier', '3d-direct': 'frondeurAtelier' },
+  sapeur: { '3d': 'sapeurAtelier', anime: 'sapeurAtelier', peint: 'sapeurAtelier', '3d-precalc': 'sapeurAtelier', '3d-direct': 'sapeurAtelier' },
 };
 export const STYLES = [
   { id: '3d', nom: '3D', desc: 'Tes modèles animés' },
@@ -376,6 +380,19 @@ const EN_3D = {
     modele: 'militia', unite: 'militia', repli: 'militia', natif: 'bleu',
     recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
   },
+  // Cimier, tunique et pavois bleu franc basculent ; le bronze et la peau restent.
+  pavoisierAtelier: {
+    modele: 'pavoisier', unite: 'pavoisier', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  frondeurAtelier: {
+    modele: 'frondeur', unite: 'frondeur', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
+  sapeurAtelier: {
+    modele: 'sapeur', unite: 'sapeur', repli: null, natif: 'bleu', aLaDemande: true,
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  },
 };
 
 /**
@@ -406,6 +423,7 @@ const IMAGES_CIV = {
       villager: 'solVillager', militia: 'solMilitia', spearman: 'solSpearman', archer: 'solArcher',
       scout: 'solScout', knight: 'solKnight', champion: 'solChampion', priest: 'solPriest',
       ram: 'solRam', catapult: 'solCatapult',
+      pavoisier: 'solPavoisier', frondeur: 'solFrondeur', sapeur: 'solSapeur',
     },
   },
 };
@@ -810,7 +828,7 @@ export function etatModeles3d() {
   // (Les modèles des Atlantes dans leur ordre habituel, puis ceux, cuits à la demande, des autres civilisations.)
   const cles = [...Object.values(ALTERNATIVES).map((a) => a['3d']).filter((c) => EN_3D[c]), ...Object.keys(EN_3D).filter((c) => EN_3D[c].civ)]
     .filter((c) => !EN_3D[c].aLaDemande || charges.has(c));
-  const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte', crossbowman: 'arbalétrier', horseArcher: 'archer monté' };
+  const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte', crossbowman: 'arbalétrier', horseArcher: 'archer monté', pavoisier: 'pavoisier', frondeur: 'frondeur', sapeur: 'sapeur' };
   // « ouvrier », « fellah solarien » : le modèle d'une autre civilisation porte le nom qu'elle lui donne.
   const nom = (c) => (EN_3D[c].civ
     ? `${nomDe(EN_3D[c].unite, EN_3D[c].civ).toLowerCase()} ${EN_3D[c].civ}`

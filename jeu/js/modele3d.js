@@ -249,6 +249,40 @@ export const MODELES = {
     // fenêtre de la couleur d'équipe : bleu chez le joueur, rouge en face.
     retouches: [{ teinte: [338, 14], satMin: 0.5, vers: 216 }],
   },
+  // Les trois troupes des ligues 6 à 8 : les gestes du milicien, l'accessoire
+  // change. Le Pavoisier porte un pavois (grand bouclier debout) à la place du
+  // bouclier rond.
+  pavoisier: {
+    src: 'assets/modeles/pavoisier.json',
+    taille: 45,
+    clips: { marche: 'marche_epee', repos: 'garde', attaque: 'attaque_epee', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 16, repos: 12, attaque: 12, touche: 5, mort: 13 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: 'garde',
+  },
+  // Le Frondeur : une fronde au poing, pas de bouclier ; la pierre part au bout
+  // du geste (`lacher` : l'instant où le coup d'épée porterait).
+  frondeur: {
+    src: 'assets/modeles/frondeur.json',
+    taille: 40,
+    clips: { marche: 'marche_epee', repos: 'garde', attaque: 'attaque_epee', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 16, repos: 12, attaque: 12, touche: 5, mort: 13 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: 'garde',
+    lacher: 0.42,
+  },
+  // Le Sapeur : une pioche au poing, pas de bouclier.
+  sapeur: {
+    src: 'assets/modeles/sapeur.json',
+    taille: 41,
+    clips: { marche: 'marche_epee', repos: 'garde', attaque: 'attaque_epee', touche: 'coup_recu', mort: 'mort' },
+    images: { marche: 16, repos: 12, attaque: 12, touche: 5, mort: 13 },
+    boucles: ['marche', 'repos'],
+    parDistance: ['marche'],
+    accessoires: 'garde',
+  },
 };
 
 // Les Solariens : mêmes animations et mêmes réglages que le modèle atlante du
@@ -279,6 +313,10 @@ MODELES.solPriest = { ...MODELES.priest, src: 'assets/modeles/sol-pretre.json', 
 // Les engins : ceux des Atlantes, en bois de cèdre (mêmes formes, mêmes animations).
 MODELES.solRam = { ...MODELES.ram, src: 'assets/modeles/sol-belier.json', retouches: BOIS_CEDRE };
 MODELES.solCatapult = { ...MODELES.catapult, src: 'assets/modeles/sol-catapulte.json', retouches: BOIS_CEDRE };
+// Pavoisier, Frondeur et Sapeur solariens : mêmes gestes, mêmes accessoires.
+MODELES.solPavoisier = { ...MODELES.pavoisier, src: 'assets/modeles/sol-pavoisier.json', retouches: PEAU_SOLARIENNE };
+MODELES.solFrondeur = { ...MODELES.frondeur, src: 'assets/modeles/sol-frondeur.json', retouches: PEAU_SOLARIENNE };
+MODELES.solSapeur = { ...MODELES.sapeur, src: 'assets/modeles/sol-sapeur.json', retouches: PEAU_SOLARIENNE };
 
 export const DENSITE = 2;   // px d'atlas par px monde (le style « net » de l'Atelier)
 /**

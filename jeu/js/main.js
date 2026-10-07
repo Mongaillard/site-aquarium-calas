@@ -5,9 +5,9 @@
 import {
   TILE, TICKS_PER_SECOND, AGES, DIFFICULTIES, MAP_SIZES, BUILDING_TYPES,
   GAME_MODES, DEFAULT_MODE, GAME_SPEEDS, DEFAULT_SPEED,
-  CIVILISATIONS, civDe, ficheDe, nomDe,
+  CIVILISATIONS, civDe, ficheDe, nomDe, UNIT_TYPES,
 } from './config.js';
-import { World } from './game.js';
+import { World, ESSAI_NOMBRE } from './game.js';
 import {
   saveGame, loadSave, clearSave, restoreWorld,
   lirePalmares, lignePalmares, inscrireAuPalmares, resumePalmares,
@@ -125,6 +125,8 @@ class Game {
     this.classee = !!(options.classee || (options.restore && options.restore.classee));
     // Son identifiant : la même partie, reprise dans un autre onglet, ne se compte qu'une fois.
     this.partieId = options.partieId || (options.restore && options.restore.partieId) || null;
+    // Partie d'essai d'une troupe à débloquer : elle ne compte nulle part.
+    this.essai = this.world.essai;
     // Les images propres à chaque camp (partie neuve ou reprise) ; sans effet pour les Atlantes.
     for (const p of this.world.players) chargerCivilisation(p.civ);
     this.canvas = document.getElementById('game');
@@ -199,6 +201,7 @@ class Game {
     // Le conseil de départ, pour une partie neuve seulement : à la reprise,
     // les villageois travaillent déjà.
     if (!repris) this.ui.toast(`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
+    if (!repris && this.world.essai) this.ui.toast(`Partie d’essai : ${ESSAI_NOMBRE} ${nomDe(this.world.essai, this.civ, ESSAI_NOMBRE)} t’attendent près de ton centre.`, 'good');
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
   }
@@ -459,6 +462,8 @@ class Game {
           // Une partie classée compte au classement, pas au palmarès : sa
           // difficulté est celle de la ligue, elle fausserait les records.
           if (this.classee) this.ui.showGameOver(event.result, null, this.compterPartieClassee(event.result));
+          // Une partie d'essai (trois soldats offerts au départ) ne compte pas non plus au palmarès.
+          else if (this.essai) this.ui.showGameOver(event.result, null, '<p class="fin-note">Partie d’essai : elle ne compte ni au classement ni au palmarès.</p>');
           else {
             this.ui.showGameOver(event.result, inscrireAuPalmares({
               mode: this.world.modeId, difficulty: this.world.difficultyId,
@@ -1320,12 +1325,14 @@ class Game {
     // Après une reprise, `options` ne porte que la sauvegarde : on relit le
     // format, la carte et les civilisations sur la partie qui s'achève.
     const w = this.world;
-    startGame(avecProgression({
+    const suivante = avecProgression({
       ...this.options, restore: null,
       mode: w.modeId, difficulty: w.difficultyId, mapSize: w.mapSizeId,
       civs: w.players.map((p) => p.civ), speed: this.speedId,
       seed: Math.floor(Math.random() * 1e9),
-    }, this.classee));
+    }, this.classee);
+    // (Rejouer une partie d'essai : la même troupe attend de nouveau.)
+    startGame(this.essai ? pourEssai(suivante, this.essai) : { ...suivante, essai: null });
   }
 
   quitToMenu() {
@@ -1378,6 +1385,35 @@ function avecProgression(options, classee) {
     ...options, ...reglagesDePartie(lireProgression(), classee ? 'classe' : 'libre'), classee: !!classee,
     partieId: classee ? `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}` : null,
   };
+}
+
+/**
+ * La même partie libre, où `type` — une troupe pas encore débloquée — peut être
+ * formée par le joueur, et où trois exemplaires l'attendent (World, `essai`).
+ */
+function pourEssai(options, type) {
+  const [siennes = [], autres = []] = options.troupesInterdites || [];
+  return { ...options, essai: type, troupesInterdites: [siennes.filter((t) => t !== type), autres] };
+}
+
+/**
+ * Le bouton « Essayer » d'une fiche de troupe : lance une partie libre d'essai
+ * avec les réglages de l'accueil. Une partie qui dort serait effacée : la
+ * première fois on répond « confirmer », et la fiche demande un second toucher.
+ */
+function essayerTroupe(type, sur) {
+  if (!UNIT_TYPES[type]) return 'refus';
+  if (currentGame && !currentGame.world.gameOver) return 'refus';   // une partie se joue : pas d'essai par-dessus
+  if (loadSave() && !sur) return 'confirmer';
+  if (currentGame) currentGame.destroy();
+  abandonnerPartieClasseeEnCours();
+  clearSave();
+  startGame(pourEssai(avecProgression({
+    mode: settings.mode, difficulty: settings.difficulty, mapSize: settings.mapSize,
+    civs: [settings.civ, settings.civAdverse],
+    speed: settings.speed, seed: Math.floor(Math.random() * 1e9),
+  }, false), type));
+  return 'lancee';
 }
 
 /**
@@ -1727,7 +1763,7 @@ function setupStartScreen() {
   });
 }
 
-installerProgression({ quandLeProfilChange: refreshLigue });
+installerProgression({ quandLeProfilChange: refreshLigue, quandOnEssaie: essayerTroupe });
 // Là où la page offre un rangement par personne, le profil y est gardé aussi :
 // s'il y est plus avancé qu'ici (autre appareil, stockage effacé), il revient.
 brancherRangementDurable({ hote: window.claude, lire: lireProgression, ecrire: ecrireProgression }).then((rangement) => {

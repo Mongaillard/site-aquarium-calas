@@ -8,7 +8,7 @@
 // Tout se joue sans navigateur, comme dans simulation.test.js.
 // Lancement : node test/troupes-nouvelles.test.js
 
-import { World } from '../js/game.js';
+import { World, ESSAI_NOMBRE } from '../js/game.js';
 import { AIPlayer } from '../js/ai.js';
 import { serializeWorld, restoreWorld, PROGRESSION_KEY, lireProgression } from '../js/save.js';
 import { UNIT_TYPES, BUILDING_TYPES, AGES, DIFFICULTIES, TICKS_PER_SECOND, TILE, nomDe, portraitDe } from '../js/config.js';
@@ -16,7 +16,7 @@ import { computeDamage } from '../js/entities.js';
 import { ICONES, ICON_BOX, iconeSVG } from '../js/icones.js';
 import { PROGRESSION } from '../js/progression-config.js';
 import { profilNeuf, migrerProfil, regulariser, reglagesDePartie, definitionAuNiveau } from '../js/progression.js';
-import { ouvrirProgression, htmlBandeau, htmlFinDePartie, reglerPeuple } from '../js/progression-ecrans.js';
+import { ouvrirProgression, htmlBandeau, htmlFinDePartie, reglerPeuple, installerProgression } from '../js/progression-ecrans.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 let failures = 0;
@@ -630,15 +630,15 @@ console.log('\n--- Du profil à la partie ---');
   const ecran = (nom, arg) => { noeud.innerHTML = ''; ouvrirProgression(nom, arg); return noeud.innerHTML; };
   const propre = (html) => html.length > 200 && !/undefined|NaN|\[object/.test(html);
   /** La vignette d'une troupe : son portrait s'il existe, sinon son pictogramme. */
-  const vignette = (html, type) => {
-    const src = portraitDe(type, 'atlante');
+  const vignette = (html, type, peuple = 'atlante') => {
+    const src = portraitDe(type, peuple);
     return src ? html.includes(`<img src="${src}"`) : html.includes(ICONES[type].d[0]);
   };
   for (const peuple of ['atlante', 'solarien']) {
     reglerPeuple(peuple);
     const collection = ecran('troupes');
     check(`collection (${peuple}) : les trois troupes y ont leur carte, avec leur nom et leur vignette`,
-      propre(collection) && NOUVELLES.every((t) => collection.includes(`data-ecran="fiche" data-arg="${t}"`) && collection.includes(`<b>${UNIT_TYPES[t].name}</b>`) && vignette(collection, t))
+      propre(collection) && NOUVELLES.every((t) => collection.includes(`data-ecran="fiche" data-arg="${t}"`) && collection.includes(`<b>${UNIT_TYPES[t].name}</b>`) && vignette(collection, t, peuple))
       && (collection.match(/class="prog-troupe /g) || []).length === 17);
   }
   reglerPeuple('atlante');
@@ -664,8 +664,65 @@ console.log('\n--- Du profil à la partie ---');
   check('fin de partie : la troupe gagnée est annoncée, avec sa vignette', propre(fin) && fin.includes('Nouvelle troupe : <b>Pavoisier</b>') && vignette(fin, 'pavoisier'));
   check('bandeau de l’accueil : rien n’y casse', propre(htmlBandeau(lu)));
   check('un type qui n’est pas une troupe du jeu ramène à la collection', ecran('fiche', 'licorne').includes('Mes troupes'));
+
+  // Le bouton « Essayer » d'une troupe verrouillée : absent tant que l'accueil
+  // ne sait pas lancer d'essai, puis un toucher, ou deux si une partie dort.
+  check('sans lanceur d’essai, la fiche d’une troupe verrouillée n’a pas de bouton « Essayer »', !ecran('fiche', 'sapeur').includes('data-act="essayer"'));
+  let clic = null;
+  const demandes = [];
+  let reponse = 'lancee';
+  document.addEventListener = (type, f) => { if (type === 'click') clic = f; };
+  installerProgression({ quandOnEssaie: (type, sur) => { demandes.push([type, sur]); return reponse; } });
+  const toucher = (dataset) => clic({ target: { closest: () => ({ dataset }) } });
+  const ficheSapeur = ecran('fiche', 'sapeur');
+  check('avec lui, la fiche du Sapeur verrouillé propose « Essayer en partie libre » et dit ce que l’essai ne compte pas',
+    propre(ficheSapeur) && ficheSapeur.includes('data-act="essayer" data-arg="sapeur"') && ficheSapeur.includes('Essayer en partie libre')
+    && ficheSapeur.includes('ne compte ni au classement ni au palmarès') && ficheSapeur.includes('Offerte en ligue d’Orichalque'));
+  check('… pas celle d’une troupe déjà débloquée', !ecran('fiche', 'pavoisier').includes('data-act="essayer"'));
+  ecran('fiche', 'sapeur');
+  toucher({ act: 'essayer', arg: 'sapeur' });
+  check('un toucher lance l’essai de cette troupe', egal(demandes, [['sapeur', false]]));
+  reponse = 'confirmer';
+  ecran('fiche', 'sapeur');
+  toucher({ act: 'essayer', arg: 'sapeur' });
+  check('une partie dort : la fiche demande un second toucher, et dit que la partie sera effacée',
+    noeud.innerHTML.includes('la partie en cours sera effacée') && noeud.innerHTML.includes('data-i="1"') && propre(noeud.innerHTML));
+  reponse = 'lancee';
+  toucher({ act: 'essayer', arg: 'sapeur', i: '1' });
+  check('… le second toucher la lance pour de bon', egal(demandes[demandes.length - 1], ['sapeur', true]));
+  const avant = demandes.length;
+  toucher({ act: 'essayer', arg: 'pavoisier' });
+  check('une troupe déjà débloquée ne s’essaie pas', demandes.length === avant);
   Object.defineProperty(globalThis, 'document', { value: undefined, configurable: true, writable: true });
   Object.defineProperty(globalThis, 'localStorage', { value: undefined, configurable: true, writable: true });
+}
+
+// --- La partie d'essai ---------------------------------------------------------------
+{
+  console.log('\n--- La partie d’essai ---');
+  const base = { seed: 4242, mode: 'express', mapSize: 'small', difficulty: 'normal' };
+  const compte = (m, type, joueur) => m.units.filter((u) => !u.dead && u.type === type && u.playerIndex === joueur).length;
+  const temoin = new World(base);
+  for (const type of NOUVELLES) {
+    const w = new World({ ...base, essai: type, troupesInterdites: [[], [type]] });
+    check(`essai du ${UNIT_TYPES[type].name} : ${ESSAI_NOMBRE} attendent le joueur, aucun chez l’ordinateur, et leurs places sont offertes`,
+      w.essai === type && compte(w, type, 0) === ESSAI_NOMBRE && compte(w, type, 1) === 0
+      && w.players[0].pop === temoin.players[0].pop + ESSAI_NOMBRE && w.players[0].popCap === temoin.players[0].popCap + ESSAI_NOMBRE
+      && w.players[1].pop === temoin.players[1].pop && w.players[1].popCap === temoin.players[1].popCap,
+      `${w.players[0].pop} sur ${w.players[0].popCap}`);
+  }
+  const hydres = new World({ ...base, essai: 'hydra' });
+  check('une troupe qui occupe trois places en offre neuf', hydres.players[0].popCap === temoin.players[0].popCap + 3 * ESSAI_NOMBRE && compte(hydres, 'hydra', 0) === ESSAI_NOMBRE);
+  check('ni l’ouvrier ni un type inconnu ne s’essaient : la partie est une partie ordinaire',
+    ['villager', 'licorne', 7, null].every((t) => { const w = new World({ ...base, essai: t }); return w.essai === null && w.units.length === temoin.units.length && w.players[0].popCap === temoin.players[0].popCap; }));
+  const essai = new World({ ...base, essai: 'sapeur' });
+  advance(essai, 20);
+  const image = JSON.parse(JSON.stringify(serializeWorld(essai)));
+  const repris = restoreWorld(image);
+  check('la sauvegarde garde la troupe essayée, ses soldats et ses places offertes',
+    image.essai === 'sapeur' && !!repris && repris.essai === 'sapeur' && compte(repris, 'sapeur', 0) === compte(essai, 'sapeur', 0)
+    && repris.players[0].popCap === essai.players[0].popCap);
+  check('… et une partie ordinaire ne porte pas ce champ', !('essai' in serializeWorld(temoin)));
 }
 
 console.log(`\n${failures === 0 ? 'Tous les tests passent' : failures + ' test(s) en échec'}`);
