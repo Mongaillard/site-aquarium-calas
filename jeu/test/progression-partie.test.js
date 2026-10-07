@@ -6,10 +6,10 @@
 
 import { World } from '../js/game.js';
 import { AIPlayer } from '../js/ai.js';
-import { serializeWorld, restoreWorld } from '../js/save.js';
+import { serializeWorld, restoreWorld, PROGRESSION_KEY, lireProgression, ecrireProgression } from '../js/save.js';
 import { DIFFICULTIES, TICKS_PER_SECOND, UNIT_TYPES } from '../js/config.js';
 import { PROGRESSION } from '../js/progression-config.js';
-import { definitionAuNiveau } from '../js/progression.js';
+import { definitionAuNiveau, profilNeuf, regulariser, appliquerResultat, reglagesDePartie, issueDePartie } from '../js/progression.js';
 
 const DT = 1 / TICKS_PER_SECOND;
 let failures = 0;
@@ -36,14 +36,14 @@ function partie(options, minutes) {
   pas(w, minutes * 60, () => !!w.gameOver);
   return w;
 }
-/** Une case libre pour ce bâtiment, à `d` cases au moins du bâtiment principal. */
-function emplacement(w, type, d) {
-  const tc = centre(w);
+/** Une case libre pour ce bâtiment, à `d` cases au moins du bâtiment principal du camp. */
+function emplacement(w, type, d, joueur = 0) {
+  const tc = centre(w, joueur);
   for (let r = d; r <= d + 10; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        if (w.canPlace(0, type, tc.tx + dx, tc.ty + dy, true)) return { tx: tc.tx + dx, ty: tc.ty + dy };
+        if (w.canPlace(joueur, type, tc.tx + dx, tc.ty + dy, true)) return { tx: tc.tx + dx, ty: tc.ty + dy };
       }
     }
   }
@@ -66,6 +66,14 @@ console.log('=== Niveaux des troupes dans la partie ===\n--- Au niveau 1, la par
       'niveaux illisibles': [null, { villager: 'beaucoup', licorne: 4, militia: 0, archer: -3, scout: NaN }],
       'pas un tableau': 'niveau 5 partout',
     };
+    const autres = {
+      'aucune troupe interdite': { troupesInterdites: [[], []] },
+      'interdites illisibles': { troupesInterdites: [['licorne', 'villager'], 'toutes'], recolteAdverse: 'vite' },
+    };
+    for (const [quoi, plus] of Object.entries(autres)) {
+      check(`${nom} — ${quoi} : même partie, au caractère près`, etat(partie({ ...options, ...plus }, minutes)) === reference);
+    }
+    check(`${nom} — la sauvegarde ne parle pas de troupes interdites`, !reference.includes('interdites'));
     for (const [quoi, niveaux] of Object.entries(variantes)) {
       check(`${nom} — ${quoi} : même partie, au caractère près`, etat(partie({ ...options, niveaux }, minutes)) === reference);
     }
@@ -171,6 +179,133 @@ console.log('\n--- La sauvegarde ---');
   const ancienne = JSON.parse(JSON.stringify(serializeWorld(partie({ seed: 808, mode: 'express', mapSize: 'small' }, 1))));
   const relue = restoreWorld(ancienne);
   check('une sauvegarde sans niveaux se reprend au niveau 1', !!relue && egal(relue.players[0].niveaux, {}) && relue.units.every((u) => u.def === UNIT_TYPES[u.type]));
+}
+
+// ---------------------------------------------------------------------------
+// 5. Les troupes à débloquer
+// ---------------------------------------------------------------------------
+console.log('\n--- Les troupes à débloquer ---');
+const AVANCEES = ['triton', 'horseArcher', 'catapult', 'hydra'];
+{
+  /** Un camp à l'Âge des Châteaux, riche, logé, avec tous ses bâtiments militaires debout. */
+  function equiper(w, joueur) {
+    const p = w.players[joueur];
+    p.age = 2;
+    Object.assign(p.resources, { food: 20000, wood: 20000, gold: 20000 });
+    const poses = {};
+    for (const type of ['house', 'house', 'house', 'house', 'house', 'house', 'barracks', 'archery', 'stable', 'siege', 'temple']) {
+      const e = emplacement(w, type, 5, joueur);
+      poses[type] = w.spawnBuilding(joueur, type, e.tx, e.ty, true);
+    }
+    return poses;
+  }
+  const w = new World({ seed: 51, troupesInterdites: [AVANCEES, []] });
+  w.ais = [];
+  const b = equiper(w, 0);
+  const refus = { triton: b.barracks, horseArcher: b.archery, catapult: b.siege, hydra: b.temple };
+  check('le joueur ne peut former aucune troupe à débloquer',
+    Object.entries(refus).every(([type, bat]) => { const r = w.canTrain(bat, type); return !r.ok && r.reason === 'Troupe à débloquer'; }));
+  check('… et l’ordre de formation est refusé sans rien dépenser',
+    w.trainUnit(b.temple, 'hydra') === false && b.temple.queue.length === 0 && w.players[0].resources.gold === 20000);
+  check('… les troupes de base se forment toujours',
+    ['militia', 'spearman', 'champion'].every((t) => w.canTrain(b.barracks, t).ok) && w.canTrain(b.archery, 'archer').ok
+    && w.canTrain(b.stable, 'knight').ok && w.canTrain(b.siege, 'ram').ok && w.canTrain(b.temple, 'priest').ok);
+  const adverse = equiper(w, 1);
+  check('… l’adversaire, lui, n’est pas concerné', w.canTrain(adverse.temple, 'hydra').ok && w.canTrain(adverse.siege, 'catapult').ok);
+  check('l’ouvrier ne s’interdit jamais', new World({ seed: 51, troupesInterdites: [['villager', 'deer', 'licorne']] }).players[0].interdites.size === 0);
+
+  // La sauvegarde.
+  const image = JSON.parse(JSON.stringify(serializeWorld(w)));
+  const repris = restoreWorld(image);
+  check('la sauvegarde garde les troupes interdites',
+    egal(image.players[0].interdites, AVANCEES) && image.players[1].interdites === undefined
+    && !!repris && egal([...repris.players[0].interdites], AVANCEES) && repris.players[1].interdites.size === 0);
+  const temple = repris.buildings.find((x) => x.playerIndex === 0 && x.type === 'temple');
+  check('… la partie reprise refuse toujours l’Hydre', !repris.canTrain(temple, 'hydra').ok && repris.canTrain(temple, 'priest').ok);
+
+  // L'ordinateur : à l'Âge des Châteaux, riche, il forme ce que sa liste lui laisse.
+  const forme = (interdites) => {
+    const m = new World({ seed: 51, difficulty: 'hard', troupesInterdites: [[], interdites] });
+    equiper(m, 1);
+    for (const u of m.units) if (u.playerIndex === 0 && u.setStance) u.setStance('passive');
+    const vus = new Set();
+    pas(m, 150, () => {
+      for (const bat of m.buildings) if (bat.playerIndex === 1) for (const q of bat.queue) if (q.kind === 'unit') vus.add(q.id);
+      return false;
+    });
+    return vus;
+  };
+  const libre = forme([]), bride = forme(AVANCEES);
+  check('sans interdit, l’ordinateur forme des troupes avancées', AVANCEES.some((t) => libre.has(t)), [...libre].join(' '));
+  check('avec les quatre interdites, il n’en forme aucune — et forme le reste', AVANCEES.every((t) => !bride.has(t)) && bride.has('knight'), [...bride].join(' '));
+  const sansCatapulte = forme(['catapult']);
+  check('sans catapulte, ses engins sont des béliers', !sansCatapulte.has('catapult') && sansCatapulte.has('ram'), [...sansCatapulte].join(' '));
+
+  check('la récolte de l’adversaire peut être donnée à part de sa difficulté',
+    new World({ seed: 51, difficulty: 'hard', recolteAdverse: 1.45 }).players[1].mods.gatherRate === 1.45
+    && new World({ seed: 51, difficulty: 'hard' }).players[1].mods.gatherRate === DIFFICULTIES.hard.gatherBonus);
+}
+
+// ---------------------------------------------------------------------------
+// 6. Du profil à la partie, et retour
+// ---------------------------------------------------------------------------
+console.log('\n--- Du profil à la partie, et retour ---');
+{
+  const neuf = reglagesDePartie(profilNeuf());
+  check('profil neuf, partie classée : ordinateur facile, tout au niveau 1, aucune troupe avancée de part et d’autre',
+    egal(neuf, { difficulty: 'easy', recolteAdverse: 0.8, niveaux: [{}, {}], troupesInterdites: [AVANCEES, AVANCEES] }), JSON.stringify(neuf));
+
+  // Ligue 5 (Argent, plafond 3), un milicien poussé au niveau 5.
+  const argent = regulariser({ ...profilNeuf(), elo: 780 }).profil;
+  argent.troupes.militia.niveau = 5;
+  const classe = reglagesDePartie(argent, 'classe'), libre = reglagesDePartie(argent, 'libre');
+  check('ligue 5, partie classée : le milicien de niveau 5 joue au plafond, 3', classe.niveaux[0].militia === 3);
+  check('… l’ouvrier est au plafond, monté d’office', classe.niveaux[0].villager === 3 && argent.troupes.villager.niveau === 3);
+  check('… l’ordinateur est difficile, récolte à 1,25, toutes ses troupes au niveau 3',
+    classe.difficulty === 'hard' && classe.recolteAdverse === 1.25
+    && Object.keys(classe.niveaux[1]).length === 14 && Object.values(classe.niveaux[1]).every((n) => n === 3));
+  check('… et les quatre troupes avancées sont permises aux deux camps', egal(classe.troupesInterdites, [[], []]));
+  check('ligue 5, partie libre : le milicien joue à son niveau réel, l’adversaire n’est pas touché',
+    libre.niveaux[0].militia === 5 && egal(libre.niveaux[1], {}) && libre.difficulty === undefined && libre.recolteAdverse === undefined);
+  const bronze = reglagesDePartie(regulariser({ ...profilNeuf(), elo: 300 }).profil);
+  check('ligue 3 : le joueur a l’Atlante et l’Archer monté, l’ordinateur aussi, pas la Catapulte ni l’Hydre',
+    egal(bronze.troupesInterdites, [['catapult', 'hydra'], ['catapult', 'hydra']]) && bronze.difficulty === 'normal');
+  const achat = regulariser({ ...profilNeuf(), elo: 300 }).profil;
+  achat.debloquees.hydra = 'achat';
+  check('une troupe achetée se forme avant sa ligue ; l’ordinateur, lui, attend la ligue',
+    egal(reglagesDePartie(achat).troupesInterdites, [['catapult'], ['catapult', 'hydra']]));
+  check('les réglages comptent une ligne par ligue, de plus en plus forte',
+    PROGRESSION.echelle.length === PROGRESSION.ligues.length
+    && PROGRESSION.echelle.every((e, i) => DIFFICULTIES[e.difficulte] && e.niveau === PROGRESSION.ligues[i].plafond && (i === 0 || e.recolte > PROGRESSION.echelle[i - 1].recolte)));
+
+  // Le monde reçoit ces réglages tels quels.
+  const w = new World({ seed: 51, mode: 'express', ...classe });
+  check('le monde créé avec ces réglages porte la ligue du joueur',
+    w.difficultyId === 'hard' && w.players[1].mods.gatherRate === 1.25 && w.players[0].niveaux.militia === 3
+    && w.players[1].niveaux.knight === 3 && villageois(w, 0).every((u) => u.def.gather.food === 0.625) && villageois(w, 1).every((u) => u.def.gather.food === 0.625));
+
+  // Le résultat d'une partie, dans les mots du moteur.
+  check('issue d’une partie : victoire, défaite, égalité, abandon',
+    issueDePartie({ victory: true, winner: 0 }) === 'victoire' && issueDePartie({ victory: false, winner: 1 }) === 'defaite'
+    && issueDePartie({ victory: false, winner: -1, timeUp: true }) === 'egalite' && issueDePartie({ victory: false, winner: 1, resigned: true }) === 'abandon'
+    && issueDePartie(null) === 'annulee');
+  const apres = appliquerResultat(profilNeuf(), { issue: issueDePartie({ victory: true, winner: 0 }), duree: 600, contreOrdinateur: 'echelle', jour: '2026-10-07' });
+  check('une victoire classée contre l’ordinateur : +30 et un coffre de bois', apres.profil.elo === 30 && apres.profil.coffres.some((c) => c.type === 'bois'));
+
+  // Le profil rangé dans le navigateur.
+  const m = new Map();
+  const store = { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); } };
+  Object.defineProperty(globalThis, 'localStorage', { value: store, configurable: true, writable: true });
+  check('sans rien de rangé, on lit un profil neuf', egal(lireProgression(), profilNeuf()));
+  check('le profil se range et se relit', ecrireProgression(apres.profil) === true && m.has(PROGRESSION_KEY) && egal(lireProgression(), apres.profil));
+  m.set(PROGRESSION_KEY, '{"elo": "beaucoup", "troupes": 12');
+  check('un profil illisible donne un profil neuf, sans erreur', egal(lireProgression(), profilNeuf()));
+  m.set(PROGRESSION_KEY, JSON.stringify({ ...profilNeuf(), elo: 780 }));
+  check('un profil dont le score a monté reçoit sa ligue à la lecture', lireProgression().ligue === 5);
+  store.setItem = () => { throw new Error('quota'); };
+  check('un navigateur qui refuse d’écrire : rien n’est retenu, sans erreur', ecrireProgression(apres.profil) === false);
+  Object.defineProperty(globalThis, 'localStorage', { value: undefined, configurable: true, writable: true });
+  check('sans stockage du tout : profil neuf à la lecture, refus à l’écriture', egal(lireProgression(), profilNeuf()) && ecrireProgression(apres.profil) === false);
 }
 
 console.log(`\n${failures === 0 ? 'Tous les tests passent' : failures + ' test(s) en échec'}`);

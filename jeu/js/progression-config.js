@@ -184,6 +184,27 @@ export const PROGRESSION = figer({
     or: { joursJoues: 3, joursParSemaine: 7, decalage: 3 },
   },
 
+  // --- L'ordinateur de chaque ligue ----------------------------------------------
+  // Tant que le jeu entre joueurs n'existe pas, la partie classée se joue
+  // contre l'ordinateur, et sa force suit la ligue du joueur (H) — une ligne
+  // par ligue, dans l'ordre :
+  //  difficulte : celle de DIFFICULTIES (js/config.js) — sa façon d'attaquer
+  //  recolte    : sa vitesse de récolte, à la place de celle de la difficulté
+  //  niveau     : le niveau de toutes ses troupes — le plafond de la ligue
+  // Il ne forme que les troupes avancées que la ligue du joueur offre.
+  echelle: [
+    { difficulte: 'easy', recolte: 0.8, niveau: 1 },
+    { difficulte: 'easy', recolte: 0.9, niveau: 1 },
+    { difficulte: 'normal', recolte: 1, niveau: 2 },
+    { difficulte: 'normal', recolte: 1.1, niveau: 2 },
+    { difficulte: 'hard', recolte: 1.25, niveau: 3 },
+    { difficulte: 'hard', recolte: 1.35, niveau: 3 },
+    { difficulte: 'hard', recolte: 1.45, niveau: 4 },
+    { difficulte: 'hard', recolte: 1.55, niveau: 4 },
+    { difficulte: 'hard', recolte: 1.7, niveau: 5 },
+    { difficulte: 'hard', recolte: 1.85, niveau: 5 },
+  ],
+
   // --- Fragments et niveaux ----------------------------------------------------
   // Débloquer n'est pas améliorer : les fragments ne servent qu'à monter le
   // niveau d'une troupe déjà débloquée. `couts[catégorie][n − 1]` est le prix

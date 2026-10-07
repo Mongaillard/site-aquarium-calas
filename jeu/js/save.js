@@ -16,6 +16,7 @@ import { World } from './game.js';
 import { Projectile } from './entities.js';
 import { entityDef } from './config.js';
 import { formatTime } from './utils.js';
+import { migrerProfil, regulariser } from './progression.js';
 
 export const SAVE_KEY = 'aem.partie';
 export const SAVE_VERSION = 1;
@@ -64,6 +65,7 @@ function serializePlayer(p) {
     // Les niveaux des troupes, seulement s'il y en a : une partie où tout est
     // au niveau 1 se sauvegarde comme avant.
     ...(Object.keys(p.niveaux || {}).length ? { niveaux: { ...p.niveaux } } : {}),
+    ...(p.interdites && p.interdites.size ? { interdites: [...p.interdites] } : {}),
     resources: { ...p.resources },
     age: p.age,
     ageProgress: p.ageProgress
@@ -235,6 +237,7 @@ export function restoreWorld(data) {
     civs: (data.players || []).map((j) => j && j.civ),
     // Champ absent (sauvegarde d'avant les niveaux, ou partie sans niveaux) : tout au niveau 1.
     niveaux: (data.players || []).map((j) => j && j.niveaux),
+    troupesInterdites: (data.players || []).map((j) => j && j.interdites),
   });
   world.time = data.time || 0;
   world.humanIndex = data.humanIndex || 0;
@@ -634,6 +637,30 @@ export function clearSave() {
   const store = storage();
   if (!store) return;
   try { store.removeItem(SAVE_KEY); } catch { /* rien à faire */ }
+}
+
+// --- Progression ---------------------------------------------------------------
+//
+// Le profil du joueur (classement, ligue, coffres, fragments, niveaux : voir
+// js/progression.js), rangé sous sa propre clé comme le palmarès. Tant qu'il
+// n'y a pas de compte, c'est ici qu'il vit ; son format est celui que lira le
+// serveur le jour où il fera foi.
+
+export const PROGRESSION_KEY = 'aem.progression.v1';
+
+/** Le profil rangé sur cet appareil, remis d'aplomb ; un profil neuf s'il n'y a rien ou si rien n'est lisible. */
+export function lireProgression() {
+  const store = storage();
+  let rangee = null;
+  try { rangee = store ? JSON.parse(store.getItem(PROGRESSION_KEY) || 'null') : null; } catch { rangee = null; }
+  return regulariser(migrerProfil(rangee)).profil;
+}
+
+/** Range le profil. Renvoie false si le navigateur refuse (mode privé, quota) : rien n'est alors retenu. */
+export function ecrireProgression(profil) {
+  const store = storage();
+  if (!store) return false;
+  try { store.setItem(PROGRESSION_KEY, JSON.stringify(migrerProfil(profil))); return true; } catch { return false; }
 }
 
 // --- Palmarès ------------------------------------------------------------------

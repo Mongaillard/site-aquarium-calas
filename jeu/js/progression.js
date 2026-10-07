@@ -822,6 +822,52 @@ export function debloquerParAchat(profil, type, preuve) {
   return { profil: p, evenements: [{ type: 'troupeDebloquee', troupe: type, origine: 'achat' }] };
 }
 
+// --- La partie ---------------------------------------------------------------
+
+/**
+ * Ce qu'une partie doit savoir de la progression du joueur, à passer tel quel
+ * à World (js/game.js) :
+ *   - `classe` : la partie classée. Ses troupes jouent à leur niveau, plafonné
+ *     par la ligue ; l'ordinateur, tant qu'il tient lieu d'adversaire, a la
+ *     force de la ligue (PROGRESSION.echelle) et ne forme que les troupes
+ *     avancées que cette ligue offre ;
+ *   - `libre` : la partie libre contre l'ordinateur. Ses troupes jouent à leur
+ *     niveau réel, l'adversaire reste celui que le joueur a réglé.
+ * Dans les deux cas, le joueur ne forme pas les troupes qu'il n'a pas débloquées.
+ */
+export function reglagesDePartie(profil, mode = 'classe') {
+  const p = migrerProfil(profil);
+  const classe = mode === 'classe';
+  const niveauxDuJoueur = {};
+  for (const type of EXISTANTES) {
+    const niveau = niveauEffectif(p, type, { mode: classe ? 'classe' : 'ordinateur', ligue: p.ligue });
+    if (niveau > 1) niveauxDuJoueur[type] = niveau;
+  }
+  const aDebloquer = AVANCEES.filter((type) => !p.debloquees[type]);
+  if (!classe) return { niveaux: [niveauxDuJoueur, {}], troupesInterdites: [aDebloquer, []] };
+  const adversaire = R.echelle[p.ligue - 1];
+  const niveauxAdverses = {};
+  if (adversaire.niveau > 1) for (const type of EXISTANTES) niveauxAdverses[type] = adversaire.niveau;
+  return {
+    difficulty: adversaire.difficulte,
+    recolteAdverse: adversaire.recolte,
+    niveaux: [niveauxDuJoueur, niveauxAdverses],
+    troupesInterdites: [aDebloquer, AVANCEES.filter((type) => R.troupes[type].gratuite.ligue > p.ligue)],
+  };
+}
+
+/**
+ * L'issue d'une partie finie, dans les mots d'appliquerResultat, à partir du
+ * résultat que rend World (`gameOver`) : une victoire, une égalité (personne
+ * ne l'emporte au temps), un abandon, sinon une défaite.
+ */
+export function issueDePartie(resultat) {
+  if (!estObjet(resultat)) return 'annulee';
+  if (resultat.victory === true) return 'victoire';
+  if (resultat.winner === -1) return 'egalite';
+  return resultat.resigned ? 'abandon' : 'defaite';
+}
+
 // --- Recherche d'adversaire ------------------------------------------------------
 
 /** L'écart d'Elo accepté après `secondes` d'attente : il s'élargit par paliers, jusqu'à un maximum. */

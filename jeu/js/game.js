@@ -54,6 +54,9 @@ function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
     // déjà calculées, une par type amélioré.
     niveaux: {},
     defs: {},
+    // Les troupes que ce camp ne peut pas former : celles qu'il n'a pas encore
+    // débloquées (voir canTrain). Vide, tout se forme comme avant.
+    interdites: new Set(),
     // Réaffectation automatique des villageois quand un gisement s'épuise.
     // Toujours active pour l'IA ; côté joueur c'est un choix, désactivé par
     // défaut : les ouvriers sont affectés à la main.
@@ -119,6 +122,15 @@ export class World {
     this.players[1].mods.gatherRate = this.difficulty.gatherBonus;
     const niveaux = Array.isArray(options.niveaux) ? options.niveaux : [];
     this.players.forEach((joueur, i) => { joueur.niveaux = niveauxLus(niveaux[i]); });
+    // Les troupes à débloquer : jamais l'ouvrier, sans lui il n'y a pas de partie.
+    const interdites = Array.isArray(options.troupesInterdites) ? options.troupesInterdites : [];
+    this.players.forEach((joueur, i) => {
+      const liste = Array.isArray(interdites[i]) ? interdites[i] : [];
+      joueur.interdites = new Set(liste.filter((type) => UNIT_TYPES[type] && UNIT_TYPES[type].class !== 'villager' && UNIT_TYPES[type].class !== 'animal'));
+    });
+    // La force de l'ordinateur en partie classée suit la ligue : sa récolte
+    // peut être donnée à part de sa difficulté (voir PROGRESSION.echelle).
+    if (options.recolteAdverse > 0) this.players[1].mods.gatherRate = options.recolteAdverse;
     // « La nature » : le camp des animaux sauvages, qui n'est pas un joueur.
     this.gaia = makePlayer(-1, 'Nature', false);
     this.gaia.color = { main: '#8b7d66', light: '#c2b59f', dark: '#5c5142', name: 'Nature' };
@@ -1073,6 +1085,7 @@ export class World {
     const player = this.players[building.playerIndex];
     const def = UNIT_TYPES[unitType];
     if (!def || !building.complete) return { ok: false, reason: 'Bâtiment en construction' };
+    if (player.interdites.has(unitType)) return { ok: false, reason: 'Troupe à débloquer' };
     if ((def.age || 0) > player.age) return { ok: false, reason: 'Âge requis : ' + AGES[def.age].name };
     if (building.queue.length >= 8) return { ok: false, reason: 'File d’attente pleine' };
     if (!canAfford(player.resources, def.cost)) return { ok: false, reason: 'Ressources insuffisantes' };

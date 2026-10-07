@@ -693,7 +693,7 @@ export class AIPlayer {
       if (!b.def.trains || b.type === 'towncenter') continue;
       if (b.queue.length >= 2) continue;
       if (player.pop >= player.popCap) break;
-      let options = b.def.trains.filter((t) => roster.includes(t) && UNIT_TYPES[t].age <= player.age);
+      let options = b.def.trains.filter((t) => roster.includes(t) && UNIT_TYPES[t].age <= player.age && !player.interdites.has(t));
       // Une Prêtresse soigne une armée qui existe : pas avant quatre soldats,
       // jamais plus de deux (celles en formation comprises).
       if (options.includes('priest')) {
@@ -962,14 +962,16 @@ export class AIPlayer {
     const place = player.popCap - player.pop;
     const enFile = (b, types) => b.queue.filter((q) => types.includes(q.id)).length;
     const temple = this.completed.find((b) => b.type === 'temple');
-    if (temple && age >= UNIT_TYPES.hydra.age && place >= (UNIT_TYPES.hydra.pop || 1)) {
+    if (temple && !player.interdites.has('hydra') && age >= UNIT_TYPES.hydra.age && place >= (UNIT_TYPES.hydra.pop || 1)) {
       const hydres = this.army.filter((u) => u.type === 'hydra').length + enFile(temple, ['hydra']);
       if (hydres < HYDRES_VOULUES) return { type: 'hydra', batiment: temple };
     }
     const atelier = this.completed.find((b) => b.type === 'siege');
     if (atelier && age >= UNIT_TYPES.ram.age && place >= 1) {
       const engins = this.army.filter((u) => u.def.class === 'siege').length + enFile(atelier, ['ram', 'catapult']);
-      if (engins < ENGINS_VOULUS) return { type: engins % 2 === 0 ? 'catapult' : 'ram', batiment: atelier };
+      // (Sans catapulte à former, tous ses engins sont des béliers — et l'inverse.)
+      const engin = player.interdites.has('catapult') ? 'ram' : player.interdites.has('ram') ? 'catapult' : engins % 2 === 0 ? 'catapult' : 'ram';
+      if (engins < ENGINS_VOULUS && !player.interdites.has(engin)) return { type: engin, batiment: atelier };
     }
     return null;
   }
