@@ -83,7 +83,10 @@ const RECOUVREMENT = 8;
 // de calcul et de mémoire.)
 // Ce qui n'a jamais été vu est opaque : à 94 %, les lacs de toute la carte se
 // devinaient, mini-carte comprise. Ce qui a été vu, hors de vue, garde un voile
-// léger. Hors des bords de la carte, la même teinte : un seul vide, pas deux.
+// qui assombrit autant que l'ancien voile noir (une herbe y garde 58 % de sa
+// clarté) : à 42 %, la limite de ce qui est en vue, déjà fondue, se lisait
+// moins bien qu'avant. Hors des bords de la carte, la même teinte : un seul
+// vide, pas deux.
 const FOG_K = 3;
 const FOG_RAYON = 2;
 // Le masque déborde de la carte de FOG_MARGE cases, où se prolonge la case du
@@ -95,7 +98,7 @@ const FOG_BLOCS_PAR_IMAGE = 64;    // blocs repeints au plus dans une image ; le
 export const BROUILLARD = {
   teinte: [12, 24, 34],
   inexplore: 255,                  // opacité, sur 255
-  explore: 107,                    // 42 %
+  explore: 140,                    // 55 %
 };
 const FOND_HORS_CARTE = `rgb(${BROUILLARD.teinte.join(',')})`;
 const NIVEAU_INCONNU = 1;          // case pas encore lue : aucune opacité ne vaut 1
