@@ -212,7 +212,11 @@ const ATLAS = {
     // reste plantée. Chaque rangée rejoue ses images dans l'ordre d'un
     // balancier — repos, un pied, repos, l'autre — sans saut.
     sequences: { 0: [0, 1, 0, 3], 1: [0, 3, 2, 3, 0, 1], 2: [0, 1, 3, 2], 3: [0, 3, 2, 1, 2, 3], 4: [0, 2, 0, 3] },
-    ancreY: 61, hauteurMonde: 31.5,
+    // Rose clair sur l'herbe, c'était le dessin le plus voyant de la carte, à
+    // côté d'un cerf brun : assombri et moins rose au chargement (`etalonnage`),
+    // et dessiné à 0,85 fois sa taille d'origine (31,5).
+    ancreY: 61, hauteurMonde: 26.8,
+    etalonnage: { r: 0.82, v: 0.74, b: 0.7, contraste: 1.15 },
   },
   spearman: {
     src: 'assets/lancier.png',
@@ -307,11 +311,13 @@ const EN_3D = {
     recolorage: { teinte: [178, 255], vers: 0, satMin: 0.32 },
   },
   // Cuite à la demande, à la première Hydre invoquée. Corps turquoise (teinte
-  // 180 à 200°), crinières et nageoires bleu franc (200 à 240°) : tout bascule,
-  // l'Hydre adverse est rouge ; l'or des colliers (20 à 60°) reste.
+  // 180 à 200°), crinières et nageoires bleu franc (200 à 240°) : seul le bleu
+  // franc bascule, comme chez l'homme-poisson. (Quand tout basculait, l'Hydre
+  // adverse était un bloc rouge vif, l'objet le plus criard de l'écran.)
+  // L'or des colliers (20 à 60°) reste.
   hydraAtelier: {
     modele: 'hydra', unite: 'hydra', repli: null, natif: 'bleu', aLaDemande: true,
-    recolorage: { teinte: [176, 255], vers: 0, satMin: 0.3 },
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.3 },
   },
   // Caparaçon, tabard et plumet bleu franc basculent ; l'acier et la robe du cheval restent.
   knightAtelier: {
@@ -486,6 +492,37 @@ function copie(image, l, h) {
 }
 
 /**
+ * Étalonne une planche dessinée, une fois, à son chargement : chaque canal est
+ * multiplié (`r`, `v`, `b`), puis écarté du gris moyen (`contraste`). Rend une
+ * toile, ou l'image telle quelle si la toile est refusée ou illisible.
+ */
+function etalonner(image, l, h, e) {
+  try {
+    const { canvas, ctx } = copie(image, l, h);
+    const data = ctx.getImageData(0, 0, l, h);
+    etalonnerPixels(data.data, e);
+    ctx.putImageData(data, 0, 0);
+    return canvas;
+  } catch {
+    return image;
+  }
+}
+
+/** Le calcul d'etalonner, sur des pixels (quatre octets chacun). Pure : sert aux tests. */
+export function etalonnerPixels(p, e) {
+  const c = e.contraste ?? 1;
+  const tables = [e.r ?? 1, e.v ?? 1, e.b ?? 1].map((k) => {
+    const t = new Uint8ClampedArray(256);
+    for (let v = 0; v < 256; v++) t[v] = (v * k - 128) * c + 128;
+    return t;
+  });
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i + 3] === 0) continue;
+    p[i] = tables[0][p[i]]; p[i + 1] = tables[1][p[i + 1]]; p[i + 2] = tables[2][p[i + 2]];
+  }
+}
+
+/**
  * Échange rouge et bleu sur les pixels à dominante bleue. C'est la règle la
  * moins chère, et elle convient à une illustration où le bleu couvre une
  * grande surface peinte sans acier bleuté alentour.
@@ -593,20 +630,42 @@ function regleEquipe(d) {
   const [a, b] = regle.teinte;
   const satMin = regle.satMin ?? 0.3, lumMax = regle.lumMax ?? 1;
   const dans = a <= b ? (t) => t >= a && t <= b : (t) => t >= a || t <= b;
+  // La teinte d'une couleur tombe entre 0 et 60° ou 300 et 360° quand son
+  // rouge domine, entre 60 et 180° quand c'est son vert, entre 180 et 300°
+  // quand c'est son bleu : une fenêtre de bleus écarte donc d'une comparaison
+  // tout ce qui est peau, or, cuir ou herbe, sans calculer leur teinte.
+  const touche = (de, vers) => (a <= b ? !(vers < a || de > b) : vers >= a || de <= b);
+  const peutRouge = touche(0, 60) || touche(300, 360), peutVert = touche(60, 180), peutBleu = touche(180, 300);
   return {
     cle: [a, b, satMin, lumMax, regle.saturer ?? 1, 'acier'].join('_'),
     saturer: regle.saturer,
+    // Appelée pour chaque pixel de chaque atlas, à la cuisson : le calcul de
+    // versHSL, dans le même ordre (mêmes arrondis, donc mêmes pixels marqués),
+    // mais sans tableau fabriqué à chaque appel.
     dedans: (r, g, bl) => {
-      const [teinte, sat, lum] = versHSL(r, g, bl);
-      if (!(sat > satMin && lum < lumMax && dans(teinte * 360))) return false;
+      const haut = r > g ? (r > bl ? r : bl) : (g > bl ? g : bl);
+      if (haut === r ? !peutRouge : haut === g ? !peutVert : !peutBleu) return false;
+      const bas = r < g ? (r < bl ? r : bl) : (g < bl ? g : bl);
+      const max = haut / 255, min = bas / 255;
+      const lum = (max + min) / 2, ecart = max - min;
+      const sat = lum > 0.5 ? ecart / (2 - max - min) : ecart / (max + min);
+      if (!(sat > satMin && lum < lumMax)) return false;   // (un gris : saturation nulle)
+      const R = r / 255, G = g / 255, B = bl / 255;
+      const teinte = max === R ? ((G - B) / ecart + (G < B ? 6 : 0)) / 6 : max === G ? ((B - R) / ecart + 2) / 6 : ((R - G) / ecart + 4) / 6;
+      if (!dans(teinte * 360)) return false;
       // Un acier poli tire sur le bleu pâle, et la saturation « HSL » d'un ton
       // clair s'emballe : sans ce garde-fou, la lame de l'épée passait au rose
       // dans le camp rouge. Un tissu d'équipe, même en pleine lumière, garde
       // au moins un tiers de sa couleur.
-      const max = Math.max(r, g, bl);
-      return !(lum > 0.6 && (max - Math.min(r, g, bl)) / max < 0.3);
+      return !(lum > 0.6 && (haut - bas) / haut < 0.3);
     },
   };
+}
+
+/** La règle de couleur d'équipe du modèle 3D de ce type de troupe atlante, ou null. Pure : sert aux tests. */
+export function regleEquipeDe(type) {
+  const d = EN_3D[ALTERNATIVES[type]?.['3d']];
+  return d ? regleEquipe(d) : null;
 }
 
 /**
@@ -916,10 +975,11 @@ function chargerAtlas(cle) {
   image.onload = () => {
     const l = image.width, h = image.height;
     if (!def.cellW) { def.cellW = l; def.cellH = h; }   // bâtiment d'une civilisation : une seule case, l'image entière
-    const autre = recolorer(def, image, l, h);
+    const source = def.etalonnage ? etalonner(image, l, h, def.etalonnage) : image;
+    const autre = recolorer(def, source, l, h);
     entree.variantes = def.natif === 'bleu'
-      ? { bleu: image, rouge: autre }
-      : { rouge: image, bleu: autre };
+      ? { bleu: source, rouge: autre }
+      : { rouge: source, bleu: autre };
     entree.pret = true;
   };
   image.onerror = () => { charges.set(cle, { def, pret: false, absent: true }); };

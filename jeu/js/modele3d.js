@@ -38,7 +38,25 @@
  * garde son propre geste (l'arc pivote, la flèche paraît puis part).
  * `tourne` : angle (degrés) à ajouter pour que l'avant du modèle regarde le sud
  * dans la case 0 — les engins viennent d'une vue de trois quarts.
+ * `reglage` : ce que ce modèle change à l'étalonnage commun (REGLAGE) ;
+ * `retouches` : sa couleur peinte corrigée avant la cuisson (voir retoucher) —
+ * rien ne doit crier plus fort que les bâtiments.
  */
+// Bélier et catapulte : leurs grosses ferrures d'or en faisaient des jouets
+// dorés, quand l'atelier qui les fabrique montre des engins de bois sombre.
+// Bois et or perdent de leur vivacité ; l'or (teinte 30 à 60°) est assombri
+// et tiré vers le brun.
+const BOIS_BRUN = [{ teinte: [10, 60], sat: 0.85, satPlafond: 0.6 }, { teinte: [30, 60], lum: 0.8, tourne: -5 }];
+// Les engins solariens sont ceux des Atlantes reteints en blond — la couleur
+// des murs de grès, et l'objet le plus pâle de l'écran : un cèdre, plutôt.
+const BOIS_CEDRE = [{ teinte: [18, 60], satMin: 0.12, sat: 1.2, satPlafond: 0.55, lum: 0.66, tourne: -6 }];
+// La peau des Solariens (teinte 14 à 30°) se confondait avec l'or de leurs
+// bijoux et le grès de leurs murs : un peu moins saturée, plus sombre. L'or
+// (au-delà de 30°) ne bouge pas.
+const PEAU_SOLARIENNE = [{ teinte: [14, 30], sat: 0.85, lum: 0.9 }];
+// Cheval brun, cuir, bronze : ces troupes sont à peine plus claires que
+// l'herbe. Leurs tons sombres sont relevés pour qu'elles ne s'y noient pas.
+const SOMBRE = { gamma: 0.8 };
 export const MODELES = {
   villager: {
     src: 'assets/modeles/villageois.json',
@@ -116,6 +134,11 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
+    // Sa texture est déjà très vive (plus de la moitié en couleur pure) : on
+    // ne la ravive pas comme les autres, et son turquoise est ramené d'un cran
+    // vers celui de la statue du Temple dont elle sort.
+    reglage: { saturation: 1, retenue: 1 },
+    retouches: [{ teinte: [165, 200], sat: 0.66, lum: 0.95 }, { teinte: [206, 260], sat: 0.74, tourne: -6 }],
   },
   // Le Cavalier lourd : un cheval caparaçonné (squelette « quatre pattes » de
   // l'Atelier) et son chevalier, dont le bras droit porte l'épée. Sa marche du
@@ -132,6 +155,7 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
+    reglage: SOMBRE,
   },
   // Le Bélier : un engin, pas un personnage — châssis, poutre suspendue qui va et
   // vient, quatre roues (un quart de tour par cycle : elles ont quatre rayons).
@@ -145,6 +169,8 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
+    reglage: { saturation: 1.05, gamma: 0.84 },
+    retouches: BOIS_BRUN,
   },
   // La Catapulte : le bras se tend pendant la fin de la recharge, part à
   // l'instant du tir (`lacher`), claque sur sa butée puis se réarme lentement.
@@ -157,6 +183,8 @@ export const MODELES = {
     parDistance: ['marche'],
     accessoires: null,
     lacher: 0.25,
+    reglage: { saturation: 1.05, gamma: 0.84 },
+    retouches: BOIS_BRUN,
   },
   // Le Champion : armure de plates, épée et bouclier — les animations du milicien.
   champion: {
@@ -177,6 +205,7 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
+    reglage: SOMBRE,
   },
   // La Prêtresse : son bâton est un trident ; son « attaque » est le geste du soin
   // (les bras levés), joué à chaque soin rendu.
@@ -198,6 +227,7 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_lance',
+    reglage: SOMBRE,
   },
   militia: {
     src: 'assets/modeles/milicien.json',
@@ -207,6 +237,10 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde',
+    // Son panache est peint en rouge — la couleur de l'adversaire, sur la
+    // troupe de base du joueur bleu. Repeint en bleu roi, il entre dans la
+    // fenêtre de la couleur d'équipe : bleu chez le joueur, rouge en face.
+    retouches: [{ teinte: [338, 14], satMin: 0.5, vers: 216 }],
   },
 };
 
@@ -214,28 +248,28 @@ export const MODELES = {
 // même rôle — seul le fichier change (ajouter `taille` ou `lacher` ici s'ils
 // diffèrent). N'inscrire une ligne qu'une fois le fichier livré ET listé dans
 // sw.js : sprites.js (IMAGES_CIV) ignore un modèle absent de cette table.
-MODELES.solVillager = { ...MODELES.villager, src: 'assets/modeles/sol-fellah.json' };
-MODELES.solMilitia = { ...MODELES.militia, src: 'assets/modeles/sol-garde.json' };
-MODELES.solSpearman = { ...MODELES.spearman, src: 'assets/modeles/sol-lancier.json' };
-MODELES.solArcher = { ...MODELES.archer, src: 'assets/modeles/sol-archer.json' };
+MODELES.solVillager = { ...MODELES.villager, src: 'assets/modeles/sol-fellah.json', retouches: PEAU_SOLARIENNE };
+MODELES.solMilitia = { ...MODELES.militia, src: 'assets/modeles/sol-garde.json', retouches: PEAU_SOLARIENNE };
+MODELES.solSpearman = { ...MODELES.spearman, src: 'assets/modeles/sol-lancier.json', reglage: null, retouches: PEAU_SOLARIENNE };
+MODELES.solArcher = { ...MODELES.archer, src: 'assets/modeles/sol-archer.json', retouches: PEAU_SOLARIENNE };
 // Le Chacal dressé tient le rôle de l'éclaireur : un animal seul (pack « Loup » de
 // l'Atelier), qui court et mord. `taille` compte sa longueur vue de face, comme
 // pour une monture : à 22, de profil, il est long de 36 px et arrive à la
 // taille d'un homme (à 33 il était aussi long qu'un cheval).
 MODELES.solScout = {
-  ...MODELES.scout, src: 'assets/modeles/sol-chacal.json', taille: 22,
+  ...MODELES.scout, src: 'assets/modeles/sol-chacal.json', taille: 22, reglage: null,
   clips: { marche: 'course', repos: 'repos', attaque: 'attaque_morsure', touche: 'coup_recu', mort: 'mort' },
 };
 // Le Méhariste (cavalerie lourde) : un dromadaire au trot, le sabre au poing.
 // (48 et non 52 : le cavalier est assis plus haut que sur un cheval.)
-MODELES.solKnight = { ...MODELES.knight, src: 'assets/modeles/sol-mehariste.json', taille: 48 };
+MODELES.solKnight = { ...MODELES.knight, src: 'assets/modeles/sol-mehariste.json', taille: 48, reglage: null };
 // Le Garde masqué (l'élite) : les gestes du Champion sous un masque de chacal.
-MODELES.solChampion = { ...MODELES.champion, src: 'assets/modeles/sol-elite.json' };
+MODELES.solChampion = { ...MODELES.champion, src: 'assets/modeles/sol-elite.json', retouches: PEAU_SOLARIENNE };
 // Le Prêtre du Soleil : les gestes de la Prêtresse, un sceptre solaire à la place du trident.
-MODELES.solPriest = { ...MODELES.priest, src: 'assets/modeles/sol-pretre.json' };
-// Les engins : ceux des Atlantes, en bois blond (mêmes formes, mêmes animations).
-MODELES.solRam = { ...MODELES.ram, src: 'assets/modeles/sol-belier.json' };
-MODELES.solCatapult = { ...MODELES.catapult, src: 'assets/modeles/sol-catapulte.json' };
+MODELES.solPriest = { ...MODELES.priest, src: 'assets/modeles/sol-pretre.json', retouches: PEAU_SOLARIENNE };
+// Les engins : ceux des Atlantes, en bois de cèdre (mêmes formes, mêmes animations).
+MODELES.solRam = { ...MODELES.ram, src: 'assets/modeles/sol-belier.json', retouches: BOIS_CEDRE };
+MODELES.solCatapult = { ...MODELES.catapult, src: 'assets/modeles/sol-catapulte.json', retouches: BOIS_CEDRE };
 
 export const DENSITE = 2;   // px d'atlas par px monde (le style « net » de l'Atelier)
 /**
@@ -278,36 +312,43 @@ const CADRE = { gauche: 2.1, droite: 2.1, haut: 2.7, bas: 1.5 };
 const MARGE = 2;            // px d'atlas autour de l'emprise (le contour y loge)
 /**
  * Lumières (× π : l'éclairage physique de three.js) et étalonnage des couleurs.
- * Une texture peinte, éclairée puis réduite à quarante pixels sur de l'herbe,
- * sort terne : `gamma` (< 1) relève les tons sombres et moyens, `saturation`
- * ravive les couleurs — moins celles qui sont déjà vives (`retenue`), pour ne
- * pas les brûler —, `contraste` écarte autour du gris moyen. Réglés sur un banc
- * d'essai face aux dessins d'origine (lancier, champion, prêtresse) : même
- * luminosité et même saturation moyennes, à 0,02 près. La lumière reste
- * légère (0,95 à 1,2 fois la couleur peinte) : la texture porte déjà ses ombres.
+ * Les bâtiments et les arbres sont dessinés à l'encre : un trait sombre, des
+ * ombres peintes, une face éclairée bien plus claire que l'autre. Une troupe
+ * cuite à plat (ambiante 0,95, directe 0,25, liseré à 0,4) avait l'air d'une
+ * figurine lisse posée sur ce dessin. La lumière directe, venue du même côté
+ * que celle des bâtiments, creuse donc le volume (1,35 fois la couleur peinte
+ * en pleine lumière, 0,8 à l'ombre) ; `contraste` écarte autour du gris moyen
+ * et donne des noirs ; `gamma` (< 1) relève un peu les tons sombres et moyens,
+ * pour que la troupe reste plus claire que l'herbe ; `saturation` ravive les
+ * couleurs — moins celles qui sont déjà vives (`retenue`), pour ne pas les
+ * brûler. `nettete` : masque flou sur la luminance, qui fait ressortir plis,
+ * sangles et traits du visage comme un trait de plume. `contour` : part de sa
+ * couleur que garde le liseré d'un pixel autour de la silhouette — un trait
+ * d'encre teinté, jamais plus épais (à deux pixels, la troupe fait autocollant).
+ * Réglés sur des captures du jeu à taille de téléphone, sur herbe claire et
+ * sur herbe sombre : autant de tons sombres que dans un bâtiment (un
+ * cinquième de la silhouette), une clarté moyenne qui reste au-dessus de celle
+ * de l'herbe.
  * `elevation` : la caméra, en degrés au-dessus de l'horizon. Les bâtiments sont
  * dessinés de plus haut (30°) ; à 22°, une troupe montre son visage et son
  * torse plutôt que le dessus de son casque — plus proche de son dessin.
+ * Un modèle peut surcharger ces valeurs (`reglage`, dans MODELES).
  */
-export const REGLAGE = { ambiante: 0.95, directe: 0.25, gamma: 0.88, saturation: 1.3, retenue: 0.6, contraste: 1.04, elevation: 22 };
+export const REGLAGE = { ambiante: 0.8, directe: 0.55, gamma: 0.9, saturation: 1.18, retenue: 0.6, contraste: 1.2, elevation: 22, contour: 0.22, nettete: 1.2 };
 /**
  * Essai de direction artistique, par l'adresse de la page (sans effet sinon) :
- * `amb`, `dir`, `gam`, `sat`, `con` remplacent les réglages ci-dessus ; `cont`
- * (0,4) = part de la couleur gardée par le liseré, `ep` (1) = son épaisseur en
- * pixels d'atlas, `net` (0) = netteté ajoutée (masque flou sur la luminance).
+ * `amb`, `dir`, `gam`, `sat`, `con`, `cont` (contour) et `net` (netteté)
+ * remplacent les réglages ci-dessus.
  */
-export const ESSAI = { contour: 0.4, epaisseur: 1, nettete: 0 };
 if (typeof location !== 'undefined' && location.search) {
   const q = new URLSearchParams(location.search);
-  const lu = (nom) => (q.has(nom) && Number.isFinite(parseFloat(q.get(nom))) ? parseFloat(q.get(nom)) : null);
-  for (const [nom, cle] of [['amb', 'ambiante'], ['dir', 'directe'], ['gam', 'gamma'], ['sat', 'saturation'], ['con', 'contraste']]) {
-    if (lu(nom) !== null) REGLAGE[cle] = lu(nom);
+  for (const [nom, cle] of [['amb', 'ambiante'], ['dir', 'directe'], ['gam', 'gamma'], ['sat', 'saturation'], ['con', 'contraste'], ['cont', 'contour'], ['net', 'nettete']]) {
+    const v = q.has(nom) ? parseFloat(q.get(nom)) : NaN;
+    if (Number.isFinite(v)) REGLAGE[cle] = v;
   }
-  if (lu('cont') !== null) ESSAI.contour = lu('cont');
-  if (lu('ep') !== null) ESSAI.epaisseur = Math.max(1, Math.min(2, Math.round(lu('ep'))));
-  if (lu('net') !== null) ESSAI.nettete = lu('net');
 }
-const cleEssai = () => (ESSAI.contour === 0.4 && ESSAI.epaisseur === 1 && ESSAI.nettete === 0 ? '' : `-e${ESSAI.contour}_${ESSAI.epaisseur}_${ESSAI.nettete}`);
+/** Les réglages d'un modèle : ceux de tous, et ce qu'il a en propre. */
+export const reglageDe = (m) => (m.reglage ? { ...REGLAGE, ...m.reglage } : REGLAGE);
 /**
  * Les pixels de la couleur d'équipe portent cette opacité (au lieu de 255) :
  * la cuisson les reconnaît sur la couleur PEINTE, avant l'étalonnage, et
@@ -328,8 +369,15 @@ const pause = () => new Promise((r) => {
 // lancement, les atlas reviennent en un instant, sans three.js. La clé porte
 // l'empreinte du fichier et la version de la cuisson — un nouveau modèle, ou
 // une caméra retouchée ici, refait la cuisson une fois.
-const VERSION_CUISSON = 8;
+const VERSION_CUISSON = 9;
 const CACHE = 'aem-modeles-3d';
+
+/** Empreinte FNV-1a d'un texte court (les retouches d'un modèle, pour sa clé de cache). */
+function signature(texte) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < texte.length; i++) h = Math.imul(h ^ texte.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(16);
+}
 
 /** Empreinte FNV-1a du fichier : deux modèles différents, deux clés. */
 function empreinte(octets) {
@@ -415,9 +463,10 @@ export async function modeleCuit(cle, vitessePxS, equipe = null) {
   let octets = null, h = await empreinteRetenue(m.src);
   if (!h) ({ octets, h } = await lireModele(m));
   const url = new URL(m.src, location.href);
-  const reglage = Object.values(REGLAGE).join('_');
+  // (Un réglage ou une retouche propre au modèle entre dans la clé : le retoucher recuit ce modèle-là, pas les autres.)
+  const reglage = `${Object.values(reglageDe(m)).join('_')}${m.retouches ? `-r${signature(JSON.stringify(m.retouches))}` : ''}`;
   const cleDe = (e) => {
-    url.searchParams.set('cuisson', `${VERSION_CUISSON}-${e}-${m.taille}-${m.tourne || 0}-${vitessePxS}-${Object.values(m.images).join('.')}-${reglage}${cleEssai()}-${equipe ? equipe.cle : ''}`);
+    url.searchParams.set('cuisson', `${VERSION_CUISSON}-${e}-${m.taille}-${m.tourne || 0}-${vitessePxS}-${Object.values(m.images).join('.')}-${reglage}-${equipe ? equipe.cle : ''}`);
     return url.href;
   };
   let cleCache = cleDe(h);
@@ -567,6 +616,7 @@ function gltfSansAdresses(octets) {
  */
 export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = false, anticrenelage = true, equipe = null, densite = DENSITE, reduire = false } = {}) {
   const m = MODELES[cle];
+  const reglage = reglageDe(m);
   const THREE = await import('./vendor/three-jeu.min.js');
   const { glb, images, cartes } = gltfSansAdresses(octets);
   const gltf = await new Promise((ok, echec) => new THREE.GLTFLoader().parse(glb, '', ok, echec));
@@ -576,8 +626,15 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
     const bmp = await createImageBitmap(blob);
     const toileTexture = document.createElement('canvas');
     toileTexture.width = bmp.width; toileTexture.height = bmp.height;
-    toileTexture.getContext('2d').drawImage(bmp, 0, 0);
+    const peinture = toileTexture.getContext('2d', m.retouches ? { willReadFrequently: true } : undefined);
+    peinture.drawImage(bmp, 0, 0);
     bmp.close?.();
+    if (m.retouches) {
+      // La couleur peinte, retouchée une fois pour toutes les images (voir retoucher).
+      const texels = peinture.getImageData(0, 0, toileTexture.width, toileTexture.height);
+      retoucher(texels.data, m.retouches);
+      peinture.putImageData(texels, 0, 0);
+    }
     const t = new THREE.CanvasTexture(toileTexture);
     t.flipY = false;                        // convention glTF
     t.colorSpace = THREE.SRGBColorSpace;
@@ -600,17 +657,17 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
   const pivot = modele;                     // tourné vers la case voulue
   scene.add(modele);
 
-  const e = (REGLAGE.elevation * Math.PI) / 180;
+  const e = (reglage.elevation * Math.PI) / 180;
   const versCamera = new THREE.Vector3(0, Math.sin(e), Math.cos(e));
   const hautCamera = new THREE.Vector3(0, Math.cos(e), -Math.sin(e));
-  const lumiere = new THREE.DirectionalLight(0xffffff, REGLAGE.directe * Math.PI);
+  const lumiere = new THREE.DirectionalLight(0xffffff, reglage.directe * Math.PI);
   lumiere.position.set(0, 0, 0)
     .addScaledVector(new THREE.Vector3(1, 0, 0), LUMIERE[0])
     .addScaledVector(hautCamera, LUMIERE[1])
     .addScaledVector(versCamera, LUMIERE[2]);
   scene.add(lumiere);
   // Une lumière d'ambiance : un ciel et un sol de même couleur.
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xffffff, REGLAGE.ambiante * Math.PI));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xffffff, reglage.ambiante * Math.PI));
 
   const melangeur = new THREE.AnimationMixer(modele);
   const clipDe = (nom) => {
@@ -734,7 +791,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
         }
         await pause();   // rendre la main : le menu reste fluide pendant la cuisson
       }
-      clips[etat] = recadrer(bande, n, travailL, travailH, ancreX, ancreY, equipe,
+      clips[etat] = recadrer(bande, n, travailL, travailH, ancreX, ancreY, equipe, reglage,
         densite < DENSITE || !reduire ? 1 : (REDUCTION[etat] || 1), densite);
       clips[etat].duree = clip.duration;
       clips[etat].boucle = boucle;
@@ -797,7 +854,7 @@ function finesseTexture(modele, textures) {
  * la distance de son bord gauche à l'ancre (le point entre les pieds), en
  * pixels d'atlas entiers. Puis le contour et la netteté.
  */
-function recadrer(bande, n, L, H, ancreX, ancreY, equipe, f = 1, densite = DENSITE) {
+function recadrer(bande, n, L, H, ancreX, ancreY, equipe, reglage, f = 1, densite = DENSITE) {
   const ctx = bande.getContext('2d', { willReadFrequently: true });
   const largeur = L * n;   // la partie de la bande que cette animation occupe
   const gauche = new Array(DIRECTIONS).fill(Infinity), droite = new Array(DIRECTIONS).fill(-Infinity);
@@ -846,7 +903,7 @@ function recadrer(bande, n, L, H, ancreX, ancreY, equipe, f = 1, densite = DENSI
       actx.drawImage(bande, i * L + x0[k], k * H + y0, c.l * f, pleineH, c.x, i * cellH, c.l, cellH);
     }
   }
-  netteteEtContour(actx, atlas.width, atlas.height, equipe);
+  netteteEtContour(actx, atlas.width, atlas.height, equipe, reglage);
   // La toile de travail est faite pour être LUE (elle vit en mémoire centrale) ;
   // celle que le jeu dessine soixante fois par seconde doit être une toile
   // ordinaire, que le navigateur garde côté carte graphique.
@@ -864,16 +921,86 @@ function recadrer(bande, n, L, H, ancreX, ancreY, equipe, f = 1, densite = DENSI
 }
 
 /**
+ * Retouche la couleur PEINTE d'un modèle, avant la cuisson (une fois par
+ * modèle, sur sa texture : toutes les images en héritent, et les bords se
+ * fondent ensuite d'eux-mêmes au rendu). `p` : les texels, quatre octets
+ * chacun. Chaque règle vise une fenêtre de teinte, en degrés (elle peut passer
+ * par 0 : [338, 14]), bornée par `satMin` (0,2), `lumMin` et `lumMax` ; dedans,
+ * elle multiplie la saturation (`sat`, plafonnée ensuite à `satPlafond`) et la
+ * luminosité (`lum`), tourne la teinte de `tourne` degrés ou la remplace
+ * (`vers`). `fondu` : degrés sur lesquels l'effet s'éteint hors de la fenêtre
+ * (6 ; 0 pour une teinte remplacée) — une peau dégradée vers l'or ne montre
+ * pas de couture. Les règles se cumulent là où leurs fenêtres se touchent.
+ * Pure : sert aux tests.
+ */
+export function retoucher(p, regles) {
+  // Chaque règle, ses valeurs par défaut posées une fois, et ce qu'elle peut
+  // toucher : la teinte d'une couleur tombe entre 0 et 60° ou 300 et 360°
+  // quand son rouge domine, entre 60 et 180° quand c'est son vert, entre 180
+  // et 300° quand c'est son bleu — une comparaison écarte donc, sans calcul,
+  // les texels qu'aucune règle ne vise.
+  let peutRouge = false, peutVert = false, peutBleu = false;
+  const R = regles.map((regle) => {
+    const [a, z] = regle.teinte, fondu = regle.fondu ?? (regle.vers === undefined ? 6 : 0);
+    const de = a <= z ? Math.max(0, a - fondu) : a - fondu, jusqua = a <= z ? Math.min(360, z + fondu) : z + fondu;
+    const touche = (x, y) => (a <= z ? !(y < de || x > jusqua) : y >= de || x <= jusqua);
+    peutRouge = peutRouge || touche(0, 60) || touche(300, 360); peutVert = peutVert || touche(60, 180); peutBleu = peutBleu || touche(180, 300);
+    return {
+      a, z, fondu, satMin: regle.satMin ?? 0.2, lumMin: regle.lumMin ?? 0, lumMax: regle.lumMax ?? 1,
+      sat: regle.sat ?? 1, lum: regle.lum ?? 1, plafond: regle.satPlafond ?? 1, tourne: regle.tourne || 0, vers: regle.vers === undefined ? -1 : regle.vers / 60,
+    };
+  });
+  const canal = (a, b, t) => {
+    if (t < 0) t += 6; else if (t >= 6) t -= 6;
+    return t < 1 ? a + (b - a) * t : t < 3 ? b : t < 4 ? a + (b - a) * (4 - t) : a;
+  };
+  for (let o = 0; o < p.length; o += 4) {
+    const r = p[o], g = p[o + 1], b = p[o + 2];
+    const max = r > g ? (r > b ? r : b) : (g > b ? g : b);
+    if (max === r ? !peutRouge : max === g ? !peutVert : !peutBleu) continue;
+    const min = r < g ? (r < b ? r : b) : (g < b ? g : b);
+    if (max === min) continue;   // un gris n'a pas de teinte
+    const d = max - min, somme = max + min;
+    const l = somme / 510, s = somme > 255 ? d / (510 - somme) : d / somme;
+    // Teinte en sixièmes de tour (0 à 6), puis en degrés.
+    let t = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    const deg = t * 60;
+    let ks = 1, kl = 1, plafond = 1, touche = false;
+    for (const regle of R) {
+      if (s <= regle.satMin || l < regle.lumMin || l > regle.lumMax) continue;
+      const { a, z, fondu } = regle;
+      const dehors = a <= z ? (deg < a ? a - deg : deg > z ? deg - z : 0) : (deg >= a || deg <= z ? 0 : Math.min(a - deg, deg - z));
+      if (dehors > 0 && dehors >= fondu) continue;
+      // Plein effet dans la fenêtre ; il s'éteint sur ses bords, et vers les tons à peine colorés.
+      const poids = (dehors ? 1 - dehors / fondu : 1) * Math.min(1, (s - regle.satMin) / 0.1);
+      touche = true;
+      if (regle.vers >= 0) t = regle.vers;
+      else if (regle.tourne) t += (regle.tourne * poids) / 60;
+      ks *= 1 + (regle.sat - 1) * poids;
+      kl *= 1 + (regle.lum - 1) * poids;
+      if (regle.plafond < 1) plafond = Math.min(plafond, 1 + (regle.plafond - 1) * poids);
+    }
+    if (!touche) continue;
+    t = ((t % 6) + 6) % 6;
+    const s2 = Math.min(plafond, s * ks), l2 = Math.min(1, l * kl);
+    const q = l2 < 0.5 ? l2 * (1 + s2) : l2 + s2 - l2 * s2, m = 2 * l2 - q;
+    p[o] = Math.round(canal(m, q, t + 2) * 255);
+    p[o + 1] = Math.round(canal(m, q, t) * 255);
+    p[o + 2] = Math.round(canal(m, q, t - 2) * 255);
+  }
+}
+
+/**
  * Le traitement des sprites de l'Atelier : bords francs (un sprite réduit à
  * quarante pixels s'interpole mieux qu'un bord à demi transparent), couleurs
- * étalonnées (REGLAGE), couleur d'équipe marquée (ALPHA_EQUIPE), et un liseré
- * sombre qui détache le personnage de l'herbe.
+ * étalonnées (`reglage`), couleur d'équipe marquée (ALPHA_EQUIPE), netteté,
+ * et un liseré sombre — le trait d'encre qui détache le personnage de l'herbe.
  */
-function netteteEtContour(ctx, l, h, equipe) {
+function netteteEtContour(ctx, l, h, equipe, reglage) {
   const img = ctx.getImageData(0, 0, l, h);
   const p = img.data;
   const plein = new Uint8Array(l * h);
-  const { gamma, saturation, retenue, contraste } = REGLAGE;
+  const { gamma, saturation, retenue, contraste, contour, nettete } = reglage;
   const courbe = new Float32Array(256);
   for (let v = 0; v < 256; v++) courbe[v] = Math.pow(v / 255, gamma) * 255;
   for (let i = 0; i < l * h; i++) {
@@ -896,18 +1023,19 @@ function netteteEtContour(ctx, l, h, equipe) {
     p[o + 1] = Math.max(0, Math.min(255, (gris + (g - gris) * k - 128) * contraste + 128));
     p[o + 2] = Math.max(0, Math.min(255, (gris + (b - gris) * k - 128) * contraste + 128));
   }
-  if (ESSAI.nettete > 0) {
-    // Masque flou sur la luminance : les plis, les sangles et les traits du
-    // visage ressortent, comme le trait des bâtiments dessinés.
-    const lum = new Float32Array(l * h);
-    for (let i = 0; i < l * h; i++) if (plein[i]) lum[i] = 0.299 * p[i * 4] + 0.587 * p[i * 4 + 1] + 0.114 * p[i * 4 + 2];
+  if (nettete > 0) {
+    // Masque flou sur la luminance (moyenne des voisins pleins, dans un carré
+    // de trois pixels) : chaque pixel s'écarte de ses voisins, les plis, les
+    // sangles et les traits du visage ressortent.
+    const lum = new Uint8Array(l * h);   // 0 hors de la silhouette : la somme des voisins l'ignore d'elle-même
+    for (let i = 0, o = 0; i < l * h; i++, o += 4) if (plein[i]) lum[i] = 0.299 * p[o] + 0.587 * p[o + 1] + 0.114 * p[o + 2] + 0.5;
     for (let y = 1; y < h - 1; y++) {
-      for (let x = 1; x < l - 1; x++) {
-        const i = y * l + x;
+      for (let i = y * l + 1, fin = y * l + l - 1; i < fin; i++) {
         if (!plein[i]) continue;
-        let somme = 0, n = 0;
-        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const j = i + dy * l + dx; if (plein[j]) { somme += lum[j]; n++; } }
-        const ecart = (lum[i] - somme / n) * ESSAI.nettete;
+        const a = i - l, b = i + l;
+        const n = plein[a - 1] + plein[a] + plein[a + 1] + plein[i - 1] + 1 + plein[i + 1] + plein[b - 1] + plein[b] + plein[b + 1];
+        const somme = lum[a - 1] + lum[a] + lum[a + 1] + lum[i - 1] + lum[i] + lum[i + 1] + lum[b - 1] + lum[b] + lum[b + 1];
+        const ecart = (lum[i] - somme / n) * nettete;
         const o = i * 4;
         p[o] = Math.max(0, Math.min(255, p[o] + ecart));
         p[o + 1] = Math.max(0, Math.min(255, p[o + 1] + ecart));
@@ -915,30 +1043,23 @@ function netteteEtContour(ctx, l, h, equipe) {
       }
     }
   }
-  for (let passe = 0; passe < ESSAI.epaisseur; passe++) {
-  const ajoutes = [];
+  // Le liseré : tout pixel vide qui touche la silhouette prend la couleur de
+  // ses voisins pleins, assombrie. (Lu sur `plein`, écrit dans `p` seulement :
+  // un pixel de liseré n'en fait pas naître un autre.)
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < l; x++) {
-      const i = y * l + x;
+    for (let x = 0, i = y * l; x < l; x++, i++) {
       if (plein[i]) continue;
-      let r = 0, g = 0, b = 0, n = 0, equipe = 0;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const xx = x + dx, yy = y + dy;
-        if (xx < 0 || yy < 0 || xx >= l || yy >= h || !plein[yy * l + xx]) continue;
-        const o = (yy * l + xx) * 4;
-        r += p[o]; g += p[o + 1]; b += p[o + 2]; n++;
-        if (p[o + 3] === ALPHA_EQUIPE) equipe++;
-      }
+      let r = 0, g = 0, b = 0, n = 0, camp = 0;
+      if (x + 1 < l && plein[i + 1]) { const o = (i + 1) * 4; r += p[o]; g += p[o + 1]; b += p[o + 2]; n++; if (p[o + 3] === ALPHA_EQUIPE) camp++; }
+      if (x > 0 && plein[i - 1]) { const o = (i - 1) * 4; r += p[o]; g += p[o + 1]; b += p[o + 2]; n++; if (p[o + 3] === ALPHA_EQUIPE) camp++; }
+      if (y + 1 < h && plein[i + l]) { const o = (i + l) * 4; r += p[o]; g += p[o + 1]; b += p[o + 2]; n++; if (p[o + 3] === ALPHA_EQUIPE) camp++; }
+      if (y > 0 && plein[i - l]) { const o = (i - l) * 4; r += p[o]; g += p[o + 1]; b += p[o + 2]; n++; if (p[o + 3] === ALPHA_EQUIPE) camp++; }
       if (!n) continue;
-      const o = i * 4;
+      const o = i * 4, part = contour / n;
       // Le liseré d'une cape bleue est bleu sombre : il change de camp avec elle.
-      const part = passe ? 1 : ESSAI.contour;   // la seconde passe prolonge la première, sans l'assombrir encore
-      p[o] = (r / n) * part; p[o + 1] = (g / n) * part; p[o + 2] = (b / n) * part;
-      p[o + 3] = equipe * 2 >= n ? ALPHA_EQUIPE : 255;
-      ajoutes.push(i);
+      p[o] = r * part; p[o + 1] = g * part; p[o + 2] = b * part;
+      p[o + 3] = camp * 2 >= n ? ALPHA_EQUIPE : 255;
     }
-  }
-  for (const i of ajoutes) plein[i] = 1;
   }
   ctx.putImageData(img, 0, 0);
 }
