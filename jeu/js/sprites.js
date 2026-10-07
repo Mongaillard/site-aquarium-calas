@@ -315,13 +315,15 @@ const EN_3D = {
     recolorage: { teinte: [178, 255], vers: 0, satMin: 0.32 },
   },
   // Cuite à la demande, à la première Hydre invoquée. Corps turquoise (teinte
-  // 180 à 200°), crinières et nageoires bleu franc (200 à 240°) : seul le bleu
-  // franc bascule, comme chez l'homme-poisson. (Quand tout basculait, l'Hydre
-  // adverse était un bloc rouge vif, l'objet le plus criard de l'écran.)
-  // L'or des colliers (20 à 60°) reste.
+  // 180 à 200°), crinières et nageoires bleu franc (200 à 240°) : tout bascule,
+  // l'Hydre adverse est rouge ; l'or des colliers (20 à 60°) reste. Ses teintes
+  // vont de 180 à 235° sans creux : une fenêtre coupée à 200°, comme celle de
+  // l'homme-poisson, tranchait en plein dégradé et semait ses têtes de rouge
+  // et de turquoise. C'est sa couleur peinte, calmée à la cuisson (voir
+  // MODELES.hydra), qui lui évite d'être un bloc rouge vif : rouge brique.
   hydraAtelier: {
     modele: 'hydra', unite: 'hydra', repli: null, natif: 'bleu', aLaDemande: true,
-    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.3 },
+    recolorage: { teinte: [176, 255], vers: 0, satMin: 0.3 },
   },
   // Caparaçon, tabard et plumet bleu franc basculent ; l'acier et la robe du cheval restent.
   knightAtelier: {

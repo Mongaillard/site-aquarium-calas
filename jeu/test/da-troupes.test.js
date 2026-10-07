@@ -64,9 +64,14 @@ console.log('--- Réglages de cuisson ---');
   const hydre = reglageDe(MODELES.hydra);
   check('l’Hydre n’est pas ravivée comme les autres ; le reste de ses réglages est commun',
     hydre.saturation === 1 && hydre.saturation < REGLAGE.saturation && hydre.contour === REGLAGE.contour && hydre.directe === REGLAGE.directe);
-  check('les troupes sombres (cavalier, éclaireur, lancier) ont leurs tons sombres relevés — pas leurs homologues solariens, plus clairs',
-    ['knight', 'scout', 'spearman'].every((c) => reglageDe(MODELES[c]).gamma < REGLAGE.gamma)
-    && ['solKnight', 'solScout', 'solSpearman'].every((c) => reglageDe(MODELES[c]).gamma === REGLAGE.gamma));
+  const gamma = (c) => reglageDe(MODELES[c]).gamma;
+  check('les troupes sombres ont leurs tons sombres relevés : d’un cran le milicien, de deux le lancier et les chevaux',
+    gamma('militia') < REGLAGE.gamma && gamma('militia') >= 0.78 && ['knight', 'scout', 'spearman'].every((c) => gamma(c) < gamma('militia') && gamma(c) >= 0.7),
+    `gamma ${REGLAGE.gamma} pour tous, ${gamma('militia')} et ${gamma('knight')} pour elles`);
+  check('… pas leurs homologues solariens, plus clairs : ils gardent l’étalonnage de tous',
+    ['solMilitia', 'solKnight', 'solScout', 'solSpearman'].every((c) => reglageDe(MODELES[c]) === REGLAGE));
+  check('… ni les troupes qui ont déjà leur part de noir sans tomber sous l’herbe (villageois, archers, Champion, prêtresse, homme-poisson)',
+    ['villager', 'archer', 'crossbowman', 'champion', 'solChampion', 'priest', 'horseArcher', 'triton'].every((c) => reglageDe(MODELES[c]) === REGLAGE));
   check('bélier et catapulte des deux peuples : saturation retenue',
     ['ram', 'catapult', 'solRam', 'solCatapult'].every((c) => reglageDe(MODELES[c]).saturation < REGLAGE.saturation));
   const version = Number((lire('js/modele3d.js').match(/const VERSION_CUISSON = (\d+);/) || [])[1]);
@@ -187,17 +192,35 @@ console.log('\n--- Bélier et catapulte : de l’or vers le bois ---');
   check('… et leurs ferrures d’or vif ne virent pas à l’orange pur', tsl(...retouchee(orVif, MODELES.solCatapult.retouches)).s <= 0.56);
 }
 
-console.log('\n--- L’Hydre : un cran de moins, et plus de bloc rouge en face ---');
+console.log('\n--- L’Hydre : un cran de moins ; en face, rouge brique d’un seul tenant ---');
 {
   const equipe = regleEquipeDe('hydra');
   const turquoise = [5, 147, 175], criniere = [1, 59, 167], or = [220, 159, 24];
   const corps = retouchee(turquoise, MODELES.hydra.retouches), a = tsl(...turquoise), b = tsl(...corps);
   check('son turquoise est moins saturé, de même teinte', b.s < a.s * 0.8 && Math.abs(b.t - a.t) < 1.5, `${dit(turquoise)} → ${dit(corps)}`);
-  check('le corps turquoise ne change plus de camp : l’Hydre adverse n’est plus un bloc rouge', !equipe.dedans(...turquoise) && !equipe.dedans(...corps));
   const crin = retouchee(criniere, MODELES.hydra.retouches);
-  check('crinières et nageoires bleu franc, elles, changent de camp (avant et après retouche)', equipe.dedans(...criniere) && equipe.dedans(...crin), dit(crin));
-  check('l’or de ses colliers ne bouge pas', dit(retouchee(or, MODELES.hydra.retouches)) === dit(or));
-  check('l’homme-poisson suit la même règle : peau turquoise fixe, crête au camp',
+  check('toute la bête change de camp : corps turquoise, crinières et nageoires bleu franc (avant et après retouche)',
+    [turquoise, corps, criniere, crin].every((k) => equipe.dedans(...k)), `${dit(corps)}, ${dit(crin)}`);
+  // Ses teintes vont de 180 à 235° sans creux : une fenêtre coupée au milieu
+  // (200°) semait ses têtes de rouge et de turquoise. Aucune teinte de la bête
+  // ne doit tomber dehors, ni telle que peinte, ni retouchée (ses couleurs
+  // sont vives : saturation de 0,7 au moins).
+  const couleur = (t, sat, lum) => {   // teinte en degrés → rouge, vert, bleu
+    const c = (1 - Math.abs(2 * lum - 1)) * sat, x = c * (1 - Math.abs(((t / 60) % 2) - 1)), m = lum - c / 2;
+    const [r, g, bl] = t < 60 ? [c, x, 0] : t < 120 ? [x, c, 0] : t < 180 ? [0, c, x] : t < 240 ? [0, x, c] : t < 300 ? [x, 0, c] : [c, 0, x];
+    return [r, g, bl].map((v) => Math.round((v + m) * 255));
+  };
+  const dehors = [];
+  for (let t = 180; t <= 236; t += 2) for (const [sat, lum] of [[0.95, 0.35], [0.7, 0.45], [0.8, 0.25]]) {
+    const k = couleur(t, sat, lum);
+    if (!equipe.dedans(...k) || !equipe.dedans(...retouchee(k, MODELES.hydra.retouches))) dehors.push(t);
+  }
+  check('aucune couture dans son dégradé : du turquoise (180°) au bleu roi (236°), tout est du camp', dehors.length === 0, dehors.length ? `dehors : ${[...new Set(dehors)].join(', ')}°` : '');
+  // En face, la teinte passe au rouge, saturation et luminosité gardées : la
+  // retouche du turquoise fait donc d'un rouge vif un rouge brique.
+  check('en face, son corps est rouge brique et non rouge vif : saturation sous 0,7 (elle était de 0,94)', b.s < 0.7 && a.s > 0.9, `saturation ${a.s.toFixed(2)} → ${b.s.toFixed(2)}`);
+  check('l’or de ses colliers ne bouge pas et ne change pas de camp', dit(retouchee(or, MODELES.hydra.retouches)) === dit(or) && !equipe.dedans(...or));
+  check('l’homme-poisson, lui, garde sa peau turquoise : seule sa crête bleu franc est au camp',
     !regleEquipeDe('triton').dedans(...turquoise) && regleEquipeDe('triton').dedans(...criniere));
 }
 
@@ -266,9 +289,35 @@ console.log('\n--- Ombre portée et anneau de camp ---');
   check('un cheval de profil a une empreinte plus large que de face, et qu’un homme', e(cavalierProfil) > e(cavalierFace) * 1.3 && e(cavalierFace) > e(soldat));
   check('engins et Hydre : plus larges encore (cavalerie < bélier < Hydre)', e(belier) > e(cavalierProfil) && e(hydre) > e(belier) && e(hydre) >= hydre.radius * 1.8,
     `${e(cavalierProfil).toFixed(1)} < ${e(belier).toFixed(1)} < ${e(hydre).toFixed(1)} px`);
-  cavalierFace._vue3d = { x: 0.9, y: 0.1, k: 2, t: 0 };
-  check('l’empreinte suit le cap AFFICHÉ (lissé) quand la troupe en a un, pas celui de la simulation', Math.abs(e(cavalierFace) - e(cavalierProfil)) < 0.2);
-  cavalierFace._vue3d = undefined;
+  // Une troupe cuite est montrée sous une de huit vues (voir vueDe) : c'est
+  // elle qui donne le profil, pas le cap de la simulation ni son lissage.
+  const vue = (u, k) => { u._vue3d = { x: 0, y: 0, k, t: 0 }; u._empreinte = undefined; return e(u); };
+  const face = vue(cavalierFace, 0), profil = vue(cavalierFace, 2);
+  check('l’empreinte suit la VUE affichée quand la troupe en a une, pas le cap de la simulation',
+    Math.abs(profil - e(cavalierProfil)) < 1e-9 && vue(cavalierFace, 1) > face && vue(cavalierFace, 1) < profil && Math.abs(vue(cavalierFace, 4) - face) < 1e-9);
+  check('un demi-tour (de l’est à l’ouest) ne la change pas : l’anneau ne se pince plus', Math.abs(vue(cavalierFace, 6) - profil) < 1e-9 && Math.abs(vue(cavalierFace, 5) - vue(cavalierFace, 3)) < 1e-9);
+  // Elle rejoint sa largeur à vitesse bornée, au fil de l'horloge du rendu.
+  rendu.horloge = 10;
+  vue(cavalierFace, 2);
+  cavalierFace._vue3d.k = 0;                       // la vue passe du profil à la face
+  const meme = e(cavalierFace);
+  rendu.horloge += 1 / 60;
+  const suivante = e(cavalierFace), encore = e(cavalierFace);
+  check('un changement de vue ne la fait pas sauter : un demi-pixel monde par image au plus',
+    meme === profil && suivante < profil && profil - suivante <= 0.5 + 1e-9 && profil - suivante > 0.2, `${profil.toFixed(2)} puis ${suivante.toFixed(2)} px`);
+  check('ombre, anneau et cercle de sélection d’une même image ont la même largeur', encore === suivante);
+  for (let i = 0; i < 30; i++) { rendu.horloge += 1 / 60; e(cavalierFace); }
+  check('… et elle arrive à sa largeur, sans la dépasser (une demi-seconde plus tard)', Math.abs(e(cavalierFace) - face) < 1e-9);
+  cavalierFace._vue3d.k = 2;
+  rendu.horloge += 3;
+  check('une troupe restée hors champ reprend sa largeur du moment, sans glisser', Math.abs(e(cavalierFace) - profil) < 1e-9);
+  cavalierFace._vue3d.k = 0;
+  rendu.horloge += 1 / 60;
+  const fantassin = e(soldat);
+  soldat._vue3d = { x: 0, y: 0, k: 2, t: 0 };
+  check('un fantassin a la même empreinte sous toutes les vues', e(soldat) === fantassin);
+  soldat._vue3d = undefined; cavalierFace._vue3d = undefined; cavalierFace._empreinte = undefined;
+  delete rendu.horloge;
 
   // L'ombre.
   const ombre = (u) => { traces.length = 0; rendu.dessinerOmbre(u); return traces.filter((t) => t.nom === 'drawImage'); };
@@ -289,7 +338,7 @@ console.log('\n--- Ombre portée et anneau de camp ---');
     && arrets[arrets.length - 1][0] === 1 && alpha(arrets[arrets.length - 1][1]) === 0, arrets.map((a) => a.join(' : ')).join(' ; '));
 
   // L'anneau.
-  const anneau = (u) => { traces.length = 0; rendu.dessinerSocle(u, u.x, u.y); return traces.slice(); };
+  const anneau = (u) => { traces.length = 0; rendu.dessinerSocle(u); return traces.slice(); };
   const t = anneau(soldat);
   const ellipse = t.find((c) => c.nom === 'ellipse'), fond = t.filter((c) => c.nom === 'fill'), traits = t.filter((c) => c.nom === 'stroke');
   check('la marque de camp est une ellipse posée sur l’empreinte, aux pieds',
@@ -315,12 +364,19 @@ console.log('\n--- Ombre portée et anneau de camp ---');
   check('le rouge de l’adversaire est franc, pas rose', rr >= 210 && rv <= 60 && rb <= 60 && tsl(rr, rv, rb).s > 0.75, PLAYER_COLORS[1].main);
   check('le bleu du joueur est franc', bb >= 210 && br <= 70 && tsl(br, bv, bb).s > 0.75, PLAYER_COLORS[0].main);
 
-  // Le dessin : l'ombre passe avant le corps, pour toute une suite de troupes.
+  // Le dessin : ce qui est au sol passe avant les corps, pour toute une suite de troupes.
   const source = lire('js/render.js');
   const boucle = source.slice(source.indexOf('  drawEntities() {'), source.indexOf('  preparer3d(list) {'));
-  check('dans l’ordre du peintre, les ombres d’une suite de troupes sont dessinées avant leurs corps',
-    /for \(let j = i; j < list\.length && list\[j\]\.kind === 'unit'; j\+\+\) this\.dessinerOmbre\(list\[j\]\);\s*\}\s*this\.drawUnit\(e\);/.test(boucle));
+  const ombres = boucle.indexOf('this.dessinerOmbre(list['), anneaux = boucle.indexOf('this.dessinerSocle(list['), corps = boucle.indexOf('this.drawUnit(e);');
+  check('dans l’ordre du peintre, les ombres d’une suite de troupes, puis leurs anneaux, puis leurs corps',
+    ombres > 0 && anneaux > ombres && corps > anneaux
+    && /if \(i === 0 \|\| list\[i - 1\]\.kind !== 'unit'\) \{\s*let fin = i;\s*while \(fin < list\.length && list\[fin\]\.kind === 'unit'\) this\.dessinerOmbre\(list\[fin\+\+\]\);/.test(boucle)
+    && /for \(let j = i; j < fin; j\+\+\) if \(spriteDe\(list\[j\]\.type, list\[j\]\.player\.civ\)\) this\.dessinerSocle\(list\[j\]\);\s*\}\s*this\.drawUnit\(e\);/.test(boucle));
+  check('l’anneau n’est plus dessiné avec le corps : il ne passe sur les jambes d’aucune voisine', source.split('this.dessinerSocle(').length === 2);
   check('rien ne fabrique de dégradé à chaque troupe dessinée', !/createRadialGradient/.test(source.slice(source.indexOf('  dessinerOmbre(u) {'), source.indexOf('  dessinerModele3D(u, sprite, x, y, anim) {'))));
+  // L'anneau reste au sol : il ne suit pas le balancement du corps.
+  const pose = anneau(soldat).find((c) => c.nom === 'ellipse');
+  check('l’anneau est posé aux pieds de l’unité, où qu’en soit son pas', !!pose && pose.args[0] === soldat.x && pose.args[1] === soldat.y + soldat.radius * 0.45 - 1);
 }
 
 // ---------------------------------------------------------------------------

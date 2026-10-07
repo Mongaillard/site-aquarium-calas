@@ -54,9 +54,15 @@ const BOIS_CEDRE = [{ teinte: [18, 60], satMin: 0.12, sat: 1.2, satPlafond: 0.55
 // bijoux et le grès de leurs murs : un peu moins saturée, plus sombre. L'or
 // (au-delà de 30°) ne bouge pas.
 const PEAU_SOLARIENNE = [{ teinte: [14, 30], sat: 0.85, lum: 0.9 }];
-// Cheval brun, cuir, bronze : ces troupes sont à peine plus claires que
-// l'herbe. Leurs tons sombres sont relevés pour qu'elles ne s'y noient pas.
+// Acier dans l'ombre, cuir, bronze, cheval brun : à l'encre, ces troupes
+// tombaient à la clarté de l'herbe, et le milicien portait plus de noir qu'un
+// bâtiment (27 % de tons très sombres pour 20). Leurs tons sombres sont
+// relevés pour qu'elles ne s'y noient pas : d'un cran pour le milicien, de
+// deux pour le bronze du lancier et la robe des chevaux. (Mesuré sur l'atlas
+// de repos : clarté L* de 46 pour le milicien et le lancier, de 42 à 43 pour
+// les chevaux, 17 à 22 % de tons très sombres.)
 const SOMBRE = { gamma: 0.8 };
+const TRES_SOMBRE = { gamma: 0.74 };
 export const MODELES = {
   villager: {
     src: 'assets/modeles/villageois.json',
@@ -155,7 +161,7 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
-    reglage: SOMBRE,
+    reglage: TRES_SOMBRE,
   },
   // Le Bélier : un engin, pas un personnage — châssis, poutre suspendue qui va et
   // vient, quatre roues (un quart de tour par cycle : elles ont quatre rayons).
@@ -205,7 +211,7 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: null,
-    reglage: SOMBRE,
+    reglage: TRES_SOMBRE,
   },
   // La Prêtresse : son bâton est un trident ; son « attaque » est le geste du soin
   // (les bras levés), joué à chaque soin rendu.
@@ -227,7 +233,7 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde_lance',
-    reglage: SOMBRE,
+    reglage: TRES_SOMBRE,
   },
   militia: {
     src: 'assets/modeles/milicien.json',
@@ -237,6 +243,7 @@ export const MODELES = {
     boucles: ['marche', 'repos'],
     parDistance: ['marche'],
     accessoires: 'garde',
+    reglage: SOMBRE,
     // Son panache est peint en rouge — la couleur de l'adversaire, sur la
     // troupe de base du joueur bleu. Repeint en bleu roi, il entre dans la
     // fenêtre de la couleur d'équipe : bleu chez le joueur, rouge en face.
@@ -246,10 +253,12 @@ export const MODELES = {
 
 // Les Solariens : mêmes animations et mêmes réglages que le modèle atlante du
 // même rôle — seul le fichier change (ajouter `taille` ou `lacher` ici s'ils
-// diffèrent). N'inscrire une ligne qu'une fois le fichier livré ET listé dans
-// sw.js : sprites.js (IMAGES_CIV) ignore un modèle absent de cette table.
+// diffèrent ; `reglage: null` quand le modèle atlante a ses tons sombres
+// relevés : lin blanc et grès, les Solariens sont plus clairs). N'inscrire
+// une ligne qu'une fois le fichier livré ET listé dans sw.js : sprites.js
+// (IMAGES_CIV) ignore un modèle absent de cette table.
 MODELES.solVillager = { ...MODELES.villager, src: 'assets/modeles/sol-fellah.json', retouches: PEAU_SOLARIENNE };
-MODELES.solMilitia = { ...MODELES.militia, src: 'assets/modeles/sol-garde.json', retouches: PEAU_SOLARIENNE };
+MODELES.solMilitia = { ...MODELES.militia, src: 'assets/modeles/sol-garde.json', reglage: null, retouches: PEAU_SOLARIENNE };
 MODELES.solSpearman = { ...MODELES.spearman, src: 'assets/modeles/sol-lancier.json', reglage: null, retouches: PEAU_SOLARIENNE };
 MODELES.solArcher = { ...MODELES.archer, src: 'assets/modeles/sol-archer.json', retouches: PEAU_SOLARIENNE };
 // Le Chacal dressé tient le rôle de l'éclaireur : un animal seul (pack « Loup » de
