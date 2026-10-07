@@ -18,6 +18,16 @@ import { planterDecor, ECHELLE_DECOR } from './decor.js';
 import { STATE, villagerTask } from './entities.js';
 import { clamp, dist, bruitPeriodique } from './utils.js';
 
+// Essai de direction artistique, par l'adresse de la page (sans effet sinon) :
+// `omb` = force de l'ombre portée sous les troupes (0 à 0,5), `soc=anneau` =
+// le socle de camp réduit à un anneau.
+const ESSAI_RENDU = { ombre: 0, socle: 'disque' };
+if (typeof location !== 'undefined' && location.search) {
+  const q = new URLSearchParams(location.search);
+  if (q.has('omb') && Number.isFinite(parseFloat(q.get('omb')))) ESSAI_RENDU.ombre = Math.max(0, Math.min(0.6, parseFloat(q.get('omb'))));
+  if (q.get('soc') === 'anneau') ESSAI_RENDU.socle = 'anneau';
+}
+
 // Variantes volontairement proches : un écart trop marqué transforme la
 // prairie en damier et fatigue l'œil sur un petit écran.
 // Couleurs moyennes des nappes de sol (assets/sol-*.webp) : la tuile de
@@ -1590,9 +1600,33 @@ export class Renderer {
    * Un animal sauvage n'a pas de camp : pas de socle.
    */
   dessinerSocle(u, x, y) {
-    if (u.isAnimal && u.playerIndex < 0) return;
     const ctx = this.ctx;
     const sol = y + u.radius * 0.45;
+    if (ESSAI_RENDU.ombre > 0) {
+      // Ombre portée, du même côté que celle des bâtiments dessinés (en bas à droite).
+      const r = u.radius;
+      const cx = x + r * 0.3, cy = sol + r * 0.02;
+      const d = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.05);
+      d.addColorStop(0, `rgba(10, 16, 8, ${ESSAI_RENDU.ombre})`);
+      d.addColorStop(0.6, `rgba(10, 16, 8, ${ESSAI_RENDU.ombre * 0.8})`);
+      d.addColorStop(1, 'rgba(10, 16, 8, 0)');
+      ctx.save();
+      ctx.translate(cx, cy); ctx.scale(1, 0.42); ctx.translate(-cx, -cy);
+      ctx.fillStyle = d;
+      ctx.beginPath(); ctx.arc(cx, cy, r * 1.05, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    if (u.isAnimal && u.playerIndex < 0) return;
+    if (ESSAI_RENDU.socle === 'anneau') {
+      ctx.strokeStyle = u.player.color.main;
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(x, sol - 1, u.radius * 0.78, u.radius * 0.34, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return;
+    }
     ctx.fillStyle = u.player.color.main;
     ctx.globalAlpha = 0.55;
     ctx.beginPath();

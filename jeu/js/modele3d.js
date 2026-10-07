@@ -291,6 +291,24 @@ const MARGE = 2;            // px d'atlas autour de l'emprise (le contour y loge
  */
 export const REGLAGE = { ambiante: 0.95, directe: 0.25, gamma: 0.88, saturation: 1.3, retenue: 0.6, contraste: 1.04, elevation: 22 };
 /**
+ * Essai de direction artistique, par l'adresse de la page (sans effet sinon) :
+ * `amb`, `dir`, `gam`, `sat`, `con` remplacent les réglages ci-dessus ; `cont`
+ * (0,4) = part de la couleur gardée par le liseré, `ep` (1) = son épaisseur en
+ * pixels d'atlas, `net` (0) = netteté ajoutée (masque flou sur la luminance).
+ */
+export const ESSAI = { contour: 0.4, epaisseur: 1, nettete: 0 };
+if (typeof location !== 'undefined' && location.search) {
+  const q = new URLSearchParams(location.search);
+  const lu = (nom) => (q.has(nom) && Number.isFinite(parseFloat(q.get(nom))) ? parseFloat(q.get(nom)) : null);
+  for (const [nom, cle] of [['amb', 'ambiante'], ['dir', 'directe'], ['gam', 'gamma'], ['sat', 'saturation'], ['con', 'contraste']]) {
+    if (lu(nom) !== null) REGLAGE[cle] = lu(nom);
+  }
+  if (lu('cont') !== null) ESSAI.contour = lu('cont');
+  if (lu('ep') !== null) ESSAI.epaisseur = Math.max(1, Math.min(2, Math.round(lu('ep'))));
+  if (lu('net') !== null) ESSAI.nettete = lu('net');
+}
+const cleEssai = () => (ESSAI.contour === 0.4 && ESSAI.epaisseur === 1 && ESSAI.nettete === 0 ? '' : `-e${ESSAI.contour}_${ESSAI.epaisseur}_${ESSAI.nettete}`);
+/**
  * Les pixels de la couleur d'équipe portent cette opacité (au lieu de 255) :
  * la cuisson les reconnaît sur la couleur PEINTE, avant l'étalonnage, et
  * l'autre camp se teinte plus tard en ne touchant qu'eux (sprites.js).
@@ -399,7 +417,7 @@ export async function modeleCuit(cle, vitessePxS, equipe = null) {
   const url = new URL(m.src, location.href);
   const reglage = Object.values(REGLAGE).join('_');
   const cleDe = (e) => {
-    url.searchParams.set('cuisson', `${VERSION_CUISSON}-${e}-${m.taille}-${m.tourne || 0}-${vitessePxS}-${Object.values(m.images).join('.')}-${reglage}-${equipe ? equipe.cle : ''}`);
+    url.searchParams.set('cuisson', `${VERSION_CUISSON}-${e}-${m.taille}-${m.tourne || 0}-${vitessePxS}-${Object.values(m.images).join('.')}-${reglage}${cleEssai()}-${equipe ? equipe.cle : ''}`);
     return url.href;
   };
   let cleCache = cleDe(h);
@@ -878,6 +896,27 @@ function netteteEtContour(ctx, l, h, equipe) {
     p[o + 1] = Math.max(0, Math.min(255, (gris + (g - gris) * k - 128) * contraste + 128));
     p[o + 2] = Math.max(0, Math.min(255, (gris + (b - gris) * k - 128) * contraste + 128));
   }
+  if (ESSAI.nettete > 0) {
+    // Masque flou sur la luminance : les plis, les sangles et les traits du
+    // visage ressortent, comme le trait des bâtiments dessinés.
+    const lum = new Float32Array(l * h);
+    for (let i = 0; i < l * h; i++) if (plein[i]) lum[i] = 0.299 * p[i * 4] + 0.587 * p[i * 4 + 1] + 0.114 * p[i * 4 + 2];
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < l - 1; x++) {
+        const i = y * l + x;
+        if (!plein[i]) continue;
+        let somme = 0, n = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const j = i + dy * l + dx; if (plein[j]) { somme += lum[j]; n++; } }
+        const ecart = (lum[i] - somme / n) * ESSAI.nettete;
+        const o = i * 4;
+        p[o] = Math.max(0, Math.min(255, p[o] + ecart));
+        p[o + 1] = Math.max(0, Math.min(255, p[o + 1] + ecart));
+        p[o + 2] = Math.max(0, Math.min(255, p[o + 2] + ecart));
+      }
+    }
+  }
+  for (let passe = 0; passe < ESSAI.epaisseur; passe++) {
+  const ajoutes = [];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < l; x++) {
       const i = y * l + x;
@@ -893,9 +932,13 @@ function netteteEtContour(ctx, l, h, equipe) {
       if (!n) continue;
       const o = i * 4;
       // Le liseré d'une cape bleue est bleu sombre : il change de camp avec elle.
-      p[o] = (r / n) * 0.4; p[o + 1] = (g / n) * 0.4; p[o + 2] = (b / n) * 0.4;
+      const part = passe ? 1 : ESSAI.contour;   // la seconde passe prolonge la première, sans l'assombrir encore
+      p[o] = (r / n) * part; p[o + 1] = (g / n) * part; p[o + 2] = (b / n) * part;
       p[o + 3] = equipe * 2 >= n ? ALPHA_EQUIPE : 255;
+      ajoutes.push(i);
     }
+  }
+  for (const i of ajoutes) plein[i] = 1;
   }
   ctx.putImageData(img, 0, 0);
 }
