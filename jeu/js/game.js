@@ -14,6 +14,8 @@ import { PathFinder } from './pathfinding.js';
 import { Unit, Animal, Building, Projectile, STATE, computeDamage } from './entities.js';
 import { SpatialGrid, RNG, dist, dist2, canAfford, payCost, clamp } from './utils.js';
 import { AIPlayer } from './ai.js';
+import { PROGRESSION } from './progression-config.js';
+import { definitionAuNiveau } from './progression.js';
 
 const PATHS_PER_TICK = 10;
 const FOG_INTERVAL = 0.25;
@@ -27,11 +29,34 @@ function valeurDe(def) {
   return v;
 }
 
+/**
+ * Les niveaux de troupes d'un camp, tels qu'une partie les reçoit : type →
+ * niveau, et seulement ceux au-dessus de 1. Tout le reste (type inconnu, valeur
+ * illisible) est au niveau 1, c'est-à-dire absent.
+ */
+function niveauxLus(donnes) {
+  const niveaux = {};
+  if (!donnes || typeof donnes !== 'object') return niveaux;
+  for (const type of Object.keys(UNIT_TYPES)) {
+    const n = Math.floor(donnes[type]);
+    if (n > 1) niveaux[type] = Math.min(n, PROGRESSION.niveauMax);
+  }
+  return niveaux;
+}
+
 function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
   return {
     index, name, isAI,
     // La civilisation : ce que l'on voit et ce que l'interface nomme (voir CIVILISATIONS).
     civ,
+    // Les niveaux de ses troupes (voir World.defTroupe) : vide, tout est au
+    // niveau 1 et la partie est celle de config.js. `defs` : les définitions
+    // déjà calculées, une par type amélioré.
+    niveaux: {},
+    defs: {},
+    // Les troupes que ce camp ne peut pas former : celles qu'il n'a pas encore
+    // débloquées (voir canTrain). Vide, tout se forme comme avant.
+    interdites: new Set(),
     // Réaffectation automatique des villageois quand un gisement s'épuise.
     // Toujours active pour l'IA ; côté joueur c'est un choix, désactivé par
     // défaut : les ouvriers sont affectés à la main.
@@ -95,6 +120,17 @@ export class World {
       makePlayer(1, 'Adversaire', true, civDe(civs[1])),
     ];
     this.players[1].mods.gatherRate = this.difficulty.gatherBonus;
+    const niveaux = Array.isArray(options.niveaux) ? options.niveaux : [];
+    this.players.forEach((joueur, i) => { joueur.niveaux = niveauxLus(niveaux[i]); });
+    // Les troupes à débloquer : jamais l'ouvrier, sans lui il n'y a pas de partie.
+    const interdites = Array.isArray(options.troupesInterdites) ? options.troupesInterdites : [];
+    this.players.forEach((joueur, i) => {
+      const liste = Array.isArray(interdites[i]) ? interdites[i] : [];
+      joueur.interdites = new Set(liste.filter((type) => UNIT_TYPES[type] && UNIT_TYPES[type].class !== 'villager' && UNIT_TYPES[type].class !== 'animal'));
+    });
+    // La force de l'ordinateur en partie classée suit la ligue : sa récolte
+    // peut être donnée à part de sa difficulté (voir PROGRESSION.echelle).
+    if (options.recolteAdverse > 0) this.players[1].mods.gatherRate = options.recolteAdverse;
     // « La nature » : le camp des animaux sauvages, qui n'est pas un joueur.
     this.gaia = makePlayer(-1, 'Nature', false);
     this.gaia.color = { main: '#8b7d66', light: '#c2b59f', dark: '#5c5142', name: 'Nature' };
@@ -107,6 +143,19 @@ export class World {
     if (options.restoring) return;
     this.setupStartingPositions();
     this.updateFog(true);
+  }
+
+  /**
+   * La définition d'une troupe pour un camp : celle de config.js, portée au
+   * niveau que ce camp a atteint pour elle (js/progression.js). Au niveau 1,
+   * et pour la nature, c'est l'objet de config.js lui-même : rien ne change.
+   */
+  defTroupe(type, playerIndex) {
+    const base = UNIT_TYPES[type];
+    const joueur = this.players[playerIndex];
+    const niveau = joueur ? joueur.niveaux[type] : 1;
+    if (!base || !(niveau > 1)) return base;
+    return joueur.defs[type] || (joueur.defs[type] = definitionAuNiveau(base, type, niveau));
   }
 
   // --- Mise en place --------------------------------------------------------
@@ -1036,6 +1085,7 @@ export class World {
     const player = this.players[building.playerIndex];
     const def = UNIT_TYPES[unitType];
     if (!def || !building.complete) return { ok: false, reason: 'Bâtiment en construction' };
+    if (player.interdites.has(unitType)) return { ok: false, reason: 'Troupe à débloquer' };
     if ((def.age || 0) > player.age) return { ok: false, reason: 'Âge requis : ' + AGES[def.age].name };
     if (building.queue.length >= 8) return { ok: false, reason: 'File d’attente pleine' };
     if (!canAfford(player.resources, def.cost)) return { ok: false, reason: 'Ressources insuffisantes' };

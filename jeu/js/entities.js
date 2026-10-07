@@ -140,7 +140,7 @@ class Entity {
 
 export class Unit extends Entity {
   constructor(world, playerIndex, type, x, y) {
-    super(world, playerIndex, UNIT_TYPES[type], x, y);
+    super(world, playerIndex, world.defTroupe(type, playerIndex), x, y);
     this.kind = 'unit';
     this.radius = this.def.radius;
     this.state = STATE.IDLE;
@@ -1043,7 +1043,7 @@ export class Unit extends Entity {
     this.faceTowards(site.x, site.y);
     this.gatherAnim = 0.4;
     site.activeBuilders++;
-    if (!site.complete) site.addBuildProgress(dt);
+    if (!site.complete) site.addBuildProgress(dt * (this.def.construction || 1));   // (ouvrier de haut niveau : il bâtit plus vite)
     else site.hp = Math.min(site.maxHp, site.hp + site.maxHp * 0.02 * dt); // réparation
   }
 

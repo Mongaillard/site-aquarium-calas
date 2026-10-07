@@ -18,6 +18,9 @@ const ASSETS = [
   './js/pathfinding.js',
   './js/entities.js',
   './js/ai.js',
+  // Importés par game.js (niveaux des troupes) : classement, ligues, coffres.
+  './js/progression.js',
+  './js/progression-config.js',
   './js/render.js',
   // Importés par render.js et sprites.js : sans eux, le graphe de modules
   // échoue hors ligne et le jeu ne démarre pas.
