@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { PROGRESSION as R } from './progression-config.js';
-import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau } from './progression.js';
+import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour } from './progression.js';
 import { lireProgression, ecrireProgression } from './save.js';
 import { UNIT_TYPES, DEFAULT_CIV, nomDe, portraitDe } from './config.js';
 import { iconeSVG } from './icones.js';
@@ -118,7 +118,7 @@ function ecranLigues(profil) {
   }).join('');
   montrer('Les ligues', `
     <p class="subtitle">Une victoire classée rapporte ${R.elo.victoire} points, une défaite en coûte ${-R.elo.defaite}.
-      Chaque ligue relève le niveau jusqu’où tes troupes jouent en partie classée.</p>
+      De ligue en ligue, tes troupes jouent à un niveau plus haut en partie classée.</p>
     <ol class="prog-ligues">${lignes}</ol>`);
   const ici = noeud().querySelector('.prog-ligue.actuelle');
   if (ici && ici.scrollIntoView) ici.scrollIntoView({ block: 'center' });
@@ -135,6 +135,8 @@ function ecranCoffres(profil) {
       <button class="btn primary small" data-act="ouvrir" data-i="${i}">Ouvrir</button>
     </li>`).join('');
   const bois = profil.jour.date === aujourdhui ? profil.jour.coffresBois : 0;
+  // Les compteurs de la semaine ne valent que pour la semaine où ils ont été pris.
+  const semaine = profil.semaine.numero === semaineDuJour(aujourdhui) ? profil.semaine : { jours: 0, coffre: false };
   montrer('Coffres', `
     ${liste ? `<ul class="prog-coffres">${liste}</ul>` : '<p class="prog-vide">Aucun coffre à ouvrir. Une victoire classée donne un coffre de bois.</p>'}
     <h3>Les prochains</h3>
@@ -144,7 +146,7 @@ function ecranCoffres(profil) {
         <span class="prog-barre"><span style="width:${part(profil.pointsDeBataille / s.argent.tousLes)}"></span></span>
         <small>${profil.pointsDeBataille} sur ${s.argent.tousLes} points de bataille · une victoire en vaut ${s.argent.victoire}, une défaite ${s.argent.defaite}</small></li>
       <li><span>Coffre d’or</span>
-        <small>${profil.semaine.coffre ? 'gagné cette semaine' : `en jouant ${s.or.joursJoues} jours dans la semaine · ${profil.semaine.jours} sur ${s.or.joursJoues}`} · et à chaque nouvelle ligue</small></li>
+        <small>${semaine.coffre ? 'gagné cette semaine' : `en jouant ${s.or.joursJoues} jours dans la semaine · ${semaine.jours} sur ${s.or.joursJoues}`} · et à chaque nouvelle ligue</small></li>
     </ul>
     <h3>Contenu et chances de chaque coffre</h3>
     <div class="modal-actions prog-choix-coffres">
@@ -171,7 +173,8 @@ function ecranProbas(type) {
       <li>Il choisit une catégorie selon le tableau.</li>
       <li>Dans cette catégorie, il choisit à chances égales une de tes troupes débloquées qui n’est pas au niveau maximum.</li>
       <li>Il donne le nombre de fragments indiqué, toujours le même.</li>
-      <li>Si tu n’as aucune troupe disponible dans la catégorie, le tirage passe à la catégorie du dessous.</li>
+      <li>Si tu n’as aucune troupe disponible dans la catégorie, le tirage passe à une autre : celle du dessous d’abord, sinon celle du dessus.</li>
+      <li>Si toutes tes troupes sont au niveau maximum, les fragments deviennent des éclats.</li>
     </ol>
     <p class="hint">Aucun coffre ne se vend.</p>`, { retour: 'coffres' });
 }
@@ -184,7 +187,7 @@ function ecranOuverture(resultat, profil) {
         <b>${t.troupe ? nomTroupe(t.troupe) : 'Éclats'}</b>
         <small><span class="prog-categorie" data-categorie="${t.categorie || t.tiree}">${R.nomsDesCategories[t.categorie || t.tiree] || ''}</span>${t.genre === 'garanti' ? ' · garanti' : ''}</small>
       </span>
-      <span class="prog-gain">+${t.fragments || t.eclats} ${t.fragments ? 'fragments' : 'éclats'}</span>
+      <span class="prog-gain">+${t.fragments ? pluriel(t.fragments, 'fragment') : pluriel(t.eclats, 'éclat')}</span>
     </li>`).join('');
   const prets = resultat.evenements.filter((e) => e.type === 'ameliorationPossible');
   montrer(R.coffres[resultat.coffre].nom, `
@@ -266,7 +269,7 @@ function ecranFiche(type, profil, message = '') {
     pied = `
       <div class="prog-cout">
         <span class="prog-barre"><span style="width:${part(v.fragments / v.cout)}"></span></span>
-        <small>${v.fragments} fragments sur ${v.cout}</small>
+        <small>${pluriel(v.fragments, 'fragment')} sur ${v.cout}</small>
       </div>
       <div class="modal-actions">
         <button class="btn primary" data-act="ameliorer" data-arg="${type}" ${v.pret ? '' : 'disabled'}>Passer au niveau ${t.niveau + 1}</button>
@@ -360,7 +363,11 @@ export function installerProgression({ quandLeProfilChange = () => {} } = {}) {
 export function htmlFinDePartie(evenements, profil) {
   if (!evenements || !profil) return '';
   const de = (type) => evenements.filter((e) => e.type === type);
-  if (de('partieAnnulee').length) return '<div class="prog-fin"><p>Partie annulée : elle ne compte pas au classement.</p></div>';
+  const annulee = de('partieAnnulee')[0];
+  if (annulee) {
+    return `<div class="prog-fin"><p>${annulee.raison === 'dejaComptee'
+      ? 'Cette partie a déjà été comptée au classement.' : 'Partie annulée : elle ne compte pas au classement.'}</p></div>`;
+  }
   const lignes = [];
   const elo = de('elo')[0];
   if (elo) {

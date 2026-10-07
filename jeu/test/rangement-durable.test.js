@@ -22,14 +22,18 @@ function profilApres(n) {
   return p;
 }
 /** Un hôte simulé : `claude.use('db')` et `claude.use('user')` sur une base en mémoire. */
-function hoteSimule({ id = 'u_abc', contenu = {}, refuse = null, sansDb = false, lenteur = 0 } = {}) {
+function hoteSimule({ id = 'u_abc', contenu = {}, refuse = null, sansDb = false, lenteur = 0, pendantLaLecture = null } = {}) {
   const ecritures = [];
   let enVol = 0, simultanees = 0;
   const db = {
     doc(chemin) {
       if (chemin.split('/').length % 2) throw new TypeError('chemin impair');
       return {
-        async get() { return { exists: chemin in contenu, data: () => contenu[chemin] }; },
+        async get() {
+          const image = { exists: chemin in contenu, data: () => contenu[chemin] };
+          if (pendantLaLecture) { const f = pendantLaLecture; pendantLaLecture = null; await tour(); f(); }
+          return image;
+        },
         async set(corps) {
           enVol++; simultanees = Math.max(simultanees, enVol);
           if (lenteur) await new Promise((ok) => setTimeout(ok, lenteur));
@@ -106,6 +110,26 @@ console.log('=== Rangement durable du profil ===');
   const rf = await brancher({ hote: ferme.hote, ...lf }); await tour();
   rf.recopier(profilApres(2)); rf.recopier(profilApres(3)); await tour();
   check('un visiteur qui ne peut pas écrire : on s’en tient au navigateur, sans erreur', ferme.ecritures.length === 0 && egal(lf.boite.profil, profilApres(1)));
+}
+
+{
+  // Deux appareils. Celui-ci est resté ouvert à trois opérations ; l'autre a
+  // porté la base à dix. Une écriture d'ici ne doit pas la ramener en arrière.
+  const loin = profilApres(10), ici = profilApres(3);
+  const h = hoteSimule({ contenu: { [CHEMIN]: { profil: ici, operations: ici.operations } } }), l = local(ici);
+  const r = await brancher({ hote: h.hote, ...l });
+  h.contenu[CHEMIN] = { profil: loin, operations: loin.operations };   // l'autre appareil vient d'écrire
+  r.recopier(profilApres(4)); await tour(); await tour();
+  check('un appareil en retard n’écrase pas la base, plus avancée', egal(h.contenu[CHEMIN].profil, loin) && h.ecritures.length === 0);
+  r.recopier(profilApres(12)); await tour(); await tour();
+  check('… une fois en avance, il l’écrit', egal(h.contenu[CHEMIN].profil, profilApres(12)));
+
+  // Ce qui se joue pendant que la base répond n'est pas perdu.
+  const base = profilApres(6), l2 = local(profilApres(1));
+  const h2 = hoteSimule({ contenu: { [CHEMIN]: { profil: base, operations: base.operations } }, pendantLaLecture: () => { l2.boite.profil = profilApres(8); } });
+  const r2 = await brancher({ hote: h2.hote, ...l2 }); await tour(); await tour();
+  check('une partie finie pendant la lecture de la base n’est pas écrasée par elle',
+    r2.adopte === false && egal(l2.boite.profil, profilApres(8)) && egal(h2.contenu[CHEMIN].profil, profilApres(8)));
 }
 
 console.log(`\n${failures === 0 ? 'Tous les tests passent' : failures + ' test(s) en échec'}`);

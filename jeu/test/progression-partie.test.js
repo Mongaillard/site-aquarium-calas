@@ -267,6 +267,8 @@ console.log('\n--- Du profil à la partie, et retour ---');
   check('… et les quatre troupes avancées sont permises aux deux camps', egal(classe.troupesInterdites, [[], []]));
   check('ligue 5, partie libre : le milicien joue à son niveau réel, l’adversaire n’est pas touché',
     libre.niveaux[0].militia === 5 && egal(libre.niveaux[1], {}) && libre.difficulty === undefined && libre.recolteAdverse === undefined);
+  check('profil neuf, partie libre : ce que le joueur n’a pas débloqué, l’ordinateur ne le forme pas non plus',
+    egal(reglagesDePartie(profilNeuf(), 'libre'), { niveaux: [{}, {}], troupesInterdites: [AVANCEES, AVANCEES] }));
   const bronze = reglagesDePartie(regulariser({ ...profilNeuf(), elo: 300 }).profil);
   check('ligue 3 : le joueur a l’Atlante et l’Archer monté, l’ordinateur aussi, pas la Catapulte ni l’Hydre',
     egal(bronze.troupesInterdites, [['catapult', 'hydra'], ['catapult', 'hydra']]) && bronze.difficulty === 'normal');

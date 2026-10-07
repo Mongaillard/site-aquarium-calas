@@ -12,7 +12,7 @@ import {
   appliquerResultat, rechercheFermee, pauseAccordee, finDeSaison,
   aleaDeGraine, ouvrirCoffre, probabilitesDe, verifierProbabilites,
   coutAmelioration, ameliorer, niveauEffectif, definitionAuNiveau,
-  debloquerParAchat, fenetreDeRecherche, apparier,
+  debloquerParAchat, fenetreDeRecherche, apparier, semaineDuJour,
 } from '../js/progression.js';
 import { UNIT_TYPES } from '../js/config.js';
 import { RNG } from '../js/utils.js';
@@ -668,10 +668,16 @@ console.log('\n--- Ouvrir un coffre ---');
   const communesMax = toutDebloque();
   for (const t of COMMUNES) communesMax.troupes[t].niveau = 5;
   const perdu = ouvrirCoffre(avecCoffre(communesMax, 'bois'), 0, aleaEcrit(0.1, 0, 0.9, 0, 0.99, 0));
-  check('toutes les communes au maximum : rien en dessous, les fragments deviennent des éclats',
-    egal(perdu.tirages[0], { genre: 'ordinaire', tiree: 'commune', categorie: null, troupe: null, fragments: 0, eclats: 5 })
-    && perdu.tirages[1].troupe === 'knight' && perdu.tirages[2].troupe === 'triton' && perdu.profil.eclats === 5
-    && perdu.evenements[0].eclats === 5);
+  check('toutes les communes au maximum : rien en dessous, le tirage monte aux rares, avec la quantité des rares — aucun éclat',
+    egal(perdu.tirages[0], { genre: 'ordinaire', tiree: 'commune', categorie: 'rare', troupe: 'knight', fragments: 2, eclats: 0 })
+    && perdu.tirages[1].troupe === 'knight' && perdu.tirages[2].troupe === 'triton' && perdu.profil.eclats === 0
+    && perdu.evenements[0].eclats === 0);
+  const resteLHydre = toutDebloque();
+  for (const t of QUATORZE) if (t !== 'hydra') resteLHydre.troupes[t].niveau = 5;
+  const versLHydre = ouvrirCoffre(avecCoffre(resteLHydre, 'bois'), 0, aleaEcrit(0.1, 0, 0.9, 0, 0.99, 0));
+  check('tout au maximum sauf l’Hydre : chaque tirage finit sur elle, avec la quantité des épiques',
+    versLHydre.tirages.every((t) => t.troupe === 'hydra' && t.categorie === 'epique' && t.fragments === 1 && t.eclats === 0)
+    && versLHydre.profil.troupes.hydra.fragments === 3 && versLHydre.profil.eclats === 0);
   const toutMax = toutDebloque();
   for (const t of QUATORZE) toutMax.troupes[t].niveau = 5;
   const eclats = ouvrirCoffre(avecCoffre(toutMax, 'legendaire'), 0, aleaDeGraine(4));
@@ -1197,9 +1203,10 @@ console.log('\n--- Simulation : 400 parties ---');
   }
   // Le tableau compte sept épiques, dont les trois nouvelles ; le jeu n'en a
   // encore que quatre, qui se partagent les mêmes fragments : elles montent un
-  // peu plus vite, d'où la marge plus large.
-  check('… les épiques dans l’ordre de grandeur du tableau : 2,8 – 3,0 – 3,3 – 3,6 (à un niveau près, pour quatre troupes au lieu de sept)',
-    Object.keys(TABLEAU).every((jalon) => proche(releves[jalon].epique, TABLEAU[jalon][3], 1)),
+  // peu plus vite, d'où la marge plus large. Et une fois communes et rares au
+  // maximum, leurs tirages montent aux épiques : à 400 parties elles y sont.
+  check('… les épiques dans l’ordre de grandeur du tableau : 2,8 – 3,0 – 3,3 (à un niveau près, pour quatre troupes au lieu de sept), puis au maximum',
+    ['60', '120', '240'].every((jalon) => proche(releves[jalon].epique, TABLEAU[jalon][3], 1)) && releves['400'].epique >= TABLEAU['400'][3],
     Object.keys(TABLEAU).map((jalon) => releves[jalon].epique.toFixed(2)).join(' – '));
   check('… la progression ne recule jamais d’un jalon au suivant',
     ['ligue', 'commune', 'rare', 'epique'].every((c) => releves[60][c] <= releves[120][c] && releves[120][c] <= releves[240][c] && releves[240][c] <= releves[400][c]));
@@ -1267,6 +1274,61 @@ console.log('\n--- Abandons à la chaîne, classement contre l’ordinateur ---'
     haut.profil.elo === 810 && parType(haut.evenements, 'elo')[0].classee === true);
   const bas = appliquerResultat(profilA(780), partie('defaite', { contreOrdinateur: 'echelle' }));
   check('… et la défaite aussi', bas.profil.elo === 765);
+}
+
+// ---------------------------------------------------------------------------
+// Failles fermées après relecture
+// ---------------------------------------------------------------------------
+console.log('\n--- Failles fermées après relecture ---');
+{
+  // Raser son propre bâtiment principal finit la partie en une seconde, sans
+  // le drapeau d'abandon : cette défaite-là ne vaut rien non plus.
+  let p = profilNeuf();
+  const evenements = [];
+  for (let i = 0; i < 100; i++) {
+    const r = appliquerResultat(p, partie('defaite', { duree: 0.1, jour: jourDe(i % 7), contreOrdinateur: 'echelle' }));
+    p = r.profil;
+    evenements.push(...r.evenements);
+  }
+  check('cent défaites d’une seconde : ni coffre, ni troupe, ni jour compté',
+    p.coffres.length === 0 && p.pointsDeBataille === 0 && parType(evenements, 'troupeDebloquee').length === 0
+    && p.semaine.jours === 0 && p.abandonsPrecoces === 100 && p.defaites === 100 && p.elo === 0);
+  const vraie = appliquerResultat(profilNeuf(), partie('defaite', { duree: 120 }));
+  check('une défaite de deux minutes, elle, compte : un point de bataille', vraie.profil.pointsDeBataille === 1 && vraie.profil.abandonsPrecoces === 0);
+  const eclair = appliquerResultat(profilNeuf(), partie('victoire', { duree: 30 }));
+  check('une victoire rapide reste une victoire', eclair.profil.elo === 30 && coffresDe(eclair.profil, 'bois') === 1);
+
+  // La même partie ne se compte qu'une fois.
+  const une = appliquerResultat(profilNeuf(), partie('victoire', { id: 'partie-a' }));
+  const deux = appliquerResultat(une.profil, partie('victoire', { id: 'partie-a' }));
+  check('la même partie comptée deux fois : la seconde est ignorée',
+    une.profil.elo === 30 && deux.profil.elo === 30 && deux.profil.victoires === 1 && coffresDe(deux.profil, 'bois') === 1
+    && egal(deux.evenements, [{ type: 'partieAnnulee', raison: 'dejaComptee' }]));
+  const autre = appliquerResultat(deux.profil, partie('victoire', { id: 'partie-b' }));
+  check('… une autre partie compte', autre.profil.elo === 60 && egal(autre.profil.comptees, ['partie-a', 'partie-b']));
+  const sansId = appliquerResultat(appliquerResultat(profilNeuf(), partie('victoire')).profil, partie('victoire'));
+  check('… sans identifiant, chaque résultat compte (essais, anciennes sauvegardes)', sansId.profil.elo === 60 && sansId.profil.comptees.length === 0);
+  const abandonnee = appliquerResultat(profilNeuf(), partie('abandon', { id: 'partie-c', duree: 300 }));
+  check('… une partie abandonnée puis reprise ailleurs et gagnée ne rapporte rien',
+    appliquerResultat(abandonnee.profil, partie('victoire', { id: 'partie-c' })).profil.elo === abandonnee.profil.elo);
+  let plein = profilNeuf();
+  for (let i = 0; i < R.profil.comptees + 15; i++) plein = appliquerResultat(plein, partie('egalite', { id: `p${i}` })).profil;
+  check('… la liste des parties comptées reste bornée, et survit à un aller-retour',
+    plein.comptees.length === R.profil.comptees && plein.comptees[plein.comptees.length - 1] === `p${R.profil.comptees + 14}`
+    && egal(migrerProfil(JSON.parse(JSON.stringify(plein))).comptees, plein.comptees));
+  check('… un identifiant trafiqué n’entre pas au profil',
+    migrerProfil({ ...profilNeuf(), comptees: ['bon', 12, '', 'x'.repeat(65), null] }).comptees.join() === 'bon');
+
+  // L'horloge.
+  let h = appliquerResultat(profilNeuf(), partie('victoire', { jour: '2031-01-01' })).profil;   // horloge en avance
+  h = appliquerResultat(h, partie('victoire', { jour: jourDe(2) })).profil;                       // horloge corrigée
+  check('une horloge en avance puis corrigée ne bloque pas les coffres du jour', h.jour.date === jourDe(2) && h.jour.coffresBois === 1 && coffresDe(h, 'bois') === 2);
+  let v = profilNeuf();
+  for (let i = 0; i < 5; i++) v = appliquerResultat(v, partie('victoire', { jour: jourDe(3) })).profil;
+  v = appliquerResultat(v, partie('victoire', { jour: jourDe(2) })).profil;                       // la veille : un fuseau
+  check('un recul d’un seul jour ne rouvre pas les coffres de bois', v.jour.date === jourDe(3) && coffresDe(v, 'bois') === 5);
+  check('la semaine d’un jour : lundi et dimanche ensemble, le lundi suivant à part',
+    semaineDuJour(jourDe(0)) === semaineDuJour(jourDe(6)) && semaineDuJour(jourDe(7)) === semaineDuJour(jourDe(0)) + 1 && semaineDuJour('hier') === null);
 }
 
 console.log(`\n${failures === 0 ? 'Tous les tests passent' : failures + ' test(s) en échec'}`);

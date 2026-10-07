@@ -123,6 +123,8 @@ class Game {
     // Partie classée (elle compte pour l'Elo, la ligue et les coffres) : dit au
     // lancement, et gardé par la sauvegarde pour une partie reprise.
     this.classee = !!(options.classee || (options.restore && options.restore.classee));
+    // Son identifiant : la même partie, reprise dans un autre onglet, ne se compte qu'une fois.
+    this.partieId = options.partieId || (options.restore && options.restore.partieId) || null;
     // Les images propres à chaque camp (partie neuve ou reprise) ; sans effet pour les Atlantes.
     for (const p of this.world.players) chargerCivilisation(p.civ);
     this.canvas = document.getElementById('game');
@@ -454,10 +456,15 @@ class Game {
           this.fermerMarque('fin');
           // La partie entre au palmarès (victoires, défaites, records) : l'écran
           // de fin dit ce qu'elle y change.
-          this.ui.showGameOver(event.result, inscrireAuPalmares({
-            mode: this.world.modeId, difficulty: this.world.difficultyId,
-            humanIndex: this.world.humanIndex, result: event.result,
-          }), this.classee ? this.compterPartieClassee(event.result) : '');
+          // Une partie classée compte au classement, pas au palmarès : sa
+          // difficulté est celle de la ligue, elle fausserait les records.
+          if (this.classee) this.ui.showGameOver(event.result, null, this.compterPartieClassee(event.result));
+          else {
+            this.ui.showGameOver(event.result, inscrireAuPalmares({
+              mode: this.world.modeId, difficulty: this.world.difficultyId,
+              humanIndex: this.world.humanIndex, result: event.result,
+            }));
+          }
           break;
       }
     }
@@ -470,7 +477,7 @@ class Game {
   compterPartieClassee(result) {
     const r = appliquerResultat(lireProgression(), {
       issue: issueDePartie(result), duree: this.world.time, contreOrdinateur: 'echelle',
-      jour: jourLocal(), instant: Date.now() / 1000,
+      jour: jourLocal(), instant: Date.now() / 1000, id: this.partieId || undefined,
     });
     ecrireProgression(r.profil);
     return htmlFinDePartie(r.evenements, r.profil);
@@ -1244,7 +1251,7 @@ class Game {
   /** Écrit l'instantané de la partie en cours. */
   saveNow() {
     if (this.world.gameOver) { clearSave(); return false; }
-    const ok = saveGame(this.world, { speed: this.speedId, ...(this.classee ? { classee: true } : {}) });
+    const ok = saveGame(this.world, { speed: this.speedId, ...(this.classee ? { classee: true, partieId: this.partieId } : {}) });
     // Navigation privée, quota plein : mieux vaut le dire une fois que laisser
     // croire que la partie sera retrouvée.
     if (!ok && !this.saveWarned) {
@@ -1367,7 +1374,10 @@ const settings = {
  * classée, la force de l'adversaire (js/progression.js, reglagesDePartie).
  */
 function avecProgression(options, classee) {
-  return { ...options, ...reglagesDePartie(lireProgression(), classee ? 'classe' : 'libre'), classee: !!classee };
+  return {
+    ...options, ...reglagesDePartie(lireProgression(), classee ? 'classe' : 'libre'), classee: !!classee,
+    partieId: classee ? `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}` : null,
+  };
 }
 
 /**
@@ -1380,6 +1390,7 @@ function abandonnerPartieClasseeEnCours() {
   if (!save || !save.classee) return;
   const r = appliquerResultat(lireProgression(), {
     issue: 'abandon', duree: save.time || 0, contreOrdinateur: 'echelle', jour: jourLocal(), instant: Date.now() / 1000,
+    id: save.partieId || undefined,
   });
   ecrireProgression(r.profil);
 }

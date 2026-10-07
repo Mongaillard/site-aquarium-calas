@@ -97,6 +97,9 @@ function rangDuJour(jour) {
   return ere * 146097 + jourDeLEre - 719468;
 }
 
+/** Le numéro de la semaine d'un jour « AAAA-MM-JJ », ou null s'il n'est pas lisible : celui que porte `profil.semaine.numero`. */
+export function semaineDuJour(jour) { return rangDuJour(jour) === null ? null : semaineDe(jour); }
+
 /** Le numéro de la semaine d'un jour valide. */
 function semaineDe(jour) {
   const s = R.sources.or;
@@ -116,9 +119,12 @@ function semaineDe(jour) {
  *   promotions      : les ligues dont la récompense a déjà été donnée
  *   parties…        : compteurs bruts ; un abandon compte comme une défaite,
  *                     une partie annulée ne compte pas
- *   abandonsPrecoces: parmi les défaites, les abandons d'avant
- *                     abandon.precoceAvant — ils coûtent leurs points mais ne
- *                     font avancer ni vers une troupe, ni vers un coffre
+ *   abandonsPrecoces: parmi les défaites, celles d'avant abandon.precoceAvant
+ *                     (abandon, ou bâtiment principal rasé de sa propre main) :
+ *                     elles coûtent leurs points mais ne font avancer ni vers
+ *                     une troupe, ni vers un coffre
+ *   comptees        : identifiants des dernières parties comptées — la même
+ *                     partie, reprise ailleurs, ne se compte pas deux fois
  *   pointsDeBataille: ce qui est acquis vers le prochain coffre d'argent
  *   coffres         : ceux qui attendent d'être ouverts, `{ type, origine }`
  *   troupes         : niveau et fragments de chaque troupe du jeu
@@ -142,6 +148,7 @@ export function profilNeuf() {
     plusHauteLigue: 1,
     promotions: [],
     parties: 0, victoires: 0, defaites: 0, egalites: 0, abandonsPrecoces: 0,
+    comptees: [],
     pointsDeBataille: 0,
     coffres: [],
     troupes,
@@ -177,6 +184,9 @@ function lireProfil(o) {
   p.egalites = entier(o.egalites, 0, GRAND, 0);
   p.parties = Math.max(entier(o.parties, 0, GRAND, 0), p.victoires + p.defaites + p.egalites);
   p.abandonsPrecoces = entier(o.abandonsPrecoces, 0, p.defaites, 0);
+  if (Array.isArray(o.comptees)) {
+    p.comptees = o.comptees.filter((id) => typeof id === 'string' && id.length > 0 && id.length <= 64).slice(-R.profil.comptees);
+  }
   p.pointsDeBataille = entier(o.pointsDeBataille, 0, R.sources.argent.tousLes - 1, 0);
   if (Array.isArray(o.coffres)) {
     for (const coffre of o.coffres) {
@@ -354,7 +364,13 @@ export function regulariser(profil) {
 
 /** Les compteurs du jour repartent de zéro quand la date avance — pas quand l'horloge recule. */
 function changerDeJour(p, jour) {
-  if (rangDuJour(jour) === null || jour <= p.jour.date) return;
+  const rang = rangDuJour(jour);
+  if (rang === null || jour === p.jour.date) return;
+  // La date recule d'un jour : un voyage, un fuseau — on garde les compteurs.
+  // Elle recule de davantage : l'horloge était en avance et vient d'être
+  // corrigée ; sans cela plus aucun coffre jusqu'à la fausse date.
+  const avant = rangDuJour(p.jour.date);
+  if (avant !== null && rang < avant && avant - rang <= 1) return;
   p.jour = { date: jour, parties: 0, coffresBois: 0, abandonsPrecoces: 0 };
 }
 
@@ -390,9 +406,11 @@ function compterLeJour(p, evenements) {
  *   pointsDeBataille, rechercheFermee.
  *
  * Les règles :
- *   - un abandon est une défaite ; avant abandon.precoceAvant il coûte ses
- *     points mais ne compte ni comme une partie jouée (troupes gratuites, jour
- *     joué de la semaine) ni vers le coffre d'argent ;
+ *   - un abandon est une défaite ; avant abandon.precoceAvant, une défaite —
+ *     abandon ou non — coûte ses points mais ne compte ni comme une partie
+ *     jouée (troupes gratuites, jour joué de la semaine) ni vers le coffre
+ *     d'argent ;
+ *   - `partie.id`, s'il est donné, empêche de compter deux fois la même partie ;
  *   - l'abandon de l'adversaire est une victoire, sauf avant
  *     abandon.precoceAvant : la partie est alors annulée pour celui qui
  *     reste, ni points ni coffre ;
@@ -413,6 +431,15 @@ export function appliquerResultat(profil, partie) {
   const issueDite = estObjet(partie) ? partie.issue : undefined;
   if (!ISSUES.includes(issueDite)) return { profil: p, evenements, erreur: 'issue' };
 
+  // La même partie, reprise dans un autre onglet ou d'une sauvegarde gardée
+  // en mémoire, ne se compte qu'une fois.
+  const id = typeof partie.id === 'string' && partie.id.length > 0 && partie.id.length <= 64 ? partie.id : null;
+  if (id && p.comptees.includes(id)) {
+    evenements.push({ type: 'partieAnnulee', raison: 'dejaComptee' });
+    return { profil: p, evenements };
+  }
+  if (id) { p.comptees.push(id); p.comptees = p.comptees.slice(-R.profil.comptees); }
+
   const precoce = !(partie.duree >= R.abandon.precoceAvant);   // une durée illisible vaut « précoce »
   const jour = rangDuJour(partie.jour) === null ? '' : partie.jour;
   changerDeJour(p, jour);
@@ -426,10 +453,14 @@ export function appliquerResultat(profil, partie) {
   }
   const abandon = issue === 'abandon';
   if (abandon) issue = 'defaite';
+  // Une défaite d'avant precoceAvant ne vaut rien d'autre que ses points
+  // perdus, abandon ou non : raser son propre bâtiment principal finit la
+  // partie aussi vite qu'abandonner.
+  const sansValeur = issue === 'defaite' && precoce;
 
   p.parties++;
   p[COMPTEURS[issue]]++;
-  if (abandon && precoce) p.abandonsPrecoces++;
+  if (sansValeur) p.abandonsPrecoces++;
 
   // Le score, puis la ligue qui en découle.
   const classee = partie.contreOrdinateur !== true || p.ligue <= R.recherche.ordinateurClasseJusqua;
@@ -451,16 +482,16 @@ export function appliquerResultat(profil, partie) {
     }
   }
   const argent = R.sources.argent;
-  const gagnes = abandon && precoce ? argent.abandonPrecoce : argent[issue];
+  const gagnes = sansValeur ? argent.abandonPrecoce : argent[issue];
   p.pointsDeBataille += gagnes;
   const coffresDArgent = Math.floor(p.pointsDeBataille / argent.tousLes);
   p.pointsDeBataille -= coffresDArgent * argent.tousLes;
   evenements.push({ type: 'pointsDeBataille', gagnes, total: p.pointsDeBataille, pour: argent.tousLes });
   for (let i = 0; i < coffresDArgent; i++) donnerCoffre(p, 'argent', 'bataille', evenements);
-  if (!(abandon && precoce)) compterLeJour(p, evenements);
+  if (!sansValeur) compterLeJour(p, evenements);
 
-  // Trop d'abandons précoces dans la journée : la recherche se ferme.
-  if (abandon && precoce) {
+  // Trop de défaites précoces dans la journée : la recherche se ferme.
+  if (sansValeur) {
     p.jour.abandonsPrecoces++;
     if (p.jour.abandonsPrecoces >= R.abandon.precocesParJour) {
       const secondes = R.abandon.fermetureRecherche;
@@ -572,19 +603,25 @@ function disponibles(p, categorie) {
 /**
  * Un tirage : la catégorie selon la table, puis une troupe à chances égales
  * parmi les disponibles, et le nombre fixe de fragments. Sans troupe
- * disponible, le tirage passe à la catégorie du dessous — quantité comprise ;
- * sous la plus basse, ses fragments deviennent des éclats. Il consomme
- * toujours deux nombres, même quand il n'y a pas le choix : la suite des
- * tirages ne dépend ainsi que de la graine.
+ * disponible, le tirage passe à une autre catégorie, quantité comprise : celle
+ * du dessous d'abord, de proche en proche, puis celles du dessus. Ses
+ * fragments ne deviennent des éclats que si TOUT est au niveau maximum. Il
+ * consomme toujours deux nombres, même quand il n'y a pas le choix : la suite
+ * des tirages ne dépend ainsi que de la graine.
  */
 function tirer(p, regles, groupe, alea) {
   const tiree = categorieTiree(groupe.table, alea());
   const hasard = alea();
-  let rang = R.categories.indexOf(tiree);
+  const depart = R.categories.indexOf(tiree);
+  // L'ordre d'essai : la catégorie tirée, celles du dessous, puis celles du dessus.
+  const ordre = [];
+  for (let r = depart; r >= 0; r--) ordre.push(r);
+  for (let r = depart + 1; r < R.categories.length; r++) ordre.push(r);
+  let rang = -1;
   let choix = [];
-  for (; rang >= 0; rang--) {
-    choix = disponibles(p, R.categories[rang]);
-    if (choix.length > 0) break;
+  for (const r of ordre) {
+    choix = disponibles(p, R.categories[r]);
+    if (choix.length > 0) { rang = r; break; }
   }
   const tirage = { genre: groupe.genre, tiree, categorie: null, troupe: null, fragments: 0, eclats: 0 };
   if (rang < 0) {
@@ -833,7 +870,8 @@ export function debloquerParAchat(profil, type, preuve) {
  *     avancées que cette ligue offre ;
  *   - `libre` : la partie libre contre l'ordinateur. Ses troupes jouent à leur
  *     niveau réel, l'adversaire reste celui que le joueur a réglé.
- * Dans les deux cas, le joueur ne forme pas les troupes qu'il n'a pas débloquées.
+ * Dans les deux cas, le joueur ne forme pas les troupes qu'il n'a pas
+ * débloquées, et l'ordinateur ne lui oppose pas une troupe hors de sa portée.
  */
 export function reglagesDePartie(profil, mode = 'classe') {
   const p = migrerProfil(profil);
@@ -844,7 +882,8 @@ export function reglagesDePartie(profil, mode = 'classe') {
     if (niveau > 1) niveauxDuJoueur[type] = niveau;
   }
   const aDebloquer = AVANCEES.filter((type) => !p.debloquees[type]);
-  if (!classe) return { niveaux: [niveauxDuJoueur, {}], troupesInterdites: [aDebloquer, []] };
+  // (En partie libre, ce que le joueur n'a pas débloqué, l'ordinateur ne le forme pas non plus.)
+  if (!classe) return { niveaux: [niveauxDuJoueur, {}], troupesInterdites: [aDebloquer, aDebloquer] };
   const adversaire = R.echelle[p.ligue - 1];
   const niveauxAdverses = {};
   if (adversaire.niveau > 1) for (const type of EXISTANTES) niveauxAdverses[type] = adversaire.niveau;

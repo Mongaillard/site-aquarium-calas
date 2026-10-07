@@ -41,7 +41,8 @@ export const PROGRESSION = figer({
   //  version  : format du profil, voir migrerProfil
   //  journal  : nombre d'opérations gardées (parties, coffres ouverts, améliorations…) (choix)
   //  saisons  : nombre de saisons passées gardées, pour l'écran du profil (choix)
-  profil: { version: 1, journal: 30, saisons: 24 },
+  //  comptees : nombre d'identifiants de parties gardés, pour ne pas en compter une deux fois (choix)
+  profil: { version: 1, journal: 30, saisons: 24, comptees: 40 },
 
   // --- Classement --------------------------------------------------------------
   // Le gain ne dépend pas de l'écart avec l'adversaire. Une victoire sur trois

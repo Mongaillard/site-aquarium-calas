@@ -10,7 +10,10 @@
 // application — rien ne change : `brancher` rend null et le jeu continue sur
 // le stockage du navigateur.
 //
-// Ce n'est pas un serveur qui fait foi : il ne vérifie rien, il garde.
+// Ce n'est pas un serveur qui fait foi : il ne vérifie rien, il garde. Deux
+// appareils qui jouent en même temps ne se fusionnent pas : le profil le plus
+// avancé (le plus d'opérations) l'emporte, l'autre le retrouve à son prochain
+// lancement.
 // ---------------------------------------------------------------------------
 
 import { migrerProfil } from './progression.js';
@@ -50,7 +53,12 @@ export async function brancher({ hote, lire, ecrire }) {
     if (enCours) { enAttente = profil; return; }
     enCours = true;
     try {
-      await doc.set({ profil: migrerProfil(profil), operations: migrerProfil(profil).operations });
+      // Un autre appareil a pu avancer entre-temps : on relit avant d'écrire,
+      // et on ne remplace jamais un profil plus avancé par un moins avancé.
+      const range = migrerProfil(profil);
+      const image = await doc.get();
+      const dejaLa = image && image.exists ? migrerProfil((image.data() || {}).profil).operations : -1;
+      if (range.operations > dejaLa) await doc.set({ profil: range, operations: range.operations });
     } catch (e) {
       // Ce visiteur ne peut pas écrire ici, ou l'accès est retiré : on s'en tient au navigateur.
       if (e && (e.code === 'invalid_argument' || e.code === 'revoked' || e.code === 'not_granted')) refuse = true;
@@ -59,12 +67,13 @@ export async function brancher({ hote, lire, ecrire }) {
     if (enAttente) { const suivant = enAttente; enAttente = null; envoyer(suivant); }
   }
 
-  const local = migrerProfil(lire());
   let durable = null;
   try {
     const image = await doc.get();
     if (image && image.exists) durable = (image.data() || {}).profil || null;
   } catch { durable = null; }
+  // Lu APRÈS la réponse de la base : ce qui s'est joué pendant l'attente compte.
+  const local = migrerProfil(lire());
 
   let adopte = false;
   if (durable && migrerProfil(durable).operations > local.operations) {
