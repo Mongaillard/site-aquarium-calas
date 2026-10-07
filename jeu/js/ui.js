@@ -700,6 +700,8 @@ export class UI {
           const u = UNIT_TYPES[unitType];
           buttons.push({
             icon: u.icon, troupe: unitType, label: nomDe(unitType, this.game.civ), cost: costLabel(u.cost), time: u.trainTime,
+            // Une troupe pas encore débloquée : montrée, sous cadenas (voir js/progression.js).
+            verrou: this.world.players[this.world.humanIndex].interdites.has(unitType),
             check: () => this.world.canTrain(b, unitType),
             action: () => this.game.trainUnit(b, unitType),
           });
@@ -765,11 +767,13 @@ export class UI {
       if (b.highlight) classes.push('highlight');
       if (b.compact) classes.push('compact');
       if (b.danger) classes.push('danger');
+      if (b.verrou) classes.push('verrou');
       const title = b.title ? ` title="${b.title}"` : '';
       return `<button class="${classes.join(' ')}" data-cmd="${i}"${title} ${state.ok ? '' : `data-reason="${state.reason}"`}>
         <span class="cmd-icon">${b.troupe ? this.visage(b.troupe, this.game.civ, b.icon, 22) : iconeSVG(b.icon, 22)}</span>
         <span class="cmd-label">${b.label}</span>
         ${b.cost ? `<span class="cmd-cost">${b.cost}</span>` : ''}
+        ${b.verrou ? `<span class="cmd-verrou">${iconeSVG('cadenas', 13)}</span>` : ''}
       </button>`;
     }).join('');
 
@@ -1137,7 +1141,7 @@ export class UI {
     return `<div class="fin-palmares">${lignes.join('')}</div>`;
   }
 
-  showGameOver(result, palmares = null) {
+  showGameOver(result, palmares = null, progression = '') {
     const player = this.world.players[this.world.humanIndex];
     const enemy = this.world.players[1 - this.world.humanIndex];
     const egalite = result.winner === -1;
@@ -1173,6 +1177,7 @@ export class UI {
       ${illustration}
       <h2>${title}</h2>
       <p class="subtitle">${this.raisonDeFin(result)}</p>
+      ${progression || ''}
       ${this.textePalmares(palmares, exact)}
       ${summary}
       <div class="modal-actions">

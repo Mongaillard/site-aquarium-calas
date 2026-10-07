@@ -11,7 +11,10 @@ import { World } from './game.js';
 import {
   saveGame, loadSave, clearSave, restoreWorld,
   lirePalmares, lignePalmares, inscrireAuPalmares, resumePalmares,
+  lireProgression, ecrireProgression,
 } from './save.js';
+import { appliquerResultat, reglagesDePartie, issueDePartie } from './progression.js';
+import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal } from './progression-ecrans.js';
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
@@ -116,6 +119,9 @@ class Game {
     // Reprise d'une partie interrompue : le monde vient de la sauvegarde.
     const repris = options.restore ? restoreWorld(options.restore) : null;
     this.world = repris || new World(options);
+    // Partie classée (elle compte pour l'Elo, la ligue et les coffres) : dit au
+    // lancement, et gardé par la sauvegarde pour une partie reprise.
+    this.classee = !!(options.classee || (options.restore && options.restore.classee));
     // Les images propres à chaque camp (partie neuve ou reprise) ; sans effet pour les Atlantes.
     for (const p of this.world.players) chargerCivilisation(p.civ);
     this.canvas = document.getElementById('game');
@@ -450,10 +456,23 @@ class Game {
           this.ui.showGameOver(event.result, inscrireAuPalmares({
             mode: this.world.modeId, difficulty: this.world.difficultyId,
             humanIndex: this.world.humanIndex, result: event.result,
-          }));
+          }), this.classee ? this.compterPartieClassee(event.result) : '');
           break;
       }
     }
+  }
+
+  /**
+   * Une partie classée finie entre au classement : le score, la ligue, les
+   * coffres, les troupes (js/progression.js). Rend le bloc de l'écran de fin.
+   */
+  compterPartieClassee(result) {
+    const r = appliquerResultat(lireProgression(), {
+      issue: issueDePartie(result), duree: this.world.time, contreOrdinateur: 'echelle',
+      jour: jourLocal(), instant: Date.now() / 1000,
+    });
+    ecrireProgression(r.profil);
+    return htmlFinDePartie(r.evenements, r.profil);
   }
 
   pruneSelection() {
@@ -1224,7 +1243,7 @@ class Game {
   /** Écrit l'instantané de la partie en cours. */
   saveNow() {
     if (this.world.gameOver) { clearSave(); return false; }
-    const ok = saveGame(this.world, { speed: this.speedId });
+    const ok = saveGame(this.world, { speed: this.speedId, ...(this.classee ? { classee: true } : {}) });
     // Navigation privée, quota plein : mieux vaut le dire une fois que laisser
     // croire que la partie sera retrouvée.
     if (!ok && !this.saveWarned) {
@@ -1293,12 +1312,12 @@ class Game {
     // Après une reprise, `options` ne porte que la sauvegarde : on relit le
     // format, la carte et les civilisations sur la partie qui s'achève.
     const w = this.world;
-    startGame({
+    startGame(avecProgression({
       ...this.options, restore: null,
       mode: w.modeId, difficulty: w.difficultyId, mapSize: w.mapSizeId,
       civs: w.players.map((p) => p.civ), speed: this.speedId,
       seed: Math.floor(Math.random() * 1e9),
-    });
+    }, this.classee));
   }
 
   quitToMenu() {
@@ -1336,7 +1355,48 @@ const settings = {
   speed: loadSpeed(),
   civ: civDe(stored.civ),
   civAdverse: civDe(stored.civAdverse),
+  // « classe » : la partie compte pour l'Elo, la ligue et les coffres, et
+  // l'adversaire a la force de la ligue ; « libre » : le joueur le règle.
+  type: stored.type === 'libre' ? 'libre' : 'classe',
 };
+
+/**
+ * Ce que la progression du joueur ajoute aux réglages d'une partie neuve :
+ * les niveaux de ses troupes, celles qu'il n'a pas débloquées et, en partie
+ * classée, la force de l'adversaire (js/progression.js, reglagesDePartie).
+ */
+function avecProgression(options, classee) {
+  return { ...options, ...reglagesDePartie(lireProgression(), classee ? 'classe' : 'libre'), classee: !!classee };
+}
+
+/**
+ * Une partie classée laissée en plan — une autre est lancée, ou la sauvegarde
+ * est jetée — compte comme un abandon : sans cela il suffirait de quitter une
+ * partie mal engagée pour ne jamais perdre de points.
+ */
+function abandonnerPartieClasseeEnCours() {
+  const save = loadSave();
+  if (!save || !save.classee) return;
+  const r = appliquerResultat(lireProgression(), {
+    issue: 'abandon', duree: save.time || 0, contreOrdinateur: 'echelle', jour: jourLocal(), instant: Date.now() / 1000,
+  });
+  ecrireProgression(r.profil);
+}
+
+/** Le bandeau de ligue de l'accueil : la ligue, le score, les coffres à ouvrir, les troupes à améliorer. */
+function refreshLigue() {
+  const box = document.getElementById('ligue-box');
+  if (box) box.innerHTML = htmlBandeau(lireProgression());
+}
+
+/** En partie classée, la difficulté ne se choisit pas : l'adversaire suit la ligue. */
+function refreshType() {
+  const classee = settings.type === 'classe';
+  const note = document.getElementById('difficulte-classee');
+  if (note) note.classList.toggle('hidden', !classee);
+  const boite = document.getElementById('difficulty-options');
+  if (boite) boite.classList.toggle('inactives', classee);
+}
 
 /**
  * La dernière partie a-t-elle été coupée ? (Le témoin de coupure, js/save.js.)
@@ -1382,7 +1442,12 @@ function capitaleDe(civ) {
 /** Les réglages repliés, résumés sur leur ligne. */
 function refreshReglages() {
   const node = document.getElementById('reglages-resume');
-  if (node) node.textContent = resumeReglages(settings);
+  if (!node) return;
+  const resume = resumeReglages(settings);
+  // En partie classée, la difficulté choisie ne joue pas : elle sort du résumé.
+  node.textContent = settings.type === 'classe'
+    ? `Classée · ${resume.replace(` · ${DIFFICULTIES[settings.difficulty].name}`, '')}`
+    : `Libre · ${resume}`;
 }
 
 function showStartScreen() {
@@ -1394,6 +1459,9 @@ function showStartScreen() {
   afficherIncident();
   refreshPalmares();
   refreshReglages();
+  reglerPeuple(settings.civ);
+  refreshLigue();
+  refreshType();
 }
 
 /**
@@ -1403,7 +1471,8 @@ function showStartScreen() {
 function refreshPalmares() {
   const node = document.getElementById('palmares');
   if (!node) return;
-  const resume = resumePalmares(lignePalmares(lirePalmares(), settings.mode, settings.difficulty));
+  // (En partie classée, c'est le bandeau de ligue qui dit où l'on en est.)
+  const resume = settings.type === 'classe' ? '' : resumePalmares(lignePalmares(lirePalmares(), settings.mode, settings.difficulty));
   node.textContent = resume
     ? `${GAME_MODES[settings.mode].name}, ${DIFFICULTIES[settings.difficulty].name} : ${resume}`
     : '';
@@ -1440,15 +1509,18 @@ function refreshResumeCard() {
     <button id="btn-resume" class="btn primary large">Reprendre la partie</button>
     <p class="resume-info">${civs[moi]} contre ${civs[1 - moi]} · ${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
       · ${DIFFICULTIES[save.difficulty] ? DIFFICULTIES[save.difficulty].name : ''}</p>
+    ${save.classee ? '<p class="resume-info">Partie classée : la quitter compte comme une défaite.</p>' : ''}
     <button id="btn-drop-save" class="btn ghost small">Abandonner cette partie</button>`;
   document.getElementById('btn-resume').addEventListener('click', () => {
     audio.resume(); audio.play('click');
     startGame({ restore: save, speed: settings.speed });
   });
   document.getElementById('btn-drop-save').addEventListener('click', () => {
+    abandonnerPartieClasseeEnCours();
     clearSave();
     audio.play('click');
     refreshResumeCard();
+    refreshLigue();
   });
 }
 
@@ -1465,6 +1537,7 @@ function startGame(options) {
   try { marquerIncidentsLus(); } catch { /* stockage indisponible */ }
   currentGame = new Game(options);
   habiller(currentGame.civ);
+  reglerPeuple(currentGame.civ);
   window.__jeu = currentGame;   // pratique pour déboguer depuis la console
 }
 
@@ -1500,6 +1573,28 @@ function setupStartScreen() {
   const activate = (box, btn) => box.querySelectorAll('.option').forEach(
     (b) => b.classList.toggle('active', b === btn));
 
+  // Classée ou libre.
+  const typeBox = document.getElementById('type-options');
+  typeBox.innerHTML = [
+    { id: 'classe', name: 'Classée', desc: 'Elo, ligues et coffres' },
+    { id: 'libre', name: 'Libre', desc: 'Tu règles l’adversaire' },
+  ].map((t) => `
+    <button class="option compact ${t.id === settings.type ? 'active' : ''}" data-type="${t.id}">
+      <span class="option-name">${t.name}</span>
+      <span class="option-desc">${t.desc}</span>
+    </button>`).join('');
+  typeBox.querySelectorAll('[data-type]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      settings.type = btn.dataset.type;
+      storeSetup(settings);
+      activate(typeBox, btn);
+      refreshType();
+      refreshPalmares();
+      refreshReglages();
+      audio.resume(); audio.play('click');
+    });
+  });
+
   // Civilisations : la sienne, puis celle de l'adversaire (mêmes règles, autres images, autres noms).
   // La sienne se choisit sur l'image de sa capitale, et l'accueil en prend aussitôt les couleurs.
   const choixCiv = (idBoite, cle, illustre) => {
@@ -1516,6 +1611,7 @@ function setupStartScreen() {
         storeSetup(settings);
         activate(box, btn);
         if (illustre) habiller(settings[cle]);
+        if (illustre) reglerPeuple(settings[cle]);   // les écrans des troupes en prennent les noms et les portraits
         refreshReglages();
         chargerCivilisation(settings[cle]);   // ses images arrivent pendant que le joueur finit de choisir
         audio.resume(); audio.play('click');
@@ -1574,12 +1670,13 @@ function setupStartScreen() {
     // Pas de boîte de confirmation : le bouton s'intitule « Nouvelle partie »
     // quand une partie dort, et la carte de reprise est juste au-dessus. Une
     // fenêtre modale native peut d'ailleurs être bloquée selon l'hébergement.
+    abandonnerPartieClasseeEnCours();
     clearSave();
-    startGame({
+    startGame(avecProgression({
       mode: settings.mode, difficulty: settings.difficulty, mapSize: settings.mapSize,
       civs: [settings.civ, settings.civAdverse],   // indice = numéro du joueur
       speed: settings.speed, seed: Math.floor(Math.random() * 1e9),
-    });
+    }, settings.type === 'classe'));
   });
   document.getElementById('btn-howto').addEventListener('click', () => {
     const aide = document.getElementById('howto');
@@ -1589,6 +1686,7 @@ function setupStartScreen() {
   });
 }
 
+installerProgression({ quandLeProfilChange: refreshLigue });
 setupStartScreen();
 showStartScreen();
 // Les illustrations se chargent — et les unités en 3D se cuisent — pendant
