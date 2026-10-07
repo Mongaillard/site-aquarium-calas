@@ -149,7 +149,7 @@ console.log('--- Les réglages ---');
     egal(depart('pavoisier', ['cost', 'hp', 'attack', 'speed', 'pierceArmor']), { cost: { food: 60, gold: 40 }, hp: 70, attack: 4, speed: 0.85, pierceArmor: 6 })
     && egal(depart('frondeur', ['cost', 'hp', 'attack', 'range', 'speed', 'bonus', 'bonusType']),
       { cost: { food: 30, wood: 30 }, hp: 30, attack: 3, range: 4, speed: 1.05, bonus: { archer: 6 }, bonusType: { horseArcher: 6 } })
-    && egal(depart('sapeur', ['cost', 'hp', 'attack', 'speed', 'bonus']), { cost: { food: 50, gold: 40 }, hp: 35, attack: 3, speed: 1.3, bonus: { building: 25, siege: 8 } })
+    && egal(depart('sapeur', ['cost', 'hp', 'attack', 'speed', 'bonus']), { cost: { food: 50, gold: 40 }, hp: 35, attack: 3, speed: 1.3, bonus: { building: 10, siege: 8 } })
     && NOUVELLES.every((t) => R.troupes[t].depart === undefined && R.troupes[t].nom === undefined));
   check('… elles seules sont « en plus » : l’ordinateur ne les forme que si la partie les lui donne',
     egal(Object.keys(R.troupes).filter((t) => R.troupes[t].enPlus), NOUVELLES) && NOUVELLES.every((t) => R.troupes[t].enPlus === true));
@@ -1014,7 +1014,7 @@ console.log('\n--- Définition au niveau ---');
     cinq('frondeur').hp === 36 && proche(cinq('frondeur').attack, 3.6)
     && [1, 2, 3, 4, 5].every((n) => au('frondeur', n).range === 4 && egal(au('frondeur', n).bonus, { archer: 6 }) && egal(au('frondeur', n).bonusType, { horseArcher: 6 })));
   check('Sapeur : 35 PV et 3 dégâts → 42 et 3,6 ; ses bonus contre les bâtiments et les engins ne bougent pas',
-    cinq('sapeur').hp === 42 && proche(cinq('sapeur').attack, 3.6) && [1, 2, 3, 4, 5].every((n) => egal(au('sapeur', n).bonus, { building: 25, siege: 8 })));
+    cinq('sapeur').hp === 42 && proche(cinq('sapeur').attack, 3.6) && [1, 2, 3, 4, 5].every((n) => egal(au('sapeur', n).bonus, { building: 10, siege: 8 })));
 
   check('règle générale : +5 % de dégâts par niveau',
     egal([1, 2, 3, 4, 5].map((n) => au('militia', n).attack), [5, 5.25, 5.5, 5.75, 6])
