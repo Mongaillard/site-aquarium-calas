@@ -16,9 +16,13 @@
  * case, et `pixel` coupe le lissage : agrandir du pixel art en l'interpolant le
  * transforme en bouillie.
  */
+// Fenêtre ouverte à 190° : les tuiles atlantes sont bleu pétrole (195 à 205°),
+// à cheval sur l'ancienne borne de 200° — chez l'adversaire, un toit sortait
+// moitié rouge, moitié bleu. Les cristaux et l'eau (180 à 187°) restent
+// turquoise ; les bleus solariens (226°) étaient déjà dedans.
 const batiment = (src, cellW, cellH, largeurMonde) => ({
   src, cellW, cellH, cases: 1, images: 1, largeurMonde, sol: 0.93, natif: 'bleu',
-  recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+  recolorage: { teinte: [190, 255], vers: 0, satMin: 0.32 },
 });
 
 import { TILE, UNIT_TYPES, nomDe } from './config.js';
