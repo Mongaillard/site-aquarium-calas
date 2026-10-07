@@ -35,6 +35,9 @@ const ANNEAU_ENCRE = 'rgba(8, 14, 6, 0.42)';   // le filet sombre qui le cerne (
 // profil y ajoute (un cheval, un engin ou l'Hydre sont longs ; un homme, non).
 const EMPREINTE_A_PIED = [1.05, 0];
 const EMPREINTES = { cavalry: [1.05, 0.5], siege: [1.4, 0.35], monster: [1.5, 0.45], animal: [1, 0.45] };
+// Ce qu'une vue (0 à 7, voir vueDe) montre du profil : rien de face ou de dos, tout de côté.
+const PROFIL_VUE = [0, Math.SQRT1_2, 1, Math.SQRT1_2, 0, Math.SQRT1_2, 1, Math.SQRT1_2];
+const EMPREINTE_VITESSE = 30;      // px monde par seconde : l'empreinte rejoint sa largeur sans sauter
 
 // Variantes volontairement proches : un écart trop marqué transforme la
 // prairie en damier et fatigue l'œil sur un petit écran.
@@ -1103,12 +1106,16 @@ export class Renderer {
       else if (e.kind === 'vegetation') this.dessinerVegetation(e.res, e.sprite);
       else if (e.kind === 'decor') this.dessinerPiece(e.d, e.sprite);
       else {
-        // Les ombres de toute une suite de troupes d'abord : dans une mêlée,
-        // aucune ne tombe sur les jambes de la voisine. Elles restent à leur
-        // place dans l'ordre du peintre : posées sur le parvis d'un bâtiment
-        // déjà dessiné, cachées par l'arbre qui vient après.
+        // Ce qui est au sol d'abord, pour toute une suite de troupes : leurs
+        // ombres, puis leurs anneaux de camp. Dans une mêlée, ni ombre ni
+        // anneau ne passe sur les jambes de la voisine. Ils restent à leur
+        // place dans l'ordre du peintre : posés sur le parvis d'un bâtiment
+        // déjà dessiné, cachés par l'arbre qui vient après.
         if (i === 0 || list[i - 1].kind !== 'unit') {
-          for (let j = i; j < list.length && list[j].kind === 'unit'; j++) this.dessinerOmbre(list[j]);
+          let fin = i;
+          while (fin < list.length && list[fin].kind === 'unit') this.dessinerOmbre(list[fin++]);
+          // (Une troupe dessinée au code n'a pas d'anneau : son corps est de la couleur du camp.)
+          for (let j = i; j < fin; j++) if (spriteDe(list[j].type, list[j].player.civ)) this.dessinerSocle(list[j]);
         }
         this.drawUnit(e);
       }
@@ -1565,7 +1572,6 @@ export class Renderer {
       ({ sx, sy } = cadreSource(sprite.def, k, image));
       miroir = !!(sprite.def.miroirs && sprite.def.miroirs[k]);   // l'ouest est l'est retourné
     }
-    this.dessinerSocle(u, x, y);
 
     const h = hauteurMonde;
     const w = (cellW / cellH) * h;
@@ -1611,16 +1617,27 @@ export class Renderer {
   /**
    * Demi-largeur de l'empreinte au sol d'une unité, en pixels monde : son
    * rayon, élargi pour ce qui est long (cavalerie, engins, Hydre, animaux)
-   * d'autant plus qu'on le voit de profil. Le cap est celui que l'on AFFICHE
-   * (lissé, voir vueDe) quand la troupe en a un : l'empreinte ne tremble pas
-   * avec le cap de la simulation.
+   * d'autant plus qu'on le voit de profil. Le profil est celui de la VUE
+   * affichée quand la troupe en a une (voir vueDe : huit crans, quittés
+   * seulement une fois la limite franchie), pas celui du cap lissé — il passe
+   * par zéro pendant un demi-tour, et l'anneau d'un cavalier se pinçait puis
+   * se rouvrait de cinq pixels. L'empreinte rejoint ensuite sa largeur à
+   * vitesse bornée : un changement de vue ne la fait pas sauter. (Ombre,
+   * anneau et cercle de sélection la demandent dans la même image : elle
+   * n'avance qu'avec l'horloge.)
    */
   empreinte(u) {
     const e = EMPREINTES[u.def.class] || EMPREINTE_A_PIED;
     if (!e[1]) return u.radius * e[0];
     const v = u._vue3d;
-    const profil = v ? Math.abs(v.x) / (Math.hypot(v.x, v.y) || 1) : Math.abs(Math.cos(u.facing));
-    return u.radius * (e[0] + e[1] * profil);
+    const cible = u.radius * (e[0] + e[1] * (v ? PROFIL_VUE[v.k] : Math.abs(Math.cos(u.facing))));
+    const s = u._empreinte, t = this.horloge;
+    // Première image, ou troupe restée hors champ : sa largeur du moment.
+    if (!s || !(t - s.t >= 0 && t - s.t < 0.25)) { u._empreinte = { r: cible, t }; return cible; }
+    const pas = (t - s.t) * EMPREINTE_VITESSE;
+    s.r += clamp(cible - s.r, -pas, pas);
+    s.t = t;
+    return s.r;
   }
 
   /**
@@ -1664,14 +1681,16 @@ export class Renderer {
    * l'unité, à peine rempli pour que l'ombre se voie dedans. De loin, une
    * armure reste une tache sombre, et l'appartenance doit se lire d'un coup
    * d'œil : c'est la solution d'AoE, et elle vaut mieux qu'un personnage
-   * repeint en entier. Un animal sauvage n'a pas de camp : pas d'anneau.
+   * repeint en entier. L'anneau est posé au sol, aux pieds — il ne suit pas
+   * le balancement du corps — et passe avant tous les corps de la suite (voir
+   * drawEntities). Un animal sauvage n'a pas de camp : pas d'anneau.
    */
-  dessinerSocle(u, x, y) {
+  dessinerSocle(u) {
     if (u.isAnimal && u.playerIndex < 0) return;
     const ctx = this.ctx;
-    const rx = this.empreinte(u), sol = y + u.radius * 0.45;
+    const rx = this.empreinte(u), sol = u.y + u.radius * 0.45;
     ctx.beginPath();
-    ctx.ellipse(x, sol - 1, rx, rx * APLAT, 0, 0, Math.PI * 2);
+    ctx.ellipse(u.x, sol - 1, rx, rx * APLAT, 0, 0, Math.PI * 2);
     ctx.fillStyle = u.player.color.main;
     ctx.globalAlpha = ANNEAU_VOILE;
     ctx.fill();
@@ -1746,7 +1765,6 @@ export class Renderer {
         image = parHorloge(clip);
       }
     }
-    this.dessinerSocle(u, x, y);
     this.poserImage3D(clip, u.playerIndex, this.vueDe(u, angle), image, x, y + u.radius * 0.45);
   }
 
