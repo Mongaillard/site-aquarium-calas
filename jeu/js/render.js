@@ -74,6 +74,31 @@ const TRONCONS_MAX = 40;           // tronçons gardés en cache (≈ 1,1 Mo cha
 // deux images posées bord à bord laissent une couture anticrénelée ; en les
 // faisant se chevaucher sur les MÊMES texels, il n'y a plus de bord à voir.
 const RECOUVREMENT = 8;
+// Le brouillard de guerre : une brume bleu nuit, de la famille de l'interface,
+// au bord fondu. Le masque compte FOG_K points par case, et chaque point pèse
+// les cases voisines comme le feraient deux moyennes glissantes de rayon
+// FOG_RAYON (en points) : le bord s'étale sur une case et demie environ, et
+// l'escalier des cases disparaît. (Quatre points par case et un rayon de 3
+// donnent la même image à trois niveaux sur 255 près, pour presque le double
+// de calcul et de mémoire.)
+// Ce qui n'a jamais été vu est opaque : à 94 %, les lacs de toute la carte se
+// devinaient, mini-carte comprise. Ce qui a été vu, hors de vue, garde un voile
+// léger. Hors des bords de la carte, la même teinte : un seul vide, pas deux.
+const FOG_K = 3;
+const FOG_RAYON = 2;
+// Le masque déborde de la carte de FOG_MARGE cases, où se prolonge la case du
+// bord : un arbre du premier rang, haut de trois cases, reste voilé jusqu'à la
+// cime, et le bord de la carte ne laisse pas filtrer un liseré de sol.
+const FOG_MARGE = 3;
+const FOG_BLOC = 8;                // cases de côté d'un bloc de masque repeint d'un coup
+const FOG_BLOCS_PAR_IMAGE = 64;    // blocs repeints au plus dans une image ; le reste à la suivante
+export const BROUILLARD = {
+  teinte: [12, 24, 34],
+  inexplore: 255,                  // opacité, sur 255
+  explore: 107,                    // 42 %
+};
+const FOND_HORS_CARTE = `rgb(${BROUILLARD.teinte.join(',')})`;
+const NIVEAU_INCONNU = 1;          // case pas encore lue : aucune opacité ne vaut 1
 
 const BUILDING_SKINS = {
   towncenter: { wall: '#d9c9a3', roof: '#a8452f', accent: '#8b6f47' },
@@ -215,6 +240,191 @@ function etendre(e, u, v) {
   if (v > e.v1) e.v1 = v;
 }
 
+/**
+ * Deux moyennes glissantes de rayon `rayon` sur un masque à `k` points par case
+ * reviennent à peser, pour chaque point d'une case, les cases voisines par un
+ * triangle : `poids[p * n + j]` est le poids de la case j − m pour le point p
+ * (0 à k − 1). La somme d'une ligne vaut `somme`.
+ */
+export function poidsBrouillard(k = FOG_K, rayon = FOG_RAYON) {
+  const portee = 2 * rayon;               // demi-largeur du triangle, en points
+  const m = Math.ceil(portee / k);        // cases voisines pesées, de chaque côté
+  const n = 2 * m + 1;
+  const poids = new Uint16Array(k * n);
+  for (let p = 0; p < k; p++) {
+    for (let d = -portee; d <= portee; d++) poids[p * n + Math.floor((p + d) / k) + m] += portee + 1 - Math.abs(d);
+  }
+  return { poids, m, n, somme: (portee + 1) * (portee + 1) };
+}
+
+/**
+ * Le masque doux du brouillard d'une carte de w × h cases, débordant de
+ * `marge` cases de chaque côté : l'opacité retenue pour chaque case de la
+ * carte (`niveaux`), les cases à montrer (`connu` : explorées, ou voisines
+ * d'une case explorée — le bord fondu laisse deviner une case de plus que
+ * l'exploré, et un arbre qui n'y serait pas dessiné y ferait un trou net), les
+ * blocs à repeindre et de quoi les repeindre sans rien allouer.
+ * L'image du masque fait W × H points ; la carte y commence au point `bord`.
+ */
+export function creerMasqueBrouillard(w, h, k = FOG_K, rayon = FOG_RAYON, marge = FOG_MARGE) {
+  const lw = w + 2 * marge, lh = h + 2 * marge;     // cases du masque, marge comprise
+  const bw = Math.ceil(lw / FOG_BLOC), bh = Math.ceil(lh / FOG_BLOC);
+  const { poids, m, n, somme } = poidsBrouillard(k, rayon);
+  return {
+    w, h, k, marge, lw, lh, W: lw * k, H: lh * k, bord: marge * k,
+    poids, m, n, norme: 1 / (somme * somme),
+    niveaux: new Uint8Array(w * h).fill(NIVEAU_INCONNU),
+    connu: new Uint8Array(w * h),
+    bw, bh, sales: new Uint8Array(bw * bh), aRepeindre: 0,
+    voisines: new Uint8Array(n),
+    lignes: new Uint16Array((FOG_BLOC + 2 * m) * FOG_BLOC * k),
+    cumul: new Int32Array(FOG_BLOC * k),
+  };
+}
+
+/** Marque comme à montrer la case (tx, ty) et ses huit voisines. */
+function montrerAutour(masque, tx, ty) {
+  const { w, h, connu } = masque;
+  for (let y = Math.max(0, ty - 1); y <= Math.min(h - 1, ty + 1); y++) {
+    for (let x = Math.max(0, tx - 1); x <= Math.min(w - 1, tx + 1); x++) connu[y * w + x] = 1;
+  }
+}
+
+/**
+ * Relève le brouillard du monde : l'opacité de chaque case, les cases à
+ * montrer, et les blocs à repeindre — ceux que touche une case qui a changé,
+ * à m cases près (et jusqu'au bout de la marge pour une case du bord). Le
+ * monde relève son brouillard quatre fois par seconde, qu'il ait bougé ou
+ * non : ici, une case inchangée ne coûte qu'une comparaison. Renvoie vrai si
+ * quelque chose a changé.
+ */
+export function releverBrouillard(masque, fog) {
+  const { w, h, m, marge, lw, lh, niveaux, sales, bw } = masque;
+  const visible = fog.visible, explored = fog.explored;
+  let change = false, oubli = false;
+  for (let ty = 0, i = 0; ty < h; ty++) {
+    for (let tx = 0; tx < w; tx++, i++) {
+      const v = visible[i] ? 0 : explored[i] ? BROUILLARD.explore : BROUILLARD.inexplore;
+      const avant = niveaux[i];
+      if (v === avant) continue;
+      niveaux[i] = v;
+      change = true;
+      if (v === BROUILLARD.inexplore) oubli = oubli || avant !== NIVEAU_INCONNU;
+      else if (avant === BROUILLARD.inexplore || avant === NIVEAU_INCONNU) montrerAutour(masque, tx, ty);
+      // En cases du masque : la case, m voisines de chaque côté, la marge au bord.
+      const x0 = tx === 0 ? 0 : tx + marge - m, x1 = tx === w - 1 ? lw - 1 : tx + marge + m;
+      const y0 = ty === 0 ? 0 : ty + marge - m, y1 = ty === h - 1 ? lh - 1 : ty + marge + m;
+      const bx0 = Math.floor(Math.max(0, x0) / FOG_BLOC), bx1 = Math.floor(Math.min(lw - 1, x1) / FOG_BLOC);
+      const by1 = Math.floor(Math.min(lh - 1, y1) / FOG_BLOC);
+      for (let by = Math.floor(Math.max(0, y0) / FOG_BLOC); by <= by1; by++) {
+        for (let b = by * bw + bx0; b <= by * bw + bx1; b++) {
+          if (!sales[b]) { sales[b] = 1; masque.aRepeindre++; }
+        }
+      }
+    }
+  }
+  // Une case explorée qui ne l'est plus (une partie relue, un essai) : les
+  // cases à montrer se recomptent d'un bout à l'autre.
+  if (oubli) {
+    masque.connu.fill(0);
+    for (let ty = 0, i = 0; ty < h; ty++) {
+      for (let tx = 0; tx < w; tx++, i++) if (niveaux[i] !== BROUILLARD.inexplore) montrerAutour(masque, tx, ty);
+    }
+  }
+  return change;
+}
+
+/**
+ * Repeint l'opacité du bloc (bx, by) dans `data` (l'image RGBA du masque, dont
+ * seul le quatrième octet est écrit) : une passe en largeur par rangée de
+ * cases, puis une passe en hauteur. Hors de la carte, la case du bord se
+ * prolonge : le monde ne s'assombrit pas en approchant de sa limite.
+ */
+function repeindreBloc(masque, data, bx, by) {
+  const { w, h, k, marge, lw, lh, W, poids, m, n, niveaux, voisines, lignes, cumul, norme } = masque;
+  const x0 = bx * FOG_BLOC, y0 = by * FOG_BLOC;         // en cases du masque
+  const x1 = Math.min(lw, x0 + FOG_BLOC), y1 = Math.min(lh, y0 + FOG_BLOC);
+  const large = (x1 - x0) * k;            // points par ligne du bloc
+  const enX = (x) => { const tx = x - marge; return tx < 0 ? 0 : tx >= w ? w - 1 : tx; };
+  const enY = (y) => { const ty = y - marge; return ty < 0 ? 0 : ty >= h ? h - 1 : ty; };
+  // Loin de toute lisière (le plus souvent), le bloc est d'une seule opacité.
+  const uni = niveaux[enY(y0) * w + enX(x0)];
+  let uniforme = true;
+  for (let ty = enY(y0 - m); ty <= enY(y1 - 1 + m) && uniforme; ty++) {
+    for (let i = ty * w + enX(x0 - m), fin = ty * w + enX(x1 - 1 + m); i <= fin; i++) {
+      if (niveaux[i] !== uni) { uniforme = false; break; }
+    }
+  }
+  if (uniforme) {
+    for (let y = y0 * k; y < y1 * k; y++) {
+      for (let x = 0, o = (y * W + x0 * k) * 4 + 3; x < large; x++, o += 4) data[o] = uni;
+    }
+    return;
+  }
+  for (let y = y0 - m, o = 0; y < y1 + m; y++) {
+    const rangee = enY(y) * w;
+    for (let x = x0; x < x1; x++) {
+      for (let j = 0; j < n; j++) voisines[j] = niveaux[rangee + enX(x + j - m)];
+      for (let p = 0, q = 0; p < k; p++) {
+        let s = 0;
+        for (let j = 0; j < n; j++, q++) s += poids[q] * voisines[j];
+        lignes[o++] = s;
+      }
+    }
+  }
+  for (let y = y0; y < y1; y++) {
+    for (let p = 0; p < k; p++) {
+      cumul.fill(0);
+      for (let j = 0, l = (y - y0) * large; j < n; j++, l += large) {   // la ligne de la rangée y − m + j
+        const poidsJ = poids[p * n + j];
+        if (poidsJ) for (let x = 0; x < large; x++) cumul[x] += poidsJ * lignes[l + x];
+      }
+      for (let x = 0, o = ((y * k + p) * W + x0 * k) * 4 + 3; x < large; x++, o += 4) data[o] = (cumul[x] * norme + 0.5) | 0;
+    }
+  }
+}
+
+/**
+ * Repeint dans `data` les blocs que le dernier relevé a touchés. Ceux qui
+ * couvrent les cases `vue` ({ x0, y0, x1, y1 }, bornes comprises) passent
+ * d'abord, tous : rien de périmé sous les yeux. Les autres ensuite, tant que
+ * l'appel n'a pas repeint `max` blocs : s'il en reste (`masque.aRepeindre`),
+ * ils attendent l'appel suivant — jamais un à-coup. Renvoie le rectangle de
+ * points réécrit ({ x, y, w, h }), ou null s'il n'y avait rien à faire.
+ */
+export function repeindreBrouillard(masque, data, max = Infinity, vue = null) {
+  if (masque.aRepeindre <= 0) return null;
+  const { w, h, marge, lw, lh, sales, bw, bh } = masque;
+  let x0 = bw, x1 = -1, y0 = bh, y1 = -1, faits = 0;
+  const repeindre = (bx, by) => {
+    sales[by * bw + bx] = 0;
+    faits++;
+    repeindreBloc(masque, data, bx, by);
+    if (bx < x0) x0 = bx;
+    if (bx > x1) x1 = bx;
+    if (by < y0) y0 = by;
+    if (by > y1) y1 = by;
+  };
+  if (vue) {
+    // En cases du masque ; une vue qui touche le bord de la carte voit aussi la marge.
+    const vx1 = Math.floor((vue.x1 >= w - 1 ? lw - 1 : vue.x1 + marge) / FOG_BLOC);
+    const vy1 = Math.floor((vue.y1 >= h - 1 ? lh - 1 : vue.y1 + marge) / FOG_BLOC);
+    for (let by = Math.floor((vue.y0 <= 0 ? 0 : vue.y0 + marge) / FOG_BLOC); by <= vy1; by++) {
+      for (let bx = Math.floor((vue.x0 <= 0 ? 0 : vue.x0 + marge) / FOG_BLOC); bx <= vx1; bx++) {
+        if (sales[by * bw + bx]) repeindre(bx, by);
+      }
+    }
+  }
+  for (let by = 0, b = 0; by < bh && faits < max; by++) {
+    for (let bx = 0; bx < bw && faits < max; bx++, b++) if (sales[b]) repeindre(bx, by);
+  }
+  masque.aRepeindre -= faits;
+  if (!faits) return null;
+  const pas = FOG_BLOC * masque.k;
+  const x = x0 * pas, y = y0 * pas;
+  return { x, y, w: Math.min(masque.W, (x1 + 1) * pas) - x, h: Math.min(masque.H, (y1 + 1) * pas) - y };
+}
+
 export class Renderer {
   constructor(canvas, world, camera) {
     this.decorActif = true;      // le décor de la carte (decor.js) ; débrayable pour les mesures
@@ -288,11 +498,17 @@ export class Renderer {
 
   initFogCanvas() {
     const map = this.world.map;
+    const masque = creerMasqueBrouillard(map.w, map.h);
+    this.fogMasque = masque;
     this.fogCanvas = document.createElement('canvas');
-    this.fogCanvas.width = map.w;
-    this.fogCanvas.height = map.h;
+    this.fogCanvas.width = masque.W;
+    this.fogCanvas.height = masque.H;
     this.fogCtx = this.fogCanvas.getContext('2d');
-    this.fogImage = this.fogCtx.createImageData(map.w, map.h);
+    this.fogImage = this.fogCtx.createImageData(masque.W, masque.H);
+    this.fogPeint = false;
+    // La teinte est posée une fois pour toutes : seule l'opacité change ensuite.
+    const data = this.fogImage.data, [r, v, b] = BROUILLARD.teinte;
+    for (let o = 0; o < data.length; o += 4) { data[o] = r; data[o + 1] = v; data[o + 2] = b; }
   }
 
   resize() {
@@ -388,7 +604,7 @@ export class Renderer {
     this.majParticules(this.dt);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.globalAlpha = 1;   // un dessin interrompu à l'image d'avant ne voile pas celle-ci
-    ctx.fillStyle = '#1b2430';
+    ctx.fillStyle = FOND_HORS_CARTE;   // hors de la carte : la teinte du brouillard
     ctx.fillRect(0, 0, this.width, this.height);
 
     const cam = this.camera;
@@ -406,6 +622,7 @@ export class Renderer {
     ctx.setTransform(this.versToile.echelle, 0, 0, this.versToile.echelle, this.versToile.x, this.versToile.y);
 
     const view = this.visibleTileRange();
+    this.majBrouillard(view);   // avant de dessiner : arbres et décor suivent les cases à montrer
     this.drawTerrain(view);
     this.drawResources(view);
     this.drawRubble();
@@ -810,7 +1027,7 @@ export class Renderer {
       const row = ty * map.w;
       for (let tx = view.x0; tx <= view.x1; tx++) {
         const i = row + tx;
-        if (!this.world.fog.explored[i]) continue;
+        if (!this.fogMasque.connu[i]) continue;
         const variants = this.atlas[map.terrain[i]];
         const img = variants[map.variant[i] % variants.length];
         ctx.drawImage(img, tx * TILE, ty * TILE);
@@ -829,7 +1046,7 @@ export class Renderer {
     const arbres = spriteDe('arbres'), buissons = spriteDe('baies'), or = spriteDe('or');
     for (const res of map.resources.values()) {
       if (res.tx < view.x0 || res.tx > view.x1 || res.ty < view.y0 || res.ty > view.y1) continue;
-      if (!this.world.fog.explored[res.ty * map.w + res.tx]) continue;
+      if (!this.fogMasque.connu[res.ty * map.w + res.tx]) continue;
       const x = res.tx * TILE, y = res.ty * TILE;
       if (res.gibier) { this.dessinerCarcasse(res); continue; }
       if (res.type === 'gold' && !or) this.drawGold(x, y, res);
@@ -1050,11 +1267,13 @@ export class Renderer {
     // avec le reste — une unité qui passe derrière un arbre passe derrière.
     const arbres = spriteDe('arbres'), buissons = spriteDe('baies'), or = spriteDe('or');
     if (arbres || buissons || or) {
+      // (Les cases « connues » : une de plus que l'exploré, sous le bord fondu
+      // du brouillard — voir creerMasqueBrouillard.)
       const map = this.world.map;
-      const explored = this.world.fog.explored;
+      const connu = this.fogMasque.connu;
       for (const res of map.resources.values()) {
         if (res.tx < view.x0 - 1 || res.tx > view.x1 + 1 || res.ty < view.y0 - 2 || res.ty > view.y1 + 1) continue;
-        if (!explored[res.ty * map.w + res.tx] || res.gibier) continue;
+        if (!connu[res.ty * map.w + res.tx] || res.gibier) continue;
         const sprite = res.type === 'wood' ? arbres : res.type === 'food' ? buissons : res.type === 'gold' ? or : null;
         if (sprite) list.push({ kind: 'vegetation', res, sprite, ty: res.ty });
       }
@@ -1065,7 +1284,7 @@ export class Renderer {
     // quelques lignes sous le bord bas de l'écran.
     const atlas = this.decorActif ? spriteDe('decor') : null;
     if (atlas && atlas.pret) {
-      const map = this.world.map, explored = this.world.fog.explored;
+      const map = this.world.map, connu = this.fogMasque.connu;
       const decor = this.decorCarte();
       // Une ferme ne bloque pas ses cases (on y marche) : son emprise écarte
       // quand même le décor debout, sinon rochers et buissons poussent sur elle.
@@ -1075,7 +1294,7 @@ export class Renderer {
         for (const d of decor.debout[ty]) {
           if (d.tx < view.x0 - 3 || d.tx > view.x1 + 3) continue;
           const i = d.ty * map.w + d.tx;
-          if (!explored[i] || (map.blocked[i] & BLOCK.BUILDING) || sousUneFerme(d.tx, d.ty)) continue;
+          if (!connu[i] || (map.blocked[i] & BLOCK.BUILDING) || sousUneFerme(d.tx, d.ty)) continue;
           list.push({ kind: 'decor', d, sprite: atlas });
         }
       }
@@ -2128,25 +2347,30 @@ export class Renderer {
 
   // --- Brouillard -----------------------------------------------------------
 
+  /**
+   * Le masque suit le brouillard du monde : relu seulement quand le monde l'a
+   * relevé, repeint seulement là où il a changé — d'abord les cases `vue` (ce
+   * qui est à l'écran), puis le reste, sans dépasser FOG_BLOCS_PAR_IMAGE blocs
+   * dans la même image (le premier masque excepté).
+   */
+  majBrouillard(vue = null) {
+    const fog = this.world.fog, masque = this.fogMasque;
+    if (fog.dirty) { fog.dirty = false; releverBrouillard(masque, fog); }
+    if (!masque.aRepeindre) return;
+    const refait = repeindreBrouillard(masque, this.fogImage.data, this.fogPeint ? FOG_BLOCS_PAR_IMAGE : Infinity, vue);
+    this.fogPeint = true;
+    if (refait) this.fogCtx.putImageData(this.fogImage, 0, 0, refait.x, refait.y, refait.w, refait.h);
+  }
+
   drawFog() {
-    const world = this.world;
-    const map = world.map;
-    if (world.fog.dirty) {
-      const data = this.fogImage.data;
-      for (let i = 0; i < map.w * map.h; i++) {
-        const o = i * 4;
-        data[o] = 8; data[o + 1] = 10; data[o + 2] = 14;
-        data[o + 3] = world.fog.visible[i] ? 0 : world.fog.explored[i] ? 120 : 255;
-      }
-      this.fogCtx.putImageData(this.fogImage, 0, 0);
-      world.fog.dirty = false;
-    }
+    const map = this.world.map;
     const ctx = this.ctx;
     const t = this.versToile;   // la même transformation que le monde : le brouillard reste aligné
     ctx.save();
     ctx.setTransform(t.echelle, 0, 0, t.echelle, t.x, t.y);
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(this.fogCanvas, 0, 0, map.pixelWidth, map.pixelHeight);
+    const marge = FOG_MARGE * TILE;       // le masque déborde de la carte (voir FOG_MARGE)
+    ctx.drawImage(this.fogCanvas, -marge, -marge, map.pixelWidth + 2 * marge, map.pixelHeight + 2 * marge);
     ctx.restore();
   }
 
@@ -2212,8 +2436,11 @@ export class Renderer {
     ctx.clearRect(0, 0, size, size);
     ctx.drawImage(this.minimapTerrain, 0, 0, size, size);
 
-    // Voile sur ce qui n'est pas exploré
-    ctx.drawImage(this.fogCanvas, 0, 0, size, size);
+    // Le brouillard : le même masque doux que sur la carte (sans sa marge),
+    // réduit sans crénelage.
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.fogCanvas, FOG_MARGE * FOG_K, FOG_MARGE * FOG_K, map.w * FOG_K, map.h * FOG_K, 0, 0, size, size);
+    ctx.imageSmoothingEnabled = false;
 
     for (const e of this.world.entities) {
       if (e.dead || e.garrisonedIn || (e.isAnimal && e.playerIndex < 0)) continue;
