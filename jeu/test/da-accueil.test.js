@@ -235,9 +235,13 @@ console.log('\n--- L’accueil, direction « Boîte de jeu » ---');
   check('les titres : Lilita One, puis les caractères ronds du téléphone ; jamais engraissés à la machine',
     /"Lilita One", ui-rounded, "Arial Rounded MT Bold"[^;]*sans-serif/.test(v('--b-titres')) && /"Nunito", ui-rounded[^;]*sans-serif/.test(v('--b-texte'))
     && ['#start-screen .start-head h1', '#start-screen #btn-play', '#start-screen .option.peuple .option-name'].every((x) => /font-synthesis:\s*none/.test(regleB(x))));
-  check('les caractères viennent du réseau sans retenir l’affichage : demandés par le jeu, pas par la page',
-    !/fonts\.googleapis/.test(html) && /function chargerCaracteres\(\)[\s\S]{0,400}createElement\('link'\)[\s\S]{0,300}fonts\.googleapis\.com\/css2\?family=Lilita\+One&family=Nunito/.test(main)
-    && /chargerCaracteres\(\);\s*\n\s*habiller\(settings\.civ\);/.test(main));
+  const faces = [...boite.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1]);
+  const fichiers = faces.map((b) => (b.match(/src:\s*url\("\.\.\/(assets\/polices\/[^"]+\.woff2)"\)/) || [])[1]);
+  check('les caractères sont dans le jeu : deux fichiers livrés, gardés hors ligne, leur licence à côté',
+    faces.length === 2 && fichiers.every((x) => x && existe(x) && sw.includes(`'./${x}'`))
+    && faces.every((b) => /font-display:\s*swap/.test(b)) && /font-weight:\s*700 900/.test(faces[1])
+    && existe('assets/polices/OFL-LilitaOne.txt') && existe('assets/polices/OFL-Nunito.txt'));
+  check('… et ni la page ni le jeu ne demandent de feuille de style au réseau', !/fonts\.googleapis/.test(html) && !/fonts\.googleapis/.test(main) && !/chargerCaracteres/.test(main));
   check('le couvercle porte la capitale de chaque peuple — deux images livrées, la feuille montre celle du peuple choisi',
     civs.every((c) => new RegExp(`<img class="couvercle-capitale" data-civ="${c}" src="([^"]+)" alt=""`).test(html)
       && existe(html.match(new RegExp(`<img class="couvercle-capitale" data-civ="${c}" src="([^"]+)"`))[1])

@@ -8,12 +8,36 @@
    (css/jeu.css, css/progression.css) tant que la direction n'est pas étendue :
    chaque règle d'ici passe par #start-screen, et rien n'est retiré là-bas.
 
-   Les caractères : « Lilita One » (titres) et « Nunito » (texte) quand ils sont
-   chargés (voir chargerCaracteres, js/main.js) ; sinon les caractères ronds du
-   téléphone. Un seul dessin de Lilita One existe : `font-synthesis: none`
-   l'empêche d'être engraissé à la machine, et laisse aux caractères de repli
-   leur vrai gras.
+   Les caractères : « Lilita One » (titres) et « Nunito » (texte), livrés avec
+   le jeu (assets/polices, licence SIL OFL à côté) : rien ne vient du réseau,
+   l'accueil est le même hors ligne. S'ils manquent, les caractères ronds du
+   téléphone prennent le relais. Un seul dessin de Lilita One existe :
+   `font-synthesis: none` l'empêche d'être engraissé à la machine, et laisse aux
+   caractères de repli leur vrai gras.
    --------------------------------------------------------------------------- */
+
+/* Les caractères latins seulement (le français y est en entier, « œ » compris).
+   La seconde adresse ne sert que si la page qui embarque le jeu refuse ses
+   propres fichiers de caractères : c'est le même fichier, chez son éditeur. */
+@font-face {
+  font-family: "Lilita One";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/polices/lilita-one.woff2") format("woff2"),
+       url("https://fonts.gstatic.com/s/lilitaone/v17/i7dPIFZ9Zz-WBtRtedDbYEF8RXi4EwQ.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* (Nunito est un caractère à graisse variable : un seul fichier pour le gras, le très gras et le noir.) */
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+  src: url("../assets/polices/nunito.woff2") format("woff2"),
+       url("https://fonts.gstatic.com/s/nunito/v32/XRXV3I6Li01BKofINeaBTMnFcQ.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 #start-screen {
   --b-papier: #fff4dc;

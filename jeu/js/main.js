@@ -1600,27 +1600,9 @@ function refreshReglages() {
     : `Libre · ${resume}`;
 }
 
-/**
- * Les caractères de l'accueil (direction « Boîte de jeu ») : Lilita One pour les
- * titres, Nunito pour le texte. Ils viennent du réseau quand il est là, par une
- * feuille ajoutée ici — pas dans la page, où elle retiendrait le premier
- * affichage. Hors ligne, ou si la demande échoue, l'accueil garde les
- * caractères ronds du téléphone (voir css/accueil.css) : rien n'attend après eux.
- */
-let caracteresDemandes = false;
-function chargerCaracteres() {
-  if (caracteresDemandes) return;
-  caracteresDemandes = true;
-  const lien = document.createElement('link');
-  lien.rel = 'stylesheet';
-  lien.href = 'https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap';
-  document.head.appendChild(lien);
-}
-
 function showStartScreen() {
   currentGame = null;
   musique.mettre('menu');
-  chargerCaracteres();
   habiller(settings.civ);
   document.getElementById('start-screen').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');

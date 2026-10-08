@@ -1195,6 +1195,8 @@ export class UI {
         <li><b>Bruitages</b> — paquets audio de <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a>, domaine public (CC0).</li>
         <li><b>Musique</b> — « Minstrel Dance » et « Harvest Season » de RandomMind, « Determined Pursuit » d'Emma_MA,
           publiés sur <a href="https://opengameart.org" target="_blank" rel="noopener">OpenGameArt</a>, domaine public (CC0).</li>
+        <li><b>Caractères</b> — « Lilita One » de Juan Montoreano et « Nunito » de The Nunito Project Authors,
+          sous licence <a href="https://openfontlicense.org" target="_blank" rel="noopener">SIL Open Font License 1.1</a>.</li>
         <li><b>Jeu</b> — inspiré des principes d'Age of Empires, sans en reprendre
           aucun contenu : marques, ressources graphiques et sonores appartiennent
           à leurs propriétaires respectifs.</li>

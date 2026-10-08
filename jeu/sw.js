@@ -31,6 +31,8 @@ const ASSETS = [
   './js/rangement-durable.js',
   './css/progression.css',
   './css/accueil.css',
+  './assets/polices/lilita-one.woff2',
+  './assets/polices/nunito.woff2',
   './js/render.js',
   // Importés par render.js et sprites.js : sans eux, le graphe de modules
   // échoue hors ligne et le jeu ne démarre pas.
