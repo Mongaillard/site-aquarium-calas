@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import {
-  TILE, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
+  TILE, TICKS_PER_SECOND, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
   START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, GAME_MODES, DEFAULT_MODE,
   DEFAULT_CIV, civDe, nomDe, ficheDe,
 } from './config.js';
@@ -116,6 +116,20 @@ export class World {
     this.seed = options.seed || Math.floor(Math.random() * 1e9);
     this.rng = new RNG(this.seed);
     this.map = new GameMap(mapSize.tiles, this.seed);
+    // Format « Prise de positions » : la carte est aménagée avant tout le reste,
+    // partie neuve ou rechargée (voir GameMap.amenagerPositions). Une position :
+    //   camp    : qui la tient (-1 : personne) ;
+    //   preneur : qui est en train de la prendre (-1 : personne) ;
+    //   prise   : depuis combien de pas de simulation ;
+    //   presents: les soldats de chaque camp dans son cercle, au dernier pas.
+    const reglage = this.mode.positions;
+    this.positions = reglage
+      ? this.map.amenagerPositions(reglage.nombre).map((p, id) => ({
+        id, tx: p.tx, ty: p.ty, x: p.tx * TILE + TILE / 2, y: p.ty * TILE + TILE / 2,
+        camp: -1, preneur: -1, prise: 0, presents: [0, 0],
+      }))
+      : [];
+    this.pasDePoints = 0;       // pas de simulation écoulés depuis le dernier point distribué
     this.pathfinder = new PathFinder(this.map);
     this.difficulty = DIFFICULTIES[this.difficultyId];
     this.time = 0;
@@ -139,6 +153,8 @@ export class World {
       makePlayer(1, 'Adversaire', true, civDe(civs[1])),
     ];
     this.players[1].mods.gatherRate = this.difficulty.gatherBonus;
+    // (Prise de positions : les points de chaque camp, rangés avec ses statistiques — la sauvegarde les garde sans rien de plus.)
+    if (this.positions.length) for (const joueur of this.players) joueur.stats.positions = 0;
     const niveaux = Array.isArray(options.niveaux) ? options.niveaux : [];
     this.players.forEach((joueur, i) => { joueur.niveaux = niveauxLus(niveaux[i]); });
     // Les troupes à débloquer : jamais l'ouvrier, sans lui il n'y a pas de partie.
@@ -505,8 +521,56 @@ export class World {
       this.updateFog();
     }
 
+    if (this.positions.length) this.updatePositions();
     this.checkVictory();
     this.checkTimeLimit();
+  }
+
+  /**
+   * Format « Prise de positions », à chaque pas. Dans le cercle de chaque
+   * position, on compte les soldats de chaque camp — ni ouvriers, ni
+   * soigneurs, ni troupes à l'abri. Un camp seul dans le cercle d'une position
+   * qui n'est pas à lui la prend en `prise` secondes ; tant que les deux camps
+   * s'y trouvent, rien ne bouge ; le cercle vide, ou le propriétaire revenu
+   * seul, la prise entamée se défait au même rythme. Prise, elle reste à son
+   * camp même sans personne, jusqu'à ce que l'autre la reprenne.
+   * Puis les points : un par position tenue toutes les `pas` secondes, et le
+   * premier camp au `but` gagne. Tout se compte en pas de simulation, en
+   * entiers : le résultat est le même sur tous les appareils.
+   */
+  updatePositions() {
+    const r = this.mode.positions;
+    const rayon = r.rayon * TILE, duree = r.prise * TICKS_PER_SECOND;
+    for (const pos of this.positions) {
+      const presents = [0, 0];
+      this.grid.forEachNear(pos.x, pos.y, rayon, (e) => {
+        if (e.kind !== 'unit' || e.dead || e.isAnimal || e.isVillager || e.def.heal || e.garrisonedIn) return;
+        if (e.playerIndex < 0 || e.playerIndex > 1) return;
+        if (dist2(e.x, e.y, pos.x, pos.y) <= rayon * rayon) presents[e.playerIndex]++;
+      });
+      pos.presents = presents;
+      if (presents[0] > 0 && presents[1] > 0) continue;                  // disputée : rien ne bouge
+      const seul = presents[0] > 0 ? 0 : presents[1] > 0 ? 1 : -1;
+      if (seul === -1 || seul === pos.camp) {                            // personne, ou son propriétaire : la prise se défait
+        if (pos.prise > 0 && --pos.prise === 0) pos.preneur = -1;
+        continue;
+      }
+      if (pos.preneur !== seul) { pos.preneur = seul; pos.prise = 0; }
+      if (++pos.prise < duree) continue;
+      const ancien = pos.camp;
+      pos.camp = seul; pos.preneur = -1; pos.prise = 0;
+      this.pushEvent({ type: 'position', position: pos.id, x: pos.x, y: pos.y, camp: seul, ancien });
+    }
+    if (++this.pasDePoints < r.pas * TICKS_PER_SECOND) return;
+    this.pasDePoints = 0;
+    for (const pos of this.positions) if (pos.camp >= 0) this.players[pos.camp].stats.positions++;
+    if (this.gameOver) return;
+    const points = this.players.map((p) => p.stats.positions);
+    if (Math.max(...points) < r.but) return;
+    const egalite = points[0] === points[1];
+    const winner = egalite ? -1 : points[0] > points[1] ? 0 : 1;
+    this.gameOver = this.avecScores({ winner, victory: winner === this.humanIndex, time: this.time, positions: true });
+    this.pushEvent({ type: 'gameOver', result: this.gameOver });
   }
 
   rebuildGrid() {
@@ -1977,6 +2041,8 @@ export class World {
    * chez soi.
    */
   detailScore(player) {
+    // (Prise de positions : le score, ce sont les points des positions tenues, et rien d'autre.)
+    if (this.positions.length) return { positions: player.stats.positions, total: player.stats.positions };
     const g = player.stats.gathered;
     let debout = 0;
     for (const u of this.units) {

@@ -55,6 +55,7 @@ le joueur 1 le porte en rouge, quelle que soit sa civilisation.
 | --- | --- | --- |
 | ⚔ **Escarmouche** | **5 min chrono** | Pas d'installation : on se bat tout de suite. Départ à l'**Âge Féodal** avec 5 ouvriers, **1 000 vivres, 1 000 bois et 500 or** en réserve, **une caserne déjà bâtie** et toute la population offerte (30 places, pas une maison à poser), sur la carte **minuscule** (48 cases, deux fois plus petite que celle d'Express). L'ordinateur ne bâtit qu'une archerie et met tout le reste en soldats ; il attaque dès la première minute (1 min 30 de trêve en Facile). **Raser le Centre-Ville adverse** gagne ; sinon, à cinq minutes, **le meilleur score l'emporte**. En partie classée, son coffre est tiré dans une table **un cran en dessous** de celle des autres formats (`sources.parFormat` des réglages) : victoire 35/40/20/5, défaite 75/20/5/0 |
 | ⚡ **Express** | **10 min chrono** | Départ à l'**Âge Féodal** avec 7 villageois, des ressources garnies et de la place pour produire tout de suite, petite carte, population plafonnée à 40, IA agressive dès la première minute. **Raser le Centre-Ville adverse met fin à la partie sur-le-champ** (il y est deux fois moins résistant) ; sinon, au temps écoulé, **le meilleur score l'emporte** |
+| ⚑ **Prise de positions** | 10 à 12 min (15 au plus) | La carte et le départ d'Express, avec **trois positions** sur la ligne du milieu, à égale distance des deux camps : un monument à bannière dans un cercle de 3 cases. On **prend** une position en y tenant des soldats seuls pendant **10 secondes** (ni ouvriers ni soigneurs ; tant que les deux camps sont dans le cercle, rien ne bouge ; une prise abandonnée se défait au même rythme) ; elle reste à son camp, même vide, jusqu'à ce que l'autre la reprenne. Chaque position tenue rapporte **1 point toutes les 5 secondes** : **le premier à 200 gagne**. Raser le Centre-Ville adverse gagne aussi (il y garde tous ses points de vie) ; à quinze minutes, le meilleur total l'emporte. L'ordinateur envoie chaque vague tenir la position la plus proche qui n'est pas à lui, y laisse ses soldats de garde, et ne marche sur la base que s'il les tient toutes. Réglages : `positions` du format (`nombre`, `rayon`, `prise`, `pas`, `but`) |
 | 🏰 **Classique** | 20 à 30 min | La partie complète : trois âges, population 60, victoire par conquête (tous les bâtiments **et** villageois adverses) |
 
 Le score d'une partie Express : *ressources récoltées + 10 par unité vivante +
@@ -787,7 +788,9 @@ aux mises à jour. La page passée à l'arrière-plan se tait.
 
 Tests : `node test/musique.test.js`.
 
-Les formats ajoutés aux deux d'origine ont leurs tests : `node test/modes.test.js` (mise en place, parties jouées par l'ordinateur, coffres).
+Les formats ajoutés aux deux d'origine ont leurs tests : `node test/modes.test.js` (mise en place, règles de prise et de points, sauvegarde, parties jouées par l'ordinateur, coffres).
+
+Le monument des positions est une illustration (`assets/position.webp`) à la bannière bleu roi : elle sert telle quelle au joueur bleu, sa fenêtre de bleu bascule au rouge pour l'autre camp (comme pour les troupes) et devient une toile écrue quand personne ne tient la position (`banniereNeutre`, `js/render.js`).
 
 ## Architecture
 

@@ -484,6 +484,23 @@ export const GAME_MODES = {
     // à son terme, c'est le score qui tranche.
     townCenterHp: 0.5, timeLimit: 600,
   },
+  // Trois positions sur la ligne du milieu, à égale distance des deux camps : on
+  // les prend en y tenant des soldats, elles rapportent des points tant qu'on
+  // les garde. Le départ et la carte sont ceux d'Express ; le bâtiment
+  // principal y garde tous ses points de vie, pour que la partie se joue sur
+  // les positions — le raser gagne quand même.
+  //   positions.nombre : combien ;        rayon : le cercle de prise, en cases ;
+  //   prise : secondes à tenir seul dans le cercle pour la prendre ;
+  //   pas   : un point par position tenue toutes les `pas` secondes ;
+  //   but   : le premier camp à ce total gagne.
+  positions: {
+    id: 'positions', name: 'Prise de positions', icon: 'ralliement',
+    desc: '10 à 12 min · trois positions à prendre et à tenir · 1 point toutes les 5 s par position, le premier à 200 gagne · raser le bâtiment principal adverse gagne aussi',
+    mapSize: 'small', startAge: 1, popMax: 40, villagers: 7, popStart: 6,
+    resources: { food: 500, wood: 500, gold: 250 },
+    victory: 'towncenter', aiRush: 0.4, townCenterHp: 1, timeLimit: 900,
+    positions: { nombre: 3, rayon: 3, prise: 10, pas: 5, but: 200 },
+  },
   classique: {
     id: 'classique', name: 'Classique', icon: 'modeClassique',
     desc: '20 à 30 min · trois âges, victoire par conquête',
@@ -515,8 +532,8 @@ export const DIFFICULTIES = {
     id: 'easy', name: 'Facile',
     gatherBonus: 0.8, maxVillagers: 14, armyTrigger: 3, armyStep: 2,
     attackDelay: 260,
-    treve: { classique: 900, express: 270, escarmouche: 90 }, petitesVagues: true,
-    desc: 'L’adversaire vous laisse 15 minutes pour vous installer (4 min 30 en Express, 1 min 30 en Escarmouche), vous prévient, puis attaque par petits groupes.',
+    treve: { classique: 900, express: 270, positions: 180, escarmouche: 90 }, petitesVagues: true,
+    desc: 'L’adversaire vous laisse 15 minutes pour vous installer (4 min 30 en Express, 3 min en Prise de positions, 1 min 30 en Escarmouche), vous prévient, puis attaque par petits groupes.',
   },
   normal: {
     id: 'normal', name: 'Normal',

@@ -94,6 +94,9 @@ export class AIPlayer {
     this.lastHouseAt = -99;
     this.compositionIndex = 0;
     this.badSpots = new Set();   // emplacements où un chantier s'est révélé inaccessible
+    // Prise de positions : ses soldats postés sur une position (identifiant de
+    // l'unité → numéro de la position). Ils la gardent : ni vague, ni rappel au camp.
+    this.gardes = new Map();
   }
 
   get player() { return this.world.players[this.index]; }
@@ -116,6 +119,43 @@ export class AIPlayer {
     this.manageResearch();
     this.chasserLesReparateurs();
     this.manageMilitary();
+    this.tenirPositions();
+  }
+
+  /**
+   * Prise de positions : la position que vise sa prochaine vague — la plus
+   * proche de son camp parmi celles qu'il ne tient pas. Aucune s'il les tient
+   * toutes : il marche alors sur la base adverse, comme en Express.
+   */
+  objectifPosition() {
+    const tc = this.townCenter;
+    let choix = null, plusPres = Infinity;
+    for (const pos of this.world.positions) {
+      if (pos.camp === this.index) continue;
+      const d = tc ? dist2(tc.x, tc.y, pos.x, pos.y) : pos.id;
+      if (d < plusPres) { plusPres = d; choix = pos; }
+    }
+    return choix;
+  }
+
+  /**
+   * Prise de positions : chaque soldat posté revient à sa position dès qu'il
+   * n'a plus rien à faire — après une poursuite, une riposte, un détour. Il y
+   * revient en attaquant ce qu'il croise : une position reprise par l'adversaire
+   * se dispute ainsi d'elle-même.
+   */
+  tenirPositions() {
+    if (this.gardes.size === 0) return;
+    const reglage = this.world.mode.positions;
+    if (!reglage) { this.gardes.clear(); return; }
+    const pres = (reglage.rayon * TILE * 0.7) ** 2;
+    for (const [id, numero] of this.gardes) {
+      const u = this.world.byId.get(id), pos = this.world.positions[numero];
+      if (!u || u.dead || !pos) { this.gardes.delete(id); continue; }
+      if (u.state !== STATE.IDLE || dist2(u.x, u.y, pos.x, pos.y) <= pres) continue;
+      // (Au pied du monument, pas dessus : sa case est prise.)
+      u.moveTo(pos.x + (this.rng.next() - 0.5) * TILE * 2.4, pos.y + TILE * (0.9 + this.rng.next() * 0.8), true);
+    }
   }
 
   /**
@@ -692,6 +732,8 @@ export class AIPlayer {
     // former. La plus proche est la menace — sauf alerte levée faute de combat.
     let threat = this.findThreat();
     if (threat && !this.alerteFondee()) threat = null;
+    // Prise de positions : débordé chez lui, il rappelle ceux qui gardent les positions — la base d'abord.
+    if (threat && this.gardes.size > 0 && this.intrus.length > this.troupesAuCamp().length) this.gardes.clear();
     this.rappelerAuCamp();
 
     // Production militaire dans tous les bâtiments disponibles.
@@ -796,9 +838,27 @@ export class AIPlayer {
     // avant la fin de la trêve. Là, la vague est comptée : elle ne prend que
     // les soldats présents au camp, le reste de l'armée garde la base.
     const comptee = !!this.difficulty.petitesVagues;
-    const prets = comptee ? this.troupesAuCamp() : this.army;
+    // Prise de positions : seuls comptent les soldats au camp qui ne gardent
+    // rien — ceux d'une position y restent. Et la vague va tenir la position la
+    // plus proche qui n'est pas à lui ; il ne marche sur la base adverse que
+    // s'il les tient toutes.
+    const enPositions = this.world.positions.length > 0;
+    const prets = enPositions
+      ? this.troupesAuCamp().filter((u) => !this.gardes.has(u.id))
+      : comptee ? this.troupesAuCamp() : this.army;
     let attente = this.attackTimer > 0 || this.world.time < this.treve || prets.length < this.armyTarget;
-    if (!attente) {
+    const objectif = !attente && enPositions ? this.objectifPosition() : null;
+    if (objectif) {
+      const vague = (comptee ? prets.slice(0, this.armyTarget) : prets).filter((u) => !u.def.heal);
+      this.waveCount++;
+      this.armyTarget = Math.min(24, Math.max(3, Math.round(
+        (this.difficulty.armyTrigger + this.waveCount * this.difficulty.armyStep) * this.rush)));
+      this.attackTimer = (this.difficulty.attackDelay * 0.25 + 20) * this.rush;
+      this.world.setStance(vague, 'aggressive');
+      for (const u of vague) this.gardes.set(u.id, objectif.id);
+      this.world.formationMove(vague, objectif.x, objectif.y + TILE * 1.5, true);
+    }
+    if (!attente && !objectif) {
       let vague = comptee ? prets.slice(0, this.armyTarget) : prets;
       let target = this.pickAttackTarget(vague);
       // Pas d'autre chemin que sous les flèches d'un bâtiment relevé : la
@@ -846,7 +906,7 @@ export class AIPlayer {
       // point de départ, tournerait les talons au premier ennemi croisé.
       const tc = this.townCenter;
       if (!tc) return;
-      const auCamp = this.army.filter((u) => u.state === STATE.IDLE);
+      const auCamp = this.army.filter((u) => u.state === STATE.IDLE && !this.gardes.has(u.id));
       this.world.setStance(auCamp, 'defensive');     // au camp, on tient son poste
       for (const u of auCamp) {
         // (Ni au loin, ni au repos dans une zone à éviter : on s'y fait tirer dessus sans rien rendre.)
@@ -902,6 +962,7 @@ export class AIPlayer {
     if (!this.townCenter) return;
     for (const u of this.army) {
       const cible = u.target;
+      if (this.gardes.has(u.id)) continue;   // un soldat posté sur une position s'y bat
       if (u.state !== STATE.ATTACK || !cible || cible.dead || cible.isAnimal || cible.playerIndex === this.index) continue;
       const egare = cible.kind === 'unit'
         ? !u.autoTarget && !this.intrus.includes(cible)

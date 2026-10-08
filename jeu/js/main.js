@@ -465,6 +465,18 @@ class Game {
             this.vibrate([18, 60, 18]);
           }
           break;
+        case 'position': {
+          // Prise de positions : une position change de mains. On dit laquelle des trois issues, et où.
+          const moi = this.world.humanIndex;
+          if (event.camp === moi) { this.audio.play('built'); this.ui.toast('Position prise !', 'good'); }
+          else if (event.ancien === moi) {
+            this.audio.play('alert');
+            this.lastAttackPoint = { x: event.x, y: event.y };
+            this.ui.toast('Position perdue ! Touchez pour voir où', 'error', () => this.voirAttaque());
+            this.vibrate([18, 60, 18]);
+          } else this.ui.toast('L’adversaire prend une position', 'warn');
+          break;
+        }
         case 'gameOver':
           this.musique.mettre('silence');   // la place au jingle de fin
           this.audio.play(event.result.victory ? 'victory' : 'defeat');

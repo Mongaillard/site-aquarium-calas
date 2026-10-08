@@ -218,6 +218,7 @@ export class UI {
       pop: el('res-pop'), age: el('age-label'), ageBar: el('age-bar'),
       timer: el('game-timer'),
       scoreBox: el('score-box'), scoreMoi: el('score-moi'), scoreAdverse: el('score-adverse'),
+      positionsBox: el('positions-box'),
       selection: el('selection-panel'), commands: el('command-panel'),
       alerts: el('alerts'), buildMenu: el('build-menu'), modal: el('modal'),
       workerBar: el('worker-bar'), workerMenu: el('worker-menu'),
@@ -250,6 +251,12 @@ export class UI {
     // Le score des deux camps ne s'affiche que sur un format qui se joue aussi
     // aux points, chacun à la couleur de son camp. (Le HUD survit à la partie :
     // on le remet dans l'état de celle qui commence.)
+    // Prise de positions : un losange par position, dans l'ordre de la carte.
+    if (this.nodes.positionsBox) {
+      this.nodes.positionsBox.classList.toggle('hidden', !this.world.positions.length);
+      this.nodes.positionsBox.innerHTML = this.world.positions.map(() => '<i></i>').join('');
+      this.etatDesPositions = '';
+    }
     if (this.nodes.scoreBox) {
       this.nodes.scoreBox.classList.toggle('hidden', !this.world.mode.timeLimit);
       this.nodes.scoreMoi.style.color = this.world.players[this.world.humanIndex].color.light;
@@ -336,6 +343,19 @@ export class UI {
       const adverse = this.world.players[1 - this.world.humanIndex];
       this.setText('scoreMoi', this.nodes.scoreMoi, String(this.world.score(player)));
       this.setText('scoreAdverse', this.nodes.scoreAdverse, String(this.world.score(adverse)));
+    }
+    // Prise de positions : qui tient quoi, et ce qui est en train d'être pris (retouché seulement quand cela change).
+    if (this.world.positions.length && this.nodes.positionsBox) {
+      const etat = this.world.positions.map((p) => `${p.camp}${p.preneur >= 0 ? 'p' : ''}`).join();
+      if (etat !== this.etatDesPositions) {
+        this.etatDesPositions = etat;
+        this.world.positions.forEach((p, i) => {
+          const pastille = this.nodes.positionsBox.children[i];
+          if (!pastille) return;
+          pastille.style.background = p.camp >= 0 ? this.world.players[p.camp].color.main : '';
+          pastille.classList.toggle('prise', p.preneur >= 0);
+        });
+      }
     }
 
     this.refreshWorkerBar();
@@ -1094,8 +1114,9 @@ export class UI {
         <li>Passez les <b>âges</b> depuis le ${nomDe('towncenter', this.game.civ)} pour débloquer de nouvelles unités</li>
         <li><b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil</li>
         <li><b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>Reprendre</b></li>
-        <li><b>Objectif</b> : ne laisser à l'adversaire ni ${nomDe('towncenter', civAdverse)} ni bâtiment militaire (${militaires}), achevé ou en chantier — inutile de raser la dernière ferme. En ${ic('barracks')} Escarmouche et en ${ic('modeExpress')} Express, son dernier ${nomDe('towncenter', civAdverse)} suffit ; sinon, au bout du temps (5 ou 10 minutes), le meilleur score l'emporte</li>
-        ${this.world.mode.timeLimit ? `<li><b>Score</b> ${ic('score')} : la moitié de ce que vous récoltez, le prix de vos troupes et bâtiments encore debout, et deux fois le prix de ce que vous abattez. Il s'affiche en haut, à côté du chrono : le vôtre, puis celui de l'adversaire</li>` : ''}
+        <li><b>Objectif</b> : ne laisser à l'adversaire ni ${nomDe('towncenter', civAdverse)} ni bâtiment militaire (${militaires}), achevé ou en chantier — inutile de raser la dernière ferme. En ${ic('barracks')} Escarmouche, en ${ic('modeExpress')} Express et en ${ic('ralliement')} Prise de positions, son dernier ${nomDe('towncenter', civAdverse)} suffit ; sinon, au bout du temps, le meilleur score l'emporte</li>
+        ${this.world.positions.length ? `<li><b>${ic('ralliement')} Positions</b> : ${this.world.positions.length} monuments sur la ligne du milieu, chacun dans son cercle. Tenez des <b>soldats</b> dans le cercle pendant ${this.world.mode.positions.prise} secondes, sans soldat adverse dedans, et la position est à vous — elle le reste même si vous partez, jusqu'à ce que l'adversaire la reprenne. Chaque position tenue rapporte <b>1 point toutes les ${this.world.mode.positions.pas} secondes</b> ; le premier à <b>${this.world.mode.positions.but} points</b> gagne. Les losanges en haut de l'écran et sur la mini-carte disent à qui elles sont</li>` : ''}
+        ${this.world.mode.timeLimit && !this.world.positions.length ? `<li><b>Score</b> ${ic('score')} : la moitié de ce que vous récoltez, le prix de vos troupes et bâtiments encore debout, et deux fois le prix de ce que vous abattez. Il s'affiche en haut, à côté du chrono : le vôtre, puis celui de l'adversaire</li>` : ''}
       </ul>
       <div class="modal-actions"><button class="btn primary" data-act="close">J'ai compris</button></div>`, { wide: true });
     modal.querySelector('[data-act="close"]').addEventListener('click', () => {
@@ -1141,6 +1162,14 @@ export class UI {
   /** Pourquoi la partie s'arrête, en une phrase : la conquête n'attend plus la dernière ferme, autant dire ce qui a tranché. */
   raisonDeFin(result) {
     const duree = formatTime(result.time);
+    // (Prise de positions : le but atteint, ou les points au bout du temps.)
+    if (result.positions) {
+      const but = this.world.mode.positions.but;
+      return result.winner === -1 ? `Les deux camps atteignent ${but} points ensemble, en ${duree}`
+        : result.victory ? `Vous tenez les positions : ${but} points atteints en ${duree}`
+          : `L’adversaire a tenu les positions : ${but} points atteints en ${duree}`;
+    }
+    if (result.timeUp && this.world.positions.length) return `Temps écoulé après ${duree} — les points des positions départagent`;
     if (result.timeUp) return `Temps écoulé après ${duree} — le score départage`;
     if (result.resigned) return `Vous avez abandonné après ${duree}`;
     if (result.winner === -1) return `Durée de la partie : ${duree}`;
@@ -1188,7 +1217,8 @@ export class UI {
     // départagé au temps écoulé ne se lisait plus.
     const exact = (n) => Math.floor(n).toLocaleString('fr-FR');
     // D'où vient le score, part par part (formats chronométrés : voir World.detailScore).
-    const part = (cle, libelle) => (result.detail ? `<tr><td>${libelle}</td>
+    // (Une part que ce format ne compte pas ne s'affiche pas.)
+    const part = (cle, libelle) => (result.detail && result.detail[player.index][cle] !== undefined ? `<tr><td>${libelle}</td>
           <td>${exact(result.detail[player.index][cle])}</td><td>${exact(result.detail[enemy.index][cle])}</td></tr>` : '');
     const summary = `
       <table class="scores">
@@ -1202,11 +1232,13 @@ export class UI {
         ${part('recolte', 'Points de récolte')}
         ${part('debout', 'Troupes et bâtiments debout')}
         ${part('abattu', 'Ennemis abattus')}
+        ${part('positions', 'Points des positions')}
         ${result.scores ? `<tr class="total"><td><b>Score final</b></td>
           <td><b>${exact(result.scores[player.index])}</b></td>
           <td><b>${exact(result.scores[enemy.index])}</b></td></tr>` : ''}
       </table>
-      ${result.detail ? '<p class="fin-note">Score : la moitié des ressources récoltées, le prix de ce qui est encore debout, et deux fois le prix de ce qui a été abattu chez l’autre.</p>' : ''}`;
+      ${result.detail && this.world.positions.length ? `<p class="fin-note">Score : un point toutes les ${this.world.mode.positions.pas} secondes par position tenue.</p>`
+    : result.detail ? '<p class="fin-note">Score : la moitié des ressources récoltées, le prix de ce qui est encore debout, et deux fois le prix de ce qui a été abattu chez l’autre.</p>' : ''}`;
     // La capitale du joueur, telle que la carte la dessine : debout ou éteinte, pour les deux peuples.
     const image = illustrationDeFin(result, player.civ);
     const illustration = image

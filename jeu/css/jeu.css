@@ -422,6 +422,12 @@ ul.help a { color: var(--gold); }
 #score-box b { font-weight: 700; }
 .score-icone { display: flex; color: var(--gold); }
 .score-icone svg.ic { width: 11px; height: 11px; }
+/* Prise de positions : un losange par position, à la couleur de qui la tient ;
+   il bat quand quelqu'un est en train de la prendre. */
+#positions-box { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; margin-left: 2px; }
+#positions-box i { display: block; width: 9px; height: 9px; transform: rotate(45deg); background: #b9b3a6; border: 1px solid rgba(255, 255, 255, .85); }
+#positions-box i.prise { animation: position-prise .7s steps(2, jump-none) infinite; }
+@keyframes position-prise { from { opacity: 1; } to { opacity: .35; } }
 #age-box { min-width: 0; }
 #age-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #game-timer, .age-progress { flex: 0 0 auto; }

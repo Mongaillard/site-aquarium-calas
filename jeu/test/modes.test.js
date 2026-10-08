@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { World } from '../js/game.js';
+import { serializeWorld, restoreWorld } from '../js/save.js';
 import { GAME_MODES, MAP_SIZES, DIFFICULTIES, DEFAULT_MODE, BUILDING_TYPES, TICKS_PER_SECOND, TILE } from '../js/config.js';
 import { PROGRESSION as R } from '../js/progression-config.js';
 import { profilNeuf, appliquerResultat, tableDesCoffres, verifierProbabilites } from '../js/progression.js';
@@ -51,8 +52,8 @@ function jouer(options, { deuxOrdinateurs = false, max = 400 } = {}) {
 // ---------------------------------------------------------------------------
 console.log('=== Escarmouche ===\n--- Le format ---');
 const E = GAME_MODES.escarmouche;
-check('trois formats : Escarmouche, Express, Classique — et le Classique reste celui par défaut',
-  Object.keys(GAME_MODES).join() === 'escarmouche,express,classique' && DEFAULT_MODE === 'classique');
+check('quatre formats : Escarmouche, Express, Prise de positions, Classique — et le Classique reste celui par défaut',
+  Object.keys(GAME_MODES).join() === 'escarmouche,express,positions,classique' && DEFAULT_MODE === 'classique');
 check('cinq minutes, sur la carte minuscule, deux fois plus petite que celle d’Express',
   E.timeLimit === 300 && E.mapSize === 'tiny' && MAP_SIZES.tiny.tiles === 48 && MAP_SIZES.tiny.tiles ** 2 * 2 < MAP_SIZES[GAME_MODES.express.mapSize].tiles ** 2);
 check('réserves pleines, en chiffres ronds : 1 000 vivres, 1 000 bois, 500 or', E.resources.food === 1000 && E.resources.wood === 1000 && E.resources.gold === 500);
@@ -150,6 +151,203 @@ console.log('--- Le classement et les coffres ---');
   const main = lire('js/main.js'), ecrans = lire('js/progression-ecrans.js');
   check('la partie dit son format au classement, à sa fin comme à son abandon', /format: this\.world\.modeId/.test(main) && /format: save\.mode/.test(main));
   check('l’écran des coffres montre la table de l’Escarmouche sous celle de tous', /s\.parFormat/.test(ecrans) && /un cran en dessous/.test(ecrans));
+}
+
+// ===========================================================================
+console.log('\n=== Prise de positions ===\n--- Le format ---');
+const P = GAME_MODES.positions, RP = P.positions;
+check('trois positions, un cercle de 3 cases, 10 secondes pour prendre, 1 point toutes les 5 secondes, le premier à 200',
+  RP.nombre === 3 && RP.rayon === 3 && RP.prise === 10 && RP.pas === 5 && RP.but === 200);
+check('la carte et le départ d’Express, quinze minutes au plus', P.mapSize === GAME_MODES.express.mapSize && P.startAge === 1 && P.villagers === 7
+  && JSON.stringify(P.resources) === JSON.stringify(GAME_MODES.express.resources) && P.popMax === 40 && P.timeLimit === 900);
+check('raser le bâtiment principal adverse gagne aussi — et il y garde tous ses points de vie', P.victory === 'towncenter' && P.townCenterHp === 1);
+check('sa description donne la règle en une ligne', /trois positions/.test(P.desc) && /200/.test(P.desc) && /5 s/.test(P.desc));
+check('les autres formats n’ont ni positions ni points : leurs parties et leurs sauvegardes sont celles d’avant', ['escarmouche', 'express', 'classique'].every((mode) => {
+  const w = new World({ seed: 5, mode });
+  return w.positions.length === 0 && !('positions' in w.players[0].stats) && !('positions' in serializeWorld(w)) && !('pasDePoints' in serializeWorld(w));
+}));
+
+console.log('--- Les positions sur la carte ---');
+{
+  const ok = { nombre: true, egales: true, bornes: true, prise: true, abords: true, reliees: true, memes: true, ecartees: true };
+  const details = [];
+  for (const seed of [...GRAINES, 99, 2026, 77, 123456]) {
+    const w = new World({ seed, mode: 'positions' });
+    const [a, b] = w.map.startPositions;
+    if (w.positions.length !== 3) ok.nombre = false;
+    for (const pos of w.positions) {
+      const da = Math.hypot(pos.tx - a.tx, pos.ty - a.ty), db = Math.hypot(pos.tx - b.tx, pos.ty - b.ty);
+      if (Math.abs(da - db) > 1.5) { ok.egales = false; details.push(`graine ${seed} : ${da.toFixed(1)} / ${db.toFixed(1)}`); }
+      if (pos.tx < 6 || pos.ty < 6 || pos.tx > w.map.w - 7 || pos.ty > w.map.h - 7) ok.bornes = false;
+      if (!w.map.isBlocked(pos.tx, pos.ty)) ok.prise = false;
+      // Autour du monument, le terrain est dégagé : on peut s'y tenir.
+      let libres = 0;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if ((dx || dy) && !w.map.isBlocked(pos.tx + dx, pos.ty + dy) && !w.map.resourceAt(pos.tx + dx, pos.ty + dy)) libres++;
+      if (libres < 24) ok.abords = false;
+      for (const base of [a, b]) if (!w.map.floodReaches(w.map.findFreeTile(base.tx, base.ty), { tx: pos.tx, ty: pos.ty + 1 })) ok.reliees = false;
+    }
+    const d = (p, q) => Math.hypot(p.tx - q.tx, p.ty - q.ty);
+    if (d(w.positions[0], w.positions[1]) < 12 || d(w.positions[1], w.positions[2]) < 12) ok.ecartees = false;
+    const milieu = w.positions[1];
+    if (Math.abs(milieu.tx - w.map.w / 2) > 1 || Math.abs(milieu.ty - w.map.h / 2) > 1) ok.egales = false;
+    if (JSON.stringify(new World({ seed, mode: 'positions' }).positions) !== JSON.stringify(w.positions)) ok.memes = false;
+  }
+  check('trois positions par carte, sur dix graines', ok.nombre);
+  check('chacune à égale distance des deux bases, celle du milieu au centre de la carte', ok.egales, details.join(' ; '));
+  check('aucune au bord de la carte, et douze cases au moins entre deux voisines', ok.bornes && ok.ecartees);
+  check('la case du monument est prise, le terrain autour est dégagé', ok.prise && ok.abords);
+  check('toutes sont reliées aux deux bases', ok.reliees);
+  check('la même graine les pose au même endroit', ok.memes);
+}
+
+console.log('--- Prendre, tenir, perdre ---');
+/** Une partie sans ordinateur ni éclaireurs : seuls comptent les soldats qu'on y pose. */
+function terrain(seed = 42) {
+  const w = new World({ seed, mode: 'positions' });
+  w.ais.length = 0;
+  for (const u of w.units) if (!u.isAnimal && !u.isVillager) u.dead = true;
+  return w;
+}
+const poser = (w, camp, type, pos, n = 2, dy = 1.2) => Array.from({ length: n }, (_, i) => {
+  const u = w.spawnUnit(camp, type, pos.x + (i - (n - 1) / 2) * 20, pos.y + TILE * dy);
+  w.setStance([u], 'passive');   // ils tiennent la place sans se battre : c'est la règle qu'on mesure
+  return u;
+});
+const avancer = (w, secondes, vus = []) => { const pas = Math.round(secondes * TICKS_PER_SECOND); for (let i = 0; i < pas && !w.gameOver; i++) { w.update(DT); vus.push(...w.drainEvents().filter((e) => e.type === 'position')); } return vus; };
+{
+  const w = terrain(), pos = w.positions[1];
+  poser(w, 0, 'militia', pos);
+  let vus = avancer(w, 9.5);
+  check('deux soldats seuls dans le cercle : rien avant dix secondes, mais la prise avance', pos.camp === -1 && pos.preneur === 0 && pos.prise > 0 && vus.length === 0, `prise ${pos.prise} pas`);
+  vus = avancer(w, 0.6);
+  check('à dix secondes, la position est à eux, et la partie l’annonce', pos.camp === 0 && pos.preneur === -1 && pos.prise === 0 && vus.length === 1 && vus[0].camp === 0 && vus[0].ancien === -1 && vus[0].position === 1);
+  for (const u of w.units) if (u.playerIndex === 0 && !u.isVillager && !u.isAnimal) u.dead = true;
+  avancer(w, 20);
+  check('ils partent : elle reste à leur camp', pos.camp === 0 && pos.presents.join() === '0,0');
+  const avant = w.players[0].stats.positions;
+  avancer(w, 60);
+  check('elle rapporte un point toutes les cinq secondes : douze en une minute', w.players[0].stats.positions - avant === 12 && w.players[1].stats.positions === 0, `${w.players[0].stats.positions - avant}`);
+  check('le score du format, ce sont ces points, et rien d’autre', w.score(w.players[0]) === w.players[0].stats.positions && JSON.stringify(Object.keys(w.detailScore(w.players[0]))) === '["positions","total"]');
+
+  const rouges = poser(w, 1, 'militia', pos);
+  vus = avancer(w, 5);
+  check('l’adversaire arrive seul : la reprise commence, la position est encore au premier', pos.camp === 0 && pos.preneur === 1 && pos.prise === 5 * TICKS_PER_SECOND);
+  const bleus = poser(w, 0, 'spearman', pos, 2, -1.2);
+  avancer(w, 8);
+  check('les deux camps dans le cercle : disputée, plus rien ne bouge', pos.camp === 0 && pos.prise === 5 * TICKS_PER_SECOND && pos.presents.join() === '2,2');
+  for (const u of rouges) u.dead = true;
+  avancer(w, 3);
+  check('son propriétaire resté seul : la reprise entamée se défait, au même rythme', pos.camp === 0 && pos.prise === 2 * TICKS_PER_SECOND && pos.preneur === 1);
+  avancer(w, 3);
+  check('… jusqu’à rien', pos.prise === 0 && pos.preneur === -1);
+  for (const u of bleus) u.dead = true;
+  poser(w, 1, 'militia', pos);
+  vus = avancer(w, 10.5);
+  check('l’adversaire seul dix secondes : il la reprend, et la partie dit à qui elle était', pos.camp === 1 && vus.length === 1 && vus[0].camp === 1 && vus[0].ancien === 0);
+}
+{
+  const w = terrain(7), pos = w.positions[0];
+  poser(w, 0, 'villager', pos, 3);
+  poser(w, 0, 'priest', pos, 1, -1.2);
+  avancer(w, 15);
+  check('des ouvriers et une soigneuse ne prennent rien : il faut des soldats', pos.camp === -1 && pos.prise === 0 && pos.presents.join() === '0,0');
+  const loin = w.spawnUnit(0, 'militia', pos.x + TILE * (RP.rayon + 1.5), pos.y);
+  w.setStance([loin], 'passive');
+  avancer(w, 15);
+  check('un soldat juste hors du cercle non plus', pos.camp === -1 && pos.presents[0] === 0);
+  const eclaireur = poser(w, 0, 'scout', pos, 1);
+  avancer(w, 4);
+  eclaireur[0].dead = true;
+  avancer(w, 2);
+  check('une prise abandonnée en route se défait', pos.camp === -1 && pos.preneur === 0 && pos.prise === 2 * TICKS_PER_SECOND);
+  avancer(w, 3);
+  check('… et il faudra la reprendre du début', pos.prise === 0 && pos.preneur === -1);
+}
+
+console.log('--- Gagner ---');
+{
+  const w = terrain(), pos = w.positions[1];
+  poser(w, 0, 'militia', pos);
+  avancer(w, 11);
+  w.players[0].stats.positions = RP.but - 1; w.players[1].stats.positions = 150;
+  avancer(w, 6);
+  const g = w.gameOver;
+  check('le premier à 200 points gagne sur-le-champ', !!g && g.positions === true && g.winner === 0 && g.victory === true && !g.timeUp, g ? `${g.scores}` : 'pas finie');
+  check('… et le résultat porte les points des deux camps', !!g && g.scores.join() === `${RP.but},150` && g.detail[0].positions === RP.but);
+
+  const t = terrain(); t.time = P.timeLimit - 1;
+  t.players[0].stats.positions = 120; t.players[1].stats.positions = 141;
+  avancer(t, 2);
+  check('à quinze minutes, le meilleur total l’emporte', !!t.gameOver && t.gameOver.timeUp === true && t.gameOver.winner === 1 && t.gameOver.victory === false && t.gameOver.scores.join() === '120,141');
+  const e = terrain(); e.time = P.timeLimit - 1;
+  e.players[0].stats.positions = 99; e.players[1].stats.positions = 99;
+  avancer(e, 2);
+  check('… et deux totaux égaux font une égalité', !!e.gameOver && e.gameOver.winner === -1);
+
+  const c = terrain();
+  centre(c, 1).takeDamage(99999, null);
+  avancer(c, 1);
+  check('raser le bâtiment principal adverse gagne aussi, quels que soient les points', !!c.gameOver && c.gameOver.winner === 0 && c.gameOver.victory === true && !c.gameOver.positions);
+  check('ce bâtiment a tous ses points de vie, deux fois ceux d’Express', centre(terrain(), 0).maxHp === BUILDING_TYPES.towncenter.hp && centre(new World({ seed: 1, mode: 'express' }), 0).maxHp * 2 === BUILDING_TYPES.towncenter.hp);
+}
+
+console.log('--- La sauvegarde ---');
+{
+  const w = new World({ seed: 808, mode: 'positions' });
+  w.addAI(0);
+  while (w.time < 260) w.update(DT);
+  const pos = w.positions[2];
+  poser(w, 0, 'militia', pos);
+  for (let i = 0; i < 77; i++) w.update(DT);
+  const image = JSON.parse(JSON.stringify(serializeWorld(w)));
+  const r = restoreWorld(image);
+  const etat = (m) => JSON.stringify({ p: m.positions.map((x) => [x.tx, x.ty, x.camp, x.preneur, x.prise]), points: m.players.map((x) => x.stats.positions), pas: m.pasDePoints });
+  check('une partie rechargée retrouve ses positions, les prises entamées, les points et le compte en cours', !!r && etat(r) === etat(w) && r.positions[2].prise > 0, r ? etat(r) : 'illisible');
+  check('… et les soldats que l’ordinateur y avait postés', !!r && JSON.stringify(r.ais.map((a) => [...a.gardes])) === JSON.stringify(w.ais.map((a) => [...a.gardes])));
+  // (Par identifiant : la reprise range les entités dans un autre ordre.)
+  const empreinte = (m) => m.entities.filter((x) => !x.dead).sort((x, y) => x.id - y.id).map((x) => `${x.id}:${x.type}:${Math.round(x.x)}:${Math.round(x.y)}:${Math.round(x.hp)}`).join('|') + etat(m);
+  for (let i = 0; i < 60 * TICKS_PER_SECOND; i++) { w.update(DT); r.update(DT); }
+  check('une minute plus tard, les deux parties sont encore la même', empreinte(w) === empreinte(r));
+}
+
+console.log('--- L’ordinateur ---');
+{
+  const suivre = (options, deuxOrdinateurs) => {
+    const w = new World(options);
+    if (deuxOrdinateurs) w.addAI(0);
+    const prises = [];
+    let premiereVague = null, gardesMax = 0;
+    while (!w.gameOver && w.time < 1000) {
+      w.update(DT);
+      for (const e of w.drainEvents()) if (e.type === 'position') prises.push({ t: w.time, ...e });
+      if (premiereVague === null && w.ais.some((a) => a.waveCount > 0)) premiereVague = w.time;
+      gardesMax = Math.max(gardesMax, ...w.ais.map((a) => a.gardes.size));
+    }
+    return { w, prises, premiereVague, gardesMax };
+  };
+  const passives = [1, 42, 808].map((seed) => suivre({ seed, mode: 'positions', difficulty: 'normal' }, false));
+  check('contre un joueur qui ne fait rien, il prend sa première position avant trois minutes', passives.every((p) => p.prises.length > 0 && p.prises[0].t < 180 && p.prises[0].camp === 1), passives.map((p) => (p.prises[0] ? mmss(p.prises[0].t) : 'jamais')).join(', '));
+  check('… finit par les tenir toutes les trois, et gagne aux points avant treize minutes', passives.every((p) => p.w.gameOver && p.w.gameOver.positions && p.w.gameOver.winner === 1 && p.w.positions.every((x) => x.camp === 1) && p.w.time < 780),
+    passives.map((p) => `${mmss(p.w.time)} (${p.w.players[1].stats.positions} points)`).join(', '));
+  check('… en y laissant des soldats de garde', passives.every((p) => p.gardesMax >= 3), passives.map((p) => p.gardesMax).join(', '));
+  check('il ne rase pas pour autant la base du joueur avant d’avoir tout pris', passives.every((p) => !!centre(p.w, 0)));
+  const duels = [1, 42, 808].map((seed) => suivre({ seed, mode: 'positions', difficulty: 'normal' }, true));
+  check('deux ordinateurs face à face : les positions changent de mains, les deux camps marquent', duels.every((p) => p.prises.length >= 4 && p.w.players.every((j) => j.stats.positions > 30) && new Set(p.prises.map((x) => x.camp)).size === 2),
+    duels.map((p) => `${p.prises.length} prises, ${p.w.players.map((j) => j.stats.positions).join('/')}`).join(' ; '));
+  check('… et la partie finit à quinze minutes au plus tard', duels.every((p) => p.w.gameOver && p.w.time <= 900 + DT), duels.map((p) => mmss(p.w.time)).join(', '));
+  const facile = suivre({ seed: 42, mode: 'positions', difficulty: 'easy' }, false);
+  check('en Facile, trois minutes de trêve : aucune vague avant', DIFFICULTIES.easy.treve.positions === 180 && facile.premiereVague >= 180 && /3 min en Prise de positions/.test(DIFFICULTIES.easy.desc), mmss(facile.premiereVague || 0));
+}
+
+console.log('--- À l’écran, au classement ---');
+{
+  const main = lire('js/main.js'), ui = lire('js/ui.js'), rendu = lire('js/render.js'), page = lire('index.html'), sw = lire('sw.js');
+  check('la partie annonce une position prise, perdue (avec l’endroit), ou prise par l’adversaire', /case 'position':/.test(main) && /Position prise !/.test(main) && /Position perdue !/.test(main) && /L’adversaire prend une position/.test(main));
+  check('le haut de l’écran montre les points et un losange par position', /id="positions-box"/.test(page) && /positionsBox/.test(ui) && /etatDesPositions/.test(ui));
+  check('la carte dessine le cercle de prise, son arc et le monument ; la mini-carte, un losange par position', /dessinerCerclesDesPositions\(\)/.test(rendu) && /dessinerMonument\(e\.pos\)/.test(rendu) && /for \(const pos of this\.world\.positions\) \{\n      const x = pos\.x \/ TILE \* scale/.test(rendu));
+  check('le monument a son illustration, dans la liste hors ligne, et un dessin de repli', fs.existsSync(path.join(RACINE, 'assets/position.webp')) && sw.includes("'./assets/position.webp'") && /assets\/position\.webp/.test(rendu) && /POSITION_NEUTRE/.test(rendu));
+  check('l’aide explique la règle, et l’écran de fin dit ce qui a tranché', /Tenez des <b>soldats<\/b> dans le cercle/.test(ui) && /Vous tenez les positions/.test(ui) && /les points des positions départagent/.test(ui) && /Points des positions/.test(ui));
+  check('elle compte au classement, avec les coffres de tous les formats', tableDesCoffres('positions') === R.sources.partie);
 }
 
 console.log(`\n${failures === 0 ? 'Tous les tests passent' : failures + ' test(s) en échec'}`);

@@ -333,7 +333,11 @@ export class GameMap {
     const [a, b] = this.startPositions;
     if (!a || !b) return;
     if (this.floodReaches(a, b)) return;
-    // Couloir rectiligne de 3 cases de large entre les deux bases.
+    this.creuserCouloir(a, b);
+  }
+
+  /** Un couloir de 3 cases de large d'une case à l'autre : l'eau devient du sable, ce qui gêne est ôté. */
+  creuserCouloir(a, b) {
     let x = a.tx, y = a.ty;
     const steps = Math.abs(b.tx - a.tx) + Math.abs(b.ty - a.ty);
     const sx = Math.sign(b.tx - a.tx), sy = Math.sign(b.ty - a.ty);
@@ -353,6 +357,35 @@ export class GameMap {
       else if (x !== b.tx) x += sx;
       else break;
     }
+  }
+
+  /**
+   * Format « Prise de positions » : `nombre` positions sur la ligne médiane,
+   * perpendiculaire à l'axe des deux bases et passant par le centre — chacune
+   * à égale distance des deux camps. Le terrain est dégagé autour de chacune,
+   * un couloir est creusé si l'une est coupée des bases, et sa case même est
+   * prise (un monument s'y dresse). Ne dépend que de la carte : une partie
+   * rechargée refait exactement le même aménagement.
+   */
+  amenagerPositions(nombre) {
+    const { w, h } = this;
+    const [a, b] = this.startPositions;
+    const cx = (a.tx + b.tx) / 2, cy = (a.ty + b.ty) / 2;
+    const axe = Math.hypot(b.tx - a.tx, b.ty - a.ty) || 1;
+    const px = -(b.ty - a.ty) / axe, py = (b.tx - a.tx) / axe;   // la médiane, vecteur unité
+    const ecart = w * 0.354;   // les positions des ailes au quart et aux trois quarts de la diagonale
+    const borne = (v, max) => Math.max(6, Math.min(max - 7, v));
+    this.positions = [];
+    for (let k = 0; k < nombre; k++) {
+      const t = (k - (nombre - 1) / 2) * ecart;
+      const p = { tx: borne(Math.round(cx + px * t), w), ty: borne(Math.round(cy + py * t), h) };
+      this.clearArea(p.tx, p.ty, 2);
+      this.positions.push(p);
+    }
+    for (const p of this.positions) if (!this.floodReaches(a, p)) this.creuserCouloir(a, p);
+    for (const p of this.positions) this.block(p.tx, p.ty, BLOCK.TERRAIN);
+    this.dirty = true;
+    return this.positions;
   }
 
   floodReaches(from, to) {

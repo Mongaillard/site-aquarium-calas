@@ -168,6 +168,8 @@ function serializeAI(ai) {
     // Les bâtiments ennemis qui tirent près de sa base : ses unités évitent
     // leurs abords, et les chemins déjà demandés en dépendent.
     zones: ai.zones.map((z) => ({ ...z })),
+    // (Prise de positions : ses soldats postés. Champ absent ailleurs.)
+    ...(ai.gardes && ai.gardes.size ? { gardes: [...ai.gardes] } : {}),
   };
 }
 
@@ -221,6 +223,11 @@ export function serializeWorld(world, extra = {}) {
     ais: world.ais.map(serializeAI),
     // (Champ écrit pour une partie d'essai seulement : les sauvegardes des autres parties ne changent pas.)
     ...(world.essai ? { essai: world.essai } : {}),
+    // (Prise de positions : qui tient quoi, les prises entamées, et où en est le compte des points.)
+    ...(world.positions.length ? {
+      positions: world.positions.map((p) => ({ camp: p.camp, preneur: p.preneur, prise: p.prise })),
+      pasDePoints: world.pasDePoints,
+    } : {}),
     ...extra,
   };
 }
@@ -253,6 +260,15 @@ export function restoreWorld(data) {
   world.fogTimer = data.fogTimer || 0;
   world.popWarnCooldown = data.popWarnCooldown || 0;
   world.accessResetTimer = data.accessResetTimer || 0;
+  // (Les positions sont à leur place, refaites avec la carte : seul leur état vient de la sauvegarde.)
+  (data.positions || []).forEach((saved, i) => {
+    const pos = world.positions[i];
+    if (!pos || !saved) return;
+    pos.camp = saved.camp === 0 || saved.camp === 1 ? saved.camp : -1;
+    pos.preneur = saved.preneur === 0 || saved.preneur === 1 ? saved.preneur : -1;
+    pos.prise = Math.max(0, Math.floor(saved.prise) || 0);
+  });
+  world.pasDePoints = Math.max(0, Math.floor(data.pasDePoints) || 0);
 
   // 1. La carte : gisements disparus, puis contenu restant.
   for (const i of data.map.disparus) world.map.clearResource(i);
@@ -442,6 +458,7 @@ export function restoreWorld(data) {
     ai.assauts = { ...(saved.assauts || {}) };
     ai.assautsAge = saved.assautsAge || 0;
     ai.zones = (saved.zones || []).map((z) => ({ ...z }));
+    ai.gardes = new Map(Array.isArray(saved.gardes) ? saved.gardes : []);
     ai.poserZones();
   }
 

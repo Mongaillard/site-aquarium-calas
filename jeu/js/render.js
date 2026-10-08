@@ -6,17 +6,63 @@
 // sont des tracés vectoriels (voir icones.js).
 // ---------------------------------------------------------------------------
 
-import { TILE, BUILDING_TYPES, UNIT_TYPES } from './config.js';
+import { TILE, TICKS_PER_SECOND, BUILDING_TYPES, UNIT_TYPES } from './config.js';
 import { iconePath, ICON_BOX } from './icones.js';
 import {
   chargerSprites, chargerTextures, textureSol, spriteDe, imagePourJoueur, caseDirection, cadreSource, imageDeMarche, poseSource,
-  rendu3dDirect, etatModeles3d,
+  rendu3dDirect, etatModeles3d, recolorer,
 } from './sprites.js';
 import { Rendu3D } from './rendu3d.js';
 import { TERRAIN } from './map.js';
 import { planterDecor, ECHELLE_DECOR, SOL_SABLE_OR, solEn, solPlein, solDeBase, solApparent, releverBatiments, filtrerDecor, caseArbre } from './decor.js';
 import { STATE, villagerTask } from './entities.js';
 import { clamp, dist, bruitPeriodique } from './utils.js';
+
+/** Prise de positions : la couleur d'une position que personne ne tient. */
+const POSITION_NEUTRE = { main: '#b9b3a6', light: '#e8e3d8', dark: '#6f6a60' };
+/**
+ * L'illustration du monument d'une position, en trois bannières : bleue
+ * (l'image telle quelle), rouge et grise (la fenêtre du bleu roi basculée ou
+ * éteinte, comme pour les troupes). Chargée à la première demande ; null tant
+ * qu'elle n'est pas là, ou si elle manque.
+ */
+let positionImages = null, positionDemandee = false;
+/**
+ * La bannière d'une position que personne ne tient : son bleu devient une
+ * toile écrue, claire — ni bleue ni rouge, elle se lit comme « à prendre ».
+ * Seuls les pixels franchement bleus changent ; leurs plis gardent leur relief.
+ */
+function banniereNeutre(image, l, h) {
+  const toile = document.createElement('canvas');
+  toile.width = l; toile.height = h;
+  const ctx = toile.getContext('2d');
+  ctx.drawImage(image, 0, 0);
+  const data = ctx.getImageData(0, 0, l, h), p = data.data;
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i + 3] === 0) continue;
+    const r = p[i], g = p[i + 1], b = p[i + 2];
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    if (b !== max || max - min < 60 || b - r < 50) continue;   // pas un bleu franc
+    const clair = 0.42 + 0.58 * ((max + min) / 510);            // la luminosité du pli, remontée
+    p[i] = Math.round(236 * clair); p[i + 1] = Math.round(226 * clair); p[i + 2] = Math.round(204 * clair);
+  }
+  ctx.putImageData(data, 0, 0);
+  return toile;
+}
+function imagesDePosition() {
+  if (positionImages || positionDemandee || typeof Image === 'undefined') return positionImages;
+  positionDemandee = true;
+  const image = new Image();
+  image.onload = () => {
+    const l = image.naturalWidth, h = image.naturalHeight;
+    const bleu = { recolorage: { teinte: [200, 255], vers: 0, satMin: 0.3 } };
+    try {
+      positionImages = { bleu: image, rouge: recolorer(bleu, image, l, h), neutre: banniereNeutre(image, l, h) };
+    } catch { positionImages = { bleu: image, rouge: image, neutre: image }; }
+  };
+  image.src = 'assets/position.webp';
+  return null;
+}
 
 // Les troupes posées dans le monde. Bâtiments et arbres ont leur ombre peinte
 // au pied, du côté opposé à la lumière (elle vient d'en haut à gauche) : chaque
@@ -656,6 +702,7 @@ export class Renderer {
     this.drawResources(view);
     this.drawRubble();
     this.dessinerCadavres();
+    this.dessinerCerclesDesPositions();
     this.drawEntities();
     this.drawProjectiles();
     this.drawEffects();
@@ -1379,6 +1426,73 @@ export class Renderer {
     }
   }
 
+  /** La couleur d'une position : celle du camp qui la tient, un gris clair si personne. */
+  couleurDePosition(camp) {
+    return camp >= 0 ? this.world.players[camp].color : POSITION_NEUTRE;
+  }
+
+  /**
+   * Prise de positions : au sol, le cercle de prise de chaque position. Sa
+   * couleur dit qui la tient ; un arc plus épais, à la couleur du camp qui la
+   * prend, se referme à mesure que la prise avance ; le trait est en
+   * pointillés tant qu'elle est disputée.
+   */
+  dessinerCerclesDesPositions() {
+    const w = this.world;
+    if (!w.positions.length) return;
+    const ctx = this.ctx, r = w.mode.positions.rayon * TILE, duree = w.mode.positions.prise * TICKS_PER_SECOND;
+    for (const pos of w.positions) {
+      const couleur = this.couleurDePosition(pos.camp);
+      const disputee = pos.presents[0] > 0 && pos.presents[1] > 0;
+      ctx.save();
+      ctx.globalAlpha = 0.13;
+      ctx.fillStyle = couleur.main;
+      ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = couleur.light;
+      ctx.lineWidth = 2;
+      if (disputee) ctx.setLineDash([7, 6]);
+      ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      if (pos.preneur >= 0 && pos.prise > 0) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = w.players[pos.preneur].color.main;
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, pos.prise / duree)); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Le monument d'une position : son illustration (assets/position.webp, la
+   * bannière à la couleur du camp qui la tient, grise si personne) ; tant
+   * qu'elle n'est pas chargée, un mât et sa bannière dessinés au code.
+   */
+  dessinerMonument(pos) {
+    const ctx = this.ctx;
+    const pied = pos.y + TILE / 2 - 4;
+    const images = imagesDePosition();
+    const image = images && (pos.camp === 0 ? images.bleu : pos.camp === 1 ? images.rouge : images.neutre);
+    if (image) {
+      // Le socle de pierre au centre de la case : il est à 43 % de la largeur et 84 % de la hauteur de l'image (la bannière déborde à droite).
+      const l = TILE * 2.3, h = l * image.height / image.width;
+      ctx.drawImage(image, pos.x - l * 0.43, pos.y - h * 0.84, l, h);
+      return;
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath(); ctx.ellipse(pos.x + 2, pied - 1, TILE * 0.62, TILE * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+    const couleur = this.couleurDePosition(pos.camp);
+    ctx.fillStyle = '#8d8676';
+    ctx.fillRect(pos.x - 9, pied - 8, 18, 8);
+    ctx.fillStyle = '#5b4a36';
+    ctx.fillRect(pos.x - 1.5, pied - 50, 3, 44);
+    ctx.fillStyle = couleur.main;
+    ctx.beginPath(); ctx.moveTo(pos.x + 1.5, pied - 50); ctx.lineTo(pos.x + 24, pied - 43); ctx.lineTo(pos.x + 1.5, pied - 34); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
   /** Entités triées par ordonnée : illusion de profondeur. */
   drawEntities() {
     const view = this.visibleTileRange();
@@ -1431,6 +1545,11 @@ export class Renderer {
     // nord) reste caché par les toits — c'est l'effet voulu.
     // Un arbre se classe au pied de sa case, un peu avant une unité qui s'y
     // tiendrait devant : celle-ci est dessinée par-dessus le tronc.
+    // Prise de positions : le monument de chaque position, classé au pied de sa case comme un arbre.
+    for (const pos of this.world.positions) {
+      if (pos.x < view.left - TILE * 3 || pos.x > view.right + TILE * 3 || pos.y < view.top - TILE * 2 || pos.y > view.bottom + TILE * 5) continue;
+      list.push({ kind: 'position', pos, y: pos.y + 12 });
+    }
     this.preparer3d(list);
     const rang = (e) => (e.kind === 'building' ? e.ty * TILE + 8 : e.kind === 'vegetation' ? (e.ty + 1) * TILE - 6 : e.kind === 'decor' ? e.d.y - 1 : e.y);
     list.sort((a, b) => rang(a) - rang(b));
@@ -1439,6 +1558,7 @@ export class Renderer {
       if (e.kind === 'building') this.drawBuilding(e);
       else if (e.kind === 'vegetation') this.dessinerVegetation(e.res, e.sprite);
       else if (e.kind === 'decor') this.dessinerPiece(e.d, e.sprite);
+      else if (e.kind === 'position') this.dessinerMonument(e.pos);
       else {
         // Ce qui est au sol d'abord, pour toute une suite de troupes : leurs
         // ombres, puis leurs anneaux de camp. Dans une mêlée, ni ombre ni
@@ -2643,6 +2763,16 @@ export class Renderer {
       ctx.fillStyle = e.player.color.main;
       const s = e.kind === 'building' ? Math.max(3, e.size * scale) : Math.max(2, scale * 1.2);
       ctx.fillRect(e.x / TILE * scale - s / 2, e.y / TILE * scale - s / 2, s, s);
+    }
+
+    // Prise de positions : un losange par position, à la couleur de qui la tient —
+    // toujours visible, brouillard ou non : ce sont les objectifs de la partie.
+    for (const pos of this.world.positions) {
+      const x = pos.x / TILE * scale, y = pos.y / TILE * scale, d = Math.max(4.5, scale * 2.2);
+      ctx.beginPath(); ctx.moveTo(x, y - d); ctx.lineTo(x + d, y); ctx.lineTo(x, y + d); ctx.lineTo(x - d, y); ctx.closePath();
+      ctx.fillStyle = this.couleurDePosition(pos.camp).main;
+      ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.stroke();
     }
 
     // Cadre de la vue courante
