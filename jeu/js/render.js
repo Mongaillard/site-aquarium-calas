@@ -2270,6 +2270,10 @@ export class Renderer {
     u._fxTimer = (u._fxTimer || 0) - (this.dt || 1 / 60);
     if (u._fxTimer > 0) return;
     u._fxTimer = 0.32;
+    // Un coup sur deux s'entend (hache, pioche, cueillette, marteau) : `surGeste`
+    // est posé par la partie (main.js), le rendu ne connaît pas le son.
+    u._coups = (u._coups || 0) + 1;
+    if (this.surGeste && u._coups % 2 === 1) this.surGeste(u.state === 'build' ? 'build' : u.carry.type);
     const teintes = { wood: '#b07a42', gold: '#f2c14e', food: '#d8695c' };
     const couleur = u.state === 'build' ? '#cbbfae' : (teintes[u.carry.type] || '#d8d2c4');
     const fx = Math.cos(u.facing), fy = Math.sin(u.facing);

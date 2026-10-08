@@ -698,6 +698,32 @@ qui dort n'est effacée qu'au second toucher. Tests :
 `node test/progression.test.js`, `node test/progression-partie.test.js`,
 `node test/rangement-durable.test.js`, `node test/troupes-nouvelles.test.js`.
 
+## Les sons
+
+Le jeu joue de vrais sons, des échantillons courts rangés dans `assets/sons/`
+(quarante fichiers `.m4a`, 293 Ko en tout). Ils viennent des paquets de
+**Kenney** (kenney.nl), sous licence **CC0** : usage commercial libre, sans
+mention obligatoire — leur provenance, fichier par fichier, est dans
+`assets/sons/SOURCES.md`. Les paquets d'origine (OGG, que l'iPhone ne lit pas)
+et les outils qui les décodent, les mesurent et fabriquent les `.m4a` sont hors
+du dépôt, dans `sons-sources/` à côté de `jeu/`.
+
+La table `BANQUE` de `js/audio.js` dit qui joue quoi : les quatorze sons
+d'origine (clic, sélection, ordre, pose, bâtiment fini, troupe formée, coup au
+corps à corps, tir, effondrement, alerte, passage d'âge, victoire, défaite,
+erreur), la chute d'une troupe, et les quatre gestes des ouvriers — hache,
+pioche, cueillette, marteau —, déclenchés par le rendu au rythme où il sème
+déjà copeaux et poussière (`Renderer.eclatsDeTravail`, un coup sur deux), donc
+seulement pour ce qui est à l'écran. Un son répété tire l'un de ses
+échantillons au hasard et varie un peu sa hauteur ; un écart minimal et un
+plafond de quatorze voix évitent la bouillie.
+
+Les échantillons se chargent au premier geste du joueur, sans rien bloquer.
+Tant que l'un d'eux n'est pas arrivé — ou s'il manque —, l'ancien son de
+synthèse le remplace : le jeu ne dépend d'aucun fichier pour se faire entendre.
+Le hasard du son ne touche pas la simulation (`Math.random`, pas la graine).
+Tests : `node test/sons.test.js`.
+
 ## Architecture
 
 ```
@@ -725,7 +751,7 @@ jeu/
 │   ├── icones.js         pictogrammes vectoriels (game-icons.net)
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
-│   ├── audio.js          sons générés à la volée (Web Audio)
+│   ├── audio.js          sons : échantillons (assets/sons) joués par Web Audio, synthèse en repli
 │   ├── modele3d.js       unités 3D (milicien, villageois, archer, Arbalétrier, Archer monté, lancier, Atlante, Champion, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse, Hydre) : modèles de l'Atelier cuits en atlas
 │   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case
 │   ├── main.js           écrans et boucle de jeu

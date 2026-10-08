@@ -136,6 +136,9 @@ class Game {
     this.ecouteurs = new AbortController();
     this.camera = new Camera(this.world);
     this.renderer = new Renderer(this.canvas, this.world, this.camera);
+    // Les gestes des ouvriers à l'écran s'entendent : la hache au bois, la pioche à l'or, la cueillette, le marteau au chantier.
+    const GESTES = { wood: 'chop', gold: 'mine', food: 'pick', build: 'hammer' };
+    this.renderer.surGeste = (quoi) => { if (GESTES[quoi]) audio.play(GESTES[quoi]); };
     this.finesse = loadFinesse();
     this.renderer.reglerFinesse(this.finesse === 'legere' ? 2 : 3);
     // Le garde-fou de cadence a réduit la toile : le zoom de départ, s'il n'a
@@ -420,7 +423,8 @@ class Game {
         case 'trained': if (mine) this.audio.play('trained'); break;
         case 'melee': if (this.world.isVisible(event.x, event.y)) this.audio.play('melee'); break;
         case 'shoot': if (this.world.isVisible(event.x, event.y)) this.audio.play('shoot'); break;
-        case 'destroyed': if (this.world.isVisible(event.x, event.y)) this.audio.play('destroyed'); break;
+        // (Un bâtiment s'effondre ; une troupe ou une bête tombe.)
+        case 'destroyed': if (this.world.isVisible(event.x, event.y)) this.audio.play(event.entity && event.entity.kind === 'building' ? 'destroyed' : 'death'); break;
         case 'notice': this.ui.toast(event.text, 'warn'); break;
         case 'idleWorker':
           // On prévient sans harceler : le compteur des inactifs reste la source de vérité.
