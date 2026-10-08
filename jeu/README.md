@@ -67,7 +67,7 @@ devant un dépôt (avant cette correction, deux parties sur huit finissaient
 par la chute d'un Centre-Ville). Un joueur qui masse ses troupes peut, lui,
 finir bien plus tôt.
 
-La **vitesse de jeu** — Tranquille ×0,75, Normal, Rapide ×1,5, Blitz ×2 —
+La **vitesse de jeu** — Tranquille 75 %, Normal 100 %, Rapide 150 %, Blitz 200 % —
 multiplie le nombre de pas de simulation par seconde réelle. Elle se change
 aussi en cours de partie depuis le menu pause, et le réglage est conservé d'une
 partie à l'autre. Le pas de temps, lui, ne bouge pas : la simulation reste
@@ -613,21 +613,51 @@ n'existe pas, l'adversaire d'une partie classée est l'ordinateur, et sa force
 suit la ligue : sa difficulté, sa vitesse de récolte et le niveau de ses
 troupes (table `echelle` des réglages).
 
-**Les coffres** se gagnent en jouant — bois à chaque victoire classée (cinq par
-jour au plus), argent tous les dix points de bataille (une victoire en vaut
-deux, une défaite un), or à chaque nouvelle ligue et pour trois jours joués dans
-la semaine, légendaire aux ligues 5, 8 et 10. Un coffre contient un nombre fixe
-de tirages : chacun choisit une catégorie selon une table affichée au joueur,
-puis une troupe débloquée de cette catégorie, à chances égales, et donne un
-nombre fixe de **fragments**. Aucun coffre ne se vend.
+**Les coffres** se gagnent en jouant : **chaque partie classée en donne un**,
+gagnée ou perdue. Son rang — bois, argent, or, légendaire — se tire au sort, et
+la victoire a de meilleures chances (table `sources.partie` des réglages,
+affichée au joueur sur l'écran des coffres) :
+
+| Issue | Bois | Argent | Or | Légendaire |
+|---|---|---|---|---|
+| Victoire | 20 % | 35 % | 35 % | 10 % |
+| Égalité | 45 % | 30 % | 20 % | 5 % |
+| Défaite | 65 % | 25 % | 10 % | jamais |
+
+Une défaite de moins de deux minutes, abandon compris, n'en donne pas. S'y
+ajoutent un coffre d'or pour trois jours joués dans la semaine, et celui de
+chaque nouvelle ligue (or, légendaire aux ligues 5, 8 et 10). Un coffre
+contient un nombre fixe de tirages : chacun choisit une catégorie selon une
+table affichée au joueur, puis une troupe débloquée de cette catégorie, à
+chances égales, et donne un nombre fixe de **fragments**. Un coffre par partie
+au lieu d'un toutes les deux ou trois : leur contenu a été allégé d'autant, et
+la simulation des tests (400 parties, soixante joueurs) retrouve le rythme
+d'avant — communes au niveau 3 après 60 parties, 4 après 120, 5 vers 400.
+Aucun coffre ne se vend. Chaque rang a son image (`assets/coffres/`, trois
+états : fermé, entrouvert, ouvert — l'ouverture les enchaîne sans fondu).
+
+**Des chiffres ronds partout.** Tout ce que le joueur lit est un entier, et
+c'est l'entier qui joue : les dégâts d'un niveau sont arrondis (`entiers` dans
+les réglages), la récolte de l'ouvrier se donne par minute (bois 33, 37, 41 ;
+vivres et or 30, 34, 37), le soin de la prêtresse monte d'un point entier, les
+chances des coffres sont des pour-cent ronds, la vitesse de jeu se lit en pour
+cent. `test/progression.test.js` le vérifie pour chaque troupe à chaque niveau.
 
 **Les fragments montent le niveau d'une troupe**, de 1 à 5 : +5 % de points de
-vie et de dégâts par niveau pour la plupart, la récolte pour l'ouvrier (+12,5 %
-aux niveaux 2 et 3, puis le chargement et la vitesse de chantier), le soin pour
-la prêtresse, la vitesse pour l'éclaireur. Ni la portée, ni la cadence, ni le
-coût ne changent. En partie classée, une troupe joue à son niveau **dans la
+vie et de dégâts par niveau pour la plupart (arrondis à l'entier), la récolte
+pour l'ouvrier (aux niveaux 2 et 3, puis le chargement et la vitesse de
+chantier), le soin pour la prêtresse, la vue pour l'éclaireur. Ni la portée, ni
+la cadence, ni le coût ne changent. En partie classée, une troupe joue à son niveau **dans la
 limite du plafond de la ligue**, et l'ouvrier monte d'office à ce plafond :
 l'économie n'est jamais inégale. En partie libre, elle joue à son niveau réel.
+
+**Chaque troupe a sa fiche** sur l'écran de la collection : quatre phrases
+courtes — son rôle, ce qu'elle bat, ce qu'elle craint, un conseil — écrites
+dans `js/fiches-troupes.js`. Les autres troupes y sont citées par un jeton
+(`{knight:p}`), remplacé par le nom que le peuple du joueur leur donne : un
+Solarien lit « Méharistes » là où un Atlante lit « Cavaliers ». Les chiffres
+cités (bonus, portées) sont recoupés avec les règles par
+`test/fiches-coffres.test.js`.
 
 **Sept troupes se débloquent**, en atteignant une ligue ou après un nombre de
 parties jouées. Tant qu'une troupe n'est pas débloquée, son bouton reste visible
@@ -752,6 +782,7 @@ jeu/
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons : échantillons (assets/sons) joués par Web Audio, synthèse en repli
+│   ├── fiches-troupes.js les fiches écrites des troupes (rôle, bat, craint, conseil)
 │   ├── modele3d.js       unités 3D (milicien, villageois, archer, Arbalétrier, Archer monté, lancier, Atlante, Champion, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse, Hydre) : modèles de l'Atelier cuits en atlas
 │   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case
 │   ├── main.js           écrans et boucle de jeu

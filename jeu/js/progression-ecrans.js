@@ -13,10 +13,11 @@ import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAu
 import { lireProgression, ecrireProgression } from './save.js';
 import { UNIT_TYPES, DEFAULT_CIV, nomDe, portraitDe } from './config.js';
 import { iconeSVG } from './icones.js';
+import { ficheDeTroupe } from './fiches-troupes.js';
 
 /** Les troupes que le jeu sait former, dans l'ordre des réglages. */
 const TROUPES = Object.keys(R.troupes).filter((type) => !R.troupes[type].aVenir && UNIT_TYPES[type]);
-const ORIGINES = { victoire: 'Victoire', bataille: 'Points de bataille', promotion: 'Promotion', semaine: 'Semaine jouée', saison: 'Fin de saison' };
+const ORIGINES = { victoire: 'Victoire', defaite: 'Défaite', egalite: 'Égalité', promotion: 'Promotion', semaine: 'Semaine jouée', saison: 'Fin de saison', bataille: 'Points de bataille' };
 
 let civ = DEFAULT_CIV;          // le peuple dont on montre les noms et les portraits
 let surChangement = () => {};   // l'accueil se redessine quand le profil change
@@ -125,33 +126,52 @@ function ecranLigues(profil) {
   if (ici && ici.scrollIntoView) ici.scrollIntoView({ block: 'center' });
 }
 
+/** Les trois états d'un coffre, chacun avec son image (assets/coffres) : fermé, entrouvert, ouvert. */
+export const ETATS_DE_COFFRE = ['ferme', 'entrouvert', 'ouvert'];
+/** Le chemin de l'image d'un coffre dans un état. */
+export const imageDeCoffre = (type, etat = 'ferme') => `assets/coffres/coffre-${type}-${etat}.webp`;
+/** L'image d'un coffre, à cette largeur (les fichiers font 300 × 330). */
+function coffre(type, etat, largeur, classe = '') {
+  return `<img class="prog-coffre-img ${classe}" src="${imageDeCoffre(type, etat)}" alt="" width="${largeur}" height="${Math.round(largeur * 1.1)}" decoding="async">`;
+}
+
+/** « bois », « argent », « or », « légendaire » : le rang d'un coffre, sans le mot « coffre ». */
+function nomCourtDuCoffre(type) {
+  return R.coffres[type].nom.replace('Coffre ', '').replace(/^d[e’] ?/, '');
+}
+
 function ecranCoffres(profil) {
   const aujourdhui = jourLocal();
   const s = R.sources;
   const liste = profil.coffres.map((c, i) => `
     <li class="prog-coffre" data-type="${c.type}">
-      <span class="prog-coffre-image">${iconeSVG('coffre', 34)}</span>
+      <span class="prog-coffre-image">${coffre(c.type, 'ferme', 56)}</span>
       <span class="prog-coffre-texte"><b>${R.coffres[c.type].nom}</b><small>${ORIGINES[c.origine] || ''}</small></span>
       <button class="icon-btn" data-ecran="probas" data-arg="${c.type}" aria-label="Probabilités">${iconeSVG('info', 18)}</button>
       <button class="btn primary small" data-act="ouvrir" data-i="${i}">Ouvrir</button>
     </li>`).join('');
-  const bois = profil.jour.date === aujourdhui ? profil.jour.coffresBois : 0;
   // Les compteurs de la semaine ne valent que pour la semaine où ils ont été pris.
   const semaine = profil.semaine.numero === semaineDuJour(aujourdhui) ? profil.semaine : { jours: 0, coffre: false };
+  const rangs = Object.keys(R.coffres);
+  const ISSUES = [['victoire', 'Victoire'], ['egalite', 'Égalité'], ['defaite', 'Défaite']];
   montrer('Coffres', `
-    ${liste ? `<ul class="prog-coffres">${liste}</ul>` : '<p class="prog-vide">Aucun coffre à ouvrir. Une victoire classée donne un coffre de bois.</p>'}
-    <h3>Les prochains</h3>
+    ${liste ? `<ul class="prog-coffres">${liste}</ul>` : '<p class="prog-vide">Aucun coffre à ouvrir. Chaque partie classée en donne un.</p>'}
+    <h3>Un coffre par partie</h3>
+    <p class="subtitle">Chaque partie classée donne un coffre, gagnée ou perdue. Son rang est tiré au sort : la victoire a de meilleures chances.</p>
+    <table class="scores prog-probas prog-rangs">
+      <tr><th></th>${rangs.map((r) => `<th aria-label="${R.coffres[r].nom}">${coffre(r, 'ferme', 38)}</th>`).join('')}</tr>
+      ${ISSUES.map(([issue, nom]) => `<tr><td>${nom}</td>${rangs.map((r) => `<td>${s.partie[issue][r] || 0} %</td>`).join('')}</tr>`).join('')}
+    </table>
+    <p class="hint">Une défaite de moins de ${Math.round(R.abandon.precoceAvant / 60)} minutes, abandon compris, ne donne pas de coffre.</p>
+    <h3>En plus</h3>
     <ul class="prog-prochains">
-      <li><span>Coffre de bois</span><small>à chaque victoire classée · ${bois} sur ${s.bois.parJourAuPlus} aujourd’hui</small></li>
-      <li><span>Coffre d’argent</span>
-        <span class="prog-barre"><span style="width:${part(profil.pointsDeBataille / s.argent.tousLes)}"></span></span>
-        <small>${profil.pointsDeBataille} sur ${s.argent.tousLes} points de bataille · une victoire en vaut ${s.argent.victoire}, une défaite ${s.argent.defaite}</small></li>
       <li><span>Coffre d’or</span>
-        <small>${semaine.coffre ? 'gagné cette semaine' : `en jouant ${s.or.joursJoues} jours dans la semaine · ${semaine.jours} sur ${s.or.joursJoues}`} · et à chaque nouvelle ligue</small></li>
+        <small>${semaine.coffre ? 'gagné cette semaine' : `en jouant ${s.or.joursJoues} jours dans la semaine · ${semaine.jours} sur ${s.or.joursJoues}`}</small></li>
+      <li><span>Un coffre à chaque nouvelle ligue</span><small>voir la route des ligues</small></li>
     </ul>
     <h3>Contenu et chances de chaque coffre</h3>
     <div class="modal-actions prog-choix-coffres">
-      ${Object.keys(R.coffres).map((type) => `<button class="btn small" data-ecran="probas" data-arg="${type}"><span class="prog-coffre-nom" data-type="${type}">${iconeSVG('coffre', 16, 'inline')}</span> ${R.coffres[type].nom.replace('Coffre ', '').replace(/^d[e’] ?/, '')}</button>`).join('')}
+      ${rangs.map((type) => `<button class="btn small" data-ecran="probas" data-arg="${type}">${coffre(type, 'ferme', 44)}<span class="prog-coffre-nom" data-type="${type}">${nomCourtDuCoffre(type)}</span></button>`).join('')}
     </div>`);
 }
 
@@ -162,12 +182,13 @@ function ecranProbas(type) {
     <h3>${g.nom} — ${g.nombre} ${g.nombre > 1 ? 'tirages' : 'tirage'}</h3>
     <table class="scores prog-probas">
       <tr><th>Catégorie</th><th>Chance</th><th>Fragments</th></tr>
-      ${g.lignes.map((l) => `<tr><td><span class="prog-categorie" data-categorie="${l.categorie}">${l.nom}</span></td><td>${nombre(l.pourCent, 1)} %</td><td>${l.fragments}</td></tr>`).join('')}
-      <tr class="total"><td>Total</td><td>${nombre(g.total / 10, 1)} %</td><td></td></tr>
+      ${g.lignes.map((l) => `<tr><td><span class="prog-categorie" data-categorie="${l.categorie}">${l.nom}</span></td><td>${nombre(l.pourCent)} %</td><td>${l.fragments}</td></tr>`).join('')}
+      <tr class="total"><td>Total</td><td>${nombre(g.total / 10)} %</td><td></td></tr>
     </table>`).join('');
   montrer(t.nom, `
-    <p class="subtitle">${pluriel(t.tirages, 'tirage')}. En moyenne : ${nombre(t.moyenne.commune, 1)} fragments communs,
-      ${nombre(t.moyenne.rare, 1)} rares, ${nombre(t.moyenne.epique, 1)} épiques.</p>
+    <div class="prog-coffre-tete">${coffre(type, 'ferme', 96)}${coffre(type, 'ouvert', 96)}</div>
+    <p class="subtitle">${pluriel(t.tirages, 'tirage')}. Sur 100 coffres, en moyenne : ${pluriel(t.surCent.commune, 'fragment commun', 'fragments communs')},
+      ${pluriel(t.surCent.rare, 'rare')}, ${pluriel(t.surCent.epique, 'épique')}.</p>
     ${groupes}
     <h3>Comment un tirage se fait</h3>
     <ol class="prog-regles">
@@ -180,9 +201,12 @@ function ecranProbas(type) {
     <p class="hint">Aucun coffre ne se vend.</p>`, { retour: 'coffres' });
 }
 
+/** Le temps que met le coffre à s'ouvrir (voir .prog-ouverture dans la feuille de style) : les tirages attendent. */
+const OUVERTURE_MS = 1000;
+
 function ecranOuverture(resultat, profil) {
   const lignes = resultat.tirages.map((t, i) => `
-    <li class="prog-tirage" style="animation-delay:${i * 140}ms">
+    <li class="prog-tirage" style="animation-delay:${OUVERTURE_MS + i * 140}ms">
       ${t.troupe ? vignette(t.troupe) : `<span class="prog-vignette">${iconeSVG('coffre', 26)}</span>`}
       <span class="prog-tirage-texte">
         <b>${t.troupe ? nomTroupe(t.troupe) : 'Éclats'}</b>
@@ -191,7 +215,9 @@ function ecranOuverture(resultat, profil) {
       <span class="prog-gain">+${t.fragments ? pluriel(t.fragments, 'fragment') : pluriel(t.eclats, 'éclat')}</span>
     </li>`).join('');
   const prets = resultat.evenements.filter((e) => e.type === 'ameliorationPossible');
+  // Le coffre s'ouvre en trois images, l'une après l'autre (jamais de fondu) ; ses tirages paraissent ensuite.
   montrer(R.coffres[resultat.coffre].nom, `
+    <div class="prog-ouverture" data-type="${resultat.coffre}">${ETATS_DE_COFFRE.map((etat, i) => coffre(resultat.coffre, etat, 190, `e${i + 1}`)).join('')}</div>
     <ul class="prog-tirages">${lignes}</ul>
     ${prets.length ? `<p class="prog-annonce">Tu peux améliorer : ${prets.map((e) => `<button class="btn small prog-attend" data-ecran="fiche" data-arg="${e.troupe}">${nomTroupe(e.troupe)}</button>`).join(' ')}</p>` : ''}
     <div class="modal-actions">
@@ -234,14 +260,22 @@ const STATISTIQUES = [
   ['Points de vie', (d) => d.hp],
   ['Dégâts', (d) => d.attack || null],
   ['Soin par geste', (d) => d.heal || null],
-  ['Vitesse', (d) => d.speed],
-  ['Nourriture ou or par 10 s', (d) => (d.gather ? d.gather.food * 10 : null)],
-  ['Bois par 10 s', (d) => (d.gather ? d.gather.wood * 10 : null)],
+  ['Vue, en cases', (d) => d.los],
+  // (Par minute : c'est l'unité où la récolte est un chiffre rond à chaque niveau. L'arrondi n'ôte que le bruit du calcul en virgule flottante.)
+  ['Vivres ou or par minute', (d) => (d.gather ? Math.round(d.gather.food * 60 * 1e6) / 1e6 : null)],
+  ['Bois par minute', (d) => (d.gather ? Math.round(d.gather.wood * 60 * 1e6) / 1e6 : null)],
   ['Chargement', (d) => d.carry || null],
   ['Vitesse de chantier', (d) => (d.gather ? (d.construction || 1) * 100 : null), ' %'],
   ['Contre la cavalerie', (d) => (d.bonus && d.bonus.cavalry) || null, '', '+'],
   ['Contre les bâtiments', (d) => (d.bonus && d.bonus.building) || null, '', '+'],
 ];
+
+/** La fiche écrite d'une troupe : son rôle, ce qu'elle bat, ce qu'elle craint, un conseil (js/fiches-troupes.js). */
+function texteDeFiche(type) {
+  const fiche = ficheDeTroupe(type, civ);
+  if (!fiche) return '';
+  return `<dl class="prog-fiche-texte">${fiche.map((r) => `<div data-rubrique="${r.cle}"><dt>${r.titre}</dt><dd>${r.texte}</dd></div>`).join('')}</dl>`;
+}
 
 function ecranFiche(type, profil, message = '', { confirmerEssai = false } = {}) {
   if (!TROUPES.includes(type)) return ecranTroupes(profil);
@@ -291,6 +325,7 @@ function ecranFiche(type, profil, message = '', { confirmerEssai = false } = {})
         ${debloquee ? `<b>Niveau ${t.niveau}</b> sur ${R.niveauMax}` : '<b>À débloquer</b>'}</p>
     </div>
     ${message ? `<p class="prog-annonce">${message}</p>` : ''}
+    ${texteDeFiche(type)}
     <table class="scores prog-stats">
       <tr><th></th><th>${debloquee ? `Niveau ${t.niveau}` : 'Niveau 1'}</th>${ensuite ? `<th>Niveau ${t.niveau + 1}</th>` : ''}</tr>
       ${lignes}
@@ -396,13 +431,9 @@ export function htmlFinDePartie(evenements, profil) {
   for (const e of de('troupeDebloquee')) lignes.push(`<p class="prog-fin-troupe">${vignette(e.troupe, 'petite')} Nouvelle troupe : <b>${nomTroupe(e.troupe)}</b></p>`);
   for (const e of de('ouvrierAuPlafond')) lignes.push(`<p>${nomTroupe(e.troupe)} monte au niveau ${e.a}, comme la ligue.</p>`);
   const coffres = de('coffre');
-  if (coffres.length) lignes.push(`<p>${coffres.length > 1 ? 'Coffres gagnés' : 'Coffre gagné'} : ${coffres.map((c) => `<span class="prog-coffre-nom" data-type="${c.coffre}">${R.coffres[c.coffre].nom}</span>`).join(', ')}</p>`);
-  if (de('coffreDeBoisPlafonne').length) lignes.push(`<p class="hint">Les ${R.sources.bois.parJourAuPlus} coffres de bois du jour sont déjà gagnés.</p>`);
-  const points = de('pointsDeBataille')[0];
-  if (points) {
-    lignes.push(`<p class="prog-fin-points"><span>Coffre d’argent</span>
-      <span class="prog-barre"><span style="width:${part(points.total / points.pour)}"></span></span>
-      <small>${points.total} / ${points.pour}</small></p>`);
+  if (coffres.length) {
+    lignes.push(`<p class="prog-fin-coffres">${coffres.map((c) => `<span class="prog-fin-coffre">${coffre(c.coffre, 'ferme', 60)}
+      <span class="prog-coffre-nom" data-type="${c.coffre}">${R.coffres[c.coffre].nom}</span><small>${ORIGINES[c.origine] || ''}</small></span>`).join('')}</p>`);
   }
   const attente = profil.coffres.length;
   return `

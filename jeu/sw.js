@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v57';
+const CACHE = 'age-empires-mobile-v58';
 const ASSETS = [
   './',
   './index.html',
@@ -22,6 +22,7 @@ const ASSETS = [
   './js/progression.js',
   './js/progression-config.js',
   './js/progression-ecrans.js',
+  './js/fiches-troupes.js',
   './js/rangement-durable.js',
   './css/progression.css',
   './js/render.js',
@@ -98,6 +99,18 @@ const ASSETS = [
   './assets/portrait-sol-pavoisier.webp',
   './assets/portrait-sol-frondeur.webp',
   './assets/portrait-sol-sapeur.webp',
+  './assets/coffres/coffre-bois-ferme.webp',
+  './assets/coffres/coffre-bois-entrouvert.webp',
+  './assets/coffres/coffre-bois-ouvert.webp',
+  './assets/coffres/coffre-argent-ferme.webp',
+  './assets/coffres/coffre-argent-entrouvert.webp',
+  './assets/coffres/coffre-argent-ouvert.webp',
+  './assets/coffres/coffre-or-ferme.webp',
+  './assets/coffres/coffre-or-entrouvert.webp',
+  './assets/coffres/coffre-or-ouvert.webp',
+  './assets/coffres/coffre-legendaire-ferme.webp',
+  './assets/coffres/coffre-legendaire-entrouvert.webp',
+  './assets/coffres/coffre-legendaire-ouvert.webp',
   './assets/sons/clic-1.mp4',
   './assets/sons/clic-2.mp4',
   './assets/sons/selection-1.mp4',

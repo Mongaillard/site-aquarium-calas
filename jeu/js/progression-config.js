@@ -18,13 +18,14 @@
 //     niveau 1 : elle est toujours neutre (×1000, +0, rien à poser).
 // ---------------------------------------------------------------------------
 
-// Règle générale (H) : +5 % par niveau, soit +20 % au niveau 5.
+// Règle générale (H) : +5 % par niveau, soit +20 % au niveau 5 — arrondi à
+// l'entier pour les points de vie et les dégâts (`entiers`) : le joueur ne lit
+// que des chiffres ronds, et c'est le chiffre rond qui joue.
 const PLUS_5_POUR_CENT = [1000, 1050, 1100, 1150, 1200];
-// L'éclaireur : +2 % de vitesse par niveau.
-const PLUS_2_POUR_CENT = [1000, 1020, 1040, 1060, 1080];
-// L'ouvrier : +12,5 % de récolte par niveau, arrêtée à +25 % — au-delà,
+// L'ouvrier : sa récolte monte aux niveaux 2 et 3, puis s'arrête — au-delà,
 // l'économie emballe toute la partie.
-const RECOLTE = [1000, 1125, 1250, 1250, 1250];
+/** Une récolte donnée par minute, telle que le joueur la lit, en unités par seconde (celles de js/config.js). */
+const PAR_MINUTE = (parMinute) => parMinute.map((v) => v / 60);
 /** Points de vie et dégâts : ce qui monte pour la plupart des troupes. */
 const PV_ET_DEGATS = { fois: { hp: PLUS_5_POUR_CENT, attack: PLUS_5_POUR_CENT } };
 
@@ -136,33 +137,31 @@ export const PROGRESSION = figer({
   coffres: {
     bois: {
       nom: 'Coffre de bois',
-      fragments: { commune: 5, rare: 2, epique: 1 },
+      fragments: { commune: 4, rare: 1, epique: 1 },
       tirages: [
-        { genre: 'ordinaire', nom: 'Tirages ordinaires', nombre: 3, table: { commune: 800, rare: 170, epique: 30 } },
+        { genre: 'ordinaire', nom: 'Tirages ordinaires', nombre: 2, table: { commune: 850, rare: 140, epique: 10 } },
       ],
     },
     argent: {
       nom: 'Coffre d’argent',
-      fragments: { commune: 8, rare: 3, epique: 2 },
+      fragments: { commune: 5, rare: 2, epique: 1 },
       tirages: [
-        { genre: 'ordinaire', nom: 'Tirages ordinaires', nombre: 4, table: { commune: 650, rare: 280, epique: 70 } },
-        { genre: 'garanti', nom: 'Tirage « rare ou mieux »', nombre: 1, table: { rare: 900, epique: 100 } },
+        { genre: 'ordinaire', nom: 'Tirages ordinaires', nombre: 3, table: { commune: 750, rare: 200, epique: 50 } },
       ],
     },
     or: {
       nom: 'Coffre d’or',
-      fragments: { commune: 12, rare: 5, epique: 3 },
+      fragments: { commune: 7, rare: 3, epique: 1 },
       tirages: [
-        { genre: 'ordinaire', nom: 'Tirages ordinaires', nombre: 6, table: { commune: 500, rare: 380, epique: 120 } },
-        { genre: 'garanti', nom: 'Tirage « rare ou mieux »', nombre: 1, table: { rare: 800, epique: 200 } },
-        { genre: 'garanti', nom: 'Tirage épique', nombre: 1, table: { epique: 1000 } },
+        { genre: 'ordinaire', nom: 'Tirages ordinaires', nombre: 4, table: { commune: 600, rare: 300, epique: 100 } },
+        { genre: 'garanti', nom: 'Tirage « rare ou mieux »', nombre: 1, table: { rare: 700, epique: 300 } },
       ],
     },
     legendaire: {
       nom: 'Coffre légendaire',
-      fragments: { commune: 16, rare: 8, epique: 4 },
+      fragments: { commune: 10, rare: 5, epique: 2 },
       tirages: [
-        { genre: 'ordinaire', nom: 'Tirages ordinaires', nombre: 8, table: { commune: 350, rare: 400, epique: 250 } },
+        { genre: 'ordinaire', nom: 'Tirages ordinaires', nombre: 6, table: { commune: 400, rare: 400, epique: 200 } },
         { genre: 'garanti', nom: 'Tirages épiques', nombre: 2, table: { epique: 1000 } },
       ],
     },
@@ -170,18 +169,31 @@ export const PROGRESSION = figer({
 
   // --- D'où viennent les coffres -----------------------------------------------
   // Les coffres de promotion et de fin de saison sont dans la table des ligues.
-  //  bois   : un par victoire, `parJourAuPlus` dans la journée (H)
-  //  argent : un tous les `tousLes` points de bataille. Une défaite fait donc
-  //    avancer vers le coffre. `abandonPrecoce` : ce que vaut un abandon avant
-  //    abandon.precoceAvant — rien : sinon dix abandons à la première seconde
-  //    donneraient un coffre.
-  //  or     : un par semaine où l'on a joué `joursJoues` jours (H). La semaine
-  //    court du lundi au dimanche (choix) : `decalage` est ce qu'il faut ajouter
-  //    au nombre de jours depuis le 1er janvier 1970, un jeudi, pour qu'elle
-  //    commence un lundi.
+  //  partie : CHAQUE partie classée donne un coffre, gagnée ou perdue. Son rang
+  //    se tire au sort dans la table de l'issue, en pour-cent (total 100) : la
+  //    victoire a de meilleures chances d'un rang élevé. Une défaite d'avant
+  //    abandon.precoceAvant — abandon ou non — n'en donne pas : sinon il
+  //    suffirait d'abandonner à la chaîne pour remplir sa réserve.
+  //    Les taux de la victoire et de la défaite sont ceux que l'auteur a
+  //    donnés ; l'égalité est entre les deux. Ce qui règle la vitesse de la
+  //    progression, c'est le CONTENU des coffres ci-dessus, allégé d'autant
+  //    (un coffre par partie au lieu d'un toutes les deux ou trois) : à six
+  //    victoires sur dix, une partie rapporte en moyenne 11,7 fragments
+  //    communs, 2,6 rares et 0,6 épique (contre 11,5 – 2,0 – 0,3 avec
+  //    l'ancienne règle : un coffre de bois par victoire, d'argent aux dix
+  //    points de bataille) — soit, par ces seuls coffres, environ 270 parties
+  //    pour monter toutes les communes, 390 pour les rares, 900 pour les
+  //    épiques ; les coffres de la semaine et des ligues raccourcissent cela.
+  //  or     : en plus, un par semaine où l'on a joué `joursJoues` jours (H). La
+  //    semaine court du lundi au dimanche (choix) : `decalage` est ce qu'il faut
+  //    ajouter au nombre de jours depuis le 1er janvier 1970, un jeudi, pour
+  //    qu'elle commence un lundi.
   sources: {
-    bois: { parJourAuPlus: 5 },
-    argent: { tousLes: 10, victoire: 2, defaite: 1, egalite: 1, abandonPrecoce: 0 },
+    partie: {
+      victoire: { bois: 20, argent: 35, or: 35, legendaire: 10 },
+      egalite: { bois: 45, argent: 30, or: 20, legendaire: 5 },
+      defaite: { bois: 65, argent: 25, or: 10, legendaire: 0 },
+    },
     or: { joursJoues: 3, joursParSemaine: 7, decalage: 3 },
   },
 
@@ -223,7 +235,7 @@ export const PROGRESSION = figer({
   ouvrier: 'villager',
   // Statistiques arrondies à l'entier le plus proche une fois améliorées
   // (choix) : les points de vie restent des entiers, comme partout dans le jeu.
-  entiers: ['hp'],
+  entiers: ['hp', 'attack'],
   // Partie amicale : le niveau de tous quand les deux joueurs choisissent
   // « niveaux égaux », et ce qui vaut quand rien n'est choisi (choix).
   amical: { niveauEgal: 1, egauxParDefaut: true },
@@ -239,6 +251,8 @@ export const PROGRESSION = figer({
   //              définition (js/config.js) et par niveau —
   //                fois : multiplie, en pour-mille de la valeur d'origine ;
   //                plus : ajoute ;
+  //                vaut : remplace la valeur (null : celle d'origine) — pour une
+  //                       statistique qui doit rester un chiffre rond à chaque niveau ;
   //                pose : écrit un champ qui n'existe pas au niveau 1.
   //              Ni la portée, ni la cadence, ni le coût, ni le temps de
   //              formation ne changent jamais.
@@ -255,7 +269,10 @@ export const PROGRESSION = figer({
     villager: {
       categorie: 'commune',
       ameliorations: {
-        fois: { 'gather.food': RECOLTE, 'gather.gold': RECOLTE, 'gather.wood': RECOLTE },
+        // Ce que le joueur lit est un chiffre rond : la récolte se compte par minute, en
+        // entiers (bois 33, 37, 41 ; vivres et or 30, 34, 37), et c'est cette valeur-là
+        // qui joue. Le plafond reste sous les +25 % validés (+24 % et +23 %).
+        vaut: { 'gather.wood': PAR_MINUTE([33, 37, 41, 41, 41]), 'gather.food': PAR_MINUTE([30, 34, 37, 37, 37]), 'gather.gold': PAR_MINUTE([30, 34, 37, 37, 37]) },
         // Les niveaux 4 et 5 donnent autre chose que de la récolte (H).
         plus: { carry: [0, 0, 0, 2, 2] },
         pose: { construction: [null, null, null, null, 1.1] },
@@ -268,7 +285,8 @@ export const PROGRESSION = figer({
     },
     // La portée de l'archer ne bouge jamais.
     archer: { categorie: 'commune', ameliorations: PV_ET_DEGATS },
-    scout: { categorie: 'commune', ameliorations: { fois: { hp: PLUS_5_POUR_CENT, speed: PLUS_2_POUR_CENT } } },
+    // (Sa vitesse ne monte plus : +2 % par niveau ne donnait que des chiffres à virgule. Il voit plus loin.)
+    scout: { categorie: 'commune', ameliorations: { fois: { hp: PLUS_5_POUR_CENT }, plus: { los: [0, 1, 1, 2, 2] } } },
 
     // Rares (base)
     knight: { categorie: 'rare', ameliorations: PV_ET_DEGATS },
@@ -276,7 +294,7 @@ export const PROGRESSION = figer({
     crossbowman: { categorie: 'rare', ameliorations: PV_ET_DEGATS },
     priest: {
       categorie: 'rare',
-      ameliorations: { fois: { hp: PLUS_5_POUR_CENT }, plus: { heal: [0, 0.5, 1, 1.5, 2] } },
+      ameliorations: { fois: { hp: PLUS_5_POUR_CENT }, plus: { heal: [0, 1, 1, 2, 2] } },
     },
     ram: {
       categorie: 'rare',

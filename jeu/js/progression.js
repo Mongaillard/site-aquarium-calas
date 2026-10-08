@@ -70,7 +70,7 @@ const AVANCEES = EXISTANTES.filter((type) => R.troupes[type].gratuite);
 /** Parmi elles, celles que l'ordinateur ne forme que si la partie les lui donne (voir reglagesDePartie). */
 const EN_PLUS = AVANCEES.filter((type) => R.troupes[type].enPlus);
 const ORIGINES = ['ligue', 'parties', 'achat'];   // d'une troupe avancée ; une troupe de base est « base »
-const ORIGINES_DE_COFFRE = ['victoire', 'bataille', 'promotion', 'semaine', 'saison'];
+const ORIGINES_DE_COFFRE = ['victoire', 'defaite', 'egalite', 'promotion', 'semaine', 'saison', 'bataille', 'autre'];
 const ISSUES = ['victoire', 'defaite', 'egalite', 'abandon', 'abandonAdverse', 'annulee'];
 const COMPTEURS = { victoire: 'victoires', defaite: 'defaites', egalite: 'egalites' };
 
@@ -127,7 +127,6 @@ function semaineDe(jour) {
  *                     une troupe, ni vers un coffre
  *   comptees        : identifiants des dernières parties comptées — la même
  *                     partie, reprise ailleurs, ne se compte pas deux fois
- *   pointsDeBataille: ce qui est acquis vers le prochain coffre d'argent
  *   coffres         : ceux qui attendent d'être ouverts, `{ type, origine }`
  *   troupes         : niveau et fragments de chaque troupe du jeu
  *   debloquees      : type → d'où vient la troupe (base, ligue, parties, achat)
@@ -151,14 +150,13 @@ export function profilNeuf() {
     promotions: [],
     parties: 0, victoires: 0, defaites: 0, egalites: 0, abandonsPrecoces: 0,
     comptees: [],
-    pointsDeBataille: 0,
     coffres: [],
     troupes,
     debloquees,
     eclats: 0,
     saison: 1,
     saisons: [],
-    jour: { date: '', parties: 0, coffresBois: 0, abandonsPrecoces: 0 },
+    jour: { date: '', parties: 0, abandonsPrecoces: 0 },
     semaine: { numero: 0, jours: 0, coffre: false },
     rechercheFermeeJusqua: 0,
     operations: 0,
@@ -189,7 +187,6 @@ function lireProfil(o) {
   if (Array.isArray(o.comptees)) {
     p.comptees = o.comptees.filter((id) => typeof id === 'string' && id.length > 0 && id.length <= 64).slice(-R.profil.comptees);
   }
-  p.pointsDeBataille = entier(o.pointsDeBataille, 0, R.sources.argent.tousLes - 1, 0);
   if (Array.isArray(o.coffres)) {
     for (const coffre of o.coffres) {
       if (!estObjet(coffre) || typeof coffre.type !== 'string' || !possede(R.coffres, coffre.type)) continue;
@@ -221,7 +218,6 @@ function lireProfil(o) {
   if (estObjet(o.jour)) {
     p.jour.date = rangDuJour(o.jour.date) === null ? '' : o.jour.date;
     p.jour.parties = entier(o.jour.parties, 0, GRAND, 0);
-    p.jour.coffresBois = entier(o.jour.coffresBois, 0, GRAND, 0);
     p.jour.abandonsPrecoces = entier(o.jour.abandonsPrecoces, 0, GRAND, 0);
   }
   if (estObjet(o.semaine)) {
@@ -282,6 +278,32 @@ export function plafondDe(ligue) {
 function donnerCoffre(p, type, origine, evenements) {
   p.coffres.push({ type, origine });
   evenements.push({ type: 'coffre', coffre: type, origine });
+}
+
+/**
+ * Le rang d'un coffre, tiré dans une table en pour-cent (R.sources.partie) :
+ * les rangs dans l'ordre de R.coffres, chacun pour sa part des cent cases.
+ */
+function tirerRang(table, alea) {
+  let tirage = alea();
+  let caze = estNombre(tirage) && tirage >= 0 && tirage < 1 ? Math.floor(tirage * 100) : 0;
+  const rangs = Object.keys(R.coffres);
+  for (const rang of rangs) {
+    caze -= table[rang] || 0;
+    if (caze < 0) return rang;
+  }
+  return rangs[0];
+}
+
+/**
+ * Le hasard qui tire le coffre d'une partie : celui qu'on fournit
+ * (`partie.alea`, une fonction qui rend un nombre de [0, 1) — ce sera le
+ * tirage du serveur), sinon un tirage qui ne dépend que de la partie et du
+ * profil : la même partie, recomptée, donnerait le même coffre.
+ */
+function aleaDeLaPartie(partie, p, id) {
+  if (typeof partie.alea === 'function') return partie.alea;
+  return aleaDeGraine(`${id || ''}|${p.parties}|${p.elo}|${p.operations || 0}`);
 }
 
 /** L'ouvrier monte d'office au plafond de la plus haute ligue atteinte. */
@@ -373,7 +395,7 @@ function changerDeJour(p, jour) {
   // corrigée ; sans cela plus aucun coffre jusqu'à la fausse date.
   const avant = rangDuJour(p.jour.date);
   if (avant !== null && rang < avant && avant - rang <= 1) return;
-  p.jour = { date: jour, parties: 0, coffresBois: 0, abandonsPrecoces: 0 };
+  p.jour = { date: jour, parties: 0, abandonsPrecoces: 0 };
 }
 
 /** Une partie de plus aujourd'hui ; la première de la journée compte pour le coffre d'or de la semaine. */
@@ -404,14 +426,15 @@ function compterLeJour(p, evenements) {
  *
  * Renvoie `{ profil, evenements }`. Les événements, par leur `type` :
  *   partieAnnulee, elo, promotion, recompensePromotion, coffre,
- *   ouvrierAuPlafond, retrogradation, troupeDebloquee, coffreDeBoisPlafonne,
- *   pointsDeBataille, rechercheFermee.
+ *   ouvrierAuPlafond, retrogradation, troupeDebloquee, rechercheFermee.
  *
  * Les règles :
  *   - un abandon est une défaite ; avant abandon.precoceAvant, une défaite —
  *     abandon ou non — coûte ses points mais ne compte ni comme une partie
- *     jouée (troupes gratuites, jour joué de la semaine) ni vers le coffre
- *     d'argent ;
+ *     jouée (troupes gratuites, jour joué de la semaine) et ne donne pas de
+ *     coffre ;
+ *   - toute autre partie donne UN coffre, gagnée ou perdue : son rang se tire
+ *     au sort (R.sources.partie), avec `partie.alea` s'il est fourni ;
  *   - `partie.id`, s'il est donné, empêche de compter deux fois la même partie ;
  *   - l'abandon de l'adversaire est une victoire, sauf avant
  *     abandon.precoceAvant : la partie est alors annulée pour celui qui
@@ -473,24 +496,13 @@ export function appliquerResultat(profil, partie) {
   retrograder(p, evenements, R.retrogradation.aPartirDe - 1);
   debloquerGratuites(p, evenements);
 
-  // Les coffres : bois à chaque victoire, argent aux points de bataille, or à
-  // la semaine.
-  if (issue === 'victoire') {
-    if (p.jour.coffresBois < R.sources.bois.parJourAuPlus) {
-      p.jour.coffresBois++;
-      donnerCoffre(p, 'bois', 'victoire', evenements);
-    } else {
-      evenements.push({ type: 'coffreDeBoisPlafonne', parJour: R.sources.bois.parJourAuPlus });
-    }
+  // Le coffre de la partie : un par partie, gagnée ou perdue. Son rang se tire
+  // au sort, et la victoire a de meilleures chances d'un rang élevé. Puis le
+  // coffre d'or de la semaine.
+  if (!sansValeur) {
+    donnerCoffre(p, tirerRang(R.sources.partie[issue], aleaDeLaPartie(partie, p, id)), issue, evenements);
+    compterLeJour(p, evenements);
   }
-  const argent = R.sources.argent;
-  const gagnes = sansValeur ? argent.abandonPrecoce : argent[issue];
-  p.pointsDeBataille += gagnes;
-  const coffresDArgent = Math.floor(p.pointsDeBataille / argent.tousLes);
-  p.pointsDeBataille -= coffresDArgent * argent.tousLes;
-  evenements.push({ type: 'pointsDeBataille', gagnes, total: p.pointsDeBataille, pour: argent.tousLes });
-  for (let i = 0; i < coffresDArgent; i++) donnerCoffre(p, 'argent', 'bataille', evenements);
-  if (!sansValeur) compterLeJour(p, evenements);
 
   // Trop de défaites précoces dans la journée : la recherche se ferme.
   if (sansValeur) {
@@ -708,14 +720,22 @@ export function probabilitesDe(typeDeCoffre) {
     return { genre: groupe.genre, nom: groupe.nom, nombre: groupe.nombre, lignes, total };
   });
   const moyenne = {};
-  for (const categorie of R.categories) moyenne[categorie] = parts[categorie] / 1000;
-  return { coffre: typeDeCoffre, nom: regles.nom, tirages, groupes, moyenne };
+  // `surCent` : ce que cent coffres donnent en moyenne — un nombre entier dès
+  // que les tables sont en pour-cent ronds, là où la moyenne d'un seul coffre
+  // est presque toujours un chiffre à virgule.
+  const surCent = {};
+  for (const categorie of R.categories) {
+    moyenne[categorie] = parts[categorie] / 1000;
+    surCent[categorie] = parts[categorie] / 10;
+  }
+  return { coffre: typeDeCoffre, nom: regles.nom, tirages, groupes, moyenne, surCent };
 }
 
 /**
- * Vérifie les tables de tous les coffres : des parts entières, positives, qui
- * somment à 1000 ; des catégories connues ; un nombre de fragments pour
- * chacune. Renvoie `{ valide, erreurs }`.
+ * Vérifie les tables de tous les coffres : des parts entières, positives, en
+ * pour-cent ronds, qui somment à 1000 ; des catégories connues ; un nombre de
+ * fragments pour chacune. Et les tables du coffre d'une partie, par issue :
+ * des pour-cent entiers qui somment à 100. Renvoie `{ valide, erreurs }`.
  */
 export function verifierProbabilites() {
   const erreurs = [];
@@ -737,7 +757,23 @@ export function verifierProbabilites() {
         total += part;
       }
       if (total !== 1000) erreurs.push(`${ou} : la table somme à ${total}, pas à 1000`);
+      // Le joueur lit ces chances en pour-cent : jamais de chiffre à virgule.
+      for (const categorie of Object.keys(groupe.table)) {
+        if (groupe.table[categorie] % 10 !== 0) erreurs.push(`${ou} : la part de « ${categorie} » n'est pas un pour-cent rond`);
+      }
     });
+  }
+  // Le coffre d'une partie : une table par issue, en pour-cent, sur les rangs connus.
+  for (const issue of ['victoire', 'egalite', 'defaite']) {
+    const table = R.sources.partie[issue];
+    if (!estObjet(table)) { erreurs.push(`coffre d'une ${issue} : pas de table`); continue; }
+    let total = 0;
+    for (const rang of Object.keys(table)) {
+      if (!possede(R.coffres, rang)) erreurs.push(`coffre d'une ${issue} : rang inconnu « ${rang} »`);
+      if (!Number.isInteger(table[rang]) || table[rang] < 0) erreurs.push(`coffre d'une ${issue} : part invalide pour « ${rang} »`);
+      total += table[rang];
+    }
+    if (total !== 100) erreurs.push(`coffre d'une ${issue} : la table somme à ${total}, pas à 100`);
   }
   return { valide: erreurs.length === 0, erreurs };
 }
@@ -822,7 +858,10 @@ export function definitionAuNiveau(def, type, niveau) {
   const copie = copier(def);
   const rang = entier(niveau, 1, R.niveauMax, 1) - 1;
   if (rang === 0 || !estObjet(copie) || typeof type !== 'string' || !possede(R.troupes, type)) return copie;
-  const { fois = {}, plus = {}, pose = {} } = R.troupes[type].ameliorations || {};
+  const { fois = {}, plus = {}, pose = {}, vaut = {} } = R.troupes[type].ameliorations || {};
+  for (const chemin of Object.keys(vaut)) {
+    if (vaut[chemin][rang] !== null) modifier(copie, chemin, () => vaut[chemin][rang]);
+  }
   for (const chemin of Object.keys(fois)) {
     const pourMille = fois[chemin][rang];
     if (pourMille === 1000) continue;

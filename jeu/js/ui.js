@@ -108,7 +108,7 @@ export function resumeReglages(reglages) {
     GAME_MODES[reglages.mode]?.name,
     DIFFICULTIES[reglages.difficulty]?.name,
     carte && `carte ${carte.name.toLowerCase()}`,
-    vitesse && vitesse.short,
+    vitesse && `vitesse ${vitesse.short}`,
   ].filter(Boolean).map((mention) => mention.replace(/ /g, '\u00a0')).join('\u00a0· ');
 }
 

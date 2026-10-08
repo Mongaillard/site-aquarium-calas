@@ -178,9 +178,9 @@ console.log('\n--- Le résumé des réglages ---');
   // Ce que le joueur lit : les espaces insécables rendues à des espaces ordinaires.
   const lu = (reglages) => resumeReglages(reglages).replace(/\u00a0/g, ' ');
   const defaut = { civ: 'atlante', civAdverse: 'atlante', mode: 'classique', difficulty: 'normal', mapSize: 'medium', speed: 'normal' };
-  check('les réglages par défaut', lu(defaut) === 'Atlantes en face · Classique · Normal · carte moyenne · ×1', lu(defaut));
+  check('les réglages par défaut', lu(defaut) === 'Atlantes en face · Classique · Normal · carte moyenne · vitesse 100 %', lu(defaut));
   const autre = lu({ civAdverse: 'solarien', mode: 'express', difficulty: 'hard', mapSize: 'small', speed: 'blitz' });
-  check('un autre jeu de réglages', autre === `Solariens en face · Express · ${DIFFICULTIES.hard.name} · carte petite · ×2`, autre);
+  check('un autre jeu de réglages', autre === `Solariens en face · Express · ${DIFFICULTIES.hard.name} · carte petite · vitesse 200 %`, autre);
   check('un réglage inconnu est passé, un peuple inconnu retombe sur les Atlantes',
     lu({ civAdverse: 'martien', mode: 'tournoi', difficulty: '', mapSize: 'geante', speed: 'lumiere' }) === 'Atlantes en face'
     && lu({}) === 'Atlantes en face');

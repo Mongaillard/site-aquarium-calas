@@ -95,8 +95,8 @@ console.log('\n--- Ce qu’un niveau change, et pour qui ---');
 {
   const w = new World({ seed: 7, niveaux: [{ villager: 3, militia: 5, scout: 5, priest: 5, ram: 5, spearman: 5 }, {}] });
   const ouvrier = w.defTroupe('villager', 0);
-  check('ouvrier de niveau 3 : +25 % de récolte, le reste inchangé',
-    ouvrier.gather.food === 0.625 && ouvrier.gather.gold === 0.625 && Math.abs(ouvrier.gather.wood - 0.6875) < 1e-12
+  check('ouvrier de niveau 3 : 37 vivres ou or et 41 bois par minute, le reste inchangé',
+    Math.abs(ouvrier.gather.food * 60 - 37) < 1e-9 && Math.abs(ouvrier.gather.gold * 60 - 37) < 1e-9 && Math.abs(ouvrier.gather.wood * 60 - 41) < 1e-9
     && ouvrier.carry === 10 && ouvrier.hp === 45 && ouvrier.construction === undefined,
     JSON.stringify(ouvrier.gather));
   check('… ses ouvriers de départ en portent la définition', villageois(w, 0).length > 0 && villageois(w, 0).every((u) => u.def === ouvrier));
@@ -109,7 +109,7 @@ console.log('\n--- Ce qu’un niveau change, et pour qui ---');
   const sien = w.spawnUnit(1, 'militia', tc.x + 120, tc.y + 80);
   check('milicien de niveau 5 : 54 points de vie et 6 de dégâts', mien.hp === 54 && mien.maxHp === 54 && mien.def.attack === 6, `${mien.hp} PV, ${mien.def.attack} dégâts`);
   check('… celui de l’adversaire : 45 et 5', sien.hp === 45 && sien.maxHp === 45 && sien.def.attack === 5);
-  check('éclaireur de niveau 5 : +8 % de vitesse', Math.abs(w.defTroupe('scout', 0).speed - 1.75 * 1.08) < 1e-12);
+  check('éclaireur de niveau 5 : il voit à 11 cases, sa vitesse ne bouge pas', w.defTroupe('scout', 0).los === 11 && w.defTroupe('scout', 0).speed === 1.75);
   check('prêtresse de niveau 5 : soigne 10', w.defTroupe('priest', 0).heal === 10);
   check('bélier de niveau 5 : +43 contre les bâtiments', w.defTroupe('ram', 0).bonus.building === 43);
   check('lancier de niveau 5 : +14 contre la cavalerie', w.defTroupe('spearman', 0).bonus.cavalry === 14);
@@ -121,8 +121,8 @@ console.log('\n--- Ce qu’un niveau change, et pour qui ---');
   const tout = Object.fromEntries(Object.keys(PROGRESSION.troupes).filter((t) => UNIT_TYPES[t]).map((t) => [t, PROGRESSION.niveauMax]));
   const max = new World({ seed: 7, niveaux: [tout, tout] });
   const intacts = ['range', 'attackSpeed', 'cost', 'trainTime', 'pop', 'los', 'radius', 'meleeArmor', 'pierceArmor', 'class', 'attackType', 'from', 'age'];
-  const touches = Object.keys(tout).filter((t) => intacts.some((c) => !egal(max.defTroupe(t, 0)[c], UNIT_TYPES[t][c])));
-  check('au niveau maximum, ni la portée, ni la cadence, ni le coût, ni l’armure ne bougent', touches.length === 0 && Object.keys(tout).length === 17, touches.join(', '));
+  const touches = Object.keys(tout).filter((t) => intacts.some((c) => !(t === 'scout' && c === 'los') && !egal(max.defTroupe(t, 0)[c], UNIT_TYPES[t][c])));
+  check('au niveau maximum, ni la portée, ni la cadence, ni le coût, ni l’armure ne bougent (seul l’éclaireur voit plus loin)', touches.length === 0 && Object.keys(tout).length === 17, touches.join(', '));
   check('au-delà du maximum, le niveau est ramené au maximum', new World({ seed: 7, niveaux: [{ militia: 99 }] }).players[0].niveaux.militia === PROGRESSION.niveauMax);
 }
 
@@ -173,7 +173,7 @@ console.log('\n--- La sauvegarde ---');
   const repris = restoreWorld(image);
   check('la partie reprise les retrouve', !!repris && egal(repris.players[0].niveaux, niveaux[0]) && egal(repris.players[1].niveaux, niveaux[1]));
   check('… ses troupes en portent les statistiques',
-    villageois(repris, 0).length > 0 && villageois(repris, 0).every((u) => u.def.gather.food === 0.625)
+    villageois(repris, 0).length > 0 && villageois(repris, 0).every((u) => Math.abs(u.def.gather.food * 60 - 37) < 1e-9)
     && repris.units.filter((u) => u.type === 'militia' && u.playerIndex === 0).every((u) => u.maxHp === 54));
   check('… et elle se sauvegarde à l’identique', etat(repris) === JSON.stringify({ ...image, savedAt: 0 }));
   repris.players[0].autoWorkers = true;
@@ -299,15 +299,17 @@ console.log('\n--- Du profil à la partie, et retour ---');
   const w = new World({ seed: 51, mode: 'express', ...classe });
   check('le monde créé avec ces réglages porte la ligue du joueur',
     w.difficultyId === 'hard' && w.players[1].mods.gatherRate === 1.25 && w.players[0].niveaux.militia === 3
-    && w.players[1].niveaux.knight === 3 && villageois(w, 0).every((u) => u.def.gather.food === 0.625) && villageois(w, 1).every((u) => u.def.gather.food === 0.625));
+    && w.players[1].niveaux.knight === 3 && villageois(w, 0).every((u) => Math.abs(u.def.gather.food * 60 - 37) < 1e-9) && villageois(w, 1).every((u) => Math.abs(u.def.gather.food * 60 - 37) < 1e-9));
 
   // Le résultat d'une partie, dans les mots du moteur.
   check('issue d’une partie : victoire, défaite, égalité, abandon',
     issueDePartie({ victory: true, winner: 0 }) === 'victoire' && issueDePartie({ victory: false, winner: 1 }) === 'defaite'
     && issueDePartie({ victory: false, winner: -1, timeUp: true }) === 'egalite' && issueDePartie({ victory: false, winner: 1, resigned: true }) === 'abandon'
     && issueDePartie(null) === 'annulee');
-  const apres = appliquerResultat(profilNeuf(), { issue: issueDePartie({ victory: true, winner: 0 }), duree: 600, contreOrdinateur: 'echelle', jour: '2026-10-07' });
-  check('une victoire classée contre l’ordinateur : +30 et un coffre de bois', apres.profil.elo === 30 && apres.profil.coffres.some((c) => c.type === 'bois'));
+  const apres = appliquerResultat(profilNeuf(), { issue: issueDePartie({ victory: true, winner: 0 }), duree: 600, contreOrdinateur: 'echelle', jour: '2026-10-07', alea: () => 0.6 });
+  check('une victoire classée contre l’ordinateur : +30 et son coffre (ici, d’or)', apres.profil.elo === 30 && apres.profil.coffres.length === 1 && apres.profil.coffres[0].type === 'or' && apres.profil.coffres[0].origine === 'victoire');
+  const perdue = appliquerResultat(profilNeuf(), { issue: issueDePartie({ victory: false, winner: 1 }), duree: 600, contreOrdinateur: 'echelle', jour: '2026-10-07', alea: () => 0.6 });
+  check('une défaite classée donne aussi son coffre (au même tirage, de bois)', perdue.profil.coffres.length === 1 && perdue.profil.coffres[0].type === 'bois' && perdue.profil.coffres[0].origine === 'defaite');
 
   // Le profil rangé dans le navigateur.
   const m = new Map();

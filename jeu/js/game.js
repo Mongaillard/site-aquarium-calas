@@ -1212,7 +1212,7 @@ export class World {
     switch (techId) {
       case 'wheelbarrow': mods.villagerSpeed += 0.15; mods.villagerCarry += 3; break;
       case 'forging': mods.attackMelee += 1; break;
-      case 'fletching': mods.attackPierce += 1; mods.range += 0.5; break;
+      case 'fletching': mods.attackPierce += 1; mods.range += 1; break;
       case 'scaleArmor': mods.meleeArmor += 1; mods.pierceArmor += 1; break;
     }
   }

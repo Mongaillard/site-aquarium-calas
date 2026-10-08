@@ -161,7 +161,7 @@ export const UNIT_TYPES = {
   horseArcher: {
     id: 'horseArcher', name: 'Archer monté', pluriel: 'Archers montés', icon: 'horseArcher', class: 'cavalry',
     cost: { wood: 50, gold: 70 }, trainTime: 26, hp: 60, speed: 1.45,
-    attack: 5, attackType: 'pierce', range: 4.5, attackSpeed: 2.0,
+    attack: 5, attackType: 'pierce', range: 5, attackSpeed: 2.0,
     meleeArmor: 0, pierceArmor: 1, los: 7, radius: 11,
     projectile: true,
     from: 'archery', age: 2,
@@ -223,7 +223,7 @@ export const UNIT_TYPES = {
   priest: {
     id: 'priest', name: 'Prêtresse', icon: 'priest', class: 'support',
     cost: { food: 40, gold: 80 }, trainTime: 28, hp: 30, speed: 0.95,
-    attack: 0, attackType: 'melee', range: 3.5, attackSpeed: 2.0, heal: 8,
+    attack: 0, attackType: 'melee', range: 4, attackSpeed: 2.0, heal: 8,
     meleeArmor: 0, pierceArmor: 0, los: 6, radius: 8,
     from: 'temple', age: 1,
     desc: 'Soigne les unités blessées à portée : 8 points de vie toutes les 2 s. Sans défense — gardez-la derrière vos lignes.',
@@ -417,7 +417,7 @@ export const TECHS = {
   fletching: {
     id: 'fletching', name: 'Flèches barbelées', icon: 'fletching',
     cost: { food: 100, gold: 50 }, time: 30, age: 1, from: 'blacksmith',
-    desc: '+1 attaque et +0,5 portée pour les unités à distance et les tours.',
+    desc: '+1 attaque et +1 portée pour les unités à distance et les tours.',
   },
   scaleArmor: {
     id: 'scaleArmor', name: 'Armure d’écailles', icon: 'scaleArmor',
@@ -435,11 +435,12 @@ export const START_RESOURCES = { food: 200, wood: 200, gold: 100 };
  * simulation. Le pas de temps reste fixe, on en exécute juste plus (ou moins)
  * par seconde réelle — la simulation reste déterministe.
  */
+// (`short` : la vitesse telle que le joueur la lit, en pour cent du rythme de référence — jamais de chiffre à virgule.)
 export const GAME_SPEEDS = [
-  { id: 'calme', name: 'Tranquille', short: '×0,75', mult: 0.75, desc: 'Pour prendre le temps' },
-  { id: 'normal', name: 'Normal', short: '×1', mult: 1, desc: 'Le rythme de référence' },
-  { id: 'rapide', name: 'Rapide', short: '×1,5', mult: 1.5, desc: 'Une partie plus nerveuse' },
-  { id: 'blitz', name: 'Blitz', short: '×2', mult: 2, desc: 'Tout va deux fois plus vite' },
+  { id: 'calme', name: 'Tranquille', short: '75 %', mult: 0.75, desc: 'Pour prendre le temps' },
+  { id: 'normal', name: 'Normal', short: '100 %', mult: 1, desc: 'Le rythme de référence' },
+  { id: 'rapide', name: 'Rapide', short: '150 %', mult: 1.5, desc: 'Une partie plus nerveuse' },
+  { id: 'blitz', name: 'Blitz', short: '200 %', mult: 2, desc: 'Tout va deux fois plus vite' },
 ];
 
 export const DEFAULT_SPEED = 'normal';

@@ -270,7 +270,7 @@ console.log('\n--- L’âge requis ---');
   const tc = centreDe(niveau5);
   const haut = niveau5.spawnUnit(0, 'pavoisier', tc.x + 120, tc.y + 120), bas = niveau5.spawnUnit(1, 'pavoisier', tc.x + 160, tc.y + 120);
   check('elles prennent leur niveau comme les autres : Pavoisier de niveau 5 à 84 points de vie, celui d’en face à 70',
-    haut.maxHp === 84 && Math.abs(haut.def.attack - 4.8) < 1e-9 && haut.def.pierceArmor === 6 && bas.maxHp === 70 && bas.def === UNIT_TYPES.pavoisier
+    haut.maxHp === 84 && haut.def.attack === 5 && haut.def.pierceArmor === 6 && bas.maxHp === 70 && bas.def === UNIT_TYPES.pavoisier
     && egal(niveau5.defTroupe('sapeur', 0), definitionAuNiveau(UNIT_TYPES.sapeur, 'sapeur', 3)));
 }
 
@@ -309,8 +309,8 @@ console.log('\n--- Le bonus du Frondeur ---');
     && degats('archer', cibles.horseArcher) === 3 && degats('knight', cibles.archer) === 14 && degats('spearman', cibles.horseArcher) === 14
     && degats(BUILDING_TYPES.tower, cibles.ram) === 3 && degats('ram', caserne) === 37);
   const niveau5 = definitionAuNiveau(UNIT_TYPES.frondeur, 'frondeur', 5);
-  check('au niveau 5, la pierre monte (3,6), pas le bonus : 9,6 sur un archer, 8,6 sur un archer monté',
-    Math.abs(computeDamage(niveau5, moi, cibles.archer) - 9.6) < 1e-9 && Math.abs(computeDamage(niveau5, moi, cibles.horseArcher) - 8.6) < 1e-9);
+  check('au niveau 5, la pierre monte (4), pas le bonus : 10 sur un archer, 9 sur un archer monté — des dégâts entiers',
+    computeDamage(niveau5, moi, cibles.archer) === 10 && computeDamage(niveau5, moi, cibles.horseArcher) === 9);
 }
 
 // ---------------------------------------------------------------------------
