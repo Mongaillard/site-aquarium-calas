@@ -6,7 +6,7 @@
 
 import {
   TILE, TICKS_PER_SECOND, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
-  START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, GAME_MODES, DEFAULT_MODE,
+  START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, COULEURS_EQUIPES, GAME_MODES, DEFAULT_MODE,
   DEFAULT_CIV, civDe, nomDe, ficheDe,
 } from './config.js';
 import { GameMap, BLOCK } from './map.js';
@@ -115,7 +115,23 @@ export class World {
     this.popMax = this.mode.popMax || POP_MAX;
     this.seed = options.seed || Math.floor(Math.random() * 1e9);
     this.rng = new RNG(this.seed);
-    this.map = new GameMap(mapSize.tiles, this.seed);
+    // Les places de la partie. Le format dit combien, et l'équipe de chacune
+    // (deux places, chacune son équipe, s'il n'en dit rien) ; la partie dit qui
+    // tient chaque place — option `places`, une par place :
+    //   'local'      le joueur de cet appareil (une seule place : `humanIndex`) ;
+    //   'ordinateur' un ordinateur, que le monde anime lui-même ;
+    //   'distant'    un joueur d'un autre appareil : personne ici ne joue pour
+    //                lui, ses ordres arriveront par le réseau (js/ordres.js).
+    // Par défaut : la place 0 au joueur, les autres à l'ordinateur. Les règles
+    // ne regardent jamais qui tient une place : alliés, vue partagée, victoire
+    // et scores ne dépendent que des équipes.
+    const equipes = Array.isArray(this.mode.equipes) ? this.mode.equipes : [0, 1];
+    const tenues = Array.isArray(options.places) ? options.places : [];
+    this.places = equipes.map((equipe, i) => ({
+      equipe, controle: ['local', 'ordinateur', 'distant'].includes(tenues[i]) ? tenues[i] : (i === 0 ? 'local' : 'ordinateur'),
+    }));
+    this.parEquipes = equipes.length > 2;
+    this.map = new GameMap(mapSize.tiles, this.seed, equipes.length);
     // Format « Prise de positions » : la carte est aménagée avant tout le reste,
     // partie neuve ou rechargée (voir GameMap.amenagerPositions). Une position :
     //   camp    : qui la tient (-1 : personne) ;
@@ -145,14 +161,33 @@ export class World {
     this.gameOver = null;      // {winner, reason}
     this.fogTimer = 0;
     this.popWarnCooldown = 0;
-    this.humanIndex = 0;
+    // Le joueur de cet appareil : la première place « locale » (la place 0 s'il n'y en a pas — une partie entre ordinateurs).
+    this.humanIndex = Math.max(0, this.places.findIndex((p) => p.controle === 'local'));
 
     const civs = Array.isArray(options.civs) ? options.civs : [];
-    this.players = [
-      makePlayer(0, options.playerName || 'Vous', false, civDe(civs[0])),
-      makePlayer(1, 'Adversaire', true, civDe(civs[1])),
-    ];
-    this.players[1].mods.gatherRate = this.difficulty.gatherBonus;
+    if (!this.parEquipes) {
+      this.players = [
+        makePlayer(0, options.playerName || 'Vous', false, civDe(civs[0])),
+        makePlayer(1, 'Adversaire', true, civDe(civs[1])),
+      ];
+      this.players[1].mods.gatherRate = this.difficulty.gatherBonus;
+    } else {
+      // Par équipes : un nom et une couleur par place. Un allié sans peuple dit
+      // prend celui du joueur ; un adversaire, celui du premier adversaire.
+      const moi = this.places[this.humanIndex].equipe;
+      let allies = 0, adversaires = 0;
+      this.players = this.places.map((place, i) => {
+        const dela = place.equipe === moi;
+        const nom = i === this.humanIndex ? (options.playerName || 'Vous') : dela ? `Allié${++allies > 1 ? ' ' + allies : ''}` : `Adversaire ${++adversaires}`;
+        const premier = this.places.findIndex((p) => (p.equipe === moi) === dela);
+        const joueur = makePlayer(i, nom, place.controle === 'ordinateur', civDe(civs[i] || civs[premier]));
+        joueur.color = COULEURS_EQUIPES[i % COULEURS_EQUIPES.length];
+        // (La difficulté règle la récolte des ordinateurs d'en face, pas celle d'un allié.)
+        if (place.controle === 'ordinateur' && !dela) joueur.mods.gatherRate = this.difficulty.gatherBonus;
+        return joueur;
+      });
+    }
+    this.players.forEach((joueur, i) => { joueur.equipe = this.places[i].equipe; });
     // (Prise de positions : les points de chaque camp, rangés avec ses statistiques — la sauvegarde les garde sans rien de plus.)
     if (this.positions.length) for (const joueur of this.players) joueur.stats.positions = 0;
     const niveaux = Array.isArray(options.niveaux) ? options.niveaux : [];
@@ -233,7 +268,8 @@ export class World {
         }
       }
     });
-    this.addAI(1);
+    // Un ordinateur par place qui lui est confiée (à deux camps : la place 1, comme toujours).
+    this.places.forEach((place, i) => { if (place.controle === 'ordinateur') this.addAI(i); });
     this.spawnHerds();
     this.recomputePopulation();
   }
@@ -694,11 +730,77 @@ export class World {
     return !!evite && evite[this.map.idx(Math.floor(other.x / TILE), Math.floor(other.y / TILE))] === 2;
   }
 
+  /**
+   * Ces deux camps sont-ils du même bord ? Le même joueur, ou deux alliés
+   * (format par équipes : `equipe` de chaque joueur). La nature (−1) n'est du
+   * bord de personne. À deux joueurs, chacun son équipe : « du même bord »
+   * veut dire « le même camp », comme avant.
+   */
+  allies(a, b) {
+    if (a === b) return true;
+    const ja = this.players[a], jb = this.players[b];
+    return !!ja && !!jb && ja.equipe === jb.equipe;
+  }
+
+  /** Les joueurs du bord opposé à celui-ci, dans l'ordre des places. */
+  adversairesDe(index) {
+    return this.players.filter((p) => !this.allies(p.index, index));
+  }
+
+  /**
+   * Par équipes : `de` donne une consigne à son allié `a`. Elle n'est suivie
+   * que si la place de l'allié est tenue par un ordinateur (un allié humain
+   * la recevra comme un simple signal : voir js/ordres.js). Les consignes :
+   *   'attaquer' (x, y) : ses troupes au camp marchent sur ce point ;
+   *   'defendre'        : elles viennent tenir le bâtiment principal de `de`
+   *                       pendant trois minutes, comptées de leur départ ;
+   *   'libre'           : il reprend sa conduite.
+   * Rend true si elle a été donnée.
+   */
+  consigner(de, a, type, x, y) {
+    if (de === a || !this.allies(de, a) || !this.players[a]) return false;
+    const ia = this.ais.find((i) => i.index === a);
+    if (!ia || this.players[a].defeated) return false;
+    if (type === 'libre') { ia.consigne = null; for (const [id, poste] of ia.gardes) if (typeof poste !== 'number') ia.gardes.delete(id); return true; }
+    if (type === 'attaquer' && Number.isFinite(x) && Number.isFinite(y)) {
+      ia.consigne = { type, x, y, jusqua: this.time + 120 };
+      return true;
+    }
+    if (type === 'defendre') {
+      const centre = this.buildings.find((b) => !b.dead && b.playerIndex === de && b.type === 'towncenter')
+        || this.buildings.find((b) => !b.dead && b.playerIndex === de);
+      if (!centre) return false;
+      ia.consigne = { type, x: centre.x, y: centre.y + TILE * 3, jusqua: this.time + 120 };
+      return true;
+    }
+    return false;
+  }
+
+  /** Le premier joueur d'en face : à deux camps, l'autre. */
+  adversaire(index) {
+    return this.adversairesDe(index)[0] || this.players[index === 0 ? 1 : 0];
+  }
+
+  /**
+   * De quel bord est ce camp pour l'image : 0 (tissu bleu) ou 1 (tissu
+   * rouge). C'est son équipe ; à deux camps, sa place, comme avant — et la
+   * nature (−1) garde son numéro.
+   */
+  bordDe(index) {
+    const joueur = this.players[index];
+    return joueur ? joueur.equipe : index;
+  }
+
+  /** Ses coéquipiers (lui non compris). */
+  coequipiersDe(index) {
+    return this.players.filter((p) => p.index !== index && this.allies(p.index, index));
+  }
+
   findEnemyNear(entity, radius) {
     const troupe = entity.kind === 'unit';
     let best = null, bestScore = Infinity;
     this.grid.forEachNear(entity.x, entity.y, radius, (other) => {
-      if (other.dead || other.playerIndex === entity.playerIndex || other.isAnimal) return;
+      if (other.dead || this.allies(other.playerIndex, entity.playerIndex) || other.isAnimal) return;
       if (other.kind === 'building' && !other.complete && other.hp <= 1) return;
       if (troupe && this.laisseALAssaut(entity.playerIndex, other)) return;
       const d = entity.kind === 'building' || other.kind === 'building'
@@ -721,8 +823,8 @@ export class World {
   findAssaillantNear(entity, radius) {
     let best = null, bestD = Infinity;
     this.grid.forEachNear(entity.x, entity.y, radius, (other) => {
-      if (other.dead || other.kind !== 'unit' || other.isAnimal || other.playerIndex === entity.playerIndex) return;
-      if (other.state !== STATE.ATTACK || !other.target || other.target.playerIndex !== entity.playerIndex) return;
+      if (other.dead || other.kind !== 'unit' || other.isAnimal || this.allies(other.playerIndex, entity.playerIndex)) return;
+      if (other.state !== STATE.ATTACK || !other.target || !this.allies(other.target.playerIndex, entity.playerIndex)) return;
       const d = dist(entity.x, entity.y, other.x, other.y);
       if (d <= radius && d < bestD) { bestD = d; best = other; }
     });
@@ -877,7 +979,7 @@ export class World {
   enemyAt(x, y, playerIndex, tolerance = 0) {
     let best = null, bestD = Infinity;
     for (const e of this.entities) {
-      if (e.dead || e.garrisonedIn || e.playerIndex === playerIndex) continue;
+      if (e.dead || e.garrisonedIn || this.allies(e.playerIndex, playerIndex)) continue;
       const d = this.hitTest(e, x, y, tolerance);
       if (d >= 0 && d < bestD) { bestD = d; best = e; }
     }
@@ -923,7 +1025,7 @@ export class World {
     const voisins = [];
     this.grid.forEachNear(hydre.x, hydre.y, portee + TILE, (e) => {
       if (e === cible || e.dead || e.garrisonedIn || e.kind !== 'unit' || e.isAnimal) return;
-      if (e.playerIndex === hydre.playerIndex) return;
+      if (this.allies(e.playerIndex, hydre.playerIndex)) return;
       const d = e.edgeDistanceTo(hydre.x, hydre.y);
       if (d > portee || (e.x - hydre.x) * ax + (e.y - hydre.y) * ay < 0) return;
       voisins.push({ e, d });
@@ -950,14 +1052,14 @@ export class World {
     const touches = [];
     this.grid.forEachNear(pr.x, pr.y, rayon + TILE * 2, (e) => {
       if (e.dead || e.garrisonedIn || e === tireur) return;
-      if (e.playerIndex === tireur.playerIndex && (e.kind !== 'unit' || e.isAnimal)) return;
+      if (this.allies(e.playerIndex, tireur.playerIndex) && (e.kind !== 'unit' || e.isAnimal)) return;
       if (e.isAnimal && e.playerIndex < 0) return;
       if (e.edgeDistanceTo(pr.x, pr.y) <= rayon) touches.push(e);
     });
     let amis = 0;
     for (const e of touches) {
       const degats = def ? computeDamage(def, joueur, e) : pr.damage;
-      if (e.playerIndex !== tireur.playerIndex) { e.takeDamage(degats, tireur); continue; }
+      if (!this.allies(e.playerIndex, tireur.playerIndex)) { e.takeDamage(degats, tireur); continue; }
       // Tir ami : la troupe encaisse sans passer par onDamaged — ni riposte
       // contre sa propre catapulte, ni alerte d'attaque, ni victoire comptée.
       amis++;
@@ -993,7 +1095,7 @@ export class World {
     // retourne — et avec elle ses camarades qui la voient, eux aussi sur un
     // bâtiment : sinon ils tombent un à un devant moins nombreux qu'eux.
     if (entity.kind === 'unit' && !entity.isAnimal && source && !source.dead
-        && source.kind === 'unit' && !source.isAnimal && source.playerIndex !== entity.playerIndex) {
+        && source.kind === 'unit' && !source.isAnimal && !this.allies(source.playerIndex, entity.playerIndex)) {
       // Ceux qui tapent le même bâtiment qu'elle n'ont pas à la voir : autour
       // d'un bâtiment de trois cases, deux soldats sur des faces opposées sont
       // à plus de cinq cases l'un de l'autre — la vue d'un milicien — et la
@@ -1020,7 +1122,7 @@ export class World {
     this.byId.delete(entity.id);
     const owner = this.players[entity.playerIndex] || this.gaia;
     // Ce qu'un camp abat chez l'autre lui est compté, à son prix : le score s'en sert.
-    const tueur = source && source.playerIndex !== entity.playerIndex ? this.players[source.playerIndex] : null;
+    const tueur = source && !this.allies(source.playerIndex, entity.playerIndex) ? this.players[source.playerIndex] : null;
     if (tueur && !entity.isAnimal) tueur.stats.destroyed += valeurDe(entity.def);
 
     if (entity.kind === 'unit') {
@@ -1557,7 +1659,8 @@ export class World {
         return { kind: 'heal', target };
       }
     }
-    if (target && target.playerIndex !== playerIndex && !target.dead) {
+    // (Ni soi ni un allié : on n'attaque que l'autre bord — et les bêtes.)
+    if (target && !this.allies(target.playerIndex, playerIndex) && !target.dead) {
       for (const u of units) {
         if (u.isVillager && target.kind === 'building' && !target.complete) continue;
         // Une soigneuse n'attaque pas : elle suit la troupe jusque-là.
@@ -1944,7 +2047,8 @@ export class World {
     fog.visible.fill(0);
     const { w, h } = this.map;
     for (const e of this.entities) {
-      if (e.dead || e.garrisonedIn || e.playerIndex !== this.humanIndex) continue;
+      // (Le joueur voit ce que voient les siens et ceux de ses alliés.)
+      if (e.dead || e.garrisonedIn || !this.allies(e.playerIndex, this.humanIndex)) continue;
       // Une fondation ne voit que ses abords : posée au loin puis annulée
       // (tout est rendu), elle explorait la carte sans rien coûter.
       const vue = e.kind === 'building' && !e.complete ? 1 : (e.def.los || 4);
@@ -1991,7 +2095,11 @@ export class World {
         // posé à la hâte sauverait la partie du camp qui vient de tomber.
         const hasTC = this.buildings.some(
           (b) => !b.dead && b.complete && b.playerIndex === p.index && b.type === 'towncenter');
-        if (!hasTC) p.defeated = true;
+        if (!hasTC) {
+          p.defeated = true;
+          // (Par équipes, la partie ne finit pas forcément là : on dit qui vient de tomber.)
+          if (this.parEquipes) this.pushEvent({ type: 'campTombe', player: p.index });
+        }
         continue;
       }
       // Conquête : un camp tient tant qu'il lui reste un Centre-Ville ou un
@@ -2003,12 +2111,17 @@ export class World {
       if (!tient) p.defeated = true;
     }
     const alive = this.players.filter((p) => !p.defeated);
-    if (alive.length <= 1 && !this.gameOver) {
+    // Par équipes : une équipe tient tant qu'un de ses membres tient. La partie
+    // finit quand il n'en reste qu'une — `winner` est alors son premier membre
+    // debout, `equipe` son numéro.
+    const equipes = new Set(alive.map((p) => p.equipe));
+    if (equipes.size <= 1 && !this.gameOver) {
       const winner = alive[0] || null;
       this.gameOver = this.avecScores({
         winner: winner ? winner.index : -1,
-        victory: winner ? winner.index === this.humanIndex : false,
+        victory: winner ? this.allies(winner.index, this.humanIndex) : false,
         time: this.time,
+        ...(this.parEquipes ? { equipe: winner ? winner.equipe : -1 } : {}),
       });
       this.pushEvent({ type: 'gameOver', result: this.gameOver });
     }
@@ -2058,6 +2171,11 @@ export class World {
 
   score(player) { return this.detailScore(player).total; }
 
+  /** Le score d'une équipe : la somme de ceux de ses membres. */
+  scoreEquipe(equipe) {
+    return this.players.reduce((s, p) => s + (p.equipe === equipe ? this.score(p) : 0), 0);
+  }
+
   /**
    * Sur un format chronométré, le résultat porte les scores et leur détail,
    * quelle que soit la façon dont la partie s'arrête : ils sont à l'écran
@@ -2066,13 +2184,35 @@ export class World {
   avecScores(resultat) {
     if (!this.mode.timeLimit) return resultat;
     const detail = this.players.map((p) => this.detailScore(p));
-    return { ...resultat, scores: detail.map((d) => d.total), detail };
+    const scores = detail.map((d) => d.total);
+    // (Par équipes : la somme de chacune, dans l'ordre des numéros d'équipe.)
+    const parEquipe = this.parEquipes
+      ? { scoresEquipes: [...new Set(this.players.map((p) => p.equipe))].sort().map((e) => this.players.reduce((s, p, i) => s + (p.equipe === e ? scores[i] : 0), 0)) }
+      : {};
+    return { ...resultat, scores, detail, ...parEquipe };
   }
 
   /** Fin au temps imparti (mode Express) : le meilleur score l'emporte. */
   checkTimeLimit() {
     const limite = this.mode.timeLimit || 0;
     if (!limite || this.gameOver || this.time < limite) return;
+    if (this.parEquipes) {
+      // Par équipes : la meilleure somme l'emporte ; `winner` est le premier membre de l'équipe gagnante.
+      const equipes = [...new Set(this.players.map((p) => p.equipe))].sort();
+      const sommes = equipes.map((e) => this.scoreEquipe(e));
+      const haut = Math.max(...sommes);
+      const egales = sommes.filter((s) => s === haut).length > 1;
+      const gagnante = egales ? -1 : equipes[sommes.indexOf(haut)];
+      this.gameOver = this.avecScores({
+        winner: egales ? -1 : this.players.find((p) => p.equipe === gagnante).index,
+        victory: !egales && this.players[this.humanIndex].equipe === gagnante,
+        time: this.time,
+        timeUp: true,
+        equipe: gagnante,
+      });
+      this.pushEvent({ type: 'gameOver', result: this.gameOver });
+      return;
+    }
     const scores = this.players.map((p) => this.score(p));
     let best = 0;
     for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
@@ -2089,7 +2229,10 @@ export class World {
   resign() {
     if (this.gameOver) return;
     this.players[this.humanIndex].defeated = true;
-    this.gameOver = this.avecScores({ winner: 1, victory: false, time: this.time, resigned: true });
+    // (Le vainqueur : l'adversaire, ou le premier d'entre eux par équipes. À deux camps, c'est la place 1, comme avant.)
+    const face = this.adversairesDe(this.humanIndex)[0];
+    this.gameOver = this.avecScores({ winner: face ? face.index : 1, victory: false, time: this.time, resigned: true,
+      ...(this.parEquipes && face ? { equipe: face.equipe } : {}) });
     this.pushEvent({ type: 'gameOver', result: this.gameOver });
   }
 

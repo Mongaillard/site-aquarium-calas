@@ -19,7 +19,7 @@ import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourL
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
-import { UI, FoyersAttaque, toucherArmee, resumeReglages, toucherNouvellePartie } from './ui.js';
+import { UI, FoyersAttaque, toucherArmee, resumeReglages, toucherNouvellePartie, texteDeConsigne } from './ui.js';
 import { AudioEngine } from './audio.js';
 import { Musique } from './musique.js';
 import { villagerTask } from './entities.js';
@@ -465,6 +465,18 @@ class Game {
             this.vibrate([18, 60, 18]);
           }
           break;
+        case 'campTombe': {
+          // Par équipes : un camp vient de perdre son bâtiment principal. La partie continue tant que son équipe tient.
+          const moi = this.world.humanIndex;
+          if (event.player === moi) {
+            this.audio.play('alert');
+            this.ui.toast('Votre bâtiment principal est tombé : vos troupes se battent encore, votre allié tient', 'error');
+          } else if (this.world.allies(event.player, moi)) {
+            this.audio.play('alert');
+            this.ui.toast('Votre allié a perdu son bâtiment principal', 'warn');
+          } else this.ui.toast('Un adversaire est hors de combat', 'good');
+          break;
+        }
         case 'position': {
           // Prise de positions : une position change de mains. On dit laquelle des trois issues, et où.
           const moi = this.world.humanIndex;
@@ -535,6 +547,17 @@ class Game {
     const p = this.camera.screenToWorld(screenX, screenY);
     this.audio.resume();
 
+    // Par équipes : « Attaque ici » attend ce toucher — c'est le point donné à l'allié.
+    if (this.consigneArmee) {
+      this.consigneArmee = false;
+      this.ui.setBuildHint('');
+      const allie = this.allieOrdinateur();
+      if (allie && this.world.consigner(this.world.humanIndex, allie.index, 'attaquer', p.x, p.y)) {
+        this.audio.play('order');
+        this.annoncerConsigne(allie, 'attaquer');
+      } else this.audio.play('error');
+      return;
+    }
     if (this.rallyArmed && this.selection.length === 1 && this.selection[0].kind === 'building') {
       this.world.setRally(this.selection[0], p.x, p.y);
       this.rallyArmed = false;
@@ -810,8 +833,8 @@ class Game {
    * pris sa place et doit rester tant que le fantôme est là.
    */
   desarmer() {
-    if (!this.attackMoveArmed && !this.rallyArmed && !this.garrisonArmed) return;
-    this.attackMoveArmed = false; this.rallyArmed = false; this.garrisonArmed = false;
+    if (!this.attackMoveArmed && !this.rallyArmed && !this.garrisonArmed && !this.consigneArmee) return;
+    this.attackMoveArmed = false; this.rallyArmed = false; this.garrisonArmed = false; this.consigneArmee = false;
     if (!this.buildMode) this.ui.setBuildHint('');
   }
 
@@ -1255,8 +1278,8 @@ class Game {
       return;
     }
     if (this.buildMode) { this.cancelBuild(); return; }
-    if (this.attackMoveArmed || this.rallyArmed || this.garrisonArmed) {
-      this.attackMoveArmed = false; this.rallyArmed = false; this.garrisonArmed = false;
+    if (this.attackMoveArmed || this.rallyArmed || this.garrisonArmed || this.consigneArmee) {
+      this.attackMoveArmed = false; this.rallyArmed = false; this.garrisonArmed = false; this.consigneArmee = false;
       this.ui.setBuildHint('');
       this.ui.refreshSelection(true);
       return;
@@ -1269,6 +1292,38 @@ class Game {
     if (this.world.gameOver) return;
     this.paused = !this.paused;
     if (this.paused) this.ui.showPause(); else this.ui.hideModal();
+  }
+
+  /** Par équipes : l'allié du joueur que tient l'ordinateur — celui à qui l'on peut donner une consigne —, ou null. */
+  allieOrdinateur() {
+    const w = this.world;
+    if (!w.parEquipes) return null;
+    return w.coequipiersDe(w.humanIndex).find((p) => !p.defeated && w.ais.some((ia) => ia.index === p.index)) || null;
+  }
+
+  /** Donne une consigne à l'allié : 'attaquer' (le prochain toucher sur la carte dit où), 'defendre', 'libre'. */
+  consigner(type) {
+    const allie = this.allieOrdinateur();
+    if (!allie) { this.ui.toast('Votre allié est hors de combat'); return; }
+    if (type === 'attaquer') {
+      this.consigneArmee = true;
+      this.ui.setBuildHint('Touchez l’endroit que votre allié doit attaquer');
+      return;
+    }
+    if (this.world.consigner(this.world.humanIndex, allie.index, type)) {
+      this.audio.play('order');
+      if (type === 'defendre') this.annoncerConsigne(allie, type);
+      else this.ui.toast('Votre allié reprend sa conduite', 'good');
+    } else this.audio.play('error');
+  }
+
+  /**
+   * Dit ce que l'allié fait vraiment de la consigne : combien de soldats
+   * partent — ou pourquoi aucun ne part tout de suite (il n'en a pas au camp,
+   * ou il repousse lui-même une attaque). La consigne reste alors en attente.
+   */
+  annoncerConsigne(allie, type) {
+    this.ui.toast(texteDeConsigne(this.world.ais.find((ia) => ia.index === allie.index), type), 'good');
   }
 
   toggleSound() {
@@ -1297,7 +1352,7 @@ class Game {
     try { localStorage.setItem(STYLE_KEY, styleUnites()); } catch { /* stockage indisponible */ }
     // Une civilisation qui a ses propres modèles 3D ne suit pas le style : le
     // message ne doit pas annoncer un changement que l'écran ne montre pas.
-    const moi = this.civ, adverse = this.world.players[1 - this.world.humanIndex].civ;
+    const moi = this.civ, adverse = this.world.adversaire(this.world.humanIndex).civ;
     const miennes = troupesSelonStyle(moi), adverses = troupesSelonStyle(adverse);
     // (Le chevalier d'essai n'habille que le milicien, sous le nom que lui donne la civilisation.)
     const essai = miennes.includes('militia') ? `${nomDe('militia', moi)} : chevalier d’essai` : null;
@@ -1406,10 +1461,29 @@ const settings = {
  * classée, la force de l'adversaire (js/progression.js, reglagesDePartie).
  */
 function avecProgression(options, classee) {
+  // Par équipes : jamais classée (tant que l'allié est l'ordinateur, le
+  // résultat ne dit rien du joueur). Ce que la progression donne « au joueur »
+  // vaut pour son équipe, ce qu'elle donne « à l'adversaire » pour celle d'en
+  // face ; de même les deux peuples choisis à l'accueil.
+  const equipes = (GAME_MODES[options.mode] || {}).equipes;
+  if (equipes) {
+    const r = reglagesDePartie(lireProgression(), 'libre');
+    const parPlace = (paire) => (Array.isArray(paire) ? equipes.map((e) => paire[e === equipes[0] ? 0 : 1]) : paire);
+    return {
+      ...options, ...r, classee: false, partieId: null,
+      civs: parPlace(options.civs), niveaux: parPlace(r.niveaux),
+      troupesInterdites: parPlace(r.troupesInterdites), troupesEnPlus: parPlace(r.troupesEnPlus),
+    };
+  }
   return {
     ...options, ...reglagesDePartie(lireProgression(), classee ? 'classe' : 'libre'), classee: !!classee,
     partieId: classee ? `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}` : null,
   };
+}
+
+/** La partie que l'accueil s'apprête à lancer est-elle classée ? (Jamais par équipes.) */
+function partieClassee() {
+  return settings.type === 'classe' && !GAME_MODES[settings.mode].equipes;
 }
 
 /**
@@ -1464,7 +1538,10 @@ function refreshLigue() {
 
 /** En partie classée, la difficulté ne se choisit pas : l'adversaire suit la ligue. */
 function refreshType() {
-  const classee = settings.type === 'classe';
+  const classee = partieClassee();
+  // (Par équipes : la partie n'est jamais classée, et l'accueil le dit.)
+  const equipes = document.getElementById('equipes-note');
+  if (equipes) equipes.classList.toggle('hidden', !GAME_MODES[settings.mode].equipes);
   const note = document.getElementById('difficulte-classee');
   if (note) note.classList.toggle('hidden', !classee);
   const boite = document.getElementById('difficulty-options');
@@ -1518,7 +1595,7 @@ function refreshReglages() {
   if (!node) return;
   const resume = resumeReglages(settings);
   // En partie classée, la difficulté choisie ne joue pas : elle sort du résumé.
-  node.textContent = settings.type === 'classe'
+  node.textContent = partieClassee()
     ? `Classée · ${resume.replace(` · ${DIFFICULTIES[settings.difficulty].name}`, '')}`
     : `Libre · ${resume}`;
 }
@@ -1546,7 +1623,7 @@ function refreshPalmares() {
   const node = document.getElementById('palmares');
   if (!node) return;
   // (En partie classée, c'est le bandeau de ligue qui dit où l'on en est.)
-  const resume = settings.type === 'classe' ? '' : resumePalmares(lignePalmares(lirePalmares(), settings.mode, settings.difficulty));
+  const resume = partieClassee() ? '' : resumePalmares(lignePalmares(lirePalmares(), settings.mode, settings.difficulty));
   node.textContent = resume
     ? `${GAME_MODES[settings.mode].name}, ${DIFFICULTIES[settings.difficulty].name} : ${resume}`
     : '';
@@ -1599,6 +1676,8 @@ function refreshResumeCard() {
   const age = AGES[player ? player.age : 0];
   const civs = save.players.map((p) => CIVILISATIONS[civDe(p && p.civ)].name);
   const moi = save.humanIndex || 0;
+  // (Par équipes, le peuple d'en face est celui de la dernière place ; à deux camps, l'autre.)
+  const face = save.players.length > 2 ? save.players.length - 1 : 1 - moi;
   box.classList.remove('hidden');
   // Sur un format chronométré, ce qui compte c'est le temps qu'il reste.
   const chrono = mode.timeLimit
@@ -1606,7 +1685,7 @@ function refreshResumeCard() {
     : formatClock(save.time);
   box.innerHTML = `
     <button id="btn-resume" class="btn primary large">Reprendre la partie</button>
-    <p class="resume-info">${civs[moi]} contre ${civs[1 - moi]} · ${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
+    <p class="resume-info">${civs[moi]} contre ${civs[face]} · ${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
       · ${DIFFICULTIES[save.difficulty] ? DIFFICULTIES[save.difficulty].name : ''}</p>
     ${save.classee ? '<p class="resume-info">Partie classée : la quitter compte comme une défaite.</p>' : ''}
     <button id="btn-drop-save" class="btn ghost small">Abandonner cette partie</button>`;
@@ -1730,6 +1809,7 @@ function setupStartScreen() {
       activate(modeBox, btn);
       mapBox.querySelectorAll('[data-map]').forEach(
         (b) => b.classList.toggle('active', b.dataset.map === settings.mapSize));
+      refreshType();   // par équipes, la partie n'est pas classée : la note et la difficulté suivent
       refreshPalmares();
       refreshReglages();
       audio.resume(); audio.play('click');
@@ -1780,7 +1860,7 @@ function setupStartScreen() {
       mode: settings.mode, difficulty: settings.difficulty, mapSize: settings.mapSize,
       civs: [settings.civ, settings.civAdverse],   // indice = numéro du joueur
       speed: settings.speed, seed: Math.floor(Math.random() * 1e9),
-    }, settings.type === 'classe'));
+    }, partieClassee()));
   });
   document.getElementById('btn-howto').addEventListener('click', () => {
     const aide = document.getElementById('howto');

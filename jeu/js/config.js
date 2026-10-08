@@ -502,6 +502,20 @@ export const GAME_MODES = {
     victory: 'towncenter', aiRush: 0.4, townCenterHp: 1, timeLimit: 900,
     positions: { nombre: 3, rayon: 3, prise: 10, pas: 5, but: 200 },
   },
+  // Deux équipes de deux. `equipes` donne l'équipe de chaque place, dans
+  // l'ordre : les places 0 et 1 sont alliées, 2 et 3 leur font face. Qui tient
+  // chaque place — le joueur, un ordinateur, plus tard un joueur à distance —
+  // ne fait pas partie du format : c'est la partie qui le dit (World, option
+  // `places`). Une équipe est battue quand les bâtiments principaux de ses deux
+  // membres sont tombés ; à vingt minutes, la meilleure somme des scores gagne.
+  deux: {
+    id: 'deux', name: '2 contre 2', icon: 'ouvriers',
+    desc: '15 à 20 min · vous et un allié contre deux adversaires · une équipe est battue quand ses deux bâtiments principaux sont tombés',
+    mapSize: 'medium', startAge: 1, popMax: 30, villagers: 6, popStart: 6,
+    resources: { food: 500, wood: 500, gold: 250 },
+    victory: 'towncenter', aiRush: 0.5, townCenterHp: 1, timeLimit: 1200,
+    equipes: [0, 0, 1, 1],
+  },
   classique: {
     id: 'classique', name: 'Classique', icon: 'modeClassique',
     desc: '20 à 30 min · trois âges, victoire par conquête',
@@ -533,7 +547,7 @@ export const DIFFICULTIES = {
     id: 'easy', name: 'Facile',
     gatherBonus: 0.8, maxVillagers: 14, armyTrigger: 3, armyStep: 2,
     attackDelay: 260,
-    treve: { classique: 900, express: 270, positions: 180, escarmouche: 90 }, petitesVagues: true,
+    treve: { classique: 900, express: 270, deux: 270, positions: 180, escarmouche: 90 }, petitesVagues: true,
     desc: 'L’adversaire vous laisse 15 minutes pour vous installer (4 min 30 en Express, 3 min en Prise de positions, 1 min 30 en Escarmouche), vous prévient, puis attaque par petits groupes.',
   },
   normal: {
@@ -564,6 +578,16 @@ export const MAP_SIZES = {
 export const PLAYER_COLORS = [
   { main: '#2f6fe8', light: '#93c5fd', dark: '#1d4ed8', name: 'Bleu' },
   { main: '#e3261c', light: '#fca5a5', dark: '#b91c1c', name: 'Rouge' },
+];
+// Format par équipes : une couleur par place. Les deux alliés dans des tons
+// froids (le joueur garde son bleu, son allié est turquoise), leurs adversaires
+// dans des tons chauds (rouge et orangé) : le bord se lit à la température de
+// la couleur, le camp à sa teinte.
+export const COULEURS_EQUIPES = [
+  PLAYER_COLORS[0],
+  { main: '#12b5a6', light: '#8ff0e4', dark: '#0b7d73', name: 'Turquoise' },
+  PLAYER_COLORS[1],
+  { main: '#f08a1c', light: '#fdd09a', dark: '#b85f08', name: 'Orangé' },
 ];
 
 // --- Civilisations ------------------------------------------------------------

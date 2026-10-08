@@ -15,8 +15,10 @@ import { serializeWorld, restoreWorld } from '../js/save.js';
 import { GAME_MODES, MAP_SIZES, DIFFICULTIES, DEFAULT_MODE, BUILDING_TYPES, TICKS_PER_SECOND, TILE } from '../js/config.js';
 import { PROGRESSION as R } from '../js/progression-config.js';
 import { profilNeuf, appliquerResultat, tableDesCoffres, verifierProbabilites } from '../js/progression.js';
-import { resumeReglages } from '../js/ui.js';
+import { resumeReglages, texteDeConsigne } from '../js/ui.js';
 import { formatNumber } from '../js/utils.js';
+import { executer, avancer as avancerLeJournal, Journal, ORDRES } from '../js/ordres.js';
+import { COULEURS_EQUIPES } from '../js/config.js';
 
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
@@ -52,8 +54,8 @@ function jouer(options, { deuxOrdinateurs = false, max = 400 } = {}) {
 // ---------------------------------------------------------------------------
 console.log('=== Escarmouche ===\n--- Le format ---');
 const E = GAME_MODES.escarmouche;
-check('quatre formats : Escarmouche, Express, Prise de positions, Classique — et le Classique reste celui par défaut',
-  Object.keys(GAME_MODES).join() === 'escarmouche,express,positions,classique' && DEFAULT_MODE === 'classique');
+check('cinq formats : Escarmouche, Express, Prise de positions, 2 contre 2, Classique — et le Classique reste celui par défaut',
+  Object.keys(GAME_MODES).join() === 'escarmouche,express,positions,deux,classique' && DEFAULT_MODE === 'classique');
 check('cinq minutes, sur la carte minuscule, deux fois plus petite que celle d’Express',
   E.timeLimit === 300 && E.mapSize === 'tiny' && MAP_SIZES.tiny.tiles === 48 && MAP_SIZES.tiny.tiles ** 2 * 2 < MAP_SIZES[GAME_MODES.express.mapSize].tiles ** 2);
 check('réserves pleines, en chiffres ronds : 1 000 vivres, 1 000 bois, 500 or', E.resources.food === 1000 && E.resources.wood === 1000 && E.resources.gold === 500);
@@ -348,6 +350,227 @@ console.log('--- À l’écran, au classement ---');
   check('le monument a son illustration, dans la liste hors ligne, et un dessin de repli', fs.existsSync(path.join(RACINE, 'assets/position.webp')) && sw.includes("'./assets/position.webp'") && /assets\/position\.webp/.test(rendu) && /POSITION_NEUTRE/.test(rendu));
   check('l’aide explique la règle, et l’écran de fin dit ce qui a tranché', /Tenez des <b>soldats<\/b> dans le cercle/.test(ui) && /Vous tenez les positions/.test(ui) && /les points des positions départagent/.test(ui) && /Points des positions/.test(ui));
   check('elle compte au classement, avec les coffres de tous les formats', tableDesCoffres('positions') === R.sources.partie);
+}
+
+// ===========================================================================
+console.log('\n=== 2 contre 2 ===\n--- Le format et les places ---');
+const D = GAME_MODES.deux;
+const centreDe = (w, i) => w.buildings.find((b) => b.playerIndex === i && b.type === 'towncenter' && !b.dead);
+const parId = (m) => m.entities.filter((x) => !x.dead).sort((x, y) => x.id - y.id).map((x) => `${x.id}:${x.type}:${x.playerIndex}:${Math.round(x.x)}:${Math.round(x.y)}:${Math.round(x.hp)}`).join('|');
+check('deux équipes de deux : les places 0 et 1 alliées, 2 et 3 en face', JSON.stringify(D.equipes) === '[0,0,1,1]');
+check('trente de population par camp, vingt minutes au plus, le bâtiment principal décide', D.popMax === 30 && D.timeLimit === 1200 && D.victory === 'towncenter' && /deux bâtiments principaux/.test(D.desc));
+{
+  const w = new World({ seed: 42, mode: 'deux', civs: ['atlante', 'atlante', 'solarien', 'solarien'] });
+  check('quatre camps ; par défaut le joueur tient la place 0, l’ordinateur les trois autres',
+    w.players.length === 4 && w.parEquipes && w.humanIndex === 0 && w.places.map((p) => p.controle).join() === 'local,ordinateur,ordinateur,ordinateur'
+    && w.ais.map((a) => a.index).join() === '1,2,3');
+  check('chacun son nom, son peuple et sa couleur : les alliés en tons froids, les adversaires en tons chauds',
+    w.players.map((p) => p.name).join() === 'Vous,Allié,Adversaire 1,Adversaire 2' && w.players.map((p) => p.civ).join() === 'atlante,atlante,solarien,solarien'
+    && w.players.every((p, i) => p.color === COULEURS_EQUIPES[i]) && new Set(w.players.map((p) => p.color.main)).size === 4);
+  check('qui est du même bord : soi, son allié — ni ceux d’en face, ni la nature',
+    w.allies(0, 0) && w.allies(0, 1) && w.allies(2, 3) && !w.allies(0, 2) && !w.allies(1, 3) && !w.allies(-1, 0) && w.allies(-1, -1)
+    && w.adversairesDe(0).map((p) => p.index).join() === '2,3' && w.coequipiersDe(0).map((p) => p.index).join() === '1' && w.adversaire(3).index === 0);
+  check('le tissu se peint par bord : bleu pour l’équipe du joueur, rouge pour celle d’en face', [0, 1, 2, 3, -1].map((i) => w.bordDe(i)).join() === '0,0,1,1,-1');
+  const [a, b, c, d] = w.map.startPositions;
+  check('une base par coin : les alliés du même côté, chacun son vis-à-vis', w.map.startPositions.length === 4 && a.tx === b.tx && c.tx === d.tx && a.tx < c.tx && a.ty === d.ty && b.ty === c.ty && a.ty > b.ty);
+  check('chaque camp a son bâtiment principal, six ouvriers et un éclaireur, à l’Âge Féodal', w.players.every((p) => centreDe(w, p.index) && p.age === 1
+    && w.units.filter((u) => u.playerIndex === p.index && u.isVillager).length === 6 && w.units.filter((u) => u.playerIndex === p.index && u.type === 'scout').length === 1));
+  const libre = (p) => w.map.findFreeTile(p.tx, p.ty);
+  check('les quatre bases sont reliées', [b, c, d].every((p) => w.map.floodReaches(libre(a), libre(p))));
+  const vu = (i) => { const t = centreDe(w, i); return w.fog.visible[t.ty * w.map.w + t.tx] === 1; };
+  check('la vue est partagée : le joueur voit la base de son allié, pas celles d’en face', vu(0) && vu(1) && !vu(2) && !vu(3));
+}
+check('les formats à deux camps n’ont pas bougé : deux places, chacune son équipe, la place 1 à l’ordinateur', ['escarmouche', 'express', 'positions', 'classique'].every((mode) => {
+  const w = new World({ seed: 5, mode });
+  return w.players.length === 2 && !w.parEquipes && w.players.map((p) => p.equipe).join() === '0,1' && w.ais.map((a) => a.index).join() === '1'
+    && w.map.startPositions.length === 2 && !('places' in serializeWorld(w)) && w.bordDe(1) === 1 && w.adversaire(0).index === 1 && w.adversaire(1).index === 0;
+}));
+
+console.log('--- Alliés et ennemis ---');
+{
+  const w = new World({ seed: 7, mode: 'deux' });
+  w.ais.length = 0;
+  const allie = centreDe(w, 1), ennemi = centreDe(w, 2);
+  const pres = w.spawnUnit(0, 'militia', allie.x + TILE * 3, allie.y + TILE * 3);
+  const archer = w.spawnUnit(0, 'archer', allie.x + TILE * 4, allie.y + TILE * 3);
+  w.setStance([pres, archer], 'aggressive');
+  for (let i = 0; i < 12 * TICKS_PER_SECOND; i++) w.update(DT);
+  check('des soldats agressifs au pied de la base alliée ne s’en prennent à personne', pres.state !== 'attack' && archer.state !== 'attack' && allie.hp === allie.maxHp
+    && w.units.filter((u) => u.playerIndex === 1).every((u) => u.hp === u.maxHp));
+  const ordre = w.commandUnits([pres], allie.x, allie.y);
+  check('toucher le bâtiment d’un allié n’est pas un ordre d’attaque', !ordre || ordre.kind !== 'attack');
+  check('… et il ne se vise pas comme un ennemi', w.enemyAt(allie.x, allie.y, 0) === null && w.enemyAt(ennemi.x, ennemi.y, 0) === ennemi);
+  const loin = w.spawnUnit(0, 'militia', ennemi.x + TILE * 3, ennemi.y + TILE * 3);
+  w.setStance([loin], 'aggressive');
+  for (let i = 0; i < 12 * TICKS_PER_SECOND; i++) w.update(DT);
+  check('les mêmes, au pied d’une base adverse, attaquent', loin.state === 'attack' || ennemi.hp < ennemi.maxHp || w.units.some((u) => u.playerIndex === 2 && u.hp < u.maxHp));
+  const hydre = w.spawnUnit(0, 'hydra', allie.x - TILE * 3, allie.y + TILE * 3);
+  const voisin = w.spawnUnit(1, 'militia', hydre.x + 20, hydre.y);
+  w.setStance([hydre, voisin], 'aggressive');
+  for (let i = 0; i < 8 * TICKS_PER_SECOND; i++) w.update(DT);
+  check('l’Hydre d’un camp ne mord pas le soldat de son allié posé contre elle', voisin.hp === voisin.maxHp && hydre.hp === hydre.maxHp);
+}
+
+console.log('--- Gagner, perdre ---');
+{
+  const w = new World({ seed: 7, mode: 'deux' }); w.ais.length = 0;
+  const vus = [];
+  const pas = (n) => { for (let i = 0; i < n; i++) { w.update(DT); vus.push(...w.drainEvents().filter((e) => e.type === 'campTombe')); } };
+  centreDe(w, 2).takeDamage(99999, null); pas(20);
+  check('un bâtiment principal adverse tombe : la partie continue, et le dit', !w.gameOver && w.players[2].defeated && !w.players[3].defeated && vus.length === 1 && vus[0].player === 2);
+  centreDe(w, 3).takeDamage(99999, null); pas(20);
+  check('le second tombe : l’équipe du joueur a gagné', !!w.gameOver && w.gameOver.victory === true && w.gameOver.equipe === 0 && w.allies(w.gameOver.winner, 0));
+  const p = new World({ seed: 7, mode: 'deux' }); p.ais.length = 0;
+  centreDe(p, 0).takeDamage(99999, null); for (let i = 0; i < 20; i++) p.update(DT);
+  check('le joueur perd le sien : son allié tient, rien n’est fini', !p.gameOver && p.players[0].defeated);
+  centreDe(p, 1).takeDamage(99999, null); for (let i = 0; i < 20; i++) p.update(DT);
+  check('… l’allié aussi : défaite', !!p.gameOver && p.gameOver.victory === false && p.gameOver.equipe === 1);
+  const t = new World({ seed: 7, mode: 'deux' }); t.ais.length = 0; t.time = D.timeLimit - 1;
+  t.players[2].stats.destroyed = 5000;
+  for (let i = 0; i < 40; i++) t.update(DT);
+  check('à vingt minutes, la meilleure somme des deux scores l’emporte', !!t.gameOver && t.gameOver.timeUp && t.gameOver.equipe === 1 && t.gameOver.victory === false
+    && t.gameOver.scoresEquipes.length === 2 && t.gameOver.scoresEquipes[1] > t.gameOver.scoresEquipes[0]
+    && t.gameOver.scoresEquipes[0] === t.gameOver.scores[0] + t.gameOver.scores[1] && t.scoreEquipe(1) === t.gameOver.scoresEquipes[1]);
+  const r = new World({ seed: 7, mode: 'deux' }); r.resign();
+  check('abandonner donne la partie à ceux d’en face', !!r.gameOver && r.gameOver.resigned && r.gameOver.victory === false && r.gameOver.equipe === 1 && !r.allies(r.gameOver.winner, 0));
+}
+
+console.log('--- Les ordinateurs ---');
+{
+  const parties = [1, 42, 808].map((seed) => {
+    const w = new World({ seed, mode: 'deux', places: ['ordinateur', 'ordinateur', 'ordinateur', 'ordinateur'] });
+    let entreAllies = 0, coups = 0;
+    while (!w.gameOver && w.time < 1300) {
+      w.update(DT);
+      for (const e of w.drainEvents()) if ((e.type === 'melee' || e.type === 'shoot') && e.combat) coups++;
+      if (Math.round(w.time * 20) % 20 === 0) for (const u of w.units) if (!u.dead && u.state === 'attack' && u.target && u.target.playerIndex >= 0 && u.target.playerIndex !== u.playerIndex && w.allies(u.target.playerIndex, u.playerIndex)) entreAllies++;
+    }
+    return { w, entreAllies, coups };
+  });
+  check('quatre ordinateurs, trois graines : la partie finit à vingt minutes au plus tard, avec une équipe gagnante', parties.every((p) => p.w.gameOver && p.w.time <= 1200 + DT && [0, 1].includes(p.w.gameOver.equipe)), parties.map((p) => mmss(p.w.time)).join(', '));
+  check('on s’y bat', parties.every((p) => p.coups > 200), parties.map((p) => p.coups).join(', '));
+  check('jamais un soldat n’y attaque un allié', parties.every((p) => p.entreAllies === 0), parties.map((p) => p.entreAllies).join(', '));
+  check('chaque ordinateur vise un camp d’en face', parties.every((p) => p.w.ais.every((ia) => !p.w.allies(ia.adversaireVise(), ia.index))));
+}
+{
+  // Les consignes à l'allié. Au début de la partie il n'a pas un soldat : la consigne attend, et le joueur le lit.
+  const w = new World({ seed: 42, mode: 'deux' });
+  while (w.time < 30) w.update(DT);
+  const ia = w.ais.find((a) => a.index === 1), mien = centreDe(w, 0), sien = centreDe(w, 1), leur = centreDe(w, 2);
+  const postes = () => [...ia.gardes.keys()].map((id) => w.byId.get(id)).filter((u) => u && !u.dead);
+  const pres = (c, cases) => postes().filter((u) => Math.hypot(u.x - c.x, u.y - c.y) < TILE * cases).length;
+  check('« Défends-moi » sans un soldat au camp : la consigne est prise, attend, et le joueur lit pourquoi',
+    ia.disponibles().length === 0 && w.consigner(0, 1, 'defendre') === true && ia.consigne.type === 'defendre'
+    && texteDeConsigne(ia, 'defendre').includes('aucun soldat au camp') && texteDeConsigne(null, 'defendre').includes('hors de combat'));
+  for (let i = 0; i < 5 * TICKS_PER_SECOND; i++) w.update(DT);
+  check('… cinq secondes plus tard elle attend encore, personne n’est posté', !!ia.consigne && ia.gardes.size === 0);
+  // Quatre soldats sortent de sa caserne.
+  const recrues = [0, 1, 2, 3].map((i) => w.spawnUnit(1, 'militia', sien.x + TILE * (i - 1.5), sien.y + TILE * 3));
+  for (let i = 0; i < 3 * TICKS_PER_SECOND; i++) w.update(DT);
+  check('dès qu’il a des soldats, ils partent : la consigne est suivie, les quatre sont postés chez le joueur',
+    ia.consigne === null && recrues.every((u) => ia.gardes.has(u.id)) && recrues.every((u) => u.state !== 'idle'));
+  let trajet = 0;
+  while (pres(mien, 9) < 4 && trajet < 150) { w.update(DT); trajet += DT; }
+  check('… ils traversent la carte et arrivent à sa base', pres(mien, 9) === 4, `${pres(mien, 9)} sur place après ${Math.round(trajet)} s`);
+  for (let i = 0; i < 60 * TICKS_PER_SECOND; i++) w.update(DT);
+  check('… une minute plus tard ils y sont toujours : la garde dure trois minutes, comptées du départ',
+    pres(mien, 11) >= 3 && ia.gardes.size >= 3, `${pres(mien, 11)} sur place, ${ia.gardes.size} postés`);
+  check('« À toi de voir » les libère', w.consigner(0, 1, 'libre') === true && ia.consigne === null && ia.gardes.size === 0);
+  check('attaqué chez lui, il le dit : sa base d’abord', (ia.defendUntil = w.time + 5) && texteDeConsigne(ia, 'defendre').includes('attaqué chez lui'));
+  check('on ne donne de consigne ni à soi, ni à un adversaire, ni sans point', !w.consigner(0, 0, 'defendre') && !w.consigner(0, 2, 'defendre') && !w.consigner(0, 1, 'attaquer') && !w.consigner(2, 1, 'defendre'));
+}
+{
+  // « Attaque ici », et ce que le joueur lit quand l'allié a des soldats chez lui.
+  const w = new World({ seed: 42, mode: 'deux' });
+  while (w.time < 30) w.update(DT);
+  const ia = w.ais.find((a) => a.index === 1), sien = centreDe(w, 1), leur = centreDe(w, 2);
+  const recrues = [0, 1, 2].map((i) => w.spawnUnit(1, 'militia', sien.x + TILE * (i - 1), sien.y + TILE * 3));
+  for (let i = 0; i < 2 * TICKS_PER_SECOND; i++) w.update(DT);
+  check('avec trois soldats au camp, il annonce combien partent', ia.disponibles().length === 3
+    && texteDeConsigne(ia, 'defendre') === 'Votre allié envoie 3 soldats vous défendre' && texteDeConsigne(ia, 'attaquer') === 'Votre allié envoie 3 soldats à l’attaque');
+  check('« Attaque ici » : la consigne porte le point, et attend 2 minutes au plus',
+    w.consigner(0, 1, 'attaquer', leur.x, leur.y + TILE * 4) === true && ia.consigne.type === 'attaquer' && ia.consigne.x === leur.x && Math.round(ia.consigne.jusqua - w.time) === 120);
+  for (let i = 0; i < 3 * TICKS_PER_SECOND; i++) w.update(DT);
+  check('… ses soldats partent à l’attaque, sans rester postés', ia.consigne === null && recrues.every((u) => !ia.gardes.has(u.id) && u.state !== 'idle'));
+  const depart = recrues.map((u) => Math.hypot(u.x - leur.x, u.y - leur.y));
+  for (let i = 0; i < 30 * TICKS_PER_SECOND; i++) w.update(DT);
+  check('… trente secondes plus tard ils se sont rapprochés du point', recrues.every((u, i) => u.dead || Math.hypot(u.x - leur.x, u.y - leur.y) < depart[i] - TILE * 10));
+}
+
+console.log('--- La sauvegarde ---');
+{
+  const w = new World({ seed: 42, mode: 'deux', civs: ['atlante', 'atlante', 'solarien', 'solarien'] });
+  while (w.time < 240) w.update(DT);
+  w.consigner(0, 1, 'defendre');
+  for (let i = 0; i < 100; i++) w.update(DT);
+  const r = restoreWorld(JSON.parse(JSON.stringify(serializeWorld(w))));
+  check('une partie rechargée retrouve ses quatre camps, leurs équipes, leurs couleurs et qui tient chaque place',
+    !!r && r.players.length === 4 && r.parEquipes && r.players.map((p) => `${p.equipe}${p.civ}${p.color.name}`).join() === w.players.map((p) => `${p.equipe}${p.civ}${p.color.name}`).join()
+    && JSON.stringify(r.places) === JSON.stringify(w.places) && r.ais.map((a) => a.index).sort().join() === '1,2,3');
+  check('… et les soldats que l’allié avait postés', !!r && JSON.stringify(r.ais.map((a) => [a.index, [...a.gardes]]).sort()) === JSON.stringify(w.ais.map((a) => [a.index, [...a.gardes]]).sort()));
+  for (let i = 0; i < 90 * TICKS_PER_SECOND; i++) { w.update(DT); r.update(DT); }
+  check('une minute et demie plus tard, les deux parties sont encore la même', parId(w) === parId(r));
+}
+
+console.log('--- Prêt pour d’autres joueurs : les places et les ordres ---');
+{
+  const ami = new World({ seed: 9, mode: 'deux', places: ['local', 'distant', 'ordinateur', 'ordinateur'] });
+  check('le joueur et un ami contre deux ordinateurs : seules les places d’en face sont à l’ordinateur', ami.ais.map((a) => a.index).join() === '2,3' && ami.humanIndex === 0 && ami.parEquipes);
+  const tous = new World({ seed: 9, mode: 'deux', places: ['local', 'distant', 'distant', 'distant'] });
+  check('deux joueurs contre deux joueurs : aucun ordinateur', tous.ais.length === 0 && tous.players.every((p) => !p.isAI) && tous.humanIndex === 0);
+  check('les règles n’en dépendent pas : mêmes équipes, mêmes bases, même vue partagée', JSON.stringify(tous.players.map((p) => p.equipe)) === '[0,0,1,1]'
+    && JSON.stringify(tous.map.startPositions) === JSON.stringify(ami.map.startPositions) && tous.allies(0, 1) && !tous.allies(1, 2));
+
+  check('le vocabulaire des ordres : huit types', Object.keys(ORDRES).join() === 'aller,former,batir,age,recherche,attitude,ralliement,consigne');
+  // Un journal d'ordres pour les quatre places : chacun forme des ouvriers, envoie son éclaireur au centre, puis des soldats.
+  const journalDe = (w) => {
+    const j = new Journal();
+    for (const p of w.players) {
+      const tc = centreDe(w, p.index), eclaireur = w.units.find((u) => u.playerIndex === p.index && u.type === 'scout');
+      j.noter(1, { place: p.index, type: 'former', batiment: tc.id, troupe: 'villager' });
+      j.noter(40, { place: p.index, type: 'aller', unites: [eclaireur.id], x: w.map.pixelWidth / 2, y: w.map.pixelHeight / 2, agressif: true });
+      j.noter(60, { place: p.index, type: 'attitude', unites: [eclaireur.id], attitude: 'aggressive' });
+      j.noter(200, { place: p.index, type: 'ralliement', batiment: tc.id, x: tc.x + 64, y: tc.y + 96 });
+      j.noter(300, { place: p.index, type: 'former', batiment: tc.id, troupe: 'villager' });
+    }
+    return j;
+  };
+  const un = new World({ seed: 9, mode: 'deux', places: ['distant', 'distant', 'distant', 'distant'] });
+  const deux = new World({ seed: 9, mode: 'deux', places: ['distant', 'distant', 'distant', 'distant'] });
+  const journal = journalDe(un);
+  const refusUn = avancerLeJournal(un, journal, 1200), refusDeux = avancerLeJournal(deux, new Journal(JSON.parse(JSON.stringify(journal.aPlat()))), 1200);
+  check('le même journal, rejoué sur un autre monde (après un aller-retour en JSON), donne la même partie', refusUn === 0 && refusDeux === 0 && parId(un) === parId(deux) && un.time === deux.time);
+  check('… et les ordres ont bien été suivis : huit ouvriers de plus, les quatre éclaireurs partis vers le centre', un.players.every((p) => un.units.filter((u) => u.playerIndex === p.index && u.isVillager).length === 8)
+    && un.units.filter((u) => u.type === 'scout').every((u) => { const tc = centreDe(un, u.playerIndex); return Math.hypot(u.x - tc.x, u.y - tc.y) > TILE * 12; }));
+  const sans = new World({ seed: 9, mode: 'deux', places: ['distant', 'distant', 'distant', 'distant'] });
+  avancerLeJournal(sans, new Journal(), 1200);
+  check('sans ordres, personne ne joue à la place d’un joueur à distance', parId(sans) !== parId(un) && sans.players.every((p) => sans.units.filter((u) => u.playerIndex === p.index && u.isVillager).length === 6));
+
+  const w = new World({ seed: 9, mode: 'deux', places: ['distant', 'distant', 'distant', 'distant'] });
+  const avant = parId(w), tcAllie = centreDe(w, 1), tcAdverse = centreDe(w, 2), unAdverse = w.units.find((u) => u.playerIndex === 2);
+  const refus = [
+    executer(w, { place: 0, type: 'former', batiment: tcAllie.id, troupe: 'villager' }),
+    executer(w, { place: 0, type: 'former', batiment: tcAdverse.id, troupe: 'villager' }),
+    executer(w, { place: 0, type: 'aller', unites: [unAdverse.id], x: 100, y: 100 }),
+    executer(w, { place: 0, type: 'detruire', batiment: tcAdverse.id }),
+    executer(w, { place: 7, type: 'age', batiment: tcAllie.id }),
+    executer(w, { place: 0, type: 'aller', unites: 'tout', x: 1, y: 1 }),
+    executer(w, null),
+  ];
+  check('on ne commande que ce qui est à soi : les troupes et les bâtiments d’un allié ou d’un adversaire sont refusés, comme un ordre inconnu ou illisible',
+    refus.every((r) => r.ok === false && typeof r.raison === 'string') && parId(w) === avant && centreDe(w, 1).queue.length === 0 && centreDe(w, 2).queue.length === 0);
+  check('… et le sien passe', executer(w, { place: 0, type: 'former', batiment: centreDe(w, 0).id, troupe: 'villager' }).ok === true && centreDe(w, 0).queue.length === 1);
+}
+
+console.log('--- À l’écran ---');
+{
+  const main = lire('js/main.js'), ui = lire('js/ui.js'), rendu = lire('js/render.js'), page = lire('index.html');
+  check('le 2 contre 2 n’est jamais classé, et l’accueil le dit', /function partieClassee\(\)/.test(main) && /!GAME_MODES\[settings\.mode\]\.equipes/.test(main) && /id="equipes-note"/.test(page));
+  check('la partie reçoit quatre peuples : celui du joueur pour son équipe, celui d’en face pour l’autre', /const parPlace = \(paire\)/.test(main));
+  check('un bouton donne ses consignes à l’allié ; « Attaque ici » attend un toucher sur la carte', /id="btn-allie"/.test(page) && /showConsignes\(\)/.test(ui) && /this\.consigneArmee/.test(main) && /'attaquer', p\.x, p\.y/.test(main));
+  check('le score du haut de l’écran et l’écran de fin comptent par équipe', /scoreEquipe\(player\.equipe\)/.test(ui) && /tableDesEquipes/.test(ui) && /Par équipe/.test(ui));
+  check('ce qui est à un allié est dit « allié », et son tissu reste bleu', /\(allié\)/.test(ui) && /imagePourJoueur\(sprite, this\.world\.bordDe\(u\.playerIndex\)\)/.test(rendu));
+  check('un camp qui tombe s’annonce : le sien, celui de l’allié, celui d’un adversaire', /case 'campTombe':/.test(main) && /Votre allié a perdu son bâtiment principal/.test(main));
 }
 
 console.log(`\n${failures === 0 ? 'Tous les tests passent' : failures + ' test(s) en échec'}`);

@@ -56,6 +56,7 @@ le joueur 1 le porte en rouge, quelle que soit sa civilisation.
 | ⚔ **Escarmouche** | **5 min chrono** | Pas d'installation : on se bat tout de suite. Départ à l'**Âge Féodal** avec 5 ouvriers, **1 000 vivres, 1 000 bois et 500 or** en réserve, **une caserne déjà bâtie** et toute la population offerte (30 places, pas une maison à poser), sur la carte **minuscule** (48 cases, deux fois plus petite que celle d'Express). L'ordinateur ne bâtit qu'une archerie et met tout le reste en soldats ; il attaque dès la première minute (1 min 30 de trêve en Facile). **Raser le Centre-Ville adverse** gagne ; sinon, à cinq minutes, **le meilleur score l'emporte**. En partie classée, son coffre est tiré dans une table **un cran en dessous** de celle des autres formats (`sources.parFormat` des réglages) : victoire 35/40/20/5, défaite 75/20/5/0 |
 | ⚡ **Express** | **10 min chrono** | Départ à l'**Âge Féodal** avec 7 villageois, des ressources garnies et de la place pour produire tout de suite, petite carte, population plafonnée à 40, IA agressive dès la première minute. **Raser le Centre-Ville adverse met fin à la partie sur-le-champ** (il y est deux fois moins résistant) ; sinon, au temps écoulé, **le meilleur score l'emporte** |
 | ⚑ **Prise de positions** | 10 à 12 min (15 au plus) | La carte et le départ d'Express, avec **trois positions** sur la ligne du milieu, à égale distance des deux camps : un monument à bannière dans un cercle de 3 cases. On **prend** une position en y tenant des soldats seuls pendant **10 secondes** (ni ouvriers ni soigneurs ; tant que les deux camps sont dans le cercle, rien ne bouge ; une prise abandonnée se défait au même rythme) ; elle reste à son camp, même vide, jusqu'à ce que l'autre la reprenne. Chaque position tenue rapporte **1 point toutes les 5 secondes** : **le premier à 200 gagne**. Raser le Centre-Ville adverse gagne aussi (il y garde tous ses points de vie) ; à quinze minutes, le meilleur total l'emporte. L'ordinateur envoie chaque vague tenir la position la plus proche qui n'est pas à lui, y laisse ses soldats de garde, et ne marche sur la base que s'il les tient toutes. Réglages : `positions` du format (`nombre`, `rayon`, `prise`, `pas`, `but`) |
+| 👥 **2 contre 2** | 15 à 20 min | Quatre camps, **deux équipes de deux**, une base par coin (les alliés du même côté). Départ à l'Âge Féodal, 30 de population par camp. Les alliés ne se frappent pas, **partagent leur vue**, et l'on ne peut pas viser ce qui est à son allié. **Une équipe est battue quand les bâtiments principaux de ses deux membres sont tombés** (un camp à terre garde ses troupes, qui se battent encore) ; à vingt minutes, la meilleure **somme des deux scores** l'emporte. Aujourd'hui le joueur tient une place et l'ordinateur les trois autres ; il peut donner trois consignes à son allié : **Attaque ici**, **Défends-moi**, **À toi de voir**. Jamais classé, pas de coffre : le résultat dépend de l'allié |
 | 🏰 **Classique** | 20 à 30 min | La partie complète : trois âges, population 60, victoire par conquête (tous les bâtiments **et** villageois adverses) |
 
 Le score d'une partie Express : *ressources récoltées + 10 par unité vivante +
@@ -790,6 +791,34 @@ Tests : `node test/musique.test.js`.
 
 Les formats ajoutés aux deux d'origine ont leurs tests : `node test/modes.test.js` (mise en place, règles de prise et de points, sauvegarde, parties jouées par l'ordinateur, coffres).
 
+### Par équipes : les places, et ce qui est prêt pour le jeu à plusieurs
+
+Le format `deux` (`GAME_MODES`, `js/config.js`) ne dit que les **équipes** : `equipes: [0, 0, 1, 1]`, une
+par place. **Qui tient chaque place** est dit à la partie (`World`, option `places`) : `'local'` (le joueur de
+l'appareil), `'ordinateur'` (animé par le monde) ou `'distant'` (un joueur d'un autre appareil : personne ne
+joue pour lui ici). Les trois façons de jouer ne diffèrent que par là :
+
+| Façon de jouer | `places` | Aujourd'hui |
+|---|---|---|
+| Le joueur et un allié ordinateur contre deux ordinateurs | `['local', 'ordinateur', 'ordinateur', 'ordinateur']` | jouable |
+| Le joueur et un ami contre deux ordinateurs | `['local', 'distant', 'ordinateur', 'ordinateur']` | les règles tournent, il manque le réseau |
+| Deux joueurs contre deux joueurs | `['local', 'distant', 'distant', 'distant']` | idem |
+
+Rien dans les règles ne regarde qui tient une place : alliés (`World.allies`), vue partagée, victoire par
+équipe, scores et consignes ne dépendent que des équipes. À deux camps, chacun est sa propre équipe : les
+parties d'Express, de Classique, d'Escarmouche et de Prise de positions sont inchangées, à l'unité près (leurs
+empreintes sont tenues par les tests).
+
+Ce qui manque pour ouvrir les deux autres façons, c'est le transport. Sa couture est posée : `js/ordres.js`
+fixe le **vocabulaire des ordres** d'un joueur (aller, former, bâtir, âge, recherche, attitude, ralliement,
+consigne) sous une forme qui se transmet — du JSON qui ne cite que des identifiants et des nombres —,
+`executer(world, ordre)` les applique après avoir vérifié que la place a le droit de les donner (on ne
+commande que ce qui est à soi), et un `Journal` les range par pas de simulation. La simulation étant à pas
+fixe et à graine, **le même journal rejoué donne la même partie** (`test/modes.test.js` le vérifie sur quatre
+places « distantes ») : un serveur n'aura qu'à relayer les ordres, et à rejouer le journal pour faire foi.
+Le jour venu, il restera à faire passer les ordres du joueur local par ce même chemin (l'interface appelle
+encore directement les fonctions du monde) et à écrire l'échange lui-même.
+
 Le monument des positions est une illustration (`assets/position.webp`) à la bannière bleu roi : elle sert telle quelle au joueur bleu, sa fenêtre de bleu bascule au rouge pour l'autre camp (comme pour les troupes) et devient une toile écrue quand personne ne tient la position (`banniereNeutre`, `js/render.js`).
 
 ## Architecture
@@ -821,6 +850,7 @@ jeu/
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons : échantillons (assets/sons) joués par Web Audio, synthèse en repli
 │   ├── musique.js        musique de fond : accueil, partie, bataille qui prend le relais
+│   ├── ordres.js         les ordres des joueurs sous une forme qui se transmet (jeu à plusieurs : la couture du réseau)
 │   ├── fiches-troupes.js les fiches écrites des troupes (rôle, bat, craint, conseil)
 │   ├── modele3d.js       unités 3D (milicien, villageois, archer, Arbalétrier, Archer monté, lancier, Atlante, Champion, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse, Hydre) : modèles de l'Atelier cuits en atlas
 │   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case

@@ -94,6 +94,20 @@ export function illustrationDeFin(result, civ) {
 }
 
 /**
+ * Par équipes : ce que l'allié fait d'une consigne, dit au joueur — combien de
+ * soldats partent, ou pourquoi aucun ne part tout de suite. `ia` : l'ordinateur
+ * qui tient la place de l'allié (AIPlayer) ; la consigne l'attend 2 minutes.
+ */
+export function texteDeConsigne(ia, type) {
+  if (!ia) return 'Votre allié est hors de combat';
+  if (ia.attaqueChezLui) return 'Votre allié est attaqué chez lui : il repousse d’abord l’ennemi';
+  const n = ia.disponibles().length;
+  if (n === 0) return 'Votre allié n’a aucun soldat au camp : il attend d’en avoir, 2 minutes au plus';
+  const soldats = `${n} soldat${n > 1 ? 's' : ''}`;
+  return type === 'defendre' ? `Votre allié envoie ${soldats} vous défendre` : `Votre allié envoie ${soldats} à l’attaque`;
+}
+
+/**
  * Les réglages repliés de l'accueil, en une ligne : « Solariens en face ·
  * Classique · Normal · carte moyenne · ×1 ». Un réglage inconnu est passé.
  * Les espaces sont insécables à l'intérieur d'une mention et devant le point
@@ -260,7 +274,7 @@ export class UI {
     if (this.nodes.scoreBox) {
       this.nodes.scoreBox.classList.toggle('hidden', !this.world.mode.timeLimit);
       this.nodes.scoreMoi.style.color = this.world.players[this.world.humanIndex].color.light;
-      this.nodes.scoreAdverse.style.color = this.world.players[1 - this.world.humanIndex].color.light;
+      this.nodes.scoreAdverse.style.color = this.world.adversaire(this.world.humanIndex).color.light;
     }
 
     // Ces éléments survivent à la partie : leurs écouteurs partent avec elle
@@ -268,6 +282,12 @@ export class UI {
     const opts = { signal: this.game.ecouteurs?.signal };
     el('btn-menu').addEventListener('click', () => this.game.togglePause(), opts);
     el('btn-sound').addEventListener('click', () => this.game.toggleSound(), opts);
+    // Par équipes, avec un allié tenu par l'ordinateur : le bouton des consignes. (Le HUD survit à la partie : on le remet dans l'état de celle qui commence.)
+    const allie = el('btn-allie');
+    if (allie) {
+      allie.classList.toggle('hidden', !this.game.allieOrdinateur());
+      allie.addEventListener('click', () => this.showConsignes(), opts);
+    }
     el('btn-close-build').addEventListener('click', () => this.game.cancelBuild(), opts);
 
     // Barre des ouvriers : un appui sélectionne le groupe, le bouton ouvre le panneau.
@@ -340,9 +360,12 @@ export class UI {
     this.nodes.timer.classList.toggle('urgent', limite > 0 && limite - this.world.time < 60);
     // … et le score des deux camps : c'est lui qui tranchera au bout du temps.
     if (limite) {
-      const adverse = this.world.players[1 - this.world.humanIndex];
-      this.setText('scoreMoi', this.nodes.scoreMoi, String(this.world.score(player)));
-      this.setText('scoreAdverse', this.nodes.scoreAdverse, String(this.world.score(adverse)));
+      const adverse = this.world.adversaire(this.world.humanIndex);
+      // (Par équipes : la somme de chaque bord — c'est elle qui tranchera.)
+      const mien = this.world.parEquipes ? this.world.scoreEquipe(player.equipe) : this.world.score(player);
+      const leur = this.world.parEquipes ? this.world.scoreEquipe(adverse.equipe) : this.world.score(adverse);
+      this.setText('scoreMoi', this.nodes.scoreMoi, String(mien));
+      this.setText('scoreAdverse', this.nodes.scoreAdverse, String(leur));
     }
     // Prise de positions : qui tient quoi, et ce qui est en train d'être pris (retouché seulement quand cela change).
     if (this.world.positions.length && this.nodes.positionsBox) {
@@ -562,6 +585,8 @@ export class UI {
     const node = this.nodes.selection;
     const first = selection[0];
     const mine = first.playerIndex === this.world.humanIndex;
+    // (Par équipes : ce qui est à un allié n'est ni à soi, ni à l'ennemi.)
+    const allie = !mine && first.playerIndex >= 0 && this.world.allies(first.playerIndex, this.world.humanIndex);
 
     if (selection.length === 1) {
       const def = first.def;
@@ -608,18 +633,18 @@ export class UI {
           portrait
             // Un portrait peint est bleu : l'adversaire le porte en rouge —
             // voir teinterPortrait, plutôt qu'une seconde image à télécharger.
-            ? `<img src="${portrait}" alt="" class="${mine ? '' : 'ennemi'}">`
+            ? `<img src="${portrait}" alt="" class="${mine || allie ? '' : 'ennemi'}">`
             : vignette ? `<img src="${vignette}" alt="" decoding="sync">`
             : iconeSVG(def.icon, 30)}</div>
         <div class="info">
-          <div class="name">${fiche.name}${mine ? '' : first.isAnimal && first.playerIndex < 0 ? ' <span class="enemy">(sauvage)</span>' : ' <span class="enemy">(ennemi)</span>'}</div>
+          <div class="name">${fiche.name}${mine ? '' : first.isAnimal && first.playerIndex < 0 ? ' <span class="enemy">(sauvage)</span>' : allie ? ' <span class="allie">(allié)</span>' : ' <span class="enemy">(ennemi)</span>'}</div>
           <div class="hp"><span style="width:${Math.round((first.hp / first.maxHp) * 100)}%"></span></div>
           <div class="stats">${ic('pointsDeVie')} ${Math.ceil(first.hp)}/${first.maxHp} · ${rows.join(' · ')}</div>
         </div>`;
       const portraitEnnemi = node.querySelector('.portrait img.ennemi');
       if (portraitEnnemi) teinterPortrait(portraitEnnemi, first.type);
       // Le bâtiment d'un autre camp que le bleu : sa toile recolorée, comme sur la carte.
-      const duCamp = vignette && vignetteDeCamp(first.type, first.player.civ, first.playerIndex);
+      const duCamp = vignette && vignetteDeCamp(first.type, first.player.civ, this.world.bordDe(first.playerIndex));
       if (duCamp) node.querySelector('.portrait img').replaceWith(duCamp);
       if (first.kind === 'building' && first.queue.length > 0) {
         node.insertAdjacentHTML('beforeend', this.renderQueue(first));
@@ -1011,6 +1036,28 @@ export class UI {
 
   hideModal() { this.nodes.modal.classList.add('hidden'); this.nodes.modal.innerHTML = ''; }
 
+  /** Par équipes : les trois consignes qu'on peut donner à son allié, d'un toucher. */
+  showConsignes() {
+    const allie = this.game.allieOrdinateur();
+    if (!allie) return;
+    const modal = this.showModal(`
+      <h2>Votre allié</h2>
+      <p class="hint">Il joue seul. Une consigne lui dit quoi faire de ses soldats, une fois ; ensuite il reprend sa conduite.</p>
+      <div class="options">
+        <button class="option" data-consigne="attaquer"><span class="option-name">${ic('attaquer')} Attaque ici</span>
+          <span class="option-desc">Touchez ensuite l'endroit sur la carte : ses soldats y marchent.</span></button>
+        <button class="option" data-consigne="defendre"><span class="option-name">${ic('defensive')} Défends-moi</span>
+          <span class="option-desc">Ses soldats viennent tenir votre ${nomDe('towncenter', this.game.civ)} 3 minutes.</span></button>
+        <button class="option" data-consigne="libre"><span class="option-name">${ic('ouvriers')} À toi de voir</span>
+          <span class="option-desc">Il rappelle ses soldats et fait comme il l'entend.</span></button>
+      </div>
+      <div class="modal-actions"><button class="btn" data-act="close">Fermer</button></div>`);
+    modal.querySelectorAll('[data-consigne]').forEach((btn) => {
+      btn.addEventListener('click', () => { this.hideModal(); this.game.consigner(btn.dataset.consigne); }, this.ecoute());
+    });
+    modal.querySelector('[data-act="close"]').addEventListener('click', () => this.hideModal(), this.ecoute());
+  }
+
   showPause() {
     const vitesses = GAME_SPEEDS.map((sp) => `
       <button class="option compact ${sp.id === this.game.speedId ? 'active' : ''}" data-speed="${sp.id}">
@@ -1091,7 +1138,7 @@ export class UI {
   }
 
   showHelp() {
-    const civAdverse = this.world.players[1 - this.world.humanIndex].civ;
+    const civAdverse = this.world.adversaire(this.world.humanIndex).civ;
     // Les bâtiments militaires : tout ce qui forme des troupes, hors Centre-Ville (voir World.checkVictory).
     const militaires = Object.values(BUILDING_TYPES)
       .filter((b) => b.trains && b.id !== 'towncenter').map((b) => nomDe(b.id, civAdverse)).join(', ');
@@ -1170,11 +1217,17 @@ export class UI {
           : `L’adversaire a tenu les positions : ${but} points atteints en ${duree}`;
     }
     if (result.timeUp && this.world.positions.length) return `Temps écoulé après ${duree} — les points des positions départagent`;
+    if (result.timeUp && this.world.parEquipes) return `Temps écoulé après ${duree} — la somme des scores de chaque équipe départage`;
     if (result.timeUp) return `Temps écoulé après ${duree} — le score départage`;
     if (result.resigned) return `Vous avez abandonné après ${duree}`;
     if (result.winner === -1) return `Durée de la partie : ${duree}`;
     const moi = this.world.humanIndex;
-    const centre = ficheDe('towncenter', this.world.players[result.victory ? 1 - moi : moi].civ);
+    // (Par équipes : une équipe est battue quand ses deux bâtiments principaux sont tombés.)
+    if (this.world.parEquipes) {
+      return result.victory ? `Les deux bâtiments principaux adverses sont tombés en ${duree}`
+        : `Votre équipe n’a plus de bâtiment principal — durée de la partie : ${duree}`;
+    }
+    const centre = ficheDe('towncenter', this.world.players[result.victory ? this.world.adversaire(moi).index : moi].civ);
     if (this.world.mode.victory === 'towncenter') {
       const tombe = `${centre.name}${result.victory ? ' adverse' : ''} est tombé${centre.fem ? 'e' : ''}`;
       return result.victory
@@ -1210,7 +1263,7 @@ export class UI {
 
   showGameOver(result, palmares = null, progression = '') {
     const player = this.world.players[this.world.humanIndex];
-    const enemy = this.world.players[1 - this.world.humanIndex];
+    const enemy = this.world.adversaire(this.world.humanIndex);
     const egalite = result.winner === -1;
     const title = egalite ? 'Égalité' : (result.victory ? 'Victoire !' : 'Défaite');
     // Chiffres exacts : arrondis (« 4,0k » contre « 4,0k »), un score serré
@@ -1220,7 +1273,23 @@ export class UI {
     // (Une part que ce format ne compte pas ne s'affiche pas.)
     const part = (cle, libelle) => (result.detail && result.detail[player.index][cle] !== undefined ? `<tr><td>${libelle}</td>
           <td>${exact(result.detail[player.index][cle])}</td><td>${exact(result.detail[enemy.index][cle])}</td></tr>` : '');
-    const summary = `
+    // Par équipes : une colonne par place, à sa couleur, et la somme de chaque bord.
+    const tableDesEquipes = () => {
+      const js = this.world.players, sommes = result.scoresEquipes;
+      const tete = js.map((p) => `<th style="color:${p.color.light}">${p.index === player.index ? 'Vous' : p.name.replace('Adversaire', 'Adv.')}</th>`).join('');
+      const ligne = (libelle, f) => `<tr><td>${libelle}</td>${js.map((p) => `<td>${f(p)}</td>`).join('')}</tr>`;
+      return `
+      <table class="scores equipes">
+        <tr><th></th>${tete}</tr>
+        ${ligne('Bâtiment principal', (p) => (p.defeated ? 'tombé' : 'debout'))}
+        ${ligne('Unités formées', (p) => p.stats.trained)}
+        ${ligne('Unités perdues', (p) => p.stats.lost)}
+        ${result.scores ? ligne('Score', (p) => exact(result.scores[p.index])) : ''}
+        ${sommes ? `<tr class="total"><td><b>Par équipe</b></td><td colspan="2"><b>${exact(sommes[js[0].equipe])}</b></td><td colspan="2"><b>${exact(sommes[js[js.length - 1].equipe])}</b></td></tr>` : ''}
+      </table>
+      ${result.scores ? '<p class="fin-note">Au bout du temps, la somme des scores de chaque équipe départage.</p>' : ''}`;
+    };
+    const summary = this.world.parEquipes ? tableDesEquipes() : `
       <table class="scores">
         <tr><th></th><th>Vous</th><th>Adversaire</th></tr>
         <tr><td>Ressources récoltées</td>

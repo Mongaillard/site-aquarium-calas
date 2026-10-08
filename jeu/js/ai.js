@@ -34,6 +34,8 @@ const HYDRES_VOULUES = 2;
 const ENGINS_VOULUS = 2;
 /** Au-delà de ce rayon autour du Centre-Ville (en cases), une troupe est en campagne, plus au camp. */
 const CAMP = 16;
+// Par équipes : le temps (s) que des soldats envoyés par « Défends-moi » restent chez l'allié.
+const GARDE_ALLIEE = 180;
 /**
  * Une alerte sans combat ne dure pas (voir alerteFondee) : après tant de
  * secondes sans un coup porté ni reçu dans la base, elle est levée pour tant
@@ -94,15 +96,32 @@ export class AIPlayer {
     this.lastHouseAt = -99;
     this.compositionIndex = 0;
     this.badSpots = new Set();   // emplacements où un chantier s'est révélé inaccessible
-    // Prise de positions : ses soldats postés sur une position (identifiant de
-    // l'unité → numéro de la position). Ils la gardent : ni vague, ni rappel au camp.
+    // Ses soldats postés quelque part : identifiant de l'unité → numéro d'une
+    // position (Prise de positions), ou un poste `{ x, y, jusqua }` (par
+    // équipes : la base d'un allié à défendre, jusqu'à cette heure). Ils le
+    // gardent : ni vague, ni rappel au camp.
     this.gardes = new Map();
+    // Par équipes : la consigne qu'un allié vient de lui donner (voir
+    // World.consigner), ou null — il fait alors comme il l'entend.
+    //   { type: 'attaquer', x, y, jusqua }  ses troupes au camp marchent sur ce point ;
+    //   { type: 'defendre', x, y, jusqua }  elles vont tenir ce point jusqu'à `jusqua`.
+    this.consigne = null;
   }
 
   get player() { return this.world.players[this.index]; }
 
   update(dt) {
-    if (this.player.defeated || this.world.gameOver) return;
+    if (this.world.gameOver) return;
+    if (this.player.defeated) {
+      // Par équipes, un camp à terre n'a pas fini : ce qui lui reste se bat encore pour son allié.
+      if (!this.world.parEquipes) return;
+      this.timer -= dt;
+      if (this.timer > 0) return;
+      this.timer = 2;
+      this.units = this.world.units.filter((u) => !u.dead && !u.isAnimal && u.playerIndex === this.index);
+      this.lastStand();
+      return;
+    }
     this.timer -= dt;
     this.attackTimer -= dt;
     if (this.timer > 0) return;
@@ -139,6 +158,29 @@ export class AIPlayer {
   }
 
   /**
+   * Par équipes : la consigne d'un allié, une fois. « Attaquer » : ses soldats
+   * présents au camp marchent sur le point, en engageant ce qu'ils croisent,
+   * et rentreront d'eux-mêmes ensuite. « Défendre » : ils vont tenir le point
+   * (la base de l'allié) jusqu'à la fin de la consigne. Sans soldat au camp,
+   * la consigne attend qu'il y en ait — jusqu'à son heure limite.
+   */
+  suivreConsigne() {
+    const c = this.consigne;
+    if (!c) return;
+    if (this.world.time >= c.jusqua) { this.consigne = null; return; }
+    const troupe = this.disponibles();
+    if (troupe.length === 0) return;
+    this.world.setStance(troupe, 'aggressive');
+    if (c.type === 'defendre') {
+      // (La garde compte du départ : la traversée de la carte n'est pas prise sur elle.)
+      const poste = { x: c.x, y: c.y, jusqua: this.world.time + GARDE_ALLIEE };
+      for (const u of troupe) this.gardes.set(u.id, poste);
+    }
+    this.world.formationMove(troupe, c.x, c.y, true);
+    this.consigne = null;
+  }
+
+  /**
    * Prise de positions : chaque soldat posté revient à sa position dès qu'il
    * n'a plus rien à faire — après une poursuite, une riposte, un détour. Il y
    * revient en attaquant ce qu'il croise : une position reprise par l'adversaire
@@ -147,11 +189,12 @@ export class AIPlayer {
   tenirPositions() {
     if (this.gardes.size === 0) return;
     const reglage = this.world.mode.positions;
-    if (!reglage) { this.gardes.clear(); return; }
-    const pres = (reglage.rayon * TILE * 0.7) ** 2;
-    for (const [id, numero] of this.gardes) {
-      const u = this.world.byId.get(id), pos = this.world.positions[numero];
-      if (!u || u.dead || !pos) { this.gardes.delete(id); continue; }
+    const pres = ((reglage ? reglage.rayon : 3) * TILE * 0.7) ** 2;
+    for (const [id, poste] of this.gardes) {
+      const u = this.world.byId.get(id);
+      // Un numéro : une position de la carte. Sinon un poste donné par une consigne, qui a une fin.
+      const pos = typeof poste === 'number' ? this.world.positions[poste] : poste;
+      if (!u || u.dead || !pos || (pos.jusqua && this.world.time >= pos.jusqua)) { this.gardes.delete(id); continue; }
       if (u.state !== STATE.IDLE || dist2(u.x, u.y, pos.x, pos.y) <= pres) continue;
       // (Au pied du monument, pas dessus : sa case est prise.)
       u.moveTo(pos.x + (this.rng.next() - 0.5) * TILE * 2.4, pos.y + TILE * (0.9 + this.rng.next() * 0.8), true);
@@ -170,7 +213,7 @@ export class AIPlayer {
   chasserLesReparateurs() {
     const parBatiment = new Map();
     for (const v of this.world.units) {
-      if (v.dead || v.garrisonedIn || !v.isVillager || v.playerIndex === this.index) continue;
+      if (v.dead || v.garrisonedIn || !v.isVillager || this.world.allies(v.playerIndex, this.index)) continue;
       const b = v.target;
       if (v.state !== STATE.BUILD || !b || b.dead || b.kind !== 'building' || !b.complete) continue;
       if (b.edgeDistanceTo(v.x, v.y) > TILE * 2) continue;   // encore en chemin : il ne répare rien
@@ -241,7 +284,7 @@ export class AIPlayer {
   releverZones() {
     const zones = [];
     for (const b of this.world.buildings) {
-      if (b.dead || b.playerIndex === this.index || !b.complete || b.arrowCount() <= 0) continue;
+      if (b.dead || this.world.allies(b.playerIndex, this.index) || !b.complete || b.arrowCount() <= 0) continue;
       const portee = b.rangePx();
       if (!this.zones.some((z) => z.id === b.id)) {
         if (this.chezLui(b)) continue;
@@ -799,6 +842,9 @@ export class AIPlayer {
       this.defendUntil = this.world.time + 8;
       for (const u of this.army) {
         if (u.def.heal) continue;   // une soigneuse ne « frappe » pas : elle soigne d'elle-même
+        // (Par équipes : ceux qu'une consigne a postés chez un allié y restent. Un éclaireur qui rôde ne
+        // les fait pas retraverser la carte ; débordé chez lui, il les a déjà libérés — voir plus haut.)
+        if (typeof this.gardes.get(u.id) === 'object') continue;
         if (u.state === STATE.IDLE || u.state === STATE.MOVE || !u.target) u.attackEntity(threat);
       }
       // Les villageois vraiment menacés se mettent à l'abri : garnison du
@@ -843,9 +889,15 @@ export class AIPlayer {
     // plus proche qui n'est pas à lui ; il ne marche sur la base adverse que
     // s'il les tient toutes.
     const enPositions = this.world.positions.length > 0;
-    const prets = enPositions
+    // (La consigne d'un allié passe avant la vague : ceux qu'elle emmène ne sont plus « prêts ».)
+    const consigne = this.consigne;
+    this.suivreConsigne();
+    const partis = !!consigne && !this.consigne;
+    let prets = partis ? [] : enPositions
       ? this.troupesAuCamp().filter((u) => !this.gardes.has(u.id))
       : comptee ? this.troupesAuCamp() : this.army;
+    // (Par équipes : ceux qu'une consigne a postés chez un allié ne partent pas en vague.)
+    if (!enPositions && this.gardes.size > 0) prets = prets.filter((u) => !this.gardes.has(u.id));
     let attente = this.attackTimer > 0 || this.world.time < this.treve || prets.length < this.armyTarget;
     const objectif = !attente && enPositions ? this.objectifPosition() : null;
     if (objectif) {
@@ -963,7 +1015,7 @@ export class AIPlayer {
     for (const u of this.army) {
       const cible = u.target;
       if (this.gardes.has(u.id)) continue;   // un soldat posté sur une position s'y bat
-      if (u.state !== STATE.ATTACK || !cible || cible.dead || cible.isAnimal || cible.playerIndex === this.index) continue;
+      if (u.state !== STATE.ATTACK || !cible || cible.dead || cible.isAnimal || this.world.allies(cible.playerIndex, this.index)) continue;
       const egare = cible.kind === 'unit'
         ? !u.autoTarget && !this.intrus.includes(cible)
         : u.autoTarget && this.world.laisseALAssaut(this.index, cible);
@@ -971,6 +1023,21 @@ export class AIPlayer {
       const poste = this.posteAuCamp();
       u.moveTo(poste.x, poste.y);
     }
+  }
+
+  /**
+   * Les soldats qu'une consigne d'allié peut emmener : au camp, ni soigneuses,
+   * ni déjà postés — ni l'éclaireur du départ, qui ne défend ni n'attaque rien
+   * à lui seul (sans cela, « Défends-moi » dans la première minute envoyait
+   * un cavalier léger et se disait suivie).
+   */
+  disponibles() {
+    return this.troupesAuCamp().filter((u) => !u.def.heal && u.type !== 'scout' && !this.gardes.has(u.id));
+  }
+
+  /** Vrai tant qu'il repousse des intrus chez lui : une consigne attend la fin de l'alerte. */
+  get attaqueChezLui() {
+    return this.world.time < this.defendUntil;
   }
 
   /** Les troupes présentes au camp, autour du Centre-Ville : celles qui ne sont pas en campagne. */
@@ -988,9 +1055,10 @@ export class AIPlayer {
     if (!this.treve || this.annonceFaite || this.world.time < this.treve - 60) return;
     this.annonceFaite = true;
     const world = this.world;
-    const ennemi = this.index === 0 ? 1 : 0;
+    // (Le joueur n'est prévenu que par ses adversaires : un allié ne l'attaque pas.)
+    const ennemi = world.humanIndex;
     // (Déjà en campagne — une sauvegarde d'avant ce réglage : il est trop tard pour prévenir.)
-    if (ennemi !== world.humanIndex || this.waveCount > 0) return;
+    if (world.allies(ennemi, this.index) || this.waveCount > 0) return;
     const civ = world.players[ennemi].civ;
     world.pushEvent({
       type: 'notice',
@@ -1061,7 +1129,7 @@ export class AIPlayer {
     let best = null, bestD = Infinity;
     this.intrus = [];
     for (const e of world.entities) {
-      if (e.dead || e.playerIndex === this.index || e.isAnimal) continue;
+      if (e.dead || this.world.allies(e.playerIndex, this.index) || e.isAnimal) continue;
       if (e.kind === 'building' || e.garrisonedIn) continue;
       let dedans = false;
       for (const b of this.buildings) {
@@ -1286,11 +1354,40 @@ export class AIPlayer {
     return tombes.size;
   }
 
+  /**
+   * Le camp que ses vagues visent. Un seul adversaire : lui. Plusieurs : parmi
+   * ceux qui tiennent encore (à défaut, ceux à qui il reste quelque chose), le
+   * plus proche de son bâtiment principal ; à distance égale, la plus petite place.
+   */
+  adversaireVise() {
+    const world = this.world;
+    const adversaires = world.adversairesDe(this.index);
+    if (adversaires.length <= 1) return adversaires.length ? adversaires[0].index : (this.index === 0 ? 1 : 0);
+    const tc = this.townCenter;
+    const centreDe = (p) => world.buildings.find((b) => !b.dead && b.playerIndex === p.index && b.type === 'towncenter')
+      || world.buildings.find((b) => !b.dead && b.playerIndex === p.index);
+    let choix = null, plusPres = Infinity;
+    for (const debout of [true, false]) {
+      for (const p of adversaires) {
+        if (p.defeated === debout) continue;
+        const c = centreDe(p);
+        if (!c && !world.units.some((u) => !u.dead && !u.isAnimal && u.playerIndex === p.index)) continue;
+        const d = c && tc ? dist2(tc.x, tc.y, c.x, c.y) : Infinity;
+        if (choix === null || d < plusPres) { plusPres = d; choix = p.index; }
+      }
+      if (choix !== null) return choix;
+    }
+    return adversaires[0].index;
+  }
+
   /** La cible de la vague `troupe` : un bâtiment adverse, à défaut une de ses unités. */
   pickAttackTarget(troupe = this.army) {
     const world = this.world;
-    const enemyIndex = this.index === 0 ? 1 : 0;
     const tc = this.townCenter;
+    // L'adversaire visé. À deux camps, c'est l'autre. Par équipes : celui qui
+    // tient encore et dont le bâtiment principal est le plus près du sien — les
+    // deux alliés, voisins, tombent ainsi sur le même adversaire sans se concerter.
+    const enemyIndex = this.adversaireVise();
     const targets = world.buildings.filter((b) => !b.dead && b.playerIndex === enemyIndex);
     if (targets.length === 0) {
       const units = world.units.filter((u) => !u.dead && !u.isAnimal && u.playerIndex === enemyIndex);
@@ -1356,7 +1453,7 @@ export class AIPlayer {
 
   /** Plus de base : tout le monde au combat. */
   lastStand() {
-    const enemyIndex = this.index === 0 ? 1 : 0;
+    const enemyIndex = this.adversaireVise();
     const target = this.world.entities.find((e) => !e.dead && !e.isAnimal && e.playerIndex === enemyIndex);
     if (!target) return;
     for (const u of this.units) if (u.state === STATE.IDLE && !u.def.heal) u.attackEntity(target);

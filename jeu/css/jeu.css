@@ -298,7 +298,9 @@ html, body {
 .reglages-titre { display: block; font-weight: 650; font-size: 15px; }
 /* (Si le résumé se replie, c'est en lignes de même longueur : pas un « ×1 » seul sur la seconde.) */
 .reglages-resume { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.35; color: var(--muted); text-wrap: balance; }
-.reglages > h2, .reglages > .options { margin-left: 12px; margin-right: 12px; }
+.reglages > h2, .reglages > .options, .reglages > .reglage-note { margin-left: 12px; margin-right: 12px; }
+/* (Sous des options, la note s'en détache d'un cran ; sous un titre, elle le suit de près.) */
+.reglages > .options + .reglage-note { margin-top: 6px; }
 .reglages > h2:first-of-type { margin-top: 6px; }
 .reglages > .options:last-child { margin-bottom: 12px; }
 

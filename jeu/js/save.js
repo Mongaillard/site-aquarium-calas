@@ -170,6 +170,7 @@ function serializeAI(ai) {
     zones: ai.zones.map((z) => ({ ...z })),
     // (Prise de positions : ses soldats postés. Champ absent ailleurs.)
     ...(ai.gardes && ai.gardes.size ? { gardes: [...ai.gardes] } : {}),
+    ...(ai.consigne ? { consigne: { ...ai.consigne } } : {}),
   };
 }
 
@@ -223,6 +224,8 @@ export function serializeWorld(world, extra = {}) {
     ais: world.ais.map(serializeAI),
     // (Champ écrit pour une partie d'essai seulement : les sauvegardes des autres parties ne changent pas.)
     ...(world.essai ? { essai: world.essai } : {}),
+    // (Par équipes : qui tient chaque place — le joueur, un ordinateur, un joueur à distance.)
+    ...(world.parEquipes ? { places: world.places.map((p) => p.controle) } : {}),
     // (Prise de positions : qui tient quoi, les prises entamées, et où en est le compte des points.)
     ...(world.positions.length ? {
       positions: world.positions.map((p) => ({ camp: p.camp, preneur: p.preneur, prise: p.prise })),
@@ -244,6 +247,8 @@ export function restoreWorld(data) {
   const world = new World({
     seed: data.seed, mode: data.mode, mapSize: data.mapSize,
     difficulty: data.difficulty, restoring: true,
+    // (Champ absent : une partie à deux camps.)
+    places: data.places,
     // Champ absent (sauvegarde d'avant les civilisations) : Atlantes.
     civs: (data.players || []).map((j) => j && j.civ),
     // Champ absent (sauvegarde d'avant les niveaux, ou partie sans niveaux) : tout au niveau 1.
@@ -459,6 +464,7 @@ export function restoreWorld(data) {
     ai.assautsAge = saved.assautsAge || 0;
     ai.zones = (saved.zones || []).map((z) => ({ ...z }));
     ai.gardes = new Map(Array.isArray(saved.gardes) ? saved.gardes : []);
+    ai.consigne = saved.consigne ? { ...saved.consigne } : null;
     ai.poserZones();
   }
 

@@ -1720,7 +1720,7 @@ export class Renderer {
   dessinerBatimentSprite(b, sprite, w, x, y) {
     const ctx = this.ctx;
     const { cellW, cellH, largeurMonde, sol } = sprite.def;
-    const source = imagePourJoueur(sprite, b.playerIndex);
+    const source = imagePourJoueur(sprite, this.world.bordDe(b.playerIndex));
     const dw = largeurMonde;
     const dh = (cellH / cellW) * dw;
     const dx = this.calerX(b.x - dw / 2);
@@ -1809,7 +1809,7 @@ export class Renderer {
 
   drawBuildingSelection(b, w, x, y) {
     const ctx = this.ctx;
-    ctx.strokeStyle = b.playerIndex === this.world.humanIndex ? '#ffffff' : '#ff8080';
+    ctx.strokeStyle = b.playerIndex === this.world.humanIndex ? '#ffffff' : this.world.allies(b.playerIndex, this.world.humanIndex) ? '#9fe8dd' : '#ff8080';
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
     ctx.strokeRect(x, y, w, w);
@@ -1849,7 +1849,7 @@ export class Renderer {
     if (u.selected) {
       // Autour de l'anneau de camp, à la taille de l'empreinte (voir dessinerSocle).
       const rx = this.empreinte(u) + 2.5;
-      ctx.strokeStyle = u.playerIndex === this.world.humanIndex ? '#ffffff' : '#ff8080';
+      ctx.strokeStyle = u.playerIndex === this.world.humanIndex ? '#ffffff' : this.world.allies(u.playerIndex, this.world.humanIndex) ? '#9fe8dd' : '#ff8080';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.ellipse(u.x, u.y + r * 0.45 - 1, rx, rx * APLAT, 0, 0, Math.PI * 2);
@@ -1986,7 +1986,7 @@ export class Renderer {
     if (sprite.def.cuit3d) { this.dessinerModele3D(u, sprite, x, y, anim); return; }
     const ctx = this.ctx;
     const { cellW, cellH, cases, hauteurMonde, ancreY, pixel } = sprite.def;
-    let source = imagePourJoueur(sprite, u.playerIndex);
+    let source = imagePourJoueur(sprite, this.world.bordDe(u.playerIndex));
     let sx, sy, miroir = false;
     let largeurSource = cellW, hauteurSource = cellH;
     const case3d = sprite.def.modele3d && this.rendu3d ? this.rendu3d.cellule(u) : null;

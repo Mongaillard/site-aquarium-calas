@@ -44,10 +44,12 @@ function valueNoise(rng, w, h, scale, octaves = 3) {
 }
 
 export class GameMap {
-  constructor(size, seed = 1) {
+  /** `bases` : combien de camps la carte reçoit (2, ou 4 pour le format par équipes). */
+  constructor(size, seed = 1, bases = 2) {
     this.w = size;
     this.h = size;
     this.seed = seed;
+    this.bases = bases === 4 ? 4 : 2;
     this.pixelWidth = size * TILE;
     this.pixelHeight = size * TILE;
     const n = size * size;
@@ -235,6 +237,15 @@ export class GameMap {
       { tx: margin, ty: h - margin },
       { tx: w - margin, ty: margin },
     ];
+    // Quatre camps : un par coin. Les places 0 et 1 (alliées) tiennent le bord
+    // ouest, bas puis haut ; les places 2 et 3 le bord est, haut puis bas —
+    // chacun a son vis-à-vis de l'autre côté de la carte.
+    if (this.bases === 4) {
+      this.startPositions = [
+        { tx: margin, ty: h - margin }, { tx: margin, ty: margin },
+        { tx: w - margin, ty: margin }, { tx: w - margin, ty: h - margin },
+      ];
+    }
     for (const p of this.startPositions) this.clearArea(p.tx, p.ty, 8);
 
     this.scatterForests(rng, moisture);
@@ -330,10 +341,10 @@ export class GameMap {
    * Sans ça, une carte peut être coupée en deux par un lac et la partie bloque.
    */
   ensureConnectivity() {
-    const [a, b] = this.startPositions;
-    if (!a || !b) return;
-    if (this.floodReaches(a, b)) return;
-    this.creuserCouloir(a, b);
+    const [a, ...autres] = this.startPositions;
+    if (!a) return;
+    // (Chaque base reliée à la première : à deux camps, c'est l'unique couloir d'avant.)
+    for (const b of autres) if (!this.floodReaches(a, b)) this.creuserCouloir(a, b);
   }
 
   /** Un couloir de 3 cases de large d'une case à l'autre : l'eau devient du sable, ce qui gêne est ôté. */
