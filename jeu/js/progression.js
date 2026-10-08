@@ -131,6 +131,11 @@ function semaineDe(jour) {
  *   troupes         : niveau et fragments de chaque troupe du jeu
  *   debloquees      : type → d'où vient la troupe (base, ligue, parties, achat)
  *   eclats          : fragments en trop, pour les apparences
+ *   couronnes       : la monnaie de la boutique (voir « Boutique », plus bas)
+ *   boutique        : ses offres en cours — `offreLigue` (une troupe à prix
+ *                     réduit jusqu'à une heure, en secondes), `bienvenueJusqua`
+ *                     (fin de l'offre de bienvenue ; 0 tant qu'elle n'est pas
+ *                     ouverte), `bienvenuePrise`
  *   saison, saisons : le numéro de la saison en cours, ce que furent les précédentes
  *   jour, semaine   : compteurs remis à zéro quand la date change
  *   rechercheFermeeJusqua : heure (en secondes) jusqu'à laquelle la recherche
@@ -154,6 +159,8 @@ export function profilNeuf() {
     troupes,
     debloquees,
     eclats: 0,
+    couronnes: 0,
+    boutique: { offreLigue: null, bienvenueJusqua: 0, bienvenuePrise: false },
     saison: 1,
     saisons: [],
     jour: { date: '', parties: 0, abandonsPrecoces: 0 },
@@ -208,6 +215,16 @@ function lireProfil(o) {
     }
   }
   p.eclats = entier(o.eclats, 0, GRAND, 0);
+  p.couronnes = entier(o.couronnes, 0, GRAND, 0);
+  if (estObjet(o.boutique)) {
+    const offre = o.boutique.offreLigue;
+    // (Une offre sur une troupe déjà débloquée, ou sans fin lisible, n'en est plus une.)
+    if (estObjet(offre) && AVANCEES.includes(offre.troupe) && !p.debloquees[offre.troupe] && estNombre(offre.jusqua) && offre.jusqua > 0) {
+      p.boutique.offreLigue = { troupe: offre.troupe, jusqua: offre.jusqua };
+    }
+    p.boutique.bienvenueJusqua = estNombre(o.boutique.bienvenueJusqua) && o.boutique.bienvenueJusqua > 0 ? o.boutique.bienvenueJusqua : 0;
+    p.boutique.bienvenuePrise = o.boutique.bienvenuePrise === true;
+  }
   p.saison = entier(o.saison, 1, GRAND, 1);
   if (Array.isArray(o.saisons)) {
     for (const s of o.saisons.slice(-R.profil.saisons)) {
@@ -337,8 +354,12 @@ function debloquerGratuites(p, evenements) {
   }
 }
 
-/** Promotion immédiate tant que le seuil suivant est atteint ; la récompense ne se donne qu'une fois. */
-function promouvoir(p, evenements) {
+/**
+ * Promotion immédiate tant que le seuil suivant est atteint ; la récompense ne
+ * se donne qu'une fois. `instant` (secondes) : l'heure, quand on la connaît —
+ * elle date la fin de l'offre de ligue ; sans elle, pas d'offre.
+ */
+function promouvoir(p, evenements, instant = null) {
   while (p.ligue < NB_LIGUES && p.elo >= R.ligues[p.ligue].seuil) {
     const de = p.ligue;
     p.ligue++;
@@ -349,6 +370,8 @@ function promouvoir(p, evenements) {
       p.promotions.push(p.ligue);
       evenements.push({ type: 'recompensePromotion', ligue: p.ligue, coffre: ligue.promotion.coffre, cadeaux: copier(ligue.promotion.cadeaux) });
       donnerCoffre(p, ligue.promotion.coffre, 'promotion', evenements);
+      crediter(p, R.boutique.parLigue, 'ligue', evenements);
+      ouvrirOffreDeLigue(p, instant, evenements);
     }
     monterOuvrier(p, evenements);
   }
@@ -493,13 +516,14 @@ export function appliquerResultat(profil, partie) {
   p.parties++;
   p[COMPTEURS[issue]]++;
   if (sansValeur) p.abandonsPrecoces++;
+  ouvrirOffreDeBienvenue(p, partie.instant, evenements);
 
   // Le score, puis la ligue qui en découle.
   const classee = partie.contreOrdinateur !== true || p.ligue <= R.recherche.ordinateurClasseJusqua;
   const avant = p.elo;
   if (classee) p.elo = Math.max(R.elo.plancher, p.elo + R.elo[issue]);
   evenements.push({ type: 'elo', avant, apres: p.elo, variation: p.elo - avant, classee });
-  promouvoir(p, evenements);
+  promouvoir(p, evenements, estNombre(partie.instant) ? partie.instant : null);
   retrograder(p, evenements, R.retrogradation.aPartirDe - 1);
   debloquerGratuites(p, evenements);
 
@@ -910,6 +934,201 @@ export function debloquerParAchat(profil, type, preuve) {
   p.debloquees[type] = 'achat';
   noter(p, { op: 'achat', troupe: type });
   return { profil: p, evenements: [{ type: 'troupeDebloquee', troupe: type, origine: 'achat' }] };
+}
+
+// --- Boutique ------------------------------------------------------------------
+//
+// Les Couronnes s'achètent en argent réel et se dépensent ici. Tout ce qui
+// touche à l'argent réel demande une preuve dont `valide` vaut exactement
+// true — ce sera la réponse du serveur, qui aura vérifié l'achat auprès du
+// magasin d'applications. Dépenser des Couronnes n'en demande pas : le profil
+// les a, ou ne les a pas. Les heures sont en secondes, données par l'appelant.
+
+const HEURE = 3600;
+
+/** Ajoute des Couronnes au profil et le dit. */
+function crediter(p, couronnes, origine, evenements) {
+  if (!(couronnes > 0)) return;
+  p.couronnes += couronnes;
+  evenements.push({ type: 'couronnes', variation: couronnes, origine, total: p.couronnes });
+}
+
+/** Une ligue atteinte pour la première fois ouvre l'offre sur la troupe de la suivante, si elle reste à débloquer. */
+function ouvrirOffreDeLigue(p, instant, evenements) {
+  if (!estNombre(instant)) return;
+  const troupe = AVANCEES.find((type) => R.troupes[type].gratuite.ligue === p.ligue + 1 && R.troupes[type].prix);
+  if (!troupe || p.debloquees[troupe]) return;
+  p.boutique.offreLigue = { troupe, jusqua: instant + R.boutique.offres.ligue.heures * HEURE };
+  evenements.push({ type: 'offreOuverte', offre: 'ligue', troupe, jusqua: p.boutique.offreLigue.jusqua });
+}
+
+/** La première partie comptée ouvre l'offre de bienvenue, une fois pour toutes. */
+function ouvrirOffreDeBienvenue(p, instant, evenements) {
+  if (!estNombre(instant) || p.boutique.bienvenueJusqua > 0 || p.boutique.bienvenuePrise) return;
+  p.boutique.bienvenueJusqua = instant + R.boutique.offres.bienvenue.heures * HEURE;
+  evenements.push({ type: 'offreOuverte', offre: 'bienvenue', jusqua: p.boutique.bienvenueJusqua });
+}
+
+/** L'offre de ligue de ce profil si elle court encore à cette heure, sinon null. */
+function offreDeLigue(p, maintenant) {
+  const offre = p.boutique.offreLigue;
+  if (!offre || p.debloquees[offre.troupe] || !estNombre(maintenant) || maintenant >= offre.jusqua) return null;
+  return offre;
+}
+
+/** Les troupes avancées qui restent à débloquer et que la boutique vend. */
+const aVendre = (p) => AVANCEES.filter((type) => !p.debloquees[type] && R.troupes[type].prix > 0);
+
+/**
+ * Le prix d'une troupe en Couronnes, à cette heure : son prix, ou le prix de
+ * l'offre de ligue si elle porte sur elle. null si elle ne se vend pas.
+ */
+export function prixDeTroupe(profil, type, maintenant) {
+  if (typeof type !== 'string' || !AVANCEES.includes(type) || !(R.troupes[type].prix > 0)) return null;
+  const p = migrerProfil(profil);
+  const plein = R.troupes[type].prix;
+  const offre = offreDeLigue(p, maintenant);
+  return offre && offre.troupe === type ? Math.round(plein * R.boutique.offres.ligue.part / 100) : plein;
+}
+
+/** Le lot « Toutes les troupes » : ce qui reste, son prix et la somme qu'il remplace ; null s'il en reste trop peu. */
+function lotDeTroupes(p) {
+  const { part, arrondi, minimum } = R.boutique.toutesLesTroupes;
+  const troupes = aVendre(p);
+  if (troupes.length < minimum) return null;
+  const prixPlein = troupes.reduce((somme, type) => somme + R.troupes[type].prix, 0);
+  return { troupes, prixPlein, prix: Math.round(prixPlein * part / 100 / arrondi) * arrondi };
+}
+
+/**
+ * Ce que la boutique montre à ce profil, à cette heure (secondes) :
+ *   couronnes : son porte-monnaie ;
+ *   troupes   : chaque troupe avancée — `debloquee` (son origine), sinon son
+ *               `prix`, son `prixPlein`, et `offre: true` quand l'offre de
+ *               ligue porte sur elle ;
+ *   lotTroupes: tout ce qui reste, moins cher que pièce par pièce — ou null ;
+ *   offres    : celles qui courent, avec leur fin (`jusqua`) et ce qu'il en
+ *               `reste` — « ligue » se paie en Couronnes, « bienvenue » en
+ *               argent réel (`disponible` dit si on peut l'acheter ici) ;
+ *   lots      : les lots de Couronnes, et s'ils sont `disponible`s ;
+ *   essai     : le porte-monnaie d'essai, ou null.
+ */
+export function catalogueBoutique(profil, maintenant) {
+  const p = migrerProfil(profil);
+  const t = estNombre(maintenant) ? maintenant : null;
+  const offre = offreDeLigue(p, t);
+  const reel = R.boutique.argentReel === true;
+  const offres = [];
+  if (offre) {
+    offres.push({ id: 'ligue', troupe: offre.troupe, prix: prixDeTroupe(p, offre.troupe, t), prixPlein: R.troupes[offre.troupe].prix, jusqua: offre.jusqua, reste: offre.jusqua - t });
+  }
+  const b = R.boutique.offres.bienvenue;
+  if (t !== null && !p.boutique.bienvenuePrise && p.boutique.bienvenueJusqua > t) {
+    offres.push({ id: 'bienvenue', prixCentimes: b.prixCentimes, troupes: b.troupes.filter((type) => !p.debloquees[type]), couronnes: b.couronnes,
+      jusqua: p.boutique.bienvenueJusqua, reste: p.boutique.bienvenueJusqua - t, disponible: reel });
+  }
+  return {
+    couronnes: p.couronnes,
+    troupes: AVANCEES.filter((type) => R.troupes[type].prix > 0).map((type) => (p.debloquees[type]
+      ? { type, debloquee: p.debloquees[type] }
+      : { type, debloquee: null, prix: prixDeTroupe(p, type, t), prixPlein: R.troupes[type].prix, offre: !!offre && offre.troupe === type })),
+    lotTroupes: lotDeTroupes(p),
+    offres,
+    lots: R.boutique.lots.map((lot) => ({ ...lot, disponible: reel })),
+    essai: R.boutique.essai ? { couronnes: R.boutique.essai.couronnes } : null,
+  };
+}
+
+/**
+ * Achète une troupe avancée avec des Couronnes, au prix de cette heure.
+ * Renvoie `{ profil, evenements }` (couronnes, troupeDebloquee), ou `{ erreur }` :
+ * 'inconnue', 'pasEnVente', 'dejaDebloquee', 'fonds' (avec `manque`).
+ */
+export function acheterTroupe(profil, type, maintenant) {
+  if (typeof type !== 'string' || !possede(R.troupes, type) || R.troupes[type].aVenir) return { erreur: 'inconnue' };
+  if (!AVANCEES.includes(type) || !(R.troupes[type].prix > 0)) return { erreur: 'pasEnVente' };
+  const p = migrerProfil(profil);
+  if (p.debloquees[type]) return { erreur: 'dejaDebloquee' };
+  const prix = prixDeTroupe(p, type, maintenant);
+  if (p.couronnes < prix) return { erreur: 'fonds', manque: prix - p.couronnes };
+  p.couronnes -= prix;
+  p.debloquees[type] = 'achat';
+  if (p.boutique.offreLigue && p.boutique.offreLigue.troupe === type) p.boutique.offreLigue = null;
+  noter(p, { op: 'boutique', article: 'troupe', troupe: type, prix });
+  return { profil: p, evenements: [
+    { type: 'couronnes', variation: -prix, origine: 'troupe', total: p.couronnes },
+    { type: 'troupeDebloquee', troupe: type, origine: 'achat' },
+  ] };
+}
+
+/**
+ * Achète d'un coup toutes les troupes qui restent, au prix du lot.
+ * Renvoie `{ profil, evenements }`, ou `{ erreur }` : 'pasEnVente' (il en reste trop peu), 'fonds' (avec `manque`).
+ */
+export function acheterToutesLesTroupes(profil) {
+  const p = migrerProfil(profil);
+  const lot = lotDeTroupes(p);
+  if (!lot) return { erreur: 'pasEnVente' };
+  if (p.couronnes < lot.prix) return { erreur: 'fonds', manque: lot.prix - p.couronnes };
+  p.couronnes -= lot.prix;
+  const evenements = [{ type: 'couronnes', variation: -lot.prix, origine: 'lotTroupes', total: p.couronnes }];
+  for (const type of lot.troupes) {
+    p.debloquees[type] = 'achat';
+    evenements.push({ type: 'troupeDebloquee', troupe: type, origine: 'achat' });
+  }
+  p.boutique.offreLigue = null;
+  noter(p, { op: 'boutique', article: 'lotTroupes', troupes: lot.troupes.length, prix: lot.prix });
+  return { profil: p, evenements };
+}
+
+/**
+ * Le porte-monnaie d'essai : ajoute les Couronnes d'essai, tant que les
+ * réglages le permettent (voir boutique.essai). `{ erreur: 'ferme' }` sinon.
+ */
+export function prendreCouronnesDEssai(profil) {
+  if (!R.boutique.essai || !(R.boutique.essai.couronnes > 0)) return { erreur: 'ferme' };
+  const p = migrerProfil(profil);
+  const evenements = [];
+  crediter(p, R.boutique.essai.couronnes, 'essai', evenements);
+  noter(p, { op: 'boutique', article: 'essai', couronnes: R.boutique.essai.couronnes });
+  return { profil: p, evenements };
+}
+
+/**
+ * Crédite un lot de Couronnes acheté en argent réel. N'accorde rien sans une
+ * preuve valide qui nomme ce lot. `{ erreur }` : 'inconnu', 'preuve'.
+ */
+export function crediterLot(profil, lotId, preuve) {
+  const lot = R.boutique.lots.find((l) => l.id === lotId);
+  if (!lot) return { erreur: 'inconnu' };
+  if (!estObjet(preuve) || preuve.valide !== true || preuve.lot !== lotId) return { erreur: 'preuve' };
+  const p = migrerProfil(profil);
+  const evenements = [];
+  crediter(p, lot.couronnes, 'lot', evenements);
+  noter(p, { op: 'boutique', article: 'lot', lot: lotId, couronnes: lot.couronnes });
+  return { profil: p, evenements };
+}
+
+/**
+ * Donne l'offre de bienvenue achetée en argent réel : ses troupes (celles qui
+ * restent à débloquer) et ses Couronnes. Une seule fois, avant sa fin, sur
+ * preuve valide. `{ erreur }` : 'fermee', 'preuve'.
+ */
+export function prendreOffreDeBienvenue(profil, preuve, maintenant) {
+  const p = migrerProfil(profil);
+  if (p.boutique.bienvenuePrise || !estNombre(maintenant) || !(p.boutique.bienvenueJusqua > maintenant)) return { erreur: 'fermee' };
+  if (!estObjet(preuve) || preuve.valide !== true || preuve.offre !== 'bienvenue') return { erreur: 'preuve' };
+  const b = R.boutique.offres.bienvenue;
+  const evenements = [];
+  p.boutique.bienvenuePrise = true;
+  for (const type of b.troupes) {
+    if (!AVANCEES.includes(type) || p.debloquees[type]) continue;
+    p.debloquees[type] = 'achat';
+    evenements.push({ type: 'troupeDebloquee', troupe: type, origine: 'achat' });
+  }
+  crediter(p, b.couronnes, 'bienvenue', evenements);
+  noter(p, { op: 'boutique', article: 'bienvenue' });
+  return { profil: p, evenements };
 }
 
 // --- La partie ---------------------------------------------------------------

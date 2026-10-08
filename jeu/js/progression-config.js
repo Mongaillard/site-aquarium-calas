@@ -256,8 +256,9 @@ export const PROGRESSION = figer({
   //  gratuite  : une troupe avancée s'obtient en atteignant `ligue` OU après
   //              `parties` parties jouées ; sans ce champ, c'est une troupe de
   //              base, débloquée d'office
-  //  prixCentimes : ou tout de suite, en payant (H). Achetée ou gagnée, c'est
-  //              la même troupe : mêmes statistiques, mêmes plafonds.
+  //  prix      : ou tout de suite, à la boutique, en Couronnes (voir boutique).
+  //              Achetée ou gagnée, c'est la même troupe : mêmes statistiques,
+  //              mêmes plafonds.
   //  ameliorations : ce qui monte avec le niveau, par statistique de la
   //              définition (js/config.js) et par niveau —
   //                fois : multiplie, en pour-mille de la valeur d'origine ;
@@ -313,18 +314,62 @@ export const PROGRESSION = figer({
     },
 
     // Épiques (avancées)
-    triton: { categorie: 'epique', gratuite: { ligue: 2, parties: 10 }, prixCentimes: 99, ameliorations: PV_ET_DEGATS },
-    horseArcher: { categorie: 'epique', gratuite: { ligue: 3, parties: 25 }, prixCentimes: 199, ameliorations: PV_ET_DEGATS },
-    catapult: { categorie: 'epique', gratuite: { ligue: 4, parties: 50 }, prixCentimes: 199, ameliorations: PV_ET_DEGATS },
-    hydra: { categorie: 'epique', gratuite: { ligue: 5, parties: 80 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS },
+    triton: { categorie: 'epique', gratuite: { ligue: 2, parties: 10 }, prix: 100, ameliorations: PV_ET_DEGATS },
+    horseArcher: { categorie: 'epique', gratuite: { ligue: 3, parties: 25 }, prix: 200, ameliorations: PV_ET_DEGATS },
+    catapult: { categorie: 'epique', gratuite: { ligue: 4, parties: 50 }, prix: 200, ameliorations: PV_ET_DEGATS },
+    hydra: { categorie: 'epique', gratuite: { ligue: 5, parties: 80 }, prix: 300, ameliorations: PV_ET_DEGATS },
 
     // Les trois des ligues 6 à 8. Leurs statistiques sont dans js/config.js,
     // comme celles des autres (Pavoisier : le mur contre les flèches ;
     // Frondeur : le tireur qui chasse les tireurs ; Sapeur : bâtiments et
     // engins). Sans indication, elles suivent la règle générale : points de
     // vie et dégâts (choix).
-    pavoisier: { categorie: 'epique', gratuite: { ligue: 6, parties: 130 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS, enPlus: true },
-    frondeur: { categorie: 'epique', gratuite: { ligue: 7, parties: 180 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS, enPlus: true },
-    sapeur: { categorie: 'epique', gratuite: { ligue: 8, parties: 250 }, prixCentimes: 299, ameliorations: PV_ET_DEGATS, enPlus: true },
+    pavoisier: { categorie: 'epique', gratuite: { ligue: 6, parties: 130 }, prix: 300, ameliorations: PV_ET_DEGATS, enPlus: true },
+    frondeur: { categorie: 'epique', gratuite: { ligue: 7, parties: 180 }, prix: 300, ameliorations: PV_ET_DEGATS, enPlus: true },
+    sapeur: { categorie: 'epique', gratuite: { ligue: 8, parties: 250 }, prix: 300, ameliorations: PV_ET_DEGATS, enPlus: true },
+  },
+
+  // --- Boutique ----------------------------------------------------------------
+  // La monnaie : les Couronnes. On les achète en argent réel (les lots), on les
+  // dépense à la boutique. Repère : 100 Couronnes pour 1 €.
+  //
+  // Ce qui s'y vend a toujours un contenu connu d'avance : une troupe avancée
+  // tout de suite (sinon gratuite par la ligue — c'est du temps gagné) et, plus
+  // tard, de l'apparence. Jamais un coffre, jamais un fragment, jamais un
+  // niveau : rien d'aléatoire, et pas de puissance — le classement doit garder
+  // son sens.
+  //
+  //  argentReel : les achats en argent réel attendent l'application (achat
+  //               intégré, vérifié par un serveur). Tant que c'est false, les
+  //               lots et l'offre de bienvenue s'affichent « bientôt ».
+  //  essai      : d'ici là, un porte-monnaie d'essai — un bouton ajoute ces
+  //               Couronnes, pour essayer la boutique. À retirer (null) le jour
+  //               où l'argent réel arrive.
+  //  parLigue   : Couronnes offertes à chaque ligue atteinte pour la première fois.
+  //  lots       : prix en centimes d'euro → Couronnes ; `bonus` est ce que le lot
+  //               donne de plus que le premier, en pour-cent, dit à l'écran.
+  //  toutesLesTroupes : le lot de ce qui reste à débloquer, à `part` pour-cent
+  //               de la somme, arrondi à `arrondi` ; proposé s'il en reste au
+  //               moins `minimum`.
+  //  offres     : à contenu fixe, et leur fin est une vraie date —
+  //    bienvenue : une seule fois, `heures` après la première partie comptée ;
+  //    ligue     : à chaque ligue atteinte pour la première fois, la troupe de
+  //                la ligue suivante à `part` pour-cent de son prix.
+  boutique: {
+    argentReel: false,
+    essai: { couronnes: 500 },
+    parLigue: 50,
+    lots: [
+      { id: 'poignee', nom: 'Poignée', prixCentimes: 99, couronnes: 100, bonus: 0 },
+      { id: 'bourse', nom: 'Bourse', prixCentimes: 499, couronnes: 550, bonus: 10 },
+      { id: 'coffret', nom: 'Coffret', prixCentimes: 999, couronnes: 1200, bonus: 20 },
+      { id: 'tresor', nom: 'Trésor', prixCentimes: 1999, couronnes: 2600, bonus: 30 },
+      { id: 'butin', nom: 'Butin royal', prixCentimes: 4999, couronnes: 7000, bonus: 40 },
+    ],
+    toutesLesTroupes: { part: 70, arrondi: 50, minimum: 2 },
+    offres: {
+      bienvenue: { prixCentimes: 299, troupes: ['triton', 'horseArcher'], couronnes: 300, heures: 72 },
+      ligue: { part: 50, heures: 48 },
+    },
   },
 });

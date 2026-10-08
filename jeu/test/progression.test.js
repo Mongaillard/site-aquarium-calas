@@ -164,12 +164,12 @@ console.log('--- Les réglages ---');
   check('… soit 630, 206 et 81 en tout, pour un niveau maximum de 5',
     somme(R.couts.commune) === 630 && somme(R.couts.rare) === 206 && somme(R.couts.epique) === 81 && R.niveauMax === 5);
 
-  const conditions = { triton: [2, 10, 99], horseArcher: [3, 25, 199], catapult: [4, 50, 199], hydra: [5, 80, 299],
-    pavoisier: [6, 130, 299], frondeur: [7, 180, 299], sapeur: [8, 250, 299] };
-  check('troupes avancées : la ligue OU le nombre de parties, et le prix',
-    Object.keys(conditions).every((t) => egal([R.troupes[t].gratuite.ligue, R.troupes[t].gratuite.parties, R.troupes[t].prixCentimes], conditions[t])));
+  const conditions = { triton: [2, 10, 100], horseArcher: [3, 25, 200], catapult: [4, 50, 200], hydra: [5, 80, 300],
+    pavoisier: [6, 130, 300], frondeur: [7, 180, 300], sapeur: [8, 250, 300] };
+  check('troupes avancées : la ligue OU le nombre de parties, et le prix en Couronnes',
+    Object.keys(conditions).every((t) => egal([R.troupes[t].gratuite.ligue, R.troupes[t].gratuite.parties, R.troupes[t].prix], conditions[t])));
   check('… et pas d’autre troupe à débloquer', Object.keys(R.troupes).filter((t) => R.troupes[t].gratuite).length === 7
-    && [...COMMUNES, ...RARES].every((t) => !R.troupes[t].gratuite && R.troupes[t].prixCentimes === undefined));
+    && [...COMMUNES, ...RARES].every((t) => !R.troupes[t].gratuite && R.troupes[t].prix === undefined && R.troupes[t].prixCentimes === undefined));
   check('la troupe offerte par une ligue est celle que cette ligue débloque',
     l.every((ligue) => !ligue.troupe || R.troupes[ligue.troupe].gratuite.ligue === ligue.numero)
     && Object.keys(conditions).every((t) => l[R.troupes[t].gratuite.ligue - 1].troupe === t));
@@ -425,8 +425,10 @@ console.log('\n--- Promotion ---');
   check('… et la troupe de la ligue : l’Atlante, débloqué par la ligue',
     p.debloquees.triton === 'ligue' && egal(parType(trois.evenements, 'troupeDebloquee'), [{ type: 'troupeDebloquee', troupe: 'triton', origine: 'ligue' }]));
   check('… les événements disent tout, dans l’ordre',
-    egal(trois.evenements.map((x) => x.type), ['elo', 'promotion', 'recompensePromotion', 'coffre', 'troupeDebloquee', 'coffre']),
+    egal(trois.evenements.map((x) => x.type), ['elo', 'promotion', 'recompensePromotion', 'coffre', 'couronnes', 'troupeDebloquee', 'coffre']),
     trois.evenements.map((x) => x.type).join(', '));
+  check('… dont les 50 Couronnes de la nouvelle ligue (voir test/boutique.test.js)',
+    p.couronnes === R.boutique.parLigue && egal(parType(trois.evenements, 'couronnes'), [{ type: 'couronnes', variation: 50, origine: 'ligue', total: 50 }]));
   check('… le plafond de la ligue 2 est encore 1 : l’ouvrier ne bouge pas', p.troupes.villager.niveau === 1 && parType(trois.evenements, 'ouvrierAuPlafond').length === 0);
 
   // L'ouvrier monte d'office quand le plafond se relève.
@@ -1251,8 +1253,9 @@ console.log('\n--- Achat ---');
   const plusTard = jouer({ ...a.profil, elo: 720, ligue: 4, plusHauteLigue: 4 }, 'V');
   check('… atteindre ensuite sa ligue ne la débloque pas une seconde fois',
     plusTard.profil.ligue === 5 && plusTard.profil.debloquees.hydra === 'achat' && !parType(plusTard.evenements, 'troupeDebloquee').some((x) => x.troupe === 'hydra'));
-  const cumul = Object.keys(R.troupes).filter((t) => R.troupes[t].prixCentimes).map((t) => R.troupes[t].prixCentimes);
-  check('les prix : 0,99 €, 1,99 €, 1,99 €, puis 2,99 € — en centimes entiers', egal(cumul, [99, 199, 199, 299, 299, 299, 299]));
+  const cumul = Object.keys(R.troupes).filter((t) => R.troupes[t].prix).map((t) => R.troupes[t].prix);
+  check('les prix, en Couronnes : 100, 200, 200, puis 300 — plus aucun prix en euros sur une troupe',
+    egal(cumul, [100, 200, 200, 300, 300, 300, 300]) && Object.keys(R.troupes).every((t) => R.troupes[t].prixCentimes === undefined));
 }
 
 // ---------------------------------------------------------------------------

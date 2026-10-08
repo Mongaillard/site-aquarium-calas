@@ -1,12 +1,13 @@
 /* ---------------------------------------------------------------------------
-   L'accueil, direction « Boîte de jeu » (choisie le 08/10/2026) : le couvercle
+   Les menus, direction « Boîte de jeu » (choisie le 08/10/2026) : le couvercle
    d'une boîte de jeu de société — aplats francs, contour d'encre épais, ombre
    pleine sous tout ce qui se touche, titres en gros caractères ronds.
 
-   Cette feuille n'habille QUE l'écran d'accueil (#start-screen). La partie,
-   ses fenêtres et les écrans de la progression gardent l'habillage d'avant
-   (css/jeu.css, css/progression.css) tant que la direction n'est pas étendue :
-   chaque règle d'ici passe par #start-screen, et rien n'est retiré là-bas.
+   Cette feuille habille l'écran d'accueil (#start-screen) et les écrans de la
+   progression (#progression : ligues, coffres, troupes, boutique). La partie
+   et ses fenêtres (pause, fin, aide) gardent l'habillage d'avant (css/jeu.css,
+   css/progression.css) tant que la direction n'y est pas étendue : chaque
+   règle d'ici passe par l'un de ces deux écrans, et rien n'est retiré là-bas.
 
    Les caractères : « Lilita One » (titres) et « Nunito » (texte), livrés avec
    le jeu (assets/polices, licence SIL OFL à côté) : rien ne vient du réseau,
@@ -39,20 +40,23 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-#start-screen {
+#start-screen, #progression {
   --b-papier: #fff4dc;
+  --b-blanc: #fffaf0;
   --b-sable: #ffe9b8;
   --b-encre: #17120e;
   --b-gris: #4a3f33;
   --b-jaune: #ffc93c;
   --b-rouge: #f0562d;
+  --b-titres: "Lilita One", ui-rounded, "Arial Rounded MT Bold", "Arial Black", system-ui, sans-serif;
+  --b-texte: "Nunito", ui-rounded, "Arial Rounded MT Bold", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+#start-screen {
   /* Le couvercle prend les couleurs du peuple choisi (voir plus bas). */
   --b-ciel: #3aa0e8;
   --b-bande: #ffc93c;
   --b-socle: #173a7a;
   --b-etiquette: #f0562d;
-  --b-titres: "Lilita One", ui-rounded, "Arial Rounded MT Bold", "Arial Black", system-ui, sans-serif;
-  --b-texte: "Nunito", ui-rounded, "Arial Rounded MT Bold", system-ui, -apple-system, "Segoe UI", sans-serif;
   /* Le contour d'encre d'un titre clair : huit ombres nettes autour, une portée dessous. */
   --b-contour: -3px -3px 0 var(--b-encre), 3px -3px 0 var(--b-encre), -3px 3px 0 var(--b-encre), 3px 3px 0 var(--b-encre),
     0 -3px 0 var(--b-encre), 0 3px 0 var(--b-encre), -3px 0 0 var(--b-encre), 3px 0 0 var(--b-encre),
@@ -72,12 +76,12 @@ body[data-civ="solarien"] #start-screen {
 }
 
 /* La carte : sur un téléphone, tout l'écran — le couvercle touche les bords.
-   Six colonnes : tout y prend la largeur, sauf les trois tuiles du bas. La
+   Douze colonnes : tout y prend la largeur, sauf les quatre tuiles du bas. La
    première rangée, celle du couvercle, prend la place qui reste en hauteur. */
 #start-screen .start-card {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows: minmax(clamp(230px, 34vh, 372px), 1fr);
   grid-auto-rows: auto;
   column-gap: 8px;
@@ -389,12 +393,12 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
 #start-screen #btn-play:active { transform: translateY(5px); box-shadow: 0 3px 0 var(--b-encre); }
 #start-screen .palmares { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: var(--b-gris); }
 
-/* --- Les trois tuiles du bas : Coffres, Troupes, Aide ------------------------------ */
+/* --- Les quatre tuiles du bas : Coffres, Troupes, Boutique, Aide -------------------- */
 
 #start-screen .prog-bandeau-actions .btn,
 #start-screen #btn-howto {
   order: 1;
-  grid-column: span 2;
+  grid-column: span 3;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -416,7 +420,7 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
 #start-screen .prog-bandeau-actions .btn:active,
 #start-screen #btn-howto:active { transform: translateY(2px); }
 #start-screen .prog-bandeau-actions .btn svg,
-#start-screen #btn-howto svg { width: 30px; height: 30px; margin: 0; fill: var(--b-encre); }
+#start-screen #btn-howto svg { width: 28px; height: 28px; margin: 0; fill: var(--b-encre); }
 #start-screen .prog-pastille {
   position: absolute;
   right: -7px;
@@ -441,3 +445,181 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
 #start-screen .howto ul { color: var(--b-gris); font-weight: 700; }
 #start-screen .howto b { color: var(--b-encre); font-weight: 900; }
 #start-screen .credits { order: 3; margin-top: 12px; font-size: 12.5px; font-weight: 700; color: var(--b-gris); opacity: 1; }
+
+/* ---------------------------------------------------------------------------
+   Les écrans de la progression : ligues, coffres, troupes, fiche, boutique.
+   Les feuilles d'avant y lisent leurs couleurs dans des variables : ici elles
+   prennent celles de la boîte (l'encre pour le texte et les bords, le papier
+   pour le fond), puis chaque pièce reçoit son contour et son ombre.
+   --------------------------------------------------------------------------- */
+
+#progression {
+  --text: #17120e;
+  --muted: #4a3f33;
+  --border: #17120e;
+  --panel-solid: #fff4dc;
+  /* (L'or des accents ne se lirait pas sur le papier : ici c'est un rouge de brique.) */
+  --gold: #a8420c;
+  --gold-dark: #8a3408;
+  --good: #1c7a3c;
+  --error: #b3261e;
+  --titre: var(--b-titres);
+  --radius: 14px;
+  --commune: #56626e;
+  --rare: #1c6bb5;
+  --epique: #7437c2;
+  --coffre-bois: #8a5a2b;
+  --coffre-argent: #5b6875;
+  --coffre-or: #9c6200;
+  --coffre-legendaire: #7437c2;
+  padding: 12px;
+  background: rgba(23, 18, 14, .62);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 700;
+}
+#progression :focus-visible { outline: 3px solid var(--b-rouge); outline-offset: 2px; }
+#progression .modal-card {
+  max-height: 90vh;
+  padding: 16px 14px 20px;
+  border: 4px solid var(--b-encre);
+  border-radius: 22px;
+  background: var(--b-papier);
+  box-shadow: 0 8px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#progression .modal-card h2 { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 27px; line-height: 1.05; letter-spacing: 0; }
+#progression .prog-carte h3 { margin-top: 18px; font-size: 12.5px; font-weight: 900; letter-spacing: .08em; color: var(--b-gris); }
+#progression .modal-card .subtitle,
+#progression .modal-card .hint { font-size: 13.5px; font-weight: 700; line-height: 1.4; color: var(--b-gris); }
+#progression .prog-vide,
+#progression .prog-annonce { font-weight: 800; }
+
+/* Ce qui se touche. */
+#progression .btn {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 900;
+}
+#progression .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#progression .btn.primary,
+#progression .btn.prog-attend { background: var(--b-jaune); border-color: var(--b-encre); color: var(--b-encre); }
+#progression .btn.danger { border-color: var(--b-encre); background: var(--b-rouge); color: var(--b-papier); }
+#progression .btn.small { min-height: 40px; padding: 6px 12px; font-size: 14px; font-weight: 900; }
+#progression .btn[disabled] { opacity: 1; background: var(--b-sable); box-shadow: none; color: var(--b-gris); }
+#progression .btn svg { fill: currentColor; }
+#progression .icon-btn {
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--b-encre);
+  border-radius: 12px;
+  background: var(--b-blanc);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#progression .icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+#progression .prog-coffre .icon-btn { width: 40px; height: 40px; min-width: 40px; }
+
+/* Les petites pièces : jauge, vignette, écu, catégorie. */
+#progression .prog-barre { height: 10px; border: 2px solid var(--b-encre); border-radius: 6px; background: var(--b-blanc); }
+#progression .prog-barre > span { border-radius: 0; background: var(--b-jaune); }
+#progression .prog-vignette { border: 3px solid var(--b-encre); border-radius: 12px; background: var(--b-sable); }
+#progression .prog-vignette[data-categorie="rare"] { border-color: var(--b-encre); background: #cfe6fb; }
+#progression .prog-vignette[data-categorie="epique"] { border-color: var(--b-encre); background: #e6d5fb; }
+#progression .prog-vignette svg { fill: var(--b-encre); opacity: 1; }
+#progression .prog-vignette.grande { border-radius: 16px; }
+#progression .prog-vignette.petite { border-width: 2px; }
+#progression .prog-ecu svg { filter: none; stroke: var(--b-encre); stroke-width: 30px; paint-order: stroke; }
+#progression .prog-ecu b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; color: var(--b-encre); }
+#progression .prog-categorie { font-size: 11.5px; font-weight: 900; }
+
+/* Les rangées : une ligue, un coffre, un tirage, un article. */
+#progression .prog-ligue,
+#progression .prog-coffre,
+#progression .prog-tirage {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+}
+/* (Une ligue pas encore atteinte : en pointillé, sans fond. Atteinte : pleine. La sienne : jaune, sur son ombre.) */
+#progression .prog-ligue { opacity: 1; border-style: dashed; background: none; }
+#progression .prog-ligue.atteinte { opacity: 1; border-style: solid; background: var(--b-blanc); }
+#progression .prog-ligue.actuelle { border-style: solid; border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+#progression .prog-ligue-texte b { font-family: var(--b-texte); font-weight: 900; font-size: 16px; }
+#progression .prog-ligue-texte small { font-size: 12.5px; }
+#progression .prog-ici { padding: 2px 7px; border: 2px solid var(--b-encre); border-radius: 8px; background: var(--b-papier); color: var(--b-encre); font-weight: 900; }
+#progression .prog-coffre-texte b,
+#progression .prog-tirage-texte b { font-weight: 900; }
+#progression .prog-coffre-nom { font-weight: 900; }
+#progression .prog-gain,
+#progression .prog-niveau,
+#progression .prog-monte { color: var(--b-encre); font-weight: 900; }
+#progression .scores th,
+#progression .scores td,
+#progression .prog-prochains li { border-bottom-color: rgba(23, 18, 14, .22); }
+#progression .scores tr.total td { border-top: 2px solid var(--b-encre); color: var(--b-encre); font-weight: 900; }
+#progression .prog-regles { font-weight: 700; }
+
+/* La collection : une troupe par carte. */
+#progression .prog-troupe { border: 3px solid var(--b-encre); border-radius: 14px; background: var(--b-blanc); color: var(--b-encre); font-family: var(--b-texte); }
+#progression .prog-troupe:active { transform: translateY(2px); }
+#progression .prog-troupe b { font-weight: 900; }
+#progression .prog-troupe.prete { border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+#progression .prog-troupe.verrouillee { border-style: dashed; background: none; }
+#progression .prog-fiche-texte dt { font-weight: 900; }
+#progression .prog-fiche-texte dd { font-weight: 700; }
+#progression .prog-fiche-tete p b { font-weight: 900; }
+
+/* --- La boutique ------------------------------------------------------------ */
+
+/* Un montant en Couronnes : le pictogramme d'or cerclé d'encre, puis le nombre. */
+#progression .prog-couronnes { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#progression .prog-couronnes svg { flex: none; fill: var(--b-jaune); stroke: var(--b-encre); stroke-width: 40px; paint-order: stroke; }
+#progression .btn.primary .prog-couronnes svg { fill: var(--b-blanc); }
+#progression .prog-bourse {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 6px;
+  padding: 8px 12px;
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-sable);
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: 28px;
+  line-height: 1;
+}
+#progression .prog-bourse > span:last-child { font-family: var(--b-texte); font-size: 15px; font-weight: 900; color: var(--b-gris); }
+#progression .prog-articles { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+#progression .prog-article,
+#progression .prog-offre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 6px 8px;
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+}
+/* Une offre : la même rangée, en jaune et sur son ombre. Le lot de troupes : sur le sable. */
+#progression .prog-offre { background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+#progression .prog-offre .btn.primary { background: var(--b-blanc); }
+#progression .prog-lot-troupes { background: var(--b-sable); }
+#progression .prog-article.acquis { border-style: dashed; background: none; }
+#progression .prog-offre-texte { display: grid; flex: 1; gap: 2px; min-width: 0; }
+#progression .prog-offre-texte b { font-size: 15px; font-weight: 900; line-height: 1.2; }
+#progression .prog-offre-texte small { font-size: 12.5px; font-weight: 700; line-height: 1.3; color: var(--b-gris); }
+#progression .prog-offre-texte s { color: var(--b-gris); }
+#progression .prog-article .btn.small,
+#progression .prog-offre .btn.small { flex: none; min-width: 78px; justify-content: center; }
+#progression .btn.small.prog-cher { background: var(--b-sable); box-shadow: none; color: var(--b-gris); }
+#progression .prog-acquis { flex: none; font-size: 13px; font-weight: 900; color: var(--good); }
+/* (Le portrait d'un article est un bouton : il ouvre la fiche de la troupe.) */
+#progression .prog-article-fiche { display: grid; flex: none; padding: 0; border: 0; border-radius: 12px; background: none; cursor: pointer; }

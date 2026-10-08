@@ -10,6 +10,7 @@
 
 import { PROGRESSION as R } from './progression-config.js';
 import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour } from './progression.js';
+import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai } from './progression.js';
 import { lireProgression, ecrireProgression } from './save.js';
 import { UNIT_TYPES, DEFAULT_CIV, GAME_MODES, nomDe, portraitDe } from './config.js';
 import { iconeSVG } from './icones.js';
@@ -55,11 +56,29 @@ const ameliorables = (profil) => TROUPES.filter((type) => { const v = versLeNive
 
 // --- Accueil ---------------------------------------------------------------------
 
-/** Le bandeau de l'accueil : la ligue, le score, le chemin vers la suivante, les coffres et les troupes. */
+// --- Boutique : ce qui s'écrit de la même façon partout --------------------------
+
+/** L'heure, en secondes : elle date la fin des offres. */
+const heure = () => Date.now() / 1000;
+/** Un montant en Couronnes : le pictogramme, puis le nombre. */
+const couronnes = (n, taille = 14) => `<span class="prog-couronnes">${iconeSVG('couronne', taille, 'inline')}${nombre(n)}</span>`;
+/** Un prix en euros, à partir de centimes : « 0,99 € ». */
+export const euros = (centimes) => `${(centimes / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
+/** Ce qu'il reste d'une offre, en clair : « 2 j », « 47 h », « 12 min ». */
+export function resteEnClair(secondes) {
+  const heures = secondes / 3600;
+  if (heures >= 48) return `${Math.floor(heures / 24)} j`;
+  if (heures >= 1) return `${Math.ceil(heures)} h`;
+  return `${Math.max(1, Math.ceil(secondes / 60))} min`;
+}
+
+/** Le bandeau de l'accueil : la ligue, le score, le chemin vers la suivante, les coffres, les troupes et la boutique. */
 export function htmlBandeau(profil) {
   const ligue = R.ligues[profil.ligue - 1], suivante = R.ligues[profil.ligue];
   const avance = suivante ? (profil.elo - ligue.seuil) / (suivante.seuil - ligue.seuil) : 1;
   const coffres = profil.coffres.length, prets = ameliorables(profil).length;
+  // (La pastille de la boutique : une offre qui se paie en Couronnes court en ce moment.)
+  const offres = catalogueBoutique(profil, heure()).offres.filter((o) => o.id === 'ligue').length;
   return `
     <button class="prog-bandeau-ligue" data-ecran="ligues" aria-label="Voir les ligues">
       ${ecu(ligue.numero)}
@@ -72,6 +91,7 @@ export function htmlBandeau(profil) {
     <div class="prog-bandeau-actions">
       <button class="btn small ${coffres ? 'prog-attend' : ''}" data-ecran="coffres">${iconeSVG('coffre', 16, 'inline')} Coffres${coffres ? ` <b class="prog-pastille">${coffres}</b>` : ''}</button>
       <button class="btn small ${prets ? 'prog-attend' : ''}" data-ecran="troupes">${iconeSVG('militia', 16, 'inline')} Troupes${prets ? ` <b class="prog-pastille">${prets}</b>` : ''}</button>
+      <button class="btn small ${offres ? 'prog-attend' : ''}" data-ecran="boutique">${iconeSVG('couronne', 16, 'inline')} Boutique${offres ? ` <b class="prog-pastille">${offres}</b>` : ''}</button>
     </div>`;
 }
 
@@ -312,8 +332,14 @@ function ecranFiche(type, profil, message = '', { confirmerEssai = false } = {})
     ? 'Toucher encore : la partie en cours sera effacée' : 'Essayer en partie libre'}</button>
       </div>
       <p class="hint">Trois t’attendent près de ton centre. Une partie d’essai ne compte ni au classement ni au palmarès.</p>`;
+    // La boutique la donne tout de suite, au prix de cette heure (l'offre de ligue le baisse).
+    const article = catalogueBoutique(profil, heure()).troupes.find((x) => x.type === type && !x.debloquee);
+    const boutique = !article ? '' : `
+      <div class="modal-actions">
+        <button class="btn" data-ecran="boutique">Tout de suite à la boutique : ${couronnes(article.prix)}</button>
+      </div>`;
     pied = `<p class="prog-annonce">${iconeSVG('cadenas', 14, 'inline')} Offerte en ${ligueEnPhrase(g.ligue)}, ou après ${g.parties} parties classées jouées
-      (tu en as joué ${profil.parties - profil.abandonsPrecoces}).</p>${essai}`;
+      (tu en as joué ${profil.parties - profil.abandonsPrecoces}).</p>${boutique}${essai}`;
   } else if (!v) {
     pied = '<p class="prog-annonce">Niveau maximum atteint.</p>';
   } else {
@@ -342,6 +368,106 @@ function ecranFiche(type, profil, message = '', { confirmerEssai = false } = {})
     ${pied}`, { retour: 'troupes' });
 }
 
+// --- La boutique ---------------------------------------------------------------------
+
+/**
+ * Le bouton d'un achat en Couronnes : son prix. Deux touchers — le premier
+ * demande confirmation, comme « Essayer ». Trop cher pour le porte-monnaie,
+ * il reste touchable, en plus pâle : il dit alors ce qu'il manque.
+ */
+function boutonAcheter(act, arg, prix, solde, confirmer) {
+  if (solde < prix) return `<button class="btn small prog-cher" data-act="${act}" data-arg="${arg}">${couronnes(prix)}</button>`;
+  return confirmer
+    ? `<button class="btn small danger" data-act="${act}" data-arg="${arg}" data-i="1">Toucher encore : ${couronnes(prix)}</button>`
+    : `<button class="btn small primary" data-act="${act}" data-arg="${arg}">${couronnes(prix)}</button>`;
+}
+
+/**
+ * La boutique : le porte-monnaie, les offres qui courent, les troupes à
+ * débloquer, les lots de Couronnes. `confirmer` : l'article dont on attend le
+ * second toucher (un type de troupe, ou « tout »).
+ */
+function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
+  const c = catalogueBoutique(profil, heure());
+  const offres = c.offres.map((o) => {
+    if (o.id === 'ligue') {
+      return `
+        <li class="prog-offre">
+          ${vignette(o.troupe)}
+          <span class="prog-offre-texte">
+            <b>Offre de ligue : ${nomTroupe(o.troupe)} à moitié prix</b>
+            <small>${couronnes(o.prix)} au lieu de <s>${nombre(o.prixPlein)}</s> · encore ${resteEnClair(o.reste)}</small>
+          </span>
+          ${boutonAcheter('acheter', o.troupe, o.prix, c.couronnes, confirmer === o.troupe)}
+        </li>`;
+    }
+    const contenu = [...o.troupes.map(nomTroupe), `${nombre(o.couronnes)} Couronnes`].join(' + ');
+    return `
+      <li class="prog-offre">
+        <span class="prog-vignette">${iconeSVG('couronne', 30)}</span>
+        <span class="prog-offre-texte">
+          <b>Offre de bienvenue : ${contenu}</b>
+          <small>${euros(o.prixCentimes)}, une seule fois · encore ${resteEnClair(o.reste)}</small>
+        </span>
+        <button class="btn small" disabled>${o.disponible ? euros(o.prixCentimes) : 'Bientôt'}</button>
+      </li>`;
+  }).join('');
+  const troupes = c.troupes.map((t) => {
+    const g = R.troupes[t.type].gratuite;
+    const droite = t.debloquee
+      ? '<span class="prog-acquis">Débloquée</span>'
+      : boutonAcheter('acheter', t.type, t.prix, c.couronnes, confirmer === t.type);
+    return `
+      <li class="prog-article ${t.debloquee ? 'acquis' : ''}">
+        <button class="prog-article-fiche" data-ecran="fiche" data-arg="${t.type}" aria-label="Voir la fiche : ${nomTroupe(t.type)}">${vignette(t.type)}</button>
+        <span class="prog-offre-texte">
+          <b>${nomTroupe(t.type)}</b>
+          <small>${t.debloquee ? 'Déjà à toi.' : `${t.offre ? `<s>${nombre(t.prixPlein)}</s> · ` : ''}Sinon offerte en ${ligueEnPhrase(g.ligue)}`}</small>
+        </span>
+        ${droite}
+      </li>`;
+  }).join('');
+  const lot = c.lotTroupes;
+  const lots = c.lots.map((l) => `
+    <li class="prog-article">
+      <span class="prog-vignette">${iconeSVG('couronne', 30)}</span>
+      <span class="prog-offre-texte">
+        <b>${l.nom} : ${nombre(l.couronnes)} Couronnes</b>
+        <small>${l.bonus ? `${l.bonus} % de plus que le premier lot` : 'Le premier lot'}</small>
+      </span>
+      <button class="btn small" disabled>${euros(l.prixCentimes)}</button>
+    </li>`).join('');
+  montrer('Boutique', `
+    <p class="prog-bourse">${couronnes(c.couronnes, 22)} <span>${c.couronnes > 1 ? 'Couronnes' : 'Couronne'}</span></p>
+    ${message ? `<p class="prog-annonce">${message}</p>` : ''}
+    ${offres ? `<h3>Offres du moment</h3><ul class="prog-articles">${offres}</ul>` : ''}
+    <h3>Troupes</h3>
+    <p class="subtitle">Une troupe avancée s’obtient gratuitement par sa ligue. Ici, tu l’as tout de suite : c’est la même troupe.</p>
+    <ul class="prog-articles">
+      ${troupes}
+      ${lot ? `
+      <li class="prog-article prog-lot-troupes">
+        <span class="prog-vignette">${iconeSVG('militia', 30)}</span>
+        <span class="prog-offre-texte">
+          <b>Toutes les troupes (${lot.troupes.length})</b>
+          <small>au lieu de <s>${nombre(lot.prixPlein)}</s></small>
+        </span>
+        ${boutonAcheter('acheterTout', 'tout', lot.prix, c.couronnes, confirmer === 'tout')}
+      </li>` : ''}
+    </ul>
+    <h3>Couronnes</h3>
+    <p class="subtitle">${c.lots.some((l) => l.disponible) ? 'Les Couronnes servent ici, et seulement ici.' : 'L’achat de Couronnes arrivera avec l’application. D’ici là, elles se gagnent : 50 à chaque nouvelle ligue.'}</p>
+    <ul class="prog-articles">${lots}</ul>
+    ${c.essai ? `
+    <div class="modal-actions">
+      <button class="btn" data-act="essaiCouronnes">Porte-monnaie d’essai : +${nombre(c.essai.couronnes)} Couronnes</button>
+    </div>
+    <p class="hint">Version d’essai : ce bouton sert à essayer la boutique, il disparaîtra avec l’arrivée des vrais achats.</p>` : ''}
+    <h3>Apparence</h3>
+    <p class="subtitle">Bientôt : habillages de troupes et de bâtiment principal, bannières, titres.</p>
+    <p class="hint">Rien d’aléatoire ne se vend ici : ni coffre, ni fragment, ni niveau.</p>`);
+}
+
 // --- Ouvrir un écran, agir ----------------------------------------------------------
 
 const ECRANS = {
@@ -350,9 +476,10 @@ const ECRANS = {
   troupes: (p) => ecranTroupes(p),
   probas: (p, arg) => ecranProbas(arg),
   fiche: (p, arg) => ecranFiche(arg, p),
+  boutique: (p) => ecranBoutique(p),
 };
 
-/** Ouvre un écran de la progression : « ligues », « coffres », « troupes », « probas » (un type de coffre), « fiche » (une troupe). */
+/** Ouvre un écran de la progression : « ligues », « coffres », « troupes », « probas » (un type de coffre), « fiche » (une troupe), « boutique ». */
 export function ouvrirProgression(ecran, arg) {
   if (ECRANS[ecran]) ECRANS[ecran](lireProgression(), arg);
 }
@@ -378,6 +505,27 @@ function agir(act, arg, i) {
     // (main.js répond « confirmer » quand une partie dort : second toucher demandé.)
     if (surEssai(arg, i === '1') === 'confirmer') return ecranFiche(arg, profil, '', { confirmerEssai: true });
     return fermerProgression();
+  }
+  if (act === 'acheter' || act === 'acheterTout') {
+    // Premier toucher : le bouton demande confirmation — ou dit ce qu'il manque. Second : l'achat.
+    const c = catalogueBoutique(profil, heure());
+    const prix = act === 'acheter' ? (c.troupes.find((t) => t.type === arg && !t.debloquee) || {}).prix : c.lotTroupes && c.lotTroupes.prix;
+    if (!(prix > 0)) return ecranBoutique(profil);
+    if (c.couronnes < prix) return ecranBoutique(profil, `Il te manque ${couronnes(prix - c.couronnes)} pour cet achat.`);
+    if (i !== '1') return ecranBoutique(profil, '', { confirmer: arg });
+    const r = act === 'acheter' ? acheterTroupe(profil, arg, heure()) : acheterToutesLesTroupes(profil);
+    if (r.erreur) return ecranBoutique(profil);
+    const ok = retenir(r.profil);
+    const acquises = r.evenements.filter((e) => e.type === 'troupeDebloquee').map((e) => nomTroupe(e.troupe));
+    // (Sans « il » ni « elle » : le Sphinx et l'Hydre portent le même article.)
+    return ecranBoutique(r.profil, ok ? `${acquises.join(', ')} : c’est débloqué. À former dès ta prochaine partie.`
+      : 'Sauvegarde impossible sur cet appareil : cet achat ne sera pas retenu.');
+  }
+  if (act === 'essaiCouronnes') {
+    const r = prendreCouronnesDEssai(profil);
+    if (r.erreur) return ecranBoutique(profil);
+    retenir(r.profil);
+    return ecranBoutique(r.profil);
   }
   if (act === 'ameliorer') {
     const r = ameliorer(profil, arg);
@@ -438,6 +586,10 @@ export function htmlFinDePartie(evenements, profil) {
   for (const e of de('retrogradation')) lignes.push(`<p>Retour en ${ligueEnPhrase(e.a)}.</p>`);
   for (const e of de('troupeDebloquee')) lignes.push(`<p class="prog-fin-troupe">${vignette(e.troupe, 'petite')} Nouvelle troupe : <b>${nomTroupe(e.troupe)}</b></p>`);
   for (const e of de('ouvrierAuPlafond')) lignes.push(`<p>${nomTroupe(e.troupe)} monte au niveau ${e.a}, comme la ligue.</p>`);
+  for (const e of de('couronnes')) if (e.variation > 0) lignes.push(`<p class="prog-fin-couronnes">+${couronnes(e.variation)} Couronnes pour ta nouvelle ligue.</p>`);
+  for (const e of de('offreOuverte')) {
+    if (e.offre === 'ligue') lignes.push(`<p class="prog-fin-offre"><button class="btn small prog-attend" data-ecran="boutique">${iconeSVG('couronne', 16, 'inline')} Offre de ligue : ${nomTroupe(e.troupe)} à moitié prix, ${R.boutique.offres.ligue.heures} h</button></p>`);
+  }
   const coffres = de('coffre');
   if (coffres.length) {
     lignes.push(`<p class="prog-fin-coffres">${coffres.map((c) => `<span class="prog-fin-coffre">${coffre(c.coffre, 'ferme', 60)}

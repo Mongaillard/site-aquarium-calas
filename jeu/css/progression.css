@@ -62,6 +62,9 @@
   background: var(--gold); color: #1a1408; font-size: 12px; line-height: 18px; text-align: center;
 }
 .btn.prog-attend { border-color: var(--gold); }
+/* Un montant en Couronnes (écran de fin) : le pictogramme, puis le nombre. */
+.prog-couronnes { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prog-couronnes svg { fill: var(--gold); }
 
 /* --- Bandeau de l'accueil ---------------------------------------------------- */
 

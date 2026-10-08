@@ -561,6 +561,16 @@ l'âge suivant. Tests : `node test/reglages-ia.test.js`.
 
 ## La direction artistique d'octobre 2026
 
+**Les menus, depuis le 08/10/2026 : direction « Boîte de jeu ».** L'accueil et
+les écrans de la progression (ligues, coffres, troupes, boutique) ont leur
+propre feuille, `css/boite.css` : le couvercle d'une boîte de jeu de société —
+aplats francs, contour d'encre épais, ombre pleine sous ce qui se touche,
+titres en « Lilita One », texte en « Nunito » (livrés dans `assets/polices`,
+licence SIL OFL jointe). Chaque règle y passe par `#start-screen` ou par
+`#progression` ; la partie et ses fenêtres (pause, fin, aide) gardent pour
+l'instant l'habillage décrit ci-dessous, et les anciennes règles de l'accueil
+restent dans `css/jeu.css` tant que la direction n'est pas étendue partout.
+
 Un principe : **les bâtiments et les arbres sont la référence** — un dessin à
 l'encre, trait sombre, ombres peintes, lumière venue d'en haut à gauche — et
 tout le reste s'en rapproche. On ne touche ni aux bâtiments, ni à la taille des
@@ -734,6 +744,43 @@ ni au classement ni au palmarès, l'ordinateur n'y gagne rien, et une partie
 qui dort n'est effacée qu'au second toucher. Tests :
 `node test/progression.test.js`, `node test/progression-partie.test.js`,
 `node test/rangement-durable.test.js`, `node test/troupes-nouvelles.test.js`.
+
+### La boutique
+
+Une monnaie, les **Couronnes** : on les achètera en argent réel, on les dépense
+à la boutique (repère : 100 Couronnes pour 1 €). Tout est dans les réglages
+(`boutique`, `js/progression-config.js`) et les règles sont des fonctions pures
+du profil (`js/progression.js`) : `catalogueBoutique`, `acheterTroupe`,
+`acheterToutesLesTroupes`, `prendreCouronnesDEssai`, `crediterLot`,
+`prendreOffreDeBienvenue`.
+
+| Ce qui se vend | Prix |
+|---|---|
+| Une troupe avancée tout de suite (sinon gratuite par sa ligue : c'est la même troupe) | 100 à 300 Couronnes (`prix` de la troupe) |
+| « Toutes les troupes » : ce qui reste à débloquer | 70 % de la somme, arrondi à 50 (1 200 au lieu de 1 700 pour les sept) |
+| Lots de Couronnes | 0,99 € → 100 · 4,99 € → 550 · 9,99 € → 1 200 · 19,99 € → 2 600 · 49,99 € → 7 000 |
+
+**Ce qui ne s'y vend pas, et ne s'y vendra pas** : ni coffre, ni fragment, ni
+niveau. Rien d'aléatoire, et pas de puissance — la boutique vend du temps gagné
+(une troupe plus tôt) et, plus tard, de l'apparence (habillages, bannières,
+titres : à créer).
+
+**Offres**, à contenu fixe et à vraie date de fin (pas de faux compte à
+rebours) : l'**offre de ligue** — à chaque ligue atteinte pour la première
+fois, la troupe de la ligue suivante à moitié prix pendant 48 h, en Couronnes —
+et l'**offre de bienvenue** — une seule fois, 72 h après la première partie
+comptée : le Mercenaire, l'Archer monté et 300 Couronnes pour 2,99 €. Chaque
+nouvelle ligue offre aussi 50 Couronnes.
+
+**Ce qui attend l'application** : tout ce qui se paie en argent réel (lots,
+offre de bienvenue). Ces fonctions existent déjà et n'accordent rien sans une
+preuve dont `valide` vaut exactement `true` — ce sera la réponse du serveur,
+qui aura vérifié l'achat intégré. Tant que `boutique.argentReel` est `false`,
+les lots s'affichent avec leur prix mais ne s'achètent pas, et un
+**porte-monnaie d'essai** (`boutique.essai` : +500 Couronnes par toucher)
+permet d'essayer la boutique ; le mettre à `null` le jour où l'argent réel
+arrive. Un achat en Couronnes demande deux touchers, comme « Détruire ».
+Tests : `node test/boutique.test.js`.
 
 ## Les sons
 
