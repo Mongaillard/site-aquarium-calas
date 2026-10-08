@@ -426,6 +426,7 @@ const IMAGES_CIV = {
       scout: 'solScout', knight: 'solKnight', champion: 'solChampion', priest: 'solPriest',
       ram: 'solRam', catapult: 'solCatapult',
       pavoisier: 'solPavoisier', frondeur: 'solFrondeur', sapeur: 'solSapeur',
+      crossbowman: 'solCrossbowman', horseArcher: 'solHorseArcher', hydra: 'solHydra',
     },
   },
 };

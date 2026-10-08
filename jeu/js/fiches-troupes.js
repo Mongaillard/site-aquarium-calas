@@ -120,6 +120,22 @@ export const FICHES = {
   },
 };
 
+/**
+ * Les fiches qu'un peuple réécrit : sa troupe tient le même rôle (mêmes
+ * chiffres, mêmes règles), mais ce n'est pas la même créature — le Sphinx des
+ * Solariens n'est pas « elle », et il ne mord pas.
+ */
+export const FICHES_CIV = {
+  solarien: {
+    hydra: {
+      role: 'Un monstre qui encaisse comme une escouade et frappe 3 ennemis à la fois.',
+      bat: 'Les mêlées serrées, l’infanterie légère, les bâtiments (+9).',
+      craint: 'Les tireurs en nombre qui le visent ensemble, et le harcèlement : il est lent.',
+      conseil: 'Lance-le au cœur de la mêlée, des {priest:p} derrière : c’est là que ses coups comptent. Il occupe 3 places.',
+    },
+  },
+};
+
 /** Remplace les jetons `{type}` et `{type:p}` par le nom que ce peuple donne à la troupe. */
 export function nommer(texte, civ) {
   return texte.replace(/\{([A-Za-z]+)(:p)?\}/g, (_, type, pluriel) => nomDe(type, civ, pluriel ? 2 : 1));
@@ -130,8 +146,10 @@ export function nommer(texte, civ) {
  * l'ordre des rubriques, ou null si la troupe n'en a pas.
  */
 export function ficheDeTroupe(type, civ) {
-  const fiche = Object.prototype.hasOwnProperty.call(FICHES, type) ? FICHES[type] : null;
-  if (!fiche) return null;
+  const commune = Object.prototype.hasOwnProperty.call(FICHES, type) ? FICHES[type] : null;
+  if (!commune) return null;
+  const propres = Object.prototype.hasOwnProperty.call(FICHES_CIV, civ) ? FICHES_CIV[civ] : null;
+  const fiche = propres && Object.prototype.hasOwnProperty.call(propres, type) ? propres[type] : commune;
   // (Une espace insécable devant « : » et « ; » : la ponctuation ne passe jamais seule à la ligne.)
   return RUBRIQUES.map(([cle, titre]) => ({ cle, titre, texte: nommer(fiche[cle], civ).replace(/ ([:;])/g, '\u00a0$1') }));
 }

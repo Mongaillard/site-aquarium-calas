@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v62';
+const CACHE = 'age-empires-mobile-v63';
 // La musique (js/musique.js) : trois morceaux lourds. Ils ne sont pas pris à
 // l'installation mais à la première écoute, et gardés à part, comme les unités
 // en 3D : une mise à jour du jeu ne les fait pas retélécharger.
@@ -76,6 +76,9 @@ const ASSETS = [
   './assets/modeles/sol-pavoisier.json',
   './assets/modeles/sol-frondeur.json',
   './assets/modeles/sol-sapeur.json',
+  './assets/modeles/sol-arbaletrier.json',
+  './assets/modeles/sol-archer-monte.json',
+  './assets/modeles/sol-sphinx.json',
   './assets/portrait-hydre.webp',
   './assets/portrait-pretresse.webp',
   './assets/portrait-cavalier.webp',
@@ -105,6 +108,9 @@ const ASSETS = [
   './assets/portrait-sol-pavoisier.webp',
   './assets/portrait-sol-frondeur.webp',
   './assets/portrait-sol-sapeur.webp',
+  './assets/portrait-sol-arbaletrier.webp',
+  './assets/portrait-sol-archer-monte.webp',
+  './assets/portrait-sol-sphinx.webp',
   './assets/coffres/coffre-bois-ferme.webp',
   './assets/coffres/coffre-bois-entrouvert.webp',
   './assets/coffres/coffre-bois-ouvert.webp',

@@ -5,7 +5,7 @@
 import { World } from '../js/game.js';
 import { AIPlayer } from '../js/ai.js';
 import { serializeWorld, restoreWorld } from '../js/save.js';
-import { DIFFICULTIES, TICKS_PER_SECOND, TILE, BUILDING_TYPES, nomDe, ficheDe, portraitDe } from '../js/config.js';
+import { DIFFICULTIES, TICKS_PER_SECOND, TILE, BUILDING_TYPES, UNIT_TYPES, nomDe, ficheDe, portraitDe } from '../js/config.js';
 import { ficheCiv } from '../js/sprites.js';
 import { formatTime, dist, RNG } from '../js/utils.js';
 import { STATE, Projectile } from '../js/entities.js';
@@ -873,7 +873,12 @@ function empreinte(world) {
     && nomDe('horseArcher', 'atlante', 2) === 'Archers montés' && nomDe('militia', 'solarien', 2) === 'Gardes'
     && portraitDe('militia', 'solarien') === 'assets/portrait-sol-garde.webp' && portraitDe('militia', 'atlante') === 'assets/portrait-milicien.webp'
     && portraitDe('knight', 'solarien') === 'assets/portrait-sol-mehariste.webp' && nomDe('scout', 'solarien', 2) === 'Chacals dressés'
-    && portraitDe('crossbowman', 'solarien') === 'assets/portrait-arbaletrier.webp' && portraitDe('deer', 'solarien') === null);
+    && portraitDe('crossbowman', 'solarien') === 'assets/portrait-sol-arbaletrier.webp' && portraitDe('crossbowman', 'atlante') === 'assets/portrait-arbaletrier.webp'
+    && portraitDe('horseArcher', 'solarien') === 'assets/portrait-sol-archer-monte.webp' && portraitDe('deer', 'solarien') === null);
+  check('civilisations : le Sphinx est l’Hydre des Solariens — autre nom, autre portrait, mêmes règles',
+    nomDe('hydra', 'solarien') === 'Sphinx' && nomDe('hydra', 'solarien', 2) === 'Sphinx' && nomDe('hydra', 'atlante') === 'Hydre'
+    && portraitDe('hydra', 'solarien') === 'assets/portrait-sol-sphinx.webp' && ficheDe('hydra', 'solarien').hp === UNIT_TYPES.hydra.hp
+    && ficheDe('hydra', 'solarien').desc.includes('3 places') && ficheDe('temple', 'solarien').desc.includes('Sphinx') && BUILDING_TYPES.temple.desc.includes('Hydre'));
 }
 
 {

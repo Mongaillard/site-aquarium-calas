@@ -613,6 +613,7 @@ export const CIVILISATIONS = {
       champion: { name: 'Garde masqué', pluriel: 'Gardes masqués' },
       priest: { name: 'Prêtre du Soleil', pluriel: 'Prêtres du Soleil' },
       triton: { name: 'Mercenaire atlante', pluriel: 'Mercenaires atlantes' },
+      hydra: { name: 'Sphinx', desc: 'Lion à tête de pharaon invoqué au Temple : encaisse comme une escouade et frappe jusqu’à trois ennemis à la fois. Occupe 3 places de population.' },
       towncenter: { name: 'Palais du Soleil', desc: 'Forme les fellahs, stocke les ressources et permet de passer à l’âge suivant.' },
       mill: { name: 'Grenier' },
       barracks: { name: 'Cour des Gardes' },               // féminin, comme Caserne
@@ -620,7 +621,7 @@ export const CIVILISATIONS = {
       stable: { name: 'Enclos des montures', fem: false }, // Écurie était féminin
       siege: { name: 'Atelier des engins' },
       blacksmith: { name: 'Fonderie' },                    // féminin, comme Forge
-      temple: { name: 'Temple du Soleil', desc: 'Forme les Prêtres du Soleil, qui soignent vos troupes ; à l’Âge des Châteaux, invoque l’Hydre.' },
+      temple: { name: 'Temple du Soleil', desc: 'Forme les Prêtres du Soleil, qui soignent vos troupes ; à l’Âge des Châteaux, invoque le Sphinx.' },
     },
     // type → portrait, seulement une fois le fichier livré (et listé dans sw.js).
     portraits: {
@@ -637,6 +638,9 @@ export const CIVILISATIONS = {
       pavoisier: 'assets/portrait-sol-pavoisier.webp',
       frondeur: 'assets/portrait-sol-frondeur.webp',
       sapeur: 'assets/portrait-sol-sapeur.webp',
+      crossbowman: 'assets/portrait-sol-arbaletrier.webp',
+      horseArcher: 'assets/portrait-sol-archer-monte.webp',
+      hydra: 'assets/portrait-sol-sphinx.webp',
     },
   },
 };

@@ -319,6 +319,21 @@ MODELES.solCatapult = { ...MODELES.catapult, src: 'assets/modeles/sol-catapulte.
 MODELES.solPavoisier = { ...MODELES.pavoisier, src: 'assets/modeles/sol-pavoisier.json', taille: 42, retouches: PEAU_SOLARIENNE };
 MODELES.solFrondeur = { ...MODELES.frondeur, src: 'assets/modeles/sol-frondeur.json', retouches: PEAU_SOLARIENNE };
 MODELES.solSapeur = { ...MODELES.sapeur, src: 'assets/modeles/sol-sapeur.json', retouches: PEAU_SOLARIENNE };
+// L'Arbalétrier solarien : crâne rasé sous un bandeau bleu, grand collier, pagne de
+// lin — les gestes de l'arbalétrier atlante, la même arbalète. (38 et non 42 : il
+// n'a pas de plumet, toute sa hauteur est son corps.)
+MODELES.solCrossbowman = { ...MODELES.crossbowman, src: 'assets/modeles/sol-arbaletrier.json', taille: 38, retouches: PEAU_SOLARIENNE };
+// L'Archer monté solarien : cheval clair sous un tapis de selle bleu, plumet au
+// frontal, cavalier à coiffe rayée — les gestes et le tir de l'archer monté atlante.
+MODELES.solHorseArcher = { ...MODELES.horseArcher, src: 'assets/modeles/sol-archer-monte.json', retouches: PEAU_SOLARIENNE };
+// Le Sphinx tient le rôle de l'Hydre : un lion à tête de pharaon (pack « Loup »
+// de l'Atelier, sans mâchoire : son visage ne se déforme pas). Lent, il marche
+// au pas là où l'Hydre trotte. Sa texture or et bleu n'a pas les réglages de
+// l'Hydre turquoise ; les rayures bleues de sa coiffe prennent la couleur du camp.
+MODELES.solHydra = {
+  ...MODELES.hydra, src: 'assets/modeles/sol-sphinx.json', taille: 60, reglage: null, retouches: null,
+  clips: { marche: 'marche', repos: 'repos', attaque: 'attaque_morsure', touche: 'coup_recu', mort: 'mort' },
+};
 
 export const DENSITE = 2;   // px d'atlas par px monde (le style « net » de l'Atelier)
 /**

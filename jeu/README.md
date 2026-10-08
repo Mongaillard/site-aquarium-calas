@@ -33,13 +33,17 @@ bleus, tridents) et les **Solariens** (peuple du désert : grès ocre, toits en
 terrasse, disques solaires). À ce stade, les règles sont les mêmes pour les
 deux — coûts, points de vie, IA — : une civilisation change ce que l'on voit et
 ce que l'interface nomme. Les Solariens ont leurs treize bâtiments (Palais du
-Soleil, Cour des Gardes, Grenier à dômes, Temple du Soleil…) et dix troupes
-à eux : le Fellah (l'ouvrier), le Garde à coiffe rayée, le Lancier, l'Archer,
-le Chacal dressé (leur éclaireur), le Méhariste sur son dromadaire (leur
-cavalerie lourde), le Garde masqué à tête de chacal (leur élite), le Prêtre du
-Soleil et son sceptre, et les deux engins en bois blond cerclé de bronze doré.
-L'arbalétrier, l'archer monté et l'Hydre gardent pour l'instant l'allure
-atlante. Les troupes solariennes n'ont que leur modèle 3D : le style choisi au
+Soleil, Cour des Gardes, Grenier à dômes, Temple du Soleil…) et toutes leurs
+troupes à eux : le Fellah (l'ouvrier), le Garde à coiffe rayée, le Lancier,
+l'Archer, l'Arbalétrier au crâne rasé sous son bandeau, l'Archer monté sur un
+cheval clair au plumet, le Chacal dressé (leur éclaireur), le Méhariste sur
+son dromadaire (leur cavalerie lourde), le Garde masqué à tête de chacal (leur
+élite), le Prêtre du Soleil et son sceptre, le Pavoisier, le Frondeur, le
+Sapeur, les deux engins en bois blond cerclé de bronze doré — et le **Sphinx**,
+lion à tête de pharaon, qui tient chez eux le rôle de l'Hydre (mêmes chiffres,
+autre nom, autre portrait, sa propre fiche : `FICHES_CIV`, `js/fiches-troupes.js`).
+Seul le Mercenaire atlante garde, à dessein, l'allure atlante. Les troupes
+solariennes n'ont que leur modèle 3D : le style choisi au
 menu de pause n'agit que sur les troupes atlantes, et son message le dit
 (`troupesSelonStyle`, `js/sprites.js`). Seuls l'ouvrier et l'éclaireur sont
 préparés au lancement ; le modèle
@@ -56,7 +60,7 @@ le joueur 1 le porte en rouge, quelle que soit sa civilisation.
 | ⚔ **Escarmouche** | **5 min chrono** | Pas d'installation : on se bat tout de suite. Départ à l'**Âge Féodal** avec 5 ouvriers, **1 000 vivres, 1 000 bois et 500 or** en réserve, **une caserne déjà bâtie** et toute la population offerte (30 places, pas une maison à poser), sur la carte **minuscule** (48 cases, deux fois plus petite que celle d'Express). L'ordinateur ne bâtit qu'une archerie et met tout le reste en soldats ; il attaque dès la première minute (1 min 30 de trêve en Facile). **Raser le Centre-Ville adverse** gagne ; sinon, à cinq minutes, **le meilleur score l'emporte**. En partie classée, son coffre est tiré dans une table **un cran en dessous** de celle des autres formats (`sources.parFormat` des réglages) : victoire 35/40/20/5, défaite 75/20/5/0 |
 | ⚡ **Express** | **10 min chrono** | Départ à l'**Âge Féodal** avec 7 villageois, des ressources garnies et de la place pour produire tout de suite, petite carte, population plafonnée à 40, IA agressive dès la première minute. **Raser le Centre-Ville adverse met fin à la partie sur-le-champ** (il y est deux fois moins résistant) ; sinon, au temps écoulé, **le meilleur score l'emporte** |
 | ⚑ **Prise de positions** | 10 à 12 min (15 au plus) | La carte et le départ d'Express, avec **trois positions** sur la ligne du milieu, à égale distance des deux camps : un monument à bannière dans un cercle de 3 cases. On **prend** une position en y tenant des soldats seuls pendant **10 secondes** (ni ouvriers ni soigneurs ; tant que les deux camps sont dans le cercle, rien ne bouge ; une prise abandonnée se défait au même rythme) ; elle reste à son camp, même vide, jusqu'à ce que l'autre la reprenne. Chaque position tenue rapporte **1 point toutes les 5 secondes** : **le premier à 200 gagne**. Raser le Centre-Ville adverse gagne aussi (il y garde tous ses points de vie) ; à quinze minutes, le meilleur total l'emporte. L'ordinateur envoie chaque vague tenir la position la plus proche qui n'est pas à lui, y laisse ses soldats de garde, et ne marche sur la base que s'il les tient toutes. Réglages : `positions` du format (`nombre`, `rayon`, `prise`, `pas`, `but`) |
-| 👥 **2 contre 2** | 15 à 20 min | Quatre camps, **deux équipes de deux**, une base par coin (les alliés du même côté). Départ à l'Âge Féodal, 30 de population par camp. Les alliés ne se frappent pas, **partagent leur vue**, et l'on ne peut pas viser ce qui est à son allié. **Une équipe est battue quand les bâtiments principaux de ses deux membres sont tombés** (un camp à terre garde ses troupes, qui se battent encore) ; à vingt minutes, la meilleure **somme des deux scores** l'emporte. Aujourd'hui le joueur tient une place et l'ordinateur les trois autres ; il peut donner trois consignes à son allié : **Attaque ici**, **Défends-moi**, **À toi de voir**. Jamais classé, pas de coffre : le résultat dépend de l'allié |
+| 👥 **2 contre 2** | 15 à 20 min | Quatre camps, **deux équipes de deux**, une base par coin (les alliés du même côté). Départ à l'Âge Féodal, 30 de population par camp. Les alliés ne se frappent pas, **partagent leur vue**, et l'on ne peut pas viser ce qui est à son allié. **Une équipe est battue quand les bâtiments principaux de ses deux membres sont tombés** (un camp à terre garde ses troupes, qui se battent encore) ; à vingt minutes, la meilleure **somme des deux scores** l'emporte. Aujourd'hui le joueur tient une place et l'ordinateur les trois autres ; il peut donner trois consignes à son allié : **Attaque ici**, **Défends-moi** (ses soldats au camp viennent tenir la base du joueur 3 minutes), **À toi de voir**. Une consigne attend 2 minutes que l'allié ait des soldats, et le jeu dit ce qu'il en fait (combien partent, ou pourquoi aucun). Jamais classé, pas de coffre : le résultat dépend de l'allié |
 | 🏰 **Classique** | 20 à 30 min | La partie complète : trois âges, population 60, victoire par conquête (tous les bâtiments **et** villageois adverses) |
 
 Le score d'une partie Express : *ressources récoltées + 10 par unité vivante +
