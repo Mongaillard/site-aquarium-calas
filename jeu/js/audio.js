@@ -56,6 +56,7 @@ export class AudioEngine {
     this.tampons = new Map();   // nom d'échantillon → AudioBuffer décodé
     this.voix = 0;              // échantillons en train de jouer
     this.demandes = false;      // le chargement des échantillons a été lancé
+    this.apresReprise = null;   // rappelé à chaque reprise du contexte
   }
 
   /** À appeler depuis un geste utilisateur (politique autoplay des navigateurs). */
@@ -71,8 +72,15 @@ export class AudioEngine {
       this.master.gain.value = VOLUME_SYNTHESE;
       this.master.connect(this.sortie);
     }
-    if (this.ctx.state === 'suspended') this.ctx.resume();
+    // (« interrupted » : l'iPhone, au retour d'un appel ou d'une autre application.)
+    if (this.ctx.state !== 'running') { try { this.ctx.resume(); } catch { /* le prochain geste réessaiera */ } }
     this.charger();
+    if (this.apresReprise) this.apresReprise();   // la musique s'accorde (js/musique.js)
+  }
+
+  /** La page passe à l'arrière-plan : plus un son, musique comprise, jusqu'au retour. */
+  suspendre() {
+    if (this.ctx && this.ctx.state === 'running') { try { this.ctx.suspend(); } catch { /* sans gravité */ } }
   }
 
   setEnabled(on) {

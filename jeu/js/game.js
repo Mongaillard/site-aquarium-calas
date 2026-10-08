@@ -810,13 +810,15 @@ export class World {
       return;
     }
     const damage = computeDamage(attacker.def, attacker.player, target);
+    // Un coup entre deux camps, pas une chasse ni une bête qui mord : la musique de bataille s'y fie (js/musique.js).
+    const combat = !attacker.isAnimal && !target.isAnimal;
     if (attacker.def.projectile) {
       this.projectiles.push(new Projectile(this, attacker, target, damage));
-      this.pushEvent({ type: 'shoot', x: attacker.x, y: attacker.y, player: attacker.playerIndex });
+      this.pushEvent({ type: 'shoot', x: attacker.x, y: attacker.y, player: attacker.playerIndex, combat });
     } else {
       target.takeDamage(damage, attacker);
       this.effects.push({ kind: 'hit', x: target.x, y: target.y - 6, life: 0.25, max: 0.25 });
-      this.pushEvent({ type: 'melee', x: attacker.x, y: attacker.y, player: attacker.playerIndex });
+      this.pushEvent({ type: 'melee', x: attacker.x, y: attacker.y, player: attacker.playerIndex, combat });
       if (attacker.def.morsures > 1) this.morsuresVoisines(attacker, target);
     }
   }
@@ -882,7 +884,7 @@ export class World {
       this.pushEvent({ type: 'notice', text: `Votre ${nomDe(tireur.type, joueur.civ)} a touché vos propres troupes.` });
     }
     this.effects.push({ kind: 'impact', x: pr.x, y: pr.y, rayon, life: 0.5, max: 0.5 });
-    this.pushEvent({ type: 'melee', x: pr.x, y: pr.y, player: tireur.playerIndex });
+    this.pushEvent({ type: 'melee', x: pr.x, y: pr.y, player: tireur.playerIndex, combat: true });
   }
 
   onDamaged(entity, source, amount) {
@@ -920,7 +922,7 @@ export class World {
     // Abattre son propre cochon n'est pas une attaque.
     const abattage = entity.isAnimal && source && source.playerIndex === entity.playerIndex;
     if (entity.playerIndex === this.humanIndex && !abattage) {
-      this.pushEvent({ type: 'underAttack', x: entity.x, y: entity.y, entity });
+      this.pushEvent({ type: 'underAttack', x: entity.x, y: entity.y, entity, combat: !!source && !source.isAnimal && !entity.isAnimal });
     }
   }
 

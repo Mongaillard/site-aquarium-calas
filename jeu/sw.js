@@ -1,5 +1,9 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v58';
+const CACHE = 'age-empires-mobile-v59';
+// La musique (js/musique.js) : trois morceaux lourds. Ils ne sont pas pris à
+// l'installation mais à la première écoute, et gardés à part, comme les unités
+// en 3D : une mise à jour du jeu ne les fait pas retélécharger.
+const MUSIQUE = 'aem-musique';
 const ASSETS = [
   './',
   './index.html',
@@ -23,6 +27,7 @@ const ASSETS = [
   './js/progression-config.js',
   './js/progression-ecrans.js',
   './js/fiches-troupes.js',
+  './js/musique.js',
   './js/rangement-durable.js',
   './css/progression.css',
   './js/render.js',
@@ -205,13 +210,20 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       // Les unités en 3D déjà cuites (js/modele3d.js) survivent aux mises à
       // jour : leur clé porte l'empreinte du modèle et la version de la cuisson.
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== 'aem-modeles-3d').map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== 'aem-modeles-3d' && k !== MUSIQUE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  if (new URL(event.request.url).pathname.includes('/assets/musique/')) {
+    event.respondWith(caches.open(MUSIQUE).then((cache) => cache.match(event.request).then((garde) => garde || fetch(event.request).then((reponse) => {
+      if (reponse && reponse.status === 200 && reponse.type === 'basic') cache.put(event.request, reponse.clone());
+      return reponse;
+    }))));
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request)

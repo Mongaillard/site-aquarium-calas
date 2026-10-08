@@ -1010,6 +1010,14 @@ export class UI {
         <span class="option-name">${f.nom}</span>
         <span class="option-desc">${f.desc}</span>
       </button>`).join('');
+    const musiques = [
+      { id: 'oui', nom: 'Oui', desc: 'Elle change quand un combat commence' },
+      { id: 'non', nom: 'Non', desc: 'Les bruitages seuls' },
+    ].map((m) => `
+      <button class="option compact ${(m.id === 'oui') === this.game.musique.voulue ? 'active' : ''}" data-musique="${m.id}">
+        <span class="option-name">${m.nom}</span>
+        <span class="option-desc">${m.desc}</span>
+      </button>`).join('');
     const modal = this.showModal(`
       <h2>Partie en pause</h2>
       <p class="hint">La partie est sauvegardée : vous pouvez fermer l'onglet et la reprendre plus tard.</p>
@@ -1022,6 +1030,8 @@ export class UI {
       <div class="options row">${finesses}</div>
       <p class="hint" data-role="finesse-reelle">${this.texteFinesse()}</p>
       <p class="hint" data-role="mesures">${this.texteMesures()}</p>
+      <h3 class="modal-sub">Musique</h3>
+      <div class="options row">${musiques}</div>
       <div class="modal-actions">
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="help">Comment jouer</button>
@@ -1046,6 +1056,12 @@ export class UI {
         modal.querySelectorAll('[data-finesse]').forEach((b) => b.classList.toggle('active', b === btn));
         modal.querySelector('[data-role="finesse-reelle"]').textContent = this.texteFinesse();
         modal.querySelector('[data-role="mesures"]').textContent = this.texteMesures();
+      }, this.ecoute());
+    });
+    modal.querySelectorAll('[data-musique]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.game.musique.vouloir(btn.dataset.musique === 'oui');
+        modal.querySelectorAll('[data-musique]').forEach((b) => b.classList.toggle('active', b === btn));
       }, this.ecoute());
     });
     modal.querySelector('[data-act="resume"]').addEventListener('click', () => this.game.togglePause(), this.ecoute());
@@ -1108,7 +1124,9 @@ export class UI {
           <a href="https://www.kaylousberg.com" target="_blank" rel="noopener">Kay Lousberg</a>,
           domaine public (CC0) ; rendu en direct par
           <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (licence MIT).</li>
-        <li><b>Sons</b> — synthétisés au code, sans fichier audio.</li>
+        <li><b>Bruitages</b> — paquets audio de <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a>, domaine public (CC0).</li>
+        <li><b>Musique</b> — « Minstrel Dance » et « Harvest Season » de RandomMind, « Determined Pursuit » d'Emma_MA,
+          publiés sur <a href="https://opengameart.org" target="_blank" rel="noopener">OpenGameArt</a>, domaine public (CC0).</li>
         <li><b>Jeu</b> — inspiré des principes d'Age of Empires, sans en reprendre
           aucun contenu : marques, ressources graphiques et sonores appartiennent
           à leurs propriétaires respectifs.</li>

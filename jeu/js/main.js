@@ -21,6 +21,7 @@ import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
 import { UI, FoyersAttaque, toucherArmee, resumeReglages, toucherNouvellePartie } from './ui.js';
 import { AudioEngine } from './audio.js';
+import { Musique } from './musique.js';
 import { villagerTask } from './entities.js';
 import { dist2, clamp } from './utils.js';
 import { iconeSVG } from './icones.js';
@@ -35,6 +36,9 @@ const MAX_CATCHUP = 5;
 const IMAGES_FIGEES = 4;
 
 const audio = new AudioEngine();
+// La musique de fond passe par le même contexte audio : elle s'accorde à chaque reprise (premier geste, retour sur la page).
+const musique = new Musique(audio);
+audio.apresReprise = () => musique.accorder();
 
 // Préférence « réaffectation automatique » : conservée d'une partie à l'autre.
 const AUTO_WORKERS_KEY = 'aem.autoWorkers';
@@ -146,6 +150,7 @@ class Game {
     this.renderer.surToileReduite = () => this.recalerZoom();
     this.renderer.initMinimap(document.getElementById('minimap'));
     this.audio = audio;
+    this.musique = musique;
     this.ui = new UI(this);
     this.input = new InputController(this.canvas, this);
     this.selection = [];
@@ -406,6 +411,7 @@ class Game {
     }
     this.ui.update(realDt);
     this.foyers.vieillir(realDt);
+    this.musique.suivre();
     requestAnimationFrame(this.loop);
   }
 
@@ -421,8 +427,9 @@ class Game {
           }
           break;
         case 'trained': if (mine) this.audio.play('trained'); break;
-        case 'melee': if (this.world.isVisible(event.x, event.y)) this.audio.play('melee'); break;
-        case 'shoot': if (this.world.isVisible(event.x, event.y)) this.audio.play('shoot'); break;
+        // (Un coup échangé entre deux camps, porté par le joueur : la musique de bataille le compte — voir js/musique.js.)
+        case 'melee': if (mine && event.combat) this.musique.coup(); if (this.world.isVisible(event.x, event.y)) this.audio.play('melee'); break;
+        case 'shoot': if (mine && event.combat) this.musique.coup(); if (this.world.isVisible(event.x, event.y)) this.audio.play('shoot'); break;
         // (Un bâtiment s'effondre ; une troupe ou une bête tombe.)
         case 'destroyed': if (this.world.isVisible(event.x, event.y)) this.audio.play(event.entity && event.entity.kind === 'building' ? 'destroyed' : 'death'); break;
         case 'notice': this.ui.toast(event.text, 'warn'); break;
@@ -448,6 +455,7 @@ class Game {
           }
           break;
         case 'underAttack':
+          if (event.combat) this.musique.coup();   // un coup reçu compte aussi
           // L'alerte dit où : son message se touche (voirAttaque) et l'endroit
           // pulse sur la mini-carte. Une par foyer, pour ne pas inonder.
           if (this.foyers.signaler(event.x, event.y)) {
@@ -458,6 +466,7 @@ class Game {
           }
           break;
         case 'gameOver':
+          this.musique.mettre('silence');   // la place au jingle de fin
           this.audio.play(event.result.victory ? 'victory' : 'defeat');
           clearSave();
           this.fermerMarque('fin');
@@ -1504,6 +1513,7 @@ function refreshReglages() {
 
 function showStartScreen() {
   currentGame = null;
+  musique.mettre('menu');
   habiller(settings.civ);
   document.getElementById('start-screen').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');
@@ -1610,6 +1620,7 @@ function startGame(options) {
   document.getElementById('start-screen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   audio.resume();
+  musique.mettre('partie');
   incidentAccueil = null;
   try { marquerIncidentsLus(); } catch { /* stockage indisponible */ }
   currentGame = new Game(options);
@@ -1777,6 +1788,17 @@ brancherRangementDurable({ hote: window.claude, lire: lireProgression, ecrire: e
 }).catch(() => { /* sans rangement durable, le navigateur suffit */ });
 setupStartScreen();
 showStartScreen();
+// Le son ne peut naître que d'un geste : le premier, où qu'il tombe, lance la musique de l'accueil.
+for (const geste of ['pointerup', 'touchend', 'click', 'keydown']) {
+  document.addEventListener(geste, function premierGeste() {
+    audio.resume();
+    if (audio.ctx && audio.ctx.state === 'running') document.removeEventListener(geste, premierGeste, true);
+  }, true);
+}
+// Page à l'arrière-plan : plus un son, musique comprise ; au retour, tout reprend.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') audio.suspendre(); else if (audio.ctx) audio.resume();
+});
 // Les illustrations se chargent — et les unités en 3D se cuisent — pendant
 // que le joueur choisit sa partie : elles sont prêtes quand elle commence.
 setStyleUnites(loadStyle());

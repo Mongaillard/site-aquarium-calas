@@ -754,6 +754,38 @@ synthèse le remplace : le jeu ne dépend d'aucun fichier pour se faire entendre
 Le hasard du son ne touche pas la simulation (`Math.random`, pas la graine).
 Tests : `node test/sons.test.js`.
 
+## La musique
+
+Trois ambiances, un morceau chacune, rangés dans `assets/musique/` (AAC mono,
+4,7 Mo en tout ; domaine public, CC0, publiés par leurs auteurs sur
+OpenGameArt : voir `assets/musique/SOURCES.md`) :
+
+| Scène | Morceau |
+|---|---|
+| L'accueil | « Minstrel Dance », RandomMind |
+| La partie | « Harvest Season », RandomMind |
+| La bataille | « Determined Pursuit », Emma_MA (boucle) |
+
+`js/musique.js` les joue. La musique de bataille **prend le relais quand un
+combat commence et s'efface quand il finit** : un combat, c'est six coups
+échangés en moins de cinq secondes entre le joueur et l'adversaire (un duel
+d'éclaireurs, une tour qui tire, la chasse et les bêtes ne comptent pas) ; il
+est fini après huit secondes sans coup. Elle entre en une seconde et sort en
+trois et demie ; la musique de la partie se tait pendant ce temps sans
+s'arrêter, et reprend où elle en était. Ces réglages sont la table `BATAILLE`,
+les volumes la table `MORCEAUX`.
+
+Les morceaux passent par le même chemin que les bruitages (lus en entier,
+décodés par Web Audio) : c'est le seul éprouvé sur iPhone, où le volume d'une
+balise `<audio>` ne se règle pas. Un morceau décodé pèse une vingtaine de Mo
+par minute : chaque scène ne garde que les siens (`SCENES`), les autres sont
+rendus. Le bouton du son coupe tout ; le menu de pause coupe la musique seule,
+et le choix est retenu. Hors ligne, les morceaux sont pris à la première
+écoute et gardés dans un cache à part (`aem-musique` dans `sw.js`), qui survit
+aux mises à jour. La page passée à l'arrière-plan se tait.
+
+Tests : `node test/musique.test.js`.
+
 ## Architecture
 
 ```
@@ -782,6 +814,7 @@ jeu/
 │   ├── input.js          gestes tactiles et souris
 │   ├── ui.js             HUD, sélection contextuelle, menus
 │   ├── audio.js          sons : échantillons (assets/sons) joués par Web Audio, synthèse en repli
+│   ├── musique.js        musique de fond : accueil, partie, bataille qui prend le relais
 │   ├── fiches-troupes.js les fiches écrites des troupes (rôle, bat, craint, conseil)
 │   ├── modele3d.js       unités 3D (milicien, villageois, archer, Arbalétrier, Archer monté, lancier, Atlante, Champion, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse, Hydre) : modèles de l'Atelier cuits en atlas
 │   ├── rendu3d.js        essai « 3D en direct » : un modèle 3D rendu case par case
