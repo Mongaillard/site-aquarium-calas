@@ -561,15 +561,25 @@ l'âge suivant. Tests : `node test/reglages-ia.test.js`.
 
 ## La direction artistique d'octobre 2026
 
-**Les menus, depuis le 08/10/2026 : direction « Boîte de jeu ».** L'accueil et
-les écrans de la progression (ligues, coffres, troupes, boutique) ont leur
-propre feuille, `css/boite.css` : le couvercle d'une boîte de jeu de société —
-aplats francs, contour d'encre épais, ombre pleine sous ce qui se touche,
-titres en « Lilita One », texte en « Nunito » (livrés dans `assets/polices`,
-licence SIL OFL jointe). Chaque règle y passe par `#start-screen` ou par
-`#progression` ; la partie et ses fenêtres (pause, fin, aide) gardent pour
-l'instant l'habillage décrit ci-dessous, et les anciennes règles de l'accueil
-restent dans `css/jeu.css` tant que la direction n'est pas étendue partout.
+**Toute l'interface, depuis le 08/10/2026 : direction « Boîte de jeu ».**
+L'accueil, les écrans de la progression (ligues, coffres, troupes, boutique)
+et la partie — barre du haut, barre du bas, menus Construire et Ouvriers,
+fenêtres de pause, d'aide, de consignes et de fin — sont habillés par une même
+feuille, `css/boite.css` : le couvercle d'une boîte de jeu de société — fond
+de papier, contour d'encre épais, ombre pleine sous ce qui se touche, jaune
+pour ce qui est choisi, rouge pour ce qui alerte, titres en « Lilita One »,
+texte en « Nunito » (livrés dans `assets/polices`, licence SIL OFL jointe).
+Chaque règle y passe par l'un de ces écrans (`#start-screen`, `#progression`,
+`#hud`, `#build-menu`, `#worker-menu`, `#modal`). Les feuilles d'avant
+(`css/jeu.css`, `css/progression.css`) gardent la mise en place — tailles,
+positions, cibles de toucher — et lisent leurs couleurs dans des variables que
+`css/boite.css` redéfinit ; ce qui suit décrit donc la matière d'origine, que
+la boîte recouvre. En partie, les pièces sont plus fines (deux points de bord,
+trois d'ombre) pour que la carte reste le sujet, la barre du haut n'a plus de
+bandeau, et le bouton de l'allié (2 contre 2) se range sous la mini-carte.
+Les couleurs de camp écrites en texte prennent leur ton sombre, lisible sur le
+papier. Reste à faire : retirer des feuilles d'avant les règles de matière que
+la boîte recouvre, et les essais qui les lisent encore.
 
 Un principe : **les bâtiments et les arbres sont la référence** — un dessin à
 l'encre, trait sombre, ombres peintes, lumière venue d'en haut à gauche — et

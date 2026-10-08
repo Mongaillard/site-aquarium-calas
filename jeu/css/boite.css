@@ -3,11 +3,14 @@
    d'une boîte de jeu de société — aplats francs, contour d'encre épais, ombre
    pleine sous tout ce qui se touche, titres en gros caractères ronds.
 
-   Cette feuille habille l'écran d'accueil (#start-screen) et les écrans de la
-   progression (#progression : ligues, coffres, troupes, boutique). La partie
-   et ses fenêtres (pause, fin, aide) gardent l'habillage d'avant (css/jeu.css,
-   css/progression.css) tant que la direction n'y est pas étendue : chaque
-   règle d'ici passe par l'un de ces deux écrans, et rien n'est retiré là-bas.
+   Cette feuille habille tout ce qui n'est pas la carte : l'écran d'accueil
+   (#start-screen), les écrans de la progression (#progression : ligues,
+   coffres, troupes, boutique), et la partie — sa barre du haut, sa barre du
+   bas (#hud), ses menus (#build-menu, #worker-menu) et ses fenêtres (#modal :
+   pause, aide, consignes, fin de partie). Les feuilles d'avant (css/jeu.css,
+   css/progression.css) gardent la mise en place — tailles, positions, cibles
+   de toucher — et celle-ci pose la matière par-dessus : chaque règle d'ici
+   passe par l'un de ces écrans.
 
    Les caractères : « Lilita One » (titres) et « Nunito » (texte), livrés avec
    le jeu (assets/polices, licence SIL OFL à côté) : rien ne vient du réseau,
@@ -40,7 +43,7 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-#start-screen, #progression {
+#start-screen, #progression, #hud, #build-menu, #worker-menu, #modal {
   --b-papier: #fff4dc;
   --b-blanc: #fffaf0;
   --b-sable: #ffe9b8;
@@ -623,3 +626,346 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
 #progression .prog-acquis { flex: none; font-size: 13px; font-weight: 900; color: var(--good); }
 /* (Le portrait d'un article est un bouton : il ouvre la fiche de la troupe.) */
 #progression .prog-article-fiche { display: grid; flex: none; padding: 0; border: 0; border-radius: 12px; background: none; cursor: pointer; }
+
+/* ---------------------------------------------------------------------------
+   La partie. Les feuilles d'avant y lisent leurs couleurs dans des variables :
+   ici elles prennent celles de la boîte, puis chaque pièce reçoit son contour
+   d'encre et son ombre pleine. Plus petites que celles des menus (deux points
+   de bord, trois d'ombre) : la carte doit rester le sujet.
+   --------------------------------------------------------------------------- */
+
+#hud, #build-menu, #worker-menu, #modal {
+  --text: #17120e;
+  --muted: #4a3f33;
+  --border: #17120e;
+  --panel: #fff4dc;
+  --panel-solid: #fff4dc;
+  --lisere: #17120e;
+  --fond-bouton: #fffaf0;
+  /* (L'or des accents ne se lirait pas sur le papier : ici c'est un rouge de brique.) */
+  --gold: #a8420c;
+  --gold-dark: #8a3408;
+  --good: #1c7a3c;
+  --warn: #9c6200;
+  --error: #b3261e;
+  --titre: var(--b-titres);
+  --angle: 10px;
+  --radius: 14px;
+  --commune: #56626e;
+  --rare: #1c6bb5;
+  --epique: #7437c2;
+  --coffre-bois: #8a5a2b;
+  --coffre-argent: #5b6875;
+  --coffre-or: #9c6200;
+  --coffre-legendaire: #7437c2;
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 700;
+}
+/* Le fond d'un portrait : un aplat à la couleur du peuple de ce qu'il montre. */
+body[data-civ="atlante"] #hud, #hud .portrait[data-civ="atlante"] { --fond-portrait: #9fd4f6; --fond-vignette: #b9d48a; }
+body[data-civ="solarien"] #hud, #hud .portrait[data-civ="solarien"] { --fond-portrait: #f7c783; --fond-vignette: #efd592; }
+#hud :focus-visible, #build-menu :focus-visible, #worker-menu :focus-visible, #modal :focus-visible { outline: 3px solid var(--b-rouge); outline-offset: 2px; }
+/* (Un bouton ne prend pas de lui-même les caractères de ce qui l'entoure.) */
+#hud button, #build-menu button, #worker-menu button, #modal button { font-family: var(--b-texte); }
+
+/* --- La barre du haut : des pastilles posées sur la carte, sans bandeau ------- */
+
+#hud #topbar { background: none; }
+/* (Quatre pastilles et deux boutons sur 375 points : elles sont serrées, pour que « 1000 » y tienne.) */
+#hud .res-group { gap: 4px; }
+#hud .res {
+  gap: 2px;
+  padding: 2px 5px;
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-blanc);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-size: 12px;
+  font-weight: 900;
+}
+#hud .res-icon { color: var(--b-encre); }
+#hud .res-icon svg.ic { width: 15px; height: 15px; }
+#hud #res-pop.warn { color: var(--error); }
+#hud #age-box {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-papier);
+  box-shadow: 0 3px 0 var(--b-encre);
+  font-size: 12px;
+  font-weight: 800;
+}
+#hud #age-label { color: var(--b-encre); font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 13.5px; letter-spacing: 0; }
+#hud #age-box .sep,
+#hud #game-timer { color: var(--b-gris); }
+#hud #game-timer.urgent { color: var(--error); font-weight: 900; }
+#hud .age-progress { height: 6px; border: 1px solid var(--b-encre); border-radius: 4px; background: var(--b-blanc); }
+#hud .age-progress span { background: var(--b-jaune); }
+#hud .score-icone { color: var(--b-encre); }
+#hud #score-box b { font-weight: 900; }
+#hud #positions-box i { border: 2px solid var(--b-encre); width: 11px; height: 11px; }
+#hud .icon-btn,
+#build-menu .icon-btn,
+#worker-menu .icon-btn,
+#modal .icon-btn {
+  border: 2px solid var(--b-encre);
+  border-radius: 12px;
+  background: var(--b-blanc);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#hud .icon-btn:active,
+#build-menu .icon-btn:active,
+#worker-menu .icon-btn:active,
+#modal .icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+
+/* Par équipes, le bouton de l'allié n'a pas sa place en haut à côté des deux autres : sur un
+   téléphone il recouvrait la quatrième pastille. Il se range sous la mini-carte, à sa largeur. */
+#hud #btn-allie {
+  position: absolute;
+  top: calc(174px + var(--safe-top));
+  right: calc(8px + var(--safe-right));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 114px;
+  height: 38px;
+  font-size: 13px;
+  font-weight: 900;
+}
+#hud #btn-allie::after { content: "Allié"; }
+@media (min-width: 720px) { #hud #btn-allie { top: calc(220px + var(--safe-top)); width: 160px; } }
+@media (orientation: landscape) and (max-height: 480px) { #hud #btn-allie { top: calc(154px + var(--safe-top)); width: 94px; height: 34px; } }
+
+/* La mini-carte : une vignette encadrée d'encre. */
+#hud #minimap-wrap {
+  top: calc(52px + var(--safe-top));
+  padding: 2px;
+  border: 3px solid var(--b-encre);
+  border-radius: 12px;
+  background: var(--b-papier);
+  box-shadow: 0 4px 0 var(--b-encre);
+}
+#hud #minimap { border-radius: 7px; }
+
+/* Les annonces : un carton, sa tranche à la couleur de ce qu'il dit. */
+#hud .toast {
+  padding: 7px 11px;
+  border: 2px solid var(--b-encre);
+  border-left: 7px solid var(--b-gris);
+  border-radius: 10px;
+  background: var(--b-papier);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-weight: 800;
+}
+#hud .toast.good { border-left-color: #2fae4f; }
+#hud .toast.warn { border-left-color: var(--b-jaune); }
+#hud .toast.error { border-left-color: var(--b-rouge); }
+#hud .toast.touchable:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+#hud #build-hint {
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-jaune);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-weight: 900;
+}
+
+/* --- La barre des ouvriers ---------------------------------------------------- */
+
+/* (Sa marge du bas loge l'ombre des pastilles : la barre défile, et rognerait ce qui dépasse.) */
+#hud #worker-bar { padding-bottom: 6px; }
+#hud .worker-chip,
+#hud .worker-open {
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-blanc);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-weight: 900;
+}
+#hud .worker-chip:active,
+#hud .worker-open:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+#hud .worker-open { border-color: var(--b-encre); background: var(--b-sable); color: var(--b-encre); }
+#hud .worker-chip.idle.has-idle { border-color: var(--b-encre); background: var(--b-jaune); color: var(--b-encre); }
+
+/* --- La barre du bas : le bord de la boîte --------------------------------------- */
+
+#hud #bottombar {
+  border-top: 4px solid var(--b-encre);
+  background: var(--b-papier);
+  box-shadow: none;
+}
+#hud #selection-panel .hint { color: var(--b-gris); font-weight: 700; }
+#hud #selection-panel .name { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 18px; letter-spacing: 0; }
+#hud #selection-panel .name .enemy { font-family: var(--b-texte); font-weight: 900; color: var(--error); }
+#hud #selection-panel .hp { height: 9px; margin: 4px 0; border: 2px solid var(--b-encre); border-radius: 5px; background: var(--b-blanc); }
+#hud #selection-panel .hp span { background: #2fae4f; }
+#hud #selection-panel .stats { color: var(--b-gris); font-size: 12px; font-weight: 800; }
+/* Le portrait : son cadre à la couleur du camp, cerclé d'encre. */
+#hud .portrait {
+  border: 3px solid var(--team, var(--b-encre));
+  border-radius: 12px;
+  background: var(--fond-portrait, var(--b-sable));
+  box-shadow: 0 0 0 2px var(--b-encre);
+}
+#hud .multi-title { color: var(--b-gris); font-weight: 800; }
+#hud .chip,
+#hud .queue-item {
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-blanc);
+  box-shadow: none;
+  color: var(--b-encre);
+  font-weight: 900;
+}
+#hud .qbar { height: 5px; border: 1px solid var(--b-encre); background: var(--b-blanc); }
+#hud .qbar span { background: var(--b-jaune); }
+#hud img.visage { border-radius: 6px; box-shadow: 0 0 0 2px var(--b-encre); }
+/* (La marge du bas loge l'ombre des boutons : le panneau défile, et rognerait ce qui dépasse.) */
+#hud #command-panel { padding-bottom: 6px; }
+#hud .cmd {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#hud .cmd:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#hud .cmd.disabled { opacity: .5; box-shadow: none; }
+#hud .cmd.toggled,
+#hud .cmd.highlight { border-color: var(--b-encre); background: var(--b-jaune); }
+#hud .cmd.danger { border-color: var(--b-encre); background: var(--b-rouge); color: var(--b-papier); }
+#hud .cmd-label { font-weight: 900; }
+#hud .cmd-cost { color: var(--b-gris); font-weight: 800; }
+#hud .cmd.danger .cmd-cost { color: var(--b-papier); }
+#hud .cmd-verrou svg { fill: var(--b-encre); }
+
+/* --- Les menus qui montent du bas : Construire, Ouvriers ---------------------------- */
+
+#build-menu, #worker-menu, #modal { background: rgba(23, 18, 14, .62); }
+#build-menu .sheet,
+#worker-menu .sheet {
+  border: 0;
+  border-top: 4px solid var(--b-encre);
+  border-radius: 22px 22px 0 0;
+  background: var(--b-papier);
+  color: var(--b-encre);
+}
+#build-menu .sheet-head h2,
+#worker-menu .sheet-head h2 { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 24px; letter-spacing: 0; }
+#build-menu .build-card,
+#worker-menu .worker-row {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  box-shadow: none;
+  color: var(--b-encre);
+}
+#build-menu .build-list { padding-bottom: 6px; }
+#build-menu .build-card { box-shadow: 0 4px 0 var(--b-encre); }
+#build-menu .build-card:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#build-menu .build-card.disabled { opacity: .5; box-shadow: none; }
+#build-menu .bc-icon { color: var(--b-encre); }
+#build-menu .bc-icon.vignette img { filter: none; }
+#build-menu .bc-name { font-family: var(--b-texte); font-weight: 900; font-size: 16px; letter-spacing: 0; }
+#build-menu .bc-desc { color: var(--b-gris); font-weight: 700; }
+#build-menu .bc-cost { font-weight: 900; }
+#worker-menu .worker-row .wr-label { color: var(--b-encre); }
+#worker-menu .worker-row .wr-icon { color: var(--b-encre); }
+#worker-menu .worker-row .wr-name { font-weight: 900; }
+#worker-menu .worker-row .wr-hint { color: var(--b-gris); font-weight: 700; }
+#worker-menu .worker-row .wr-count { font-weight: 900; }
+#worker-menu .wr-btn { border: 2px solid var(--b-encre); border-radius: 10px; background: var(--b-papier); box-shadow: 0 3px 0 var(--b-encre); color: var(--b-encre); font-weight: 900; }
+#worker-menu .wr-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+#worker-menu .wr-btn[disabled] { opacity: .4; box-shadow: none; }
+#worker-menu .switch-row { border: 3px solid var(--b-encre); border-radius: 14px; background: var(--b-sable); }
+#worker-menu .switch-row input { accent-color: var(--b-rouge); }
+#worker-menu .switch-row b { font-weight: 900; }
+#worker-menu .switch-row small { color: var(--b-gris); font-weight: 700; }
+@media (min-width: 720px) {
+  #build-menu .sheet,
+  #worker-menu .sheet { border: 4px solid var(--b-encre); border-radius: 22px; box-shadow: 0 8px 0 var(--b-encre); }
+}
+
+/* --- Les fenêtres : pause, aide, crédits, consignes, fin de partie ------------------- */
+
+#modal { padding: 12px; }
+#modal .modal-card {
+  max-height: 90vh;
+  padding: 16px 14px 20px;
+  border: 4px solid var(--b-encre);
+  border-radius: 22px;
+  background: var(--b-papier);
+  box-shadow: 0 8px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#modal .modal-card.fin { padding-bottom: 0; }
+#modal .modal-card h2 { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 27px; line-height: 1.05; letter-spacing: 0; }
+#modal .modal-sub { margin-top: 18px; font-size: 12.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--b-gris); }
+#modal .modal-card .subtitle,
+#modal .modal-card .hint,
+#modal .fin-note,
+#modal .fin-palmares { font-weight: 700; color: var(--b-gris); }
+#modal .modal-card .hint { font-size: 13.5px; }
+#modal .fin-palmares .record { color: var(--gold); font-weight: 900; }
+#modal ul.help { color: var(--b-gris); font-weight: 700; }
+#modal ul.help b { color: var(--b-encre); font-weight: 900; }
+#modal ul.help a { color: var(--b-encre); }
+#modal .credits-auteurs { color: var(--b-gris); }
+#modal .btn {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 900;
+}
+#modal .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#modal .btn.primary,
+#modal .btn.prog-attend { background: var(--b-jaune); border-color: var(--b-encre); color: var(--b-encre); }
+#modal .btn.danger { border-color: var(--b-encre); background: var(--b-rouge); color: var(--b-papier); }
+#modal .btn.ghost { border-color: transparent; background: none; box-shadow: none; color: var(--b-gris); text-decoration: underline; }
+#modal .btn.small { min-height: 40px; font-weight: 900; }
+#modal .btn[disabled] { opacity: 1; background: var(--b-sable); box-shadow: none; color: var(--b-gris); }
+#modal .btn svg { fill: currentColor; }
+#modal .option {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  color: var(--b-encre);
+}
+#modal .option.active { border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+/* (Deux par rangée dans une fenêtre : à trois, « Tous les pixels de l'écran » se repliait sur quatre lignes.) */
+#modal .options.row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#modal .option-name { font-weight: 900; }
+#modal .option-desc { font-weight: 700; color: var(--b-gris); }
+#modal .option svg { fill: var(--b-encre); }
+#modal .scores th,
+#modal .scores td { border-bottom-color: rgba(23, 18, 14, .22); }
+#modal .scores th { font-weight: 900; }
+#modal .scores td { font-weight: 800; }
+#modal .scores tr.total td { border-top: 2px solid var(--b-encre); color: var(--b-encre); font-weight: 900; }
+/* Ce qu'une partie classée a changé : un carton de sable dans la fenêtre de fin. */
+#modal .prog-fin {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-sable);
+  font-weight: 800;
+}
+#modal .prog-fin-elo b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 30px; line-height: 1; }
+#modal .prog-fin-elo span,
+#modal .prog-fin-coffre small { color: var(--b-gris); }
+#modal .prog-coffre-nom { font-weight: 900; }
+#modal .prog-couronnes svg { fill: var(--b-jaune); stroke: var(--b-encre); stroke-width: 40px; paint-order: stroke; }
+#modal .prog-vignette { border: 2px solid var(--b-encre); background: var(--b-blanc); }
+#modal .prog-ecu svg { filter: none; stroke: var(--b-encre); stroke-width: 30px; paint-order: stroke; }
+#modal .prog-ecu b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; color: var(--b-encre); }

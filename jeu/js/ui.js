@@ -273,8 +273,9 @@ export class UI {
     }
     if (this.nodes.scoreBox) {
       this.nodes.scoreBox.classList.toggle('hidden', !this.world.mode.timeLimit);
-      this.nodes.scoreMoi.style.color = this.world.players[this.world.humanIndex].color.light;
-      this.nodes.scoreAdverse.style.color = this.world.adversaire(this.world.humanIndex).color.light;
+      // (Le ton sombre de chaque camp : c'est lui qui se lit sur le papier de la barre.)
+      this.nodes.scoreMoi.style.color = this.world.players[this.world.humanIndex].color.dark;
+      this.nodes.scoreAdverse.style.color = this.world.adversaire(this.world.humanIndex).color.dark;
     }
 
     // Ces éléments survivent à la partie : leurs écouteurs partent avec elle
@@ -1278,7 +1279,7 @@ export class UI {
     // Par équipes : une colonne par place, à sa couleur, et la somme de chaque bord.
     const tableDesEquipes = () => {
       const js = this.world.players, sommes = result.scoresEquipes;
-      const tete = js.map((p) => `<th style="color:${p.color.light}">${p.index === player.index ? 'Vous' : p.name.replace('Adversaire', 'Adv.')}</th>`).join('');
+      const tete = js.map((p) => `<th style="color:${p.color.dark}">${p.index === player.index ? 'Vous' : p.name.replace('Adversaire', 'Adv.')}</th>`).join('');
       const ligne = (libelle, f) => `<tr><td>${libelle}</td>${js.map((p) => `<td>${f(p)}</td>`).join('')}</tr>`;
       return `
       <table class="scores equipes">

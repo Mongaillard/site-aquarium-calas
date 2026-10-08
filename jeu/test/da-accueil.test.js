@@ -13,7 +13,7 @@ import { AIPlayer } from '../js/ai.js';
 import { serializeWorld, restoreWorld, SAVE_VERSION } from '../js/save.js';
 import {
   AGES, BUILDING_TYPES, UNIT_TYPES, CIVILISATIONS, DIFFICULTIES, GAME_MODES, GAME_SPEEDS, MAP_SIZES,
-  TICKS_PER_SECOND, civDe, nomDe, portraitDe,
+  TICKS_PER_SECOND, civDe, nomDe, portraitDe, PLAYER_COLORS, COULEURS_EQUIPES,
 } from '../js/config.js';
 import { UI, imageBatiment, illustrationDeFin, resumeReglages, toucherNouvellePartie, DELAI_EFFACER } from '../js/ui.js';
 import { ficheCiv } from '../js/sprites.js';
@@ -213,17 +213,18 @@ console.log('\n--- L’accueil, direction « Boîte de jeu » ---');
   const hex = (c) => { const m = /^#([0-9a-f]{6})$/i.exec(c); return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null; };
   const lum = (c) => { const [r, g, b] = hex(c).map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const contraste = (a, b) => { const [h, l] = [lum(a), lum(b)].sort((x, y) => y - x); return (h + 0.05) / (l + 0.05); };
-  // (Les couleurs de la boîte sont communes à l'accueil et aux écrans de la progression ; celles du couvercle, à l'accueil seul.)
-  const racine = `${regleB('#start-screen, #progression')};${(sansCommentaires.match(/(?:^|\n|\})\s*#start-screen\s*\{([^}]*)\}/) || ['', ''])[1]}`;
+  // (Les couleurs de la boîte sont communes à tout ce qui est habillé ; celles du couvercle, à l'accueil seul.)
+  const racine = `${regleB('#start-screen, #progression, #hud, #build-menu, #worker-menu, #modal')};${(sansCommentaires.match(/(?:^|\n|\})\s*#start-screen\s*\{([^}]*)\}/) || ['', ''])[1]}`;
   const v = (nom) => variable(racine, nom);
 
   check('la feuille des menus vient après les deux autres, et elle est gardée hors ligne',
     html.indexOf('css/boite.css') > html.indexOf('css/progression.css') && html.indexOf('css/progression.css') > html.indexOf('css/jeu.css')
     && sw.includes("'./css/boite.css'") && existe('css/boite.css') && !existe('css/accueil.css'));
-  // Chaque sélecteur passe par l'accueil ou par les écrans de la progression : la partie et ses fenêtres ne sont pas touchées.
+  // Chaque sélecteur passe par l'un des écrans habillés : rien ne s'applique « partout » par accident, et la carte du jeu n'est pas touchée.
   const selecteurs = [...sansCommentaires.matchAll(/(?:^|\})\s*([^{}@]+?)\s*\{/g)].flatMap((m) => m[1].split(',').map((x) => x.trim())).filter(Boolean);
-  const horsAccueil = selecteurs.filter((x) => !x.includes('#start-screen') && !x.includes('#progression'));
-  check('elle n’habille que les menus : chaque règle passe par #start-screen ou par #progression', selecteurs.length > 100 && horsAccueil.length === 0, horsAccueil.slice(0, 5).join(' | '));
+  const ECRANS = ['#start-screen', '#progression', '#hud', '#build-menu', '#worker-menu', '#modal'];
+  const horsAccueil = selecteurs.filter((x) => !ECRANS.some((e) => x.includes(e)));
+  check('chaque règle passe par un écran habillé : accueil, progression, barres de la partie, menus, fenêtres', selecteurs.length > 250 && horsAccueil.length === 0, horsAccueil.slice(0, 5).join(' | '));
   check('ses couleurs : papier, encre, jaune, rouge — et le couvercle de chaque peuple a les siennes',
     ['--b-papier', '--b-sable', '--b-encre', '--b-gris', '--b-jaune', '--b-rouge', '--b-ciel', '--b-bande', '--b-socle', '--b-etiquette'].every((n) => hex(v(n)))
     && ['--b-ciel', '--b-socle', '--b-etiquette'].every((n) => hex(variable(regleB('body[data-civ="solarien"] #start-screen'), n)) && variable(regleB('body[data-civ="solarien"] #start-screen'), n) !== v(n)));
@@ -260,6 +261,28 @@ console.log('\n--- L’accueil, direction « Boîte de jeu » ---');
   check('ce qui se touche garde 44 points au moins : pastille de ligue, tuiles, « Jouer », réglages, peuples',
     [hauteur('#start-screen .prog-bandeau-ligue'), hauteur('#start-screen .prog-bandeau-actions .btn'), hauteur('#start-screen #btn-play'), hauteur('#start-screen .reglages summary'), hauteur('#start-screen .option.peuple')].every((h) => h >= 44));
   check('rien que la page embarquée refuserait, et pas d’emoji', !/data:|blob:/.test(boite) && !/\p{Extended_Pictographic}/u.test(boite));
+
+  // La partie : barres, menus, fenêtres.
+  // (La règle qui commence par #hud : celle des couleurs communes le cite aussi, plus haut.)
+  const partie = (sansCommentaires.match(/(?:^|\n|\})\s*#hud, #build-menu, #worker-menu, #modal\s*\{([^}]*)\}/) || ['', ''])[1];
+  check('en partie, les feuilles d’avant lisent les couleurs de la boîte : texte et bords à l’encre, fonds de papier',
+    ['--text', '--border', '--lisere'].every((n) => variable(partie, n) === v('--b-encre')) && ['--panel', '--panel-solid'].every((n) => variable(partie, n) === v('--b-papier'))
+    && variable(partie, '--muted') === v('--b-gris') && /font-family:\s*var\(--b-texte\)/.test(partie));
+  const accents = ['--gold', '--good', '--warn', '--error', '--commune', '--rare', '--epique', '--coffre-bois', '--coffre-argent', '--coffre-or', '--coffre-legendaire'].map((n) => [n, variable(partie, n)]);
+  check('… et leurs accents s’y lisent (contraste d’au moins 4,5 sur le papier)', accents.every(([, c]) => hex(c) && contraste(c, v('--b-papier')) >= 4.5),
+    accents.map(([n, c]) => `${n.slice(2)} ${hex(c) ? contraste(c, v('--b-papier')).toFixed(1) : c}`).join(', '));
+  check('la barre du haut n’a plus de bandeau : des pastilles posées sur la carte, la barre du bas est le bord de la boîte',
+    /background:\s*none/.test(regleB('#hud #topbar')) && /border-top:\s*4px solid var\(--b-encre\)/.test(regleB('#hud #bottombar')) && /background:\s*var\(--b-papier\)/.test(regleB('#hud #bottombar')));
+  check('par équipes, le bouton de l’allié se range sous la mini-carte : les quatre pastilles gardent leur place sur un téléphone',
+    /position:\s*absolute/.test(regleB('#hud #btn-allie')) && /width:\s*114px/.test(regleB('#hud #btn-allie')) && /content:\s*"Allié"/.test(regleB('#hud #btn-allie::after'))
+    && /font-size:\s*12px/.test(regleB('#hud .res')) && /padding:\s*2px 5px/.test(regleB('#hud .res')));
+  check('une barre qui défile garde la place de l’ombre de ses boutons', /padding-bottom:\s*6px/.test(regleB('#hud #worker-bar')) && /padding-bottom:\s*6px/.test(regleB('#hud #command-panel')));
+  check('les boutons de la partie prennent les caractères des menus', /font-family:\s*var\(--b-texte\)/.test(regleB('#hud button, #build-menu button, #worker-menu button, #modal button')));
+  // Les couleurs de camp écrites en texte (score du haut, tableau de fin) : leur ton sombre, lisible sur le papier.
+  const tons = [...PLAYER_COLORS, ...COULEURS_EQUIPES].map((c) => c.dark);
+  check('le score et le tableau de fin écrivent chaque camp dans son ton sombre, qui se lit sur le papier (3 au moins, en gras)',
+    !/color\.light/.test(ui) && (ui.match(/color\.dark/g) || []).length >= 3 && tons.every((c) => contraste(c, v('--b-papier')) >= 3),
+    tons.map((c) => contraste(c, v('--b-papier')).toFixed(1)).join(', '));
 }
 
 // ---------------------------------------------------------------------------
