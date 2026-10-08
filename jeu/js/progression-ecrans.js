@@ -11,7 +11,7 @@
 import { PROGRESSION as R } from './progression-config.js';
 import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour } from './progression.js';
 import { lireProgression, ecrireProgression } from './save.js';
-import { UNIT_TYPES, DEFAULT_CIV, nomDe, portraitDe } from './config.js';
+import { UNIT_TYPES, DEFAULT_CIV, GAME_MODES, nomDe, portraitDe } from './config.js';
 import { iconeSVG } from './icones.js';
 import { ficheDeTroupe } from './fiches-troupes.js';
 
@@ -154,14 +154,22 @@ function ecranCoffres(profil) {
   const semaine = profil.semaine.numero === semaineDuJour(aujourdhui) ? profil.semaine : { jours: 0, coffre: false };
   const rangs = Object.keys(R.coffres);
   const ISSUES = [['victoire', 'Victoire'], ['egalite', 'Égalité'], ['defaite', 'Défaite']];
+  const tableDesRangs = (table) => `
+    <table class="scores prog-probas prog-rangs">
+      <tr><th></th>${rangs.map((r) => `<th aria-label="${R.coffres[r].nom}">${coffre(r, 'ferme', 38)}</th>`).join('')}</tr>
+      ${ISSUES.map(([issue, nom]) => `<tr><td>${nom}</td>${rangs.map((r) => `<td>${table[issue][r] || 0} %</td>`).join('')}</tr>`).join('')}
+    </table>`;
+  // Un format plus court a sa table, moins généreuse : elle se montre aussi.
+  const courts = Object.entries(s.parFormat || {}).filter(([format]) => GAME_MODES[format]).map(([format, table]) => `
+    <h3>En ${GAME_MODES[format].name}</h3>
+    <p class="subtitle">Une partie de ${Math.round(GAME_MODES[format].timeLimit / 60)} minutes, deux fois plus courte : le coffre est un cran en dessous.</p>
+    ${tableDesRangs(table)}`).join('');
   montrer('Coffres', `
     ${liste ? `<ul class="prog-coffres">${liste}</ul>` : '<p class="prog-vide">Aucun coffre à ouvrir. Chaque partie classée en donne un.</p>'}
     <h3>Un coffre par partie</h3>
     <p class="subtitle">Chaque partie classée donne un coffre, gagnée ou perdue. Son rang est tiré au sort : la victoire a de meilleures chances.</p>
-    <table class="scores prog-probas prog-rangs">
-      <tr><th></th>${rangs.map((r) => `<th aria-label="${R.coffres[r].nom}">${coffre(r, 'ferme', 38)}</th>`).join('')}</tr>
-      ${ISSUES.map(([issue, nom]) => `<tr><td>${nom}</td>${rangs.map((r) => `<td>${s.partie[issue][r] || 0} %</td>`).join('')}</tr>`).join('')}
-    </table>
+    ${tableDesRangs(s.partie)}
+    ${courts}
     <p class="hint">Une défaite de moins de ${Math.round(R.abandon.precoceAvant / 60)} minutes, abandon compris, ne donne pas de coffre.</p>
     <h3>En plus</h3>
     <ul class="prog-prochains">

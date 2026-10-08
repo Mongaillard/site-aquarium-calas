@@ -194,6 +194,17 @@ export const PROGRESSION = figer({
       egalite: { bois: 45, argent: 30, or: 20, legendaire: 5 },
       defaite: { bois: 65, argent: 25, or: 10, legendaire: 0 },
     },
+    // Un format plus court a sa table, un cran en dessous : une Escarmouche dure
+    // deux fois moins qu'une partie Express, et un coffre aussi bon pour deux
+    // fois moins de temps en ferait le seul format joué. (Proposé à l'auteur et
+    // accepté le 08/10/2026.)
+    parFormat: {
+      escarmouche: {
+        victoire: { bois: 35, argent: 40, or: 20, legendaire: 5 },
+        egalite: { bois: 55, argent: 30, or: 15, legendaire: 0 },
+        defaite: { bois: 75, argent: 20, or: 5, legendaire: 0 },
+      },
+    },
     or: { joursJoues: 3, joursParSemaine: 7, decalage: 3 },
   },
 

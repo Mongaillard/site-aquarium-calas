@@ -454,6 +454,21 @@ export const DEFAULT_SPEED = 'normal';
  * fin de la partie.
  */
 export const GAME_MODES = {
+  // Le format le plus court : pas d'installation, on se bat tout de suite.
+  // Réserves pleines, caserne déjà bâtie, toute la population offerte (pas une
+  // maison à poser), sur une carte deux fois plus petite que celle d'Express.
+  escarmouche: {
+    id: 'escarmouche', name: 'Escarmouche', icon: 'barracks',
+    desc: '5 min chrono · toute petite carte · réserves pleines, caserne déjà bâtie · raser le bâtiment principal adverse, sinon le meilleur score',
+    mapSize: 'tiny', startAge: 1, popMax: 30, villagers: 5, popStart: 22,
+    resources: { food: 1000, wood: 1000, gold: 500 },
+    batimentsDeDepart: ['barracks'],
+    // L'ordinateur n'a pas le temps de bâtir une économie : peu d'ouvriers, le reste en soldats.
+    // Une archerie pour seul chantier ; miliciens, lanciers et archers à tour de rôle.
+    victory: 'towncenter', aiRush: 0.25, aiVillagers: 8,
+    aiBatiments: ['archery'], aiTroupes: ['militia', 'spearman', 'archer'],
+    townCenterHp: 0.5, timeLimit: 300,
+  },
   express: {
     id: 'express', name: 'Express', icon: 'modeExpress',
     desc: '10 min chrono · départ Féodal · raser le bâtiment principal adverse, sinon le meilleur score',
@@ -500,14 +515,14 @@ export const DIFFICULTIES = {
     id: 'easy', name: 'Facile',
     gatherBonus: 0.8, maxVillagers: 14, armyTrigger: 3, armyStep: 2,
     attackDelay: 260,
-    treve: { classique: 900, express: 270 }, petitesVagues: true,
-    desc: 'L’adversaire vous laisse 15 minutes pour vous installer (4 min 30 en Express), vous prévient, puis attaque par petits groupes.',
+    treve: { classique: 900, express: 270, escarmouche: 90 }, petitesVagues: true,
+    desc: 'L’adversaire vous laisse 15 minutes pour vous installer (4 min 30 en Express, 1 min 30 en Escarmouche), vous prévient, puis attaque par petits groupes.',
   },
   normal: {
     id: 'normal', name: 'Normal',
     gatherBonus: 1.0, maxVillagers: 20, armyTrigger: 6, armyStep: 4,
     attackDelay: 150,
-    desc: 'L’adversaire attaque sans prévenir au bout d’une dizaine de minutes (deux en Express), par vagues de plus en plus grosses.',
+    desc: 'L’adversaire attaque sans prévenir au bout d’une dizaine de minutes (deux en Express, dès la première en Escarmouche), par vagues de plus en plus grosses.',
   },
   hard: {
     id: 'hard', name: 'Difficile',
@@ -518,6 +533,7 @@ export const DIFFICULTIES = {
 };
 
 export const MAP_SIZES = {
+  tiny: { id: 'tiny', name: 'Minuscule', tiles: 48 },
   small: { id: 'small', name: 'Petite', tiles: 72 },
   medium: { id: 'medium', name: 'Moyenne', tiles: 96 },
   large: { id: 'large', name: 'Grande', tiles: 120 },

@@ -229,7 +229,8 @@ export class GameMap {
     }
 
     // Positions de départ : deux coins opposés.
-    const margin = Math.round(w * 0.16);
+    // (Dix cases au moins : sur la carte minuscule, une base collée au bord n'aurait plus la place de ses ressources.)
+    const margin = Math.max(10, Math.round(w * 0.16));
     this.startPositions = [
       { tx: margin, ty: h - margin },
       { tx: w - margin, ty: margin },

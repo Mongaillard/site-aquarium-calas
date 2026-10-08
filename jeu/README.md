@@ -53,6 +53,7 @@ le joueur 1 le porte en rouge, quelle que soit sa civilisation.
 
 | Format | Durée | Ce qui change |
 | --- | --- | --- |
+| ⚔ **Escarmouche** | **5 min chrono** | Pas d'installation : on se bat tout de suite. Départ à l'**Âge Féodal** avec 5 ouvriers, **1 000 vivres, 1 000 bois et 500 or** en réserve, **une caserne déjà bâtie** et toute la population offerte (30 places, pas une maison à poser), sur la carte **minuscule** (48 cases, deux fois plus petite que celle d'Express). L'ordinateur ne bâtit qu'une archerie et met tout le reste en soldats ; il attaque dès la première minute (1 min 30 de trêve en Facile). **Raser le Centre-Ville adverse** gagne ; sinon, à cinq minutes, **le meilleur score l'emporte**. En partie classée, son coffre est tiré dans une table **un cran en dessous** de celle des autres formats (`sources.parFormat` des réglages) : victoire 35/40/20/5, défaite 75/20/5/0 |
 | ⚡ **Express** | **10 min chrono** | Départ à l'**Âge Féodal** avec 7 villageois, des ressources garnies et de la place pour produire tout de suite, petite carte, population plafonnée à 40, IA agressive dès la première minute. **Raser le Centre-Ville adverse met fin à la partie sur-le-champ** (il y est deux fois moins résistant) ; sinon, au temps écoulé, **le meilleur score l'emporte** |
 | 🏰 **Classique** | 20 à 30 min | La partie complète : trois âges, population 60, victoire par conquête (tous les bâtiments **et** villageois adverses) |
 
@@ -785,6 +786,8 @@ et le choix est retenu. Hors ligne, les morceaux sont pris à la première
 aux mises à jour. La page passée à l'arrière-plan se tait.
 
 Tests : `node test/musique.test.js`.
+
+Les formats ajoutés aux deux d'origine ont leurs tests : `node test/modes.test.js` (mise en place, parties jouées par l'ordinateur, coffres).
 
 ## Architecture
 

@@ -144,11 +144,14 @@ export function bruitPeriodique(n, octaves, graine = 1) {
   return out;
 }
 
-/** Formate 123.7 en "123" et 1234 en "1,2k" pour les petits écrans. */
+/**
+ * Formate 123.7 en "123", 1234 en "1234" et 12 345 en "12k" pour les petits
+ * écrans. Jamais de chiffre à virgule : « 1,2k » se lisait mal, et quatre
+ * chiffres ne prennent pas plus de place.
+ */
 export function formatNumber(n) {
   n = Math.floor(n);
-  if (n >= 10000) return (n / 1000).toFixed(0) + 'k';
-  if (n >= 1000) return (n / 1000).toFixed(1).replace('.', ',') + 'k';
+  if (n >= 10000) return Math.floor(n / 1000) + 'k';
   return String(n);
 }
 

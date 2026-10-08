@@ -273,7 +273,8 @@ export class AIPlayer {
     const tc = this.townCenter;
 
     // Production continue de villageois.
-    if (tc && tc.complete && this.villagers.length < this.difficulty.maxVillagers
+    // (Le format peut plafonner les ouvriers : en Escarmouche, cinq minutes ne laissent pas le temps d'une économie.)
+    if (tc && tc.complete && this.villagers.length < Math.min(this.difficulty.maxVillagers, this.world.mode.aiVillagers || Infinity)
         && tc.queue.length < 2 && player.pop < player.popCap && !this.savingForAge) {
       this.world.trainUnit(tc, 'villager');
     }
@@ -450,6 +451,10 @@ export class AIPlayer {
 
   /** Ordre de construction, réévalué à chaque cycle selon les besoins. */
   nextBuilding() {
+    // Format court (Escarmouche) : il ne bâtit que la liste du format, dans
+    // l'ordre — ni camps ni fermes ni maisons : son bois va aux soldats.
+    const liste = this.world.mode.aiBatiments;
+    if (liste) return liste.find((type) => !this.has(type)) || null;
     const player = this.player;
     const popRoom = player.popCap - player.pop;
     // Le plafond du format de partie (40 en Express), pas celui du Classique.
@@ -669,7 +674,8 @@ export class AIPlayer {
 
   manageMilitary() {
     const player = this.player;
-    const roster = ARMY_COMPOSITION[Math.min(player.age, ARMY_COMPOSITION.length - 1)];
+    // (Le format peut imposer sa composition : en Escarmouche, la caserne offerte doit servir dès la première seconde.)
+    const roster = this.world.mode.aiTroupes || ARMY_COMPOSITION[Math.min(player.age, ARMY_COMPOSITION.length - 1)];
 
     // Ce qu'on met de côté avant de former un soldat de plus : le bâtiment
     // voulu, et le prix d'une Hydre tant que le Temple n'en a pas donné assez.

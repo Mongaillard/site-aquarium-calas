@@ -495,7 +495,7 @@ class Game {
   compterPartieClassee(result) {
     const r = appliquerResultat(lireProgression(), {
       issue: issueDePartie(result), duree: this.world.time, contreOrdinateur: 'echelle',
-      jour: jourLocal(), instant: Date.now() / 1000, id: this.partieId || undefined,
+      jour: jourLocal(), instant: Date.now() / 1000, id: this.partieId || undefined, format: this.world.modeId,
     });
     ecrireProgression(r.profil);
     return htmlFinDePartie(r.evenements, r.profil);
@@ -1439,7 +1439,7 @@ function abandonnerPartieClasseeEnCours() {
   if (!save || !save.classee) return;
   const r = appliquerResultat(lireProgression(), {
     issue: 'abandon', duree: save.time || 0, contreOrdinateur: 'echelle', jour: jourLocal(), instant: Date.now() / 1000,
-    id: save.partieId || undefined,
+    id: save.partieId || undefined, format: save.mode,
   });
   ecrireProgression(r.profil);
 }

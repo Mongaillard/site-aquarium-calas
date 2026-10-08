@@ -1094,7 +1094,7 @@ export class UI {
         <li>Passez les <b>âges</b> depuis le ${nomDe('towncenter', this.game.civ)} pour débloquer de nouvelles unités</li>
         <li><b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil</li>
         <li><b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>Reprendre</b></li>
-        <li><b>Objectif</b> : ne laisser à l'adversaire ni ${nomDe('towncenter', civAdverse)} ni bâtiment militaire (${militaires}), achevé ou en chantier — inutile de raser la dernière ferme. En mode ${ic('modeExpress')} Express, son dernier ${nomDe('towncenter', civAdverse)} suffit ; sinon, au bout du temps, le meilleur score l'emporte</li>
+        <li><b>Objectif</b> : ne laisser à l'adversaire ni ${nomDe('towncenter', civAdverse)} ni bâtiment militaire (${militaires}), achevé ou en chantier — inutile de raser la dernière ferme. En ${ic('barracks')} Escarmouche et en ${ic('modeExpress')} Express, son dernier ${nomDe('towncenter', civAdverse)} suffit ; sinon, au bout du temps (5 ou 10 minutes), le meilleur score l'emporte</li>
         ${this.world.mode.timeLimit ? `<li><b>Score</b> ${ic('score')} : la moitié de ce que vous récoltez, le prix de vos troupes et bâtiments encore debout, et deux fois le prix de ce que vous abattez. Il s'affiche en haut, à côté du chrono : le vôtre, puis celui de l'adversaire</li>` : ''}
       </ul>
       <div class="modal-actions"><button class="btn primary" data-act="close">J'ai compris</button></div>`, { wide: true });

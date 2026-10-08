@@ -284,6 +284,12 @@ function donnerCoffre(p, type, origine, evenements) {
  * Le rang d'un coffre, tiré dans une table en pour-cent (R.sources.partie) :
  * les rangs dans l'ordre de R.coffres, chacun pour sa part des cent cases.
  */
+/** La table des coffres d'une partie de ce format : la sienne s'il en a une, sinon celle de tous. */
+export function tableDesCoffres(format) {
+  const parFormat = R.sources.parFormat || {};
+  return typeof format === 'string' && possede(parFormat, format) ? parFormat[format] : R.sources.partie;
+}
+
 function tirerRang(table, alea) {
   let tirage = alea();
   let caze = estNombre(tirage) && tirage >= 0 && tirage < 1 ? Math.floor(tirage * 100) : 0;
@@ -434,7 +440,8 @@ function compterLeJour(p, evenements) {
  *     jouée (troupes gratuites, jour joué de la semaine) et ne donne pas de
  *     coffre ;
  *   - toute autre partie donne UN coffre, gagnée ou perdue : son rang se tire
- *     au sort (R.sources.partie), avec `partie.alea` s'il est fourni ;
+ *     au sort (R.sources.partie — ou la table de `partie.format`, s'il en a
+ *     une dans R.sources.parFormat), avec `partie.alea` s'il est fourni ;
  *   - `partie.id`, s'il est donné, empêche de compter deux fois la même partie ;
  *   - l'abandon de l'adversaire est une victoire, sauf avant
  *     abandon.precoceAvant : la partie est alors annulée pour celui qui
@@ -500,7 +507,7 @@ export function appliquerResultat(profil, partie) {
   // au sort, et la victoire a de meilleures chances d'un rang élevé. Puis le
   // coffre d'or de la semaine.
   if (!sansValeur) {
-    donnerCoffre(p, tirerRang(R.sources.partie[issue], aleaDeLaPartie(partie, p, id)), issue, evenements);
+    donnerCoffre(p, tirerRang(tableDesCoffres(partie.format)[issue], aleaDeLaPartie(partie, p, id)), issue, evenements);
     compterLeJour(p, evenements);
   }
 
@@ -764,16 +771,21 @@ export function verifierProbabilites() {
     });
   }
   // Le coffre d'une partie : une table par issue, en pour-cent, sur les rangs connus.
-  for (const issue of ['victoire', 'egalite', 'defaite']) {
-    const table = R.sources.partie[issue];
-    if (!estObjet(table)) { erreurs.push(`coffre d'une ${issue} : pas de table`); continue; }
-    let total = 0;
-    for (const rang of Object.keys(table)) {
-      if (!possede(R.coffres, rang)) erreurs.push(`coffre d'une ${issue} : rang inconnu « ${rang} »`);
-      if (!Number.isInteger(table[rang]) || table[rang] < 0) erreurs.push(`coffre d'une ${issue} : part invalide pour « ${rang} »`);
-      total += table[rang];
+  // (Celle de tous les formats, puis celle de chaque format qui a la sienne.)
+  const tables = [['', R.sources.partie], ...Object.entries(R.sources.parFormat || {}).map(([format, t]) => [` (${format})`, t])];
+  for (const [format, parIssue] of tables) {
+    for (const issue of ['victoire', 'egalite', 'defaite']) {
+      const table = estObjet(parIssue) ? parIssue[issue] : null;
+      const ou = `coffre d'une ${issue}${format}`;
+      if (!estObjet(table)) { erreurs.push(`${ou} : pas de table`); continue; }
+      let total = 0;
+      for (const rang of Object.keys(table)) {
+        if (!possede(R.coffres, rang)) erreurs.push(`${ou} : rang inconnu « ${rang} »`);
+        if (!Number.isInteger(table[rang]) || table[rang] < 0) erreurs.push(`${ou} : part invalide pour « ${rang} »`);
+        total += table[rang];
+      }
+      if (total !== 100) erreurs.push(`${ou} : la table somme à ${total}, pas à 100`);
     }
-    if (total !== 100) erreurs.push(`coffre d'une ${issue} : la table somme à ${total}, pas à 100`);
   }
   return { valide: erreurs.length === 0, erreurs };
 }

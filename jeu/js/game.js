@@ -208,6 +208,7 @@ export class World {
           spawn.y + Math.sin(angle) * TILE * 1.6);
       }
       this.spawnUnit(index, 'scout', spawn.x + TILE * 2.5, spawn.y + TILE * 1.2);
+      this.poserBatimentsDeDepart(index, start);
       // La troupe à l'essai : trois, en arc à l'opposé de l'éclaireur.
       if (this.essai && index === this.humanIndex) {
         for (let i = 0; i < ESSAI_NOMBRE; i++) {
@@ -219,6 +220,28 @@ export class World {
     this.addAI(1);
     this.spawnHerds();
     this.recomputePopulation();
+  }
+
+  /**
+   * Les bâtiments que le format offre au départ (une caserne en Escarmouche),
+   * achevés, posés du côté du centre de la carte : du plus près au plus loin,
+   * dans l'axe d'abord, puis de part et d'autre.
+   */
+  poserBatimentsDeDepart(index, start) {
+    const cx = this.map.w / 2, cy = this.map.h / 2;
+    const d = Math.hypot(cx - start.tx, cy - start.ty) || 1;
+    const ux = (cx - start.tx) / d, uy = (cy - start.ty) / d;
+    for (const type of this.mode.batimentsDeDepart || []) {
+      const demi = (BUILDING_TYPES[type].size - 1) / 2;
+      let pose = null;
+      for (let r = 5; r <= 10 && !pose; r++) {
+        for (const ecart of [0, 2, -2, 4, -4, 6, -6]) {
+          const tx = Math.round(start.tx + ux * r - uy * ecart - demi), ty = Math.round(start.ty + uy * r + ux * ecart - demi);
+          if (this.canPlace(index, type, tx, ty, true)) { pose = { tx, ty }; break; }
+        }
+      }
+      if (pose) this.spawnBuilding(index, type, pose.tx, pose.ty, true);
+    }
   }
 
   /**
