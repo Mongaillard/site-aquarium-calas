@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Sons du jeu. Des échantillons (assets/sons/*.m4a, tirés des paquets de
+// Sons du jeu. Des échantillons (assets/sons/*.mp4, de l'AAC ; tirés des paquets de
 // Kenney, licence CC0 : voir assets/sons/SOURCES.md) joués par Web Audio. Tant
 // qu'un échantillon n'est pas arrivé — première visite hors ligne, navigateur
 // qui ne sait pas le décoder —, le son de synthèse d'origine sert de repli :
@@ -38,7 +38,7 @@ export const BANQUE = {
 };
 
 /** Le chemin d'un échantillon. */
-export const cheminDuSon = (nom) => `assets/sons/${nom}.m4a`;
+export const cheminDuSon = (nom) => `assets/sons/${nom}.mp4`;
 
 /** Tous les échantillons que la banque demande, une fois chacun. */
 export function fichiersDeLaBanque() {

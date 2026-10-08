@@ -701,11 +701,11 @@ qui dort n'est effacée qu'au second toucher. Tests :
 ## Les sons
 
 Le jeu joue de vrais sons, des échantillons courts rangés dans `assets/sons/`
-(quarante fichiers `.m4a`, 293 Ko en tout). Ils viennent des paquets de
+(quarante fichiers `.mp4` — de l'AAC, que l'iPhone lit ; l'extension `.m4a` n'est pas servie par l'hébergement du jeu —, 293 Ko en tout). Ils viennent des paquets de
 **Kenney** (kenney.nl), sous licence **CC0** : usage commercial libre, sans
 mention obligatoire — leur provenance, fichier par fichier, est dans
 `assets/sons/SOURCES.md`. Les paquets d'origine (OGG, que l'iPhone ne lit pas)
-et les outils qui les décodent, les mesurent et fabriquent les `.m4a` sont hors
+et les outils qui les décodent, les mesurent et fabriquent les `.mp4` sont hors
 du dépôt, dans `sons-sources/` à côté de `jeu/`.
 
 La table `BANQUE` de `js/audio.js` dit qui joue quoi : les quatorze sons

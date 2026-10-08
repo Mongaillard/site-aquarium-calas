@@ -19,19 +19,19 @@ function check(label, condition, detail = '') {
 // --- Les fichiers --------------------------------------------------------------
 console.log('--- La banque et ses fichiers ---');
 const demandes = fichiersDeLaBanque();
-const surDisque = fs.readdirSync(path.join(RACINE, 'assets/sons')).filter((f) => f.endsWith('.m4a')).map((f) => f.slice(0, -4));
+const surDisque = fs.readdirSync(path.join(RACINE, 'assets/sons')).filter((f) => f.endsWith('.mp4')).map((f) => f.slice(0, -4));
 const cache = new Set([...lire('sw.js').matchAll(/'\.\/([^']*)'/g)].map((m) => m[1]));
 const sources = lire('assets/sons/SOURCES.md');
 check('chaque son de la banque a son fichier', demandes.every((n) => surDisque.includes(n)), demandes.filter((n) => !surDisque.includes(n)).join(', '));
 check('aucun fichier ne traîne sans servir', surDisque.every((n) => demandes.includes(n)), surDisque.filter((n) => !demandes.includes(n)).join(', '));
 check('tous sont dans la liste hors ligne', demandes.every((n) => cache.has(cheminDuSon(n))), demandes.filter((n) => !cache.has(cheminDuSon(n))).join(', '));
 check('… et la liste hors ligne n’en cite aucun qui manque', [...cache].filter((c) => c.startsWith('assets/sons/')).every((c) => fs.existsSync(path.join(RACINE, c))));
-check('chacun a sa provenance écrite, sous licence CC0', /Creative Commons Zero/.test(sources) && demandes.every((n) => sources.includes('`' + n + '.m4a`')));
+check('chacun a sa provenance écrite, sous licence CC0', /Creative Commons Zero/.test(sources) && demandes.every((n) => sources.includes('`' + n + '.mp4`')));
 check('un fichier pèse moins de 40 Ko, le tout moins de 400 Ko',
   demandes.every((n) => fs.statSync(path.join(RACINE, cheminDuSon(n))).size < 40_000)
   && demandes.reduce((s, n) => s + fs.statSync(path.join(RACINE, cheminDuSon(n))).size, 0) < 400_000,
   `${Math.round(demandes.reduce((s, n) => s + fs.statSync(path.join(RACINE, cheminDuSon(n))).size, 0) / 1024)} Ko`);
-check('ce sont des fichiers MPEG-4 (AAC), que l’iPhone lit', demandes.every((n) => fs.readFileSync(path.join(RACINE, cheminDuSon(n))).subarray(4, 8).toString('latin1') === 'ftyp'));
+check('ce sont des fichiers MPEG-4 (AAC), que l’iPhone lit, sous une extension que l’hébergement du jeu sert', surDisque.length === 40 && demandes.every((n) => fs.readFileSync(path.join(RACINE, cheminDuSon(n))).subarray(4, 8).toString('latin1') === 'ftyp'));
 const ORIGINE = ['click', 'select', 'order', 'place', 'built', 'trained', 'melee', 'shoot', 'destroyed', 'alert', 'age', 'victory', 'defeat', 'error'];
 const GESTES = ['chop', 'mine', 'pick', 'hammer'];
 check('les quatorze sons d’origine y sont, plus la chute d’une troupe et les quatre gestes des ouvriers',
@@ -59,7 +59,7 @@ function fauxContexte() {
 const demandesReseau = [];
 globalThis.window = { AudioContext: function Ctx() { return fauxContexte(); } };
 globalThis.performance = { now: () => horloge };
-globalThis.fetch = (url) => { demandesReseau.push(url); const nom = url.replace('assets/sons/', '').replace('.m4a', '');
+globalThis.fetch = (url) => { demandesReseau.push(url); const nom = url.replace('assets/sons/', '').replace('.mp4', '');
   if (nom === 'erreur-1') return Promise.resolve({ ok: false, status: 404 });
   return Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve({ nom, casse: nom === 'age-1' }) }); };
 const attendre = () => new Promise((ok) => setTimeout(ok, 20));
