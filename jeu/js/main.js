@@ -1600,9 +1600,27 @@ function refreshReglages() {
     : `Libre · ${resume}`;
 }
 
+/**
+ * Les caractères de l'accueil (direction « Boîte de jeu ») : Lilita One pour les
+ * titres, Nunito pour le texte. Ils viennent du réseau quand il est là, par une
+ * feuille ajoutée ici — pas dans la page, où elle retiendrait le premier
+ * affichage. Hors ligne, ou si la demande échoue, l'accueil garde les
+ * caractères ronds du téléphone (voir css/accueil.css) : rien n'attend après eux.
+ */
+let caracteresDemandes = false;
+function chargerCaracteres() {
+  if (caracteresDemandes) return;
+  caracteresDemandes = true;
+  const lien = document.createElement('link');
+  lien.rel = 'stylesheet';
+  lien.href = 'https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap';
+  document.head.appendChild(lien);
+}
+
 function showStartScreen() {
   currentGame = null;
   musique.mettre('menu');
+  chargerCaracteres();
   habiller(settings.civ);
   document.getElementById('start-screen').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');
@@ -1862,9 +1880,13 @@ function setupStartScreen() {
       speed: settings.speed, seed: Math.floor(Math.random() * 1e9),
     }, partieClassee()));
   });
-  document.getElementById('btn-howto').addEventListener('click', () => {
+  // (Son pictogramme vient de la même source que les autres : js/icones.js.)
+  const boutonAide = document.getElementById('btn-howto');
+  boutonAide.insertAdjacentHTML('afterbegin', iconeSVG('info', 16, 'inline'));
+  boutonAide.addEventListener('click', () => {
     const aide = document.getElementById('howto');
     aide.classList.toggle('hidden');
+    boutonAide.setAttribute('aria-expanded', String(!aide.classList.contains('hidden')));
     // La liste s'ouvre sous les boutons, souvent hors de l'écran : on l'y amène.
     if (!aide.classList.contains('hidden')) aide.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });

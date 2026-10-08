@@ -203,6 +203,61 @@ console.log('\n--- Le résumé des réglages ---');
 }
 
 // ---------------------------------------------------------------------------
+// 2 bis. L'accueil en direction « Boîte de jeu » (css/accueil.css)
+// ---------------------------------------------------------------------------
+console.log('\n--- L’accueil, direction « Boîte de jeu » ---');
+{
+  const boite = lire('../css/accueil.css'), sw = lire('../sw.js');
+  const sansCommentaires = boite.replace(/\/\*[\s\S]*?\*\//g, '');
+  const regleB = (selecteur) => (sansCommentaires.match(new RegExp('(?:^|\\n|\\}|,)\\s*' + selecteur.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*(?:,[^{]*)?\\{([^}]*)\\}')) || ['', ''])[1];
+  const hex = (c) => { const m = /^#([0-9a-f]{6})$/i.exec(c); return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null; };
+  const lum = (c) => { const [r, g, b] = hex(c).map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const contraste = (a, b) => { const [h, l] = [lum(a), lum(b)].sort((x, y) => y - x); return (h + 0.05) / (l + 0.05); };
+  const racine = regleB('#start-screen');
+  const v = (nom) => variable(racine, nom);
+
+  check('la feuille de l’accueil vient après les deux autres, et elle est gardée hors ligne',
+    html.indexOf('css/accueil.css') > html.indexOf('css/progression.css') && html.indexOf('css/progression.css') > html.indexOf('css/jeu.css')
+    && sw.includes("'./css/accueil.css'") && existe('css/accueil.css'));
+  // Chaque sélecteur passe par #start-screen : la partie et ses fenêtres ne sont pas touchées.
+  const selecteurs = [...sansCommentaires.matchAll(/(?:^|\})\s*([^{}@]+?)\s*\{/g)].flatMap((m) => m[1].split(',').map((x) => x.trim())).filter(Boolean);
+  const horsAccueil = selecteurs.filter((x) => !x.includes('#start-screen'));
+  check('elle n’habille que l’accueil : chaque règle passe par #start-screen', selecteurs.length > 40 && horsAccueil.length === 0, horsAccueil.slice(0, 5).join(' | '));
+  check('ses couleurs : papier, encre, jaune, rouge — et le couvercle de chaque peuple a les siennes',
+    ['--b-papier', '--b-sable', '--b-encre', '--b-gris', '--b-jaune', '--b-rouge', '--b-ciel', '--b-bande', '--b-socle', '--b-etiquette'].every((n) => hex(v(n)))
+    && ['--b-ciel', '--b-socle', '--b-etiquette'].every((n) => hex(variable(regleB('body[data-civ="solarien"] #start-screen'), n)) && variable(regleB('body[data-civ="solarien"] #start-screen'), n) !== v(n)));
+  const lisible = [['--b-encre', '--b-papier', 7], ['--b-encre', '--b-sable', 7], ['--b-encre', '--b-jaune', 7], ['--b-gris', '--b-papier', 7], ['--b-gris', '--b-sable', 7]]
+    .map(([a, b, mini]) => [a, b, mini, contraste(v(a), v(b))]);
+  check('l’encre et le texte secondaire se lisent sur le papier, le sable et le jaune (contraste d’au moins 7)',
+    lisible.every(([, , mini, c]) => c >= mini), lisible.map(([a, b, , c]) => `${a.slice(4)}/${b.slice(4)} ${c.toFixed(1)}`).join(', '));
+  const tuiles = ['atlante', 'solarien'].map((c) => variable(regleB(`#start-screen .option.peuple[data-civ="${c}"]`), '--b-tuile'));
+  check('le texte d’encre se lit sur la tuile du peuple choisi (4,5 au moins)', tuiles.every((t) => hex(t) && contraste(v('--b-encre'), t) >= 4.5), tuiles.map((t) => contraste(v('--b-encre'), t).toFixed(1)).join(', '));
+  check('les titres : Lilita One, puis les caractères ronds du téléphone ; jamais engraissés à la machine',
+    /"Lilita One", ui-rounded, "Arial Rounded MT Bold"[^;]*sans-serif/.test(v('--b-titres')) && /"Nunito", ui-rounded[^;]*sans-serif/.test(v('--b-texte'))
+    && ['#start-screen .start-head h1', '#start-screen #btn-play', '#start-screen .option.peuple .option-name'].every((x) => /font-synthesis:\s*none/.test(regleB(x))));
+  check('les caractères viennent du réseau sans retenir l’affichage : demandés par le jeu, pas par la page',
+    !/fonts\.googleapis/.test(html) && /function chargerCaracteres\(\)[\s\S]{0,400}createElement\('link'\)[\s\S]{0,300}fonts\.googleapis\.com\/css2\?family=Lilita\+One&family=Nunito/.test(main)
+    && /chargerCaracteres\(\);\s*\n\s*habiller\(settings\.civ\);/.test(main));
+  check('le couvercle porte la capitale de chaque peuple — deux images livrées, la feuille montre celle du peuple choisi',
+    civs.every((c) => new RegExp(`<img class="couvercle-capitale" data-civ="${c}" src="([^"]+)" alt=""`).test(html)
+      && existe(html.match(new RegExp(`<img class="couvercle-capitale" data-civ="${c}" src="([^"]+)"`))[1])
+      && sansCommentaires.includes(`body[data-civ="${c}"] #start-screen .couvercle-capitale[data-civ="${c}"]`))
+    && /display:\s*none/.test(regleB('#start-screen .couvercle-capitale')));
+  check('la ligue est une pastille sur le couvercle ; Coffres, Troupes et Aide sont trois tuiles en bas',
+    /position:\s*absolute/.test(regleB('#start-screen .prog-bandeau-ligue')) && /display:\s*contents/.test(regleB('#start-screen .prog-bandeau'))
+    && /grid-column:\s*span 2/.test(regleB('#start-screen .prog-bandeau-actions .btn')) && /grid-template-columns:\s*repeat\(6,/.test(regleB('#start-screen .start-card')));
+  const actions = html.slice(html.indexOf('<div class="start-actions">'), html.indexOf('<p id="palmares"'));
+  check('« Jouer » est seul dans sa barre ; « Aide » est une tuile, qui dit si la liste est ouverte',
+    actions.includes('id="btn-play"') && !actions.includes('btn-howto') && /<button id="btn-howto" class="btn" aria-expanded="false" aria-controls="howto">Aide<\/button>/.test(html)
+    && html.indexOf('id="btn-howto"') > html.indexOf('id="palmares"') && html.indexOf('id="btn-howto"') < html.indexOf('id="howto"')
+    && /iconeSVG\('info', 16, 'inline'\)/.test(main) && /setAttribute\('aria-expanded'/.test(main));
+  const hauteur = (x) => Number((regleB(x).match(/min-height:\s*(\d+)px/) || [0, 0])[1]);
+  check('ce qui se touche garde 44 points au moins : pastille de ligue, tuiles, « Jouer », réglages, peuples',
+    [hauteur('#start-screen .prog-bandeau-ligue'), hauteur('#start-screen .prog-bandeau-actions .btn'), hauteur('#start-screen #btn-play'), hauteur('#start-screen .reglages summary'), hauteur('#start-screen .option.peuple')].every((h) => h >= 44));
+  check('rien que la page embarquée refuserait, et pas d’emoji', !/data:|blob:/.test(boite) && !/\p{Extended_Pictographic}/u.test(boite));
+}
+
+// ---------------------------------------------------------------------------
 // 3. L'habillage par peuple
 // ---------------------------------------------------------------------------
 console.log('\n--- L’habillage ---');

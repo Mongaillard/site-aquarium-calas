@@ -1,0 +1,419 @@
+/* ---------------------------------------------------------------------------
+   L'accueil, direction « Boîte de jeu » (choisie le 08/10/2026) : le couvercle
+   d'une boîte de jeu de société — aplats francs, contour d'encre épais, ombre
+   pleine sous tout ce qui se touche, titres en gros caractères ronds.
+
+   Cette feuille n'habille QUE l'écran d'accueil (#start-screen). La partie,
+   ses fenêtres et les écrans de la progression gardent l'habillage d'avant
+   (css/jeu.css, css/progression.css) tant que la direction n'est pas étendue :
+   chaque règle d'ici passe par #start-screen, et rien n'est retiré là-bas.
+
+   Les caractères : « Lilita One » (titres) et « Nunito » (texte) quand ils sont
+   chargés (voir chargerCaracteres, js/main.js) ; sinon les caractères ronds du
+   téléphone. Un seul dessin de Lilita One existe : `font-synthesis: none`
+   l'empêche d'être engraissé à la machine, et laisse aux caractères de repli
+   leur vrai gras.
+   --------------------------------------------------------------------------- */
+
+#start-screen {
+  --b-papier: #fff4dc;
+  --b-sable: #ffe9b8;
+  --b-encre: #17120e;
+  --b-gris: #4a3f33;
+  --b-jaune: #ffc93c;
+  --b-rouge: #f0562d;
+  /* Le couvercle prend les couleurs du peuple choisi (voir plus bas). */
+  --b-ciel: #3aa0e8;
+  --b-bande: #ffc93c;
+  --b-socle: #173a7a;
+  --b-etiquette: #f0562d;
+  --b-titres: "Lilita One", ui-rounded, "Arial Rounded MT Bold", "Arial Black", system-ui, sans-serif;
+  --b-texte: "Nunito", ui-rounded, "Arial Rounded MT Bold", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Le contour d'encre d'un titre clair : huit ombres nettes autour, une portée dessous. */
+  --b-contour: -3px -3px 0 var(--b-encre), 3px -3px 0 var(--b-encre), -3px 3px 0 var(--b-encre), 3px 3px 0 var(--b-encre),
+    0 -3px 0 var(--b-encre), 0 3px 0 var(--b-encre), -3px 0 0 var(--b-encre), 3px 0 0 var(--b-encre),
+    3px 8px 0 var(--b-encre), -3px 8px 0 var(--b-encre), 0 8px 0 var(--b-encre);
+  --b-contour-fin: -2px -2px 0 var(--b-encre), 2px -2px 0 var(--b-encre), -2px 2px 0 var(--b-encre), 2px 2px 0 var(--b-encre),
+    0 -2px 0 var(--b-encre), 0 2px 0 var(--b-encre), -2px 0 0 var(--b-encre), 2px 0 0 var(--b-encre);
+  padding: 0;
+  background: var(--b-papier);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+}
+body[data-civ="solarien"] #start-screen {
+  --b-ciel: #e2472b;
+  --b-bande: #ffc93c;
+  --b-socle: #7c2413;
+  --b-etiquette: #3aa0e8;
+}
+
+/* La carte : sur un téléphone, tout l'écran — le couvercle touche les bords.
+   Six colonnes : tout y prend la largeur, sauf les trois tuiles du bas. La
+   première rangée, celle du couvercle, prend la place qui reste en hauteur. */
+#start-screen .start-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: minmax(clamp(230px, 34vh, 372px), 1fr);
+  grid-auto-rows: auto;
+  column-gap: 8px;
+  align-content: start;
+  width: min(430px, 100%);
+  min-height: calc(100% - 12px - var(--safe-bottom));
+  margin: 0;
+  padding: 0 16px 14px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--b-papier);
+  color: var(--b-encre);
+}
+#start-screen .start-card > * { grid-column: 1 / -1; }
+/* Sur un écran large, la carte redevient une boîte posée sur la couleur du peuple. */
+@media (min-width: 460px) {
+  #start-screen { padding: calc(16px + var(--safe-top)) 12px 0; background: var(--b-socle); }
+  #start-screen .start-card {
+    min-height: 0;
+    margin: auto 0;
+    border: 5px solid var(--b-encre);
+    border-radius: 26px;
+    box-shadow: 0 10px 0 rgba(0, 0, 0, .35);
+    overflow: clip;
+  }
+}
+#start-screen :focus-visible { outline: 3px solid var(--b-rouge); outline-offset: 2px; }
+
+/* --- Le couvercle ----------------------------------------------------------- */
+
+#start-screen .start-head {
+  position: relative;
+  margin: 0 -16px;
+  overflow: hidden;
+  border-bottom: 5px solid var(--b-encre);
+  /* (Le soleil : un disque clair cerclé d'encre, à droite, sous la pastille de la ligue et derrière la capitale.) */
+  background:
+    radial-gradient(circle at calc(100% - 62px) calc(120px + var(--safe-top)), var(--b-papier) 0 38px, var(--b-encre) 38.5px 43px, transparent 43.5px),
+    var(--b-ciel);
+  text-align: left;
+}
+/* La bande en travers, puis le socle : deux aplats penchés, séparés d'un trait d'encre. */
+#start-screen .start-head::before,
+#start-screen .start-head::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: -20%;
+  right: -20%;
+  transform: rotate(-8deg);
+}
+#start-screen .start-head::before { top: 42%; height: 36%; background: var(--b-bande); border-top: 5px solid var(--b-encre); }
+#start-screen .start-head::after { top: 74%; height: 70%; background: var(--b-socle); border-top: 5px solid var(--b-encre); }
+
+/* La capitale du peuple choisi : les deux sont dans la page, la feuille montre la bonne. */
+#start-screen .couvercle-capitale {
+  display: none;
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  /* (Son sommet passe un peu sous la pastille de la ligue ; son pied, sous le titre.) */
+  top: calc(36px + var(--safe-top));
+  height: calc(82% - 36px - var(--safe-top));
+  width: auto;
+  max-width: 78%;
+  object-fit: contain;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 6px 0 rgba(23, 18, 14, .3));
+  pointer-events: none;
+}
+body[data-civ="atlante"] #start-screen .couvercle-capitale[data-civ="atlante"],
+body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"] { display: block; }
+
+#start-screen .start-head h1 {
+  position: absolute;
+  z-index: 2;
+  left: 16px;
+  right: 16px;
+  bottom: 42px;
+  margin: 0;
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: clamp(34px, 12vw, 47px);
+  line-height: .95;
+  letter-spacing: 0;
+  color: var(--b-papier);
+  text-shadow: var(--b-contour);
+  transform: rotate(-4deg);
+  transform-origin: 0 100%;
+}
+/* « Mobile » : une étiquette collée de travers sous le titre. */
+#start-screen .start-head h1 em {
+  position: absolute;
+  right: 2px;
+  top: calc(100% + 4px);
+  padding: 1px 12px 2px;
+  border: 4px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-etiquette);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-papier);
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 1px;
+  text-shadow: none;
+}
+/* La phrase d'accroche reste pour qui écoute la page ; le couvercle parle seul. */
+#start-screen .tagline,
+#start-screen .start-card > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- La ligue : une pastille posée sur le couvercle -------------------------- */
+
+#start-screen .prog-bandeau,
+#start-screen .prog-bandeau-actions { display: contents; }
+#start-screen .prog-bandeau-ligue {
+  position: absolute;
+  z-index: 3;
+  left: 14px;
+  top: calc(14px + var(--safe-top));
+  flex: none;
+  gap: 8px;
+  max-width: calc(100% - 28px);
+  min-height: 46px;
+  padding: 2px 12px 2px 5px;
+  border: 4px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-papier);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#start-screen .prog-bandeau-ligue:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#start-screen .prog-ecu { width: 34px; height: 34px; }
+#start-screen .prog-ecu svg { width: 34px; height: 34px; filter: none; stroke: var(--b-encre); stroke-width: 34px; paint-order: stroke; }
+#start-screen .prog-ecu b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 16px; color: var(--b-encre); }
+#start-screen .prog-bandeau-texte { gap: 1px; }
+#start-screen .prog-bandeau-texte b { font-family: var(--b-texte); font-weight: 900; font-size: 15px; line-height: 1.1; letter-spacing: 0; }
+#start-screen .prog-bandeau-texte small { font-size: 12.5px; font-weight: 800; line-height: 1.15; color: var(--b-gris); }
+#start-screen .prog-barre { display: none; }
+
+/* --- Ce qui se touche : un bouton est un carton à bord d'encre, sur son ombre --- */
+
+#start-screen .btn {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-papier);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 900;
+}
+#start-screen .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#start-screen .btn.primary { background: var(--b-jaune); border-color: var(--b-encre); color: var(--b-encre); }
+#start-screen .btn.ghost { border-color: transparent; background: none; box-shadow: none; color: var(--b-gris); text-decoration: underline; }
+#start-screen .btn.danger { border-color: var(--b-encre); background: var(--b-rouge); color: var(--b-papier); }
+
+/* Une partie dort : sa carte passe avant le reste. */
+#start-screen .resume-box {
+  margin: 16px 0 0;
+  padding: 12px 12px 14px;
+  border: 3px solid var(--b-encre);
+  border-radius: 16px;
+  background: var(--b-sable);
+}
+#start-screen .resume-info { color: var(--b-gris); font-size: 13.5px; font-weight: 800; }
+
+/* --- Les deux peuples --------------------------------------------------------- */
+
+#start-screen .options.peuples { gap: 12px; margin-top: 18px; }
+#start-screen .option.peuple {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  align-items: center;
+  column-gap: 4px;
+  row-gap: 1px;
+  min-height: 92px;
+  padding: 6px;
+  border: 4px solid var(--b-encre);
+  border-radius: 18px;
+  background: var(--b-papier);
+  box-shadow: none;
+  color: var(--b-encre);
+  opacity: 1;
+  text-align: left;
+}
+#start-screen .option.peuple[data-civ="atlante"] { --b-tuile: #3aa0e8; }
+#start-screen .option.peuple[data-civ="solarien"] { --b-tuile: #f58f2a; }
+/* (Sur 375 points, une tuile fait 165 points : l'image et le nom se resserrent pour que « Solariens » tienne.) */
+#start-screen .option.peuple img { grid-row: 1 / span 2; width: clamp(46px, 14vw, 66px); height: clamp(46px, 14vw, 66px); filter: none; }
+#start-screen .option.peuple .option-name {
+  align-self: end;
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: clamp(16px, 4.8vw, 20px);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+#start-screen .option.peuple .option-desc { align-self: start; font-size: 13px; font-weight: 800; line-height: 1.15; color: var(--b-gris); }
+#start-screen .option.peuple.active { background: var(--b-tuile); border-color: var(--b-encre); box-shadow: 0 5px 0 var(--b-encre); }
+#start-screen .option.peuple.active .option-name { color: var(--b-papier); text-shadow: var(--b-contour-fin); }
+#start-screen .option.peuple.active .option-desc { color: var(--b-encre); }
+/* La coche du peuple choisi : une pastille jaune au coin, son trait d'encre dedans. */
+#start-screen .option.peuple.active::before {
+  content: "";
+  position: absolute;
+  right: -8px;
+  top: -10px;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 4px solid var(--b-encre);
+  border-radius: 50%;
+  background: var(--b-jaune);
+}
+#start-screen .option.peuple.active::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: -4px;
+  width: 6px;
+  height: 11px;
+  border-right: 3px solid var(--b-encre);
+  border-bottom: 3px solid var(--b-encre);
+  transform: rotate(40deg);
+}
+
+/* --- Les réglages -------------------------------------------------------------- */
+
+#start-screen .reglages {
+  margin-top: 14px;
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-sable);
+}
+#start-screen .reglages summary { min-height: 48px; padding: 6px 40px 7px 12px; }
+#start-screen .reglages summary::after { width: 9px; height: 9px; border-color: var(--b-encre); border-width: 3px; }
+#start-screen .reglages-titre { font-weight: 900; font-size: 15px; }
+#start-screen .reglages-resume { font-size: 13px; font-weight: 800; color: var(--b-gris); }
+#start-screen .reglages > h2 {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  font-family: var(--b-texte);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  color: var(--b-gris);
+}
+#start-screen .reglages .option {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-papier);
+  color: var(--b-encre);
+}
+#start-screen .reglages .option.active { border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+#start-screen .reglages .option-name { font-weight: 900; }
+#start-screen .reglages .option-desc { font-weight: 700; color: var(--b-gris); }
+#start-screen .reglages .option svg { fill: var(--b-encre); }
+#start-screen .reglage-note { font-weight: 700; color: var(--b-gris); }
+
+/* --- Jouer ----------------------------------------------------------------------- */
+
+#start-screen .start-actions {
+  display: block;
+  margin: 14px -16px 0;
+  padding: 0 16px calc(18px + var(--safe-bottom));
+  background: linear-gradient(180deg, transparent 0, var(--b-papier) 12px);
+}
+#start-screen #btn-play {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 12px;
+  border: 4px solid var(--b-encre);
+  border-radius: 18px;
+  background: var(--b-papier);
+  box-shadow: 0 6px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+#start-screen #btn-play.primary {
+  min-height: 84px;
+  border-width: 5px;
+  border-radius: 22px;
+  background: var(--b-jaune);
+  box-shadow: 0 8px 0 var(--b-encre);
+  font-size: 44px;
+  letter-spacing: 2px;
+}
+#start-screen #btn-play.arme { background: var(--b-rouge); color: var(--b-papier); font-size: 19px; letter-spacing: .5px; }
+#start-screen #btn-play:active { transform: translateY(5px); box-shadow: 0 3px 0 var(--b-encre); }
+#start-screen .palmares { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: var(--b-gris); }
+
+/* --- Les trois tuiles du bas : Coffres, Troupes, Aide ------------------------------ */
+
+#start-screen .prog-bandeau-actions .btn,
+#start-screen #btn-howto {
+  order: 1;
+  grid-column: span 2;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: auto;
+  min-height: 66px;
+  padding: 6px 4px;
+  border: 4px solid var(--b-encre);
+  border-radius: 16px;
+  background: var(--b-papier);
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: normal;
+}
+#start-screen .prog-bandeau-actions .btn:active,
+#start-screen #btn-howto:active { transform: translateY(2px); }
+#start-screen .prog-bandeau-actions .btn svg,
+#start-screen #btn-howto svg { width: 30px; height: 30px; margin: 0; fill: var(--b-encre); }
+#start-screen .prog-pastille {
+  position: absolute;
+  right: -7px;
+  top: -10px;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 5px;
+  border: 3px solid var(--b-encre);
+  border-radius: 13px;
+  background: var(--b-rouge);
+  color: var(--b-papier);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+#start-screen .howto { order: 2; margin-top: 14px; }
+#start-screen .howto ul { color: var(--b-gris); font-weight: 700; }
+#start-screen .howto b { color: var(--b-encre); font-weight: 900; }
+#start-screen .credits { order: 3; margin-top: 12px; font-size: 12.5px; font-weight: 700; color: var(--b-gris); opacity: 1; }
