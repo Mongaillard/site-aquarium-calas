@@ -336,9 +336,11 @@ const EN_3D = {
   },
   // Cape, bandeau et tapis de selle bleu franc basculent. Chaque camp commence avec un
   // éclaireur : sa planche dessinée le montre le temps de la cuisson.
+  // (Son bleu est plus terne que celui des autres troupes : basculé tel quel, il
+  // donnait un rose mauve. La fenêtre prend aussi ses bleus pâles, et le rouge est soutenu.)
   scoutAtelier: {
     modele: 'scout', unite: 'scout', repli: 'scout', natif: 'bleu', aLaDemande: true,
-    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.32 },
+    recolorage: { teinte: [200, 255], vers: 0, satMin: 0.2, saturer: 1.6 },
   },
   // Tuiles du toit et bannières bleu franc basculent ; bois et bronze restent.
   ramAtelier: {

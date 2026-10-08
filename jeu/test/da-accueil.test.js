@@ -323,7 +323,8 @@ essai('panneau de sélection', () => {
   const former = BUILDING_TYPES.barracks.trains.map((t) => ({ t, b: boutons.find((b) => b.nom === nomDe(t, 'solarien')) }));
   check('boutons de formation : chaque troupe y montre son portrait solarien — ou son pictogramme, faute de portrait',
     former.every(({ t, b }) => b && (portraitDe(t, 'solarien') ? b.image === portraitDe(t, 'solarien') && !b.picto : b.picto && !b.image))
-    && former.some(({ b }) => b.image) && former.some(({ b }) => b.picto),
+    // (Depuis le portrait du Mercenaire atlante, toutes les troupes de la caserne ont le leur : plus aucun pictogramme.)
+    && former.every(({ b }) => b.image) && portraitDe('triton', 'solarien') === 'assets/portrait-triton.webp',
     former.map(({ t, b }) => `${t} : ${b ? b.image || 'pictogramme' : 'absent'}`).join(' · '));
   check('… les autres boutons gardent leur pictogramme', boutons.filter((b) => !former.some((f) => f.b === b)).every((b) => b.picto && !b.image)
     && boutons.some((b) => b.nom === 'Ralliement'));

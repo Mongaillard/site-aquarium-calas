@@ -291,7 +291,8 @@ export const MODELES = {
 // relevés : lin blanc et grès, les Solariens sont plus clairs). N'inscrire
 // une ligne qu'une fois le fichier livré ET listé dans sw.js : sprites.js
 // (IMAGES_CIV) ignore un modèle absent de cette table.
-MODELES.solVillager = { ...MODELES.villager, src: 'assets/modeles/sol-fellah.json', retouches: PEAU_SOLARIENNE };
+// (39 et non 37 : la coiffe du Fellah compte dans sa hauteur — à 37 son corps était 7 % plus petit que celui du Villageois.)
+MODELES.solVillager = { ...MODELES.villager, src: 'assets/modeles/sol-fellah.json', taille: 39, retouches: PEAU_SOLARIENNE };
 MODELES.solMilitia = { ...MODELES.militia, src: 'assets/modeles/sol-garde.json', reglage: null, retouches: PEAU_SOLARIENNE };
 MODELES.solSpearman = { ...MODELES.spearman, src: 'assets/modeles/sol-lancier.json', reglage: null, retouches: PEAU_SOLARIENNE };
 MODELES.solArcher = { ...MODELES.archer, src: 'assets/modeles/sol-archer.json', retouches: PEAU_SOLARIENNE };
@@ -314,7 +315,8 @@ MODELES.solPriest = { ...MODELES.priest, src: 'assets/modeles/sol-pretre.json', 
 MODELES.solRam = { ...MODELES.ram, src: 'assets/modeles/sol-belier.json', retouches: BOIS_CEDRE };
 MODELES.solCatapult = { ...MODELES.catapult, src: 'assets/modeles/sol-catapulte.json', retouches: BOIS_CEDRE };
 // Pavoisier, Frondeur et Sapeur solariens : mêmes gestes, mêmes accessoires.
-MODELES.solPavoisier = { ...MODELES.pavoisier, src: 'assets/modeles/sol-pavoisier.json', retouches: PEAU_SOLARIENNE };
+// (42 et non 45 : sans cimier, le Pavoisier solarien remplit toute sa hauteur — à 45 son corps était 8 % plus grand que celui de l'atlante.)
+MODELES.solPavoisier = { ...MODELES.pavoisier, src: 'assets/modeles/sol-pavoisier.json', taille: 42, retouches: PEAU_SOLARIENNE };
 MODELES.solFrondeur = { ...MODELES.frondeur, src: 'assets/modeles/sol-frondeur.json', retouches: PEAU_SOLARIENNE };
 MODELES.solSapeur = { ...MODELES.sapeur, src: 'assets/modeles/sol-sapeur.json', retouches: PEAU_SOLARIENNE };
 

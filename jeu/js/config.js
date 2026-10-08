@@ -70,6 +70,7 @@ export const PORTRAITS = {
   pavoisier: 'assets/portrait-pavoisier.webp',
   frondeur: 'assets/portrait-frondeur.webp',
   sapeur: 'assets/portrait-sapeur.webp',
+  triton: 'assets/portrait-triton.webp',
 };
 
 export const RESOURCE_ICONS = { food: 'food', wood: 'wood', gold: 'gold' };
