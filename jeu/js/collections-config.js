@@ -36,6 +36,8 @@
 // assets/collections, une entrée ci-dessous, et son nom dans sw.js.
 // ---------------------------------------------------------------------------
 
+import { LANGUE, txt } from './langue.js';
+
 /** Les sortes de pièces, dans l'ordre où le blason les montre. */
 export const GENRES = ['embleme', 'cadre', 'banniere', 'grade', 'epithete', 'teinture'];
 export const NOMS_DES_GENRES = { embleme: 'Autocollant', cadre: 'Cadre', banniere: 'Bannière', grade: 'Titre', epithete: 'Titre', teinture: 'Teinture' };
@@ -339,6 +341,28 @@ const collections = DEFINITIONS.map((d) => {
   };
 });
 
+// --- La langue -----------------------------------------------------------------
+// Les noms ci-dessus sont écrits en français, la langue source. Dans une autre
+// langue, ils sont remplacés ici, une fois, par leur traduction (js/langue.js)
+// — avant que les tables soient figées ; en français, rien ne bouge. Les
+// identifiants (des collections, des pièces, des genres) ne se traduisent pas :
+// les sauvegardes les contiennent.
+
+/**
+ * Passe sur chaque texte de ces tables : `visite(objet, champ)`. Sert à
+ * traduire (ci-dessous) et à recenser ce qui est à traduire
+ * (outils/langues.mjs) : le nom des genres, des collections et des pièces —
+ * « Bannière de la Basse-cour » est un nom entier, pas un mot suivi d'une
+ * épithète.
+ */
+export function textesATraduire(visite) {
+  for (const genre of Object.keys(NOMS_DES_GENRES)) visite(NOMS_DES_GENRES, genre);
+  for (const c of collections) visite(c, 'nom');
+  for (const p of Object.values(toutes)) visite(p, 'nom');
+}
+
+if (LANGUE !== 'fr') textesATraduire((objet, champ) => { objet[champ] = txt(objet[champ]); });
+
 /** Toutes les pièces du jeu, par identifiant (« bassecour.cochon-couronne ») : `genre`, `nom`, `rarete`, `collection`, et de quoi les dessiner. */
 export const PIECES = figer(toutes);
 /** Les collections, dans l'ordre de l'album : `id`, `nom`, `source`, `planches`, `pieces` et `emblemes` (des identifiants). */
@@ -352,6 +376,16 @@ export const collection = (id) => (typeof id === 'string' && Object.prototype.ha
 export const piece = (id) => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(PIECES, id) ? PIECES[id] : null);
 /** L'identifiant de la pièce d'une collection qui porte ce nom court (« grade », « cadre », « etendard »…), ou null. */
 export const pieceDe = (collectionId, court) => (piece(`${collectionId}.${court}`) ? `${collectionId}.${court}` : null);
+
+/**
+ * Le titre que font un grade et une épithète (leurs noms) : « Dompteur du Banquet ». Sans épithète : le grade seul.
+ * L'ordre des deux mots est affaire de langue : le français met le grade d'abord ; une autre langue les range à sa
+ * façon, par sa traduction de « {grade} {épithète} » (l'anglais dit « Banquet Tamer »).
+ */
+export function composerTitre(grade, epithete) {
+  if (!epithete) return grade;
+  return txt('{grade} {épithète}').replace('{grade}', () => grade).replace('{épithète}', () => epithete);
+}
 
 /** Ce que tout joueur porte au départ : son blason avant d'avoir rien gagné. */
 export const BLASON_DE_DEPART = Object.freeze({ embleme: null, cadre: 'depart.cadre', banniere: 'depart.banniere', grade: 'depart.grade', epithete: null, teinture: null });

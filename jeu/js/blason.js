@@ -8,7 +8,8 @@
 // js/collections-config.js ; l'encre est celle de la boîte (css/jeu.css).
 // ---------------------------------------------------------------------------
 
-import { PIECES, BLASON_DE_DEPART, piece as pieceDuJeu } from './collections-config.js';
+import { PIECES, BLASON_DE_DEPART, piece as pieceDuJeu, composerTitre } from './collections-config.js';
+import { txt } from './langue.js';
 
 const ENCRE = '#17120e';
 const n = (v) => Math.round(v * 100) / 100;
@@ -163,12 +164,12 @@ export function htmlMedaillon(blason, classe = '') {
   return `<span class="blason-medaillon ${classe}">${svgCadre(b.cadre)}${b.embleme ? htmlEmbleme(b.embleme) : '<b class="blason-vide" aria-hidden="true">?</b>'}</span>`;
 }
 
-/** Le titre d'un blason : son grade, puis son épithète. */
+/** Le titre d'un blason : son grade, puis son épithète (une autre langue les range à sa façon : voir composerTitre). */
 export function titreDuBlason(blason) {
   const b = blason || BLASON_DE_DEPART;
   const grade = pieceDuJeu(b.grade) || PIECES[BLASON_DE_DEPART.grade];
   const epithete = pieceDuJeu(b.epithete);
-  return `${grade.nom}${epithete ? ` ${epithete.nom}` : ''}`;
+  return composerTitre(grade.nom, epithete ? epithete.nom : null);
 }
 
 /** La carte de joueur : la bannière en fond, le médaillon, le titre, et une ligne en dessous (`sous`, du HTML). */
@@ -186,5 +187,5 @@ export function htmlPiece(id, { manque = false } = {}) {
   if (p.genre === 'banniere') return `<span class="piece-vignette piece-fanion ${manque ? 'manque' : ''}">${svgBanniere(id)}</span>`;
   // (Une teinture se montre toujours en couleurs : on voit ce qu'on achète.)
   if (p.genre === 'teinture') return `<span class="piece-vignette piece-teinture" style="--pastille:${p.pastille}"><img src="${imageDeTeinture(p.matiere)}" alt="" decoding="async"></span>`;
-  return `<span class="piece-vignette piece-mot ${manque ? 'manque' : ''}"><b>${p.genre === 'grade' ? p.nom : `… ${p.nom}`}</b></span>`;
+  return `<span class="piece-vignette piece-mot ${manque ? 'manque' : ''}"><b>${p.genre === 'grade' ? p.nom : txt`… ${p.nom}`}</b></span>`;
 }
