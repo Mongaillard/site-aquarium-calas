@@ -372,3 +372,5 @@
 #modal .prog-fin-piece .piece-embleme,
 #modal .prog-fin-piece .piece-vignette:not(.piece-mot):not(.piece-fanion) { width: 40px; height: 40px; }
 #modal .prog-fin-saison svg { fill: var(--b-rouge); vertical-align: -2px; }
+/* (Le palier à prendre : sur sa ligne, sous la phrase.) */
+#modal .prog-fin-saison .btn { display: flex; margin-top: 4px; }
