@@ -92,7 +92,9 @@ const DANS_LES_COFFRES = R.categories.flatMap((rarete) => RESERVE[rarete]);
 /** Les deux voies de la route d'une saison. */
 const VOIES = ['gratuit', 'passe'];
 /** Les pièces du blason dont on peut se passer. */
-const FACULTATIVES = ['embleme', 'epithete'];
+const FACULTATIVES = ['embleme', 'epithete', 'teinture'];
+/** Les pièces vendues une à une, en Éclats, à prix fixe : celles des collections « atelier ». */
+const DE_L_ATELIER = COLLECTIONS.filter((c) => c.source === 'atelier').flatMap((c) => c.pieces);
 
 // --- Dates ---------------------------------------------------------------------
 
@@ -151,8 +153,9 @@ function semaineDe(jour) {
  *                     autocollants en double ; elle n'achète que de l'apparence
  *   couronnes       : la monnaie payante (voir « Boutique », plus bas)
  *   pieces          : les pièces de collection possédées (leurs identifiants)
- *   blason          : celles que l'on porte — `embleme` et `epithete` peuvent
- *                     manquer (null), `cadre`, `banniere` et `grade` jamais
+ *   blason          : celles que l'on porte — `embleme`, `epithete` et
+ *                     `teinture` (la matière de ses troupes) peuvent manquer
+ *                     (null), `cadre`, `banniere` et `grade` jamais
  *   route           : la route de la saison en cours — ses `points`, le Passe
  *                     (`passe`), les paliers déjà pris sur chaque voie (`pris`)
  *   selection       : les autocollants du jour déjà achetés à prix réduit — le
@@ -1175,6 +1178,8 @@ function lotDeTroupes(p) {
  *   lots      : les lots de Couronnes, et s'ils sont `disponible`s ;
  *   essai     : le porte-monnaie d'essai, ou null ;
  *   eclats    : sa monnaie gratuite ;
+ *   atelier   : les pièces vendues une à une, en Éclats (les teintures) —
+ *               leur `prix`, et `possedee` ;
  *   selection : les autocollants du jour (`jour`, « AAAA-MM-JJ »), en Éclats —
  *               chacun son `prix` et son `prixPlein` ; `selectionPrise` : ceux
  *               déjà achetés à prix réduit ce jour-là ;
@@ -1208,6 +1213,7 @@ export function catalogueBoutique(profil, maintenant, jour) {
     eclats: p.eclats,
     selection: selectionDuJour(p, jour).map((id) => ({ piece: id, prix: prixDePiece(p, id, jour), prixPlein: R.collections.eclats.prix[PIECES[id].rarete] })),
     selectionPrise: p.selection.jour === jour ? p.selection.achats : 0,
+    atelier: DE_L_ATELIER.filter((id) => possede(R.collections.atelier, id)).map((id) => ({ piece: id, prix: R.collections.atelier[id], possedee: p.pieces.includes(id) })),
     collections: COLLECTIONS.map((c) => lotDeCollection(p, c.id)).filter(Boolean),
     passe: { saison: p.saison, prix: R.saisons.passe.prix, pris: p.route.passe },
   };
@@ -1397,8 +1403,8 @@ export function titreDe(profil) {
 
 /**
  * Porte une pièce possédée à la place de celle du même genre (`embleme`,
- * `cadre`, `banniere`, `grade`, `epithete`) ; `null` retire l'autocollant ou
- * l'épithète. Renvoie `{ profil, evenements }` (blason), ou `{ erreur }` :
+ * `cadre`, `banniere`, `grade`, `epithete`, `teinture`) ; `null` retire
+ * l'autocollant, l'épithète ou la teinture. Renvoie `{ profil, evenements }` (blason), ou `{ erreur }` :
  * 'genre', 'obligatoire', 'pasPossedee'.
  */
 export function equiper(profil, genre, id) {
@@ -1441,20 +1447,24 @@ function selectionDuJour(p, jour) {
 }
 
 /**
- * Le prix d'un autocollant en Éclats, ce jour-là : son prix selon sa rareté,
- * réduit s'il est dans la sélection du jour. null s'il ne se vend pas — seuls
- * se vendent les autocollants des collections « coffres » qu'on n'a pas.
+ * Le prix d'une pièce en Éclats, ce jour-là. Un autocollant des coffres : son
+ * prix selon sa rareté, réduit s'il est dans la sélection du jour. Une pièce
+ * de l'atelier (une teinture) : son prix fixe. null si elle ne se vend pas, ou
+ * qu'on l'a déjà.
  */
 export function prixDePiece(profil, id, jour) {
-  if (!DANS_LES_COFFRES.includes(id)) return null;
+  const fixe = DE_L_ATELIER.includes(id) && possede(R.collections.atelier, id) ? R.collections.atelier[id] : null;
+  if (fixe === null && !DANS_LES_COFFRES.includes(id)) return null;
   const p = migrerProfil(profil);
   if (p.pieces.includes(id)) return null;
+  if (fixe !== null) return fixe;
   const plein = R.collections.eclats.prix[PIECES[id].rarete];
   return selectionDuJour(p, jour).includes(id) ? Math.round(plein * R.collections.eclats.selection.part / 100) : plein;
 }
 
 /**
- * Achète un autocollant choisi avec des Éclats, au prix de ce jour. Renvoie
+ * Achète une pièce choisie (un autocollant des coffres, une teinture de
+ * l'atelier) avec des Éclats, au prix de ce jour. Renvoie
  * `{ profil, evenements }` (eclats, piece — et les pièces que sa collection
  * donne alors), ou `{ erreur }` : 'pasEnVente', 'fonds' (avec `manque`).
  */

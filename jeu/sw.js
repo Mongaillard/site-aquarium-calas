@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v68';
+const CACHE = 'age-empires-mobile-v69';
 // La musique (js/musique.js) : trois morceaux lourds. Ils ne sont pas pris à
 // l'installation mais à la première écoute, et gardés à part, comme les unités
 // en 3D : une mise à jour du jeu ne les fait pas retélécharger.
@@ -29,6 +29,7 @@ const ASSETS = [
   './js/collections-config.js',
   './js/collections-ecrans.js',
   './js/blason.js',
+  './js/teintures.js',
   './js/fiches-troupes.js',
   './js/musique.js',
   './js/rangement-durable.js',
@@ -144,6 +145,16 @@ const ASSETS = [
   './assets/collections/tournoi2.webp',
   './assets/collections/froid.webp',
   './assets/collections/froid2.webp',
+  './assets/teintures/origine-atlante.webp',
+  './assets/teintures/origine-solarien.webp',
+  './assets/teintures/argent-atlante.webp',
+  './assets/teintures/argent-solarien.webp',
+  './assets/teintures/jade-atlante.webp',
+  './assets/teintures/jade-solarien.webp',
+  './assets/teintures/obsidienne-atlante.webp',
+  './assets/teintures/obsidienne-solarien.webp',
+  './assets/teintures/amethyste-atlante.webp',
+  './assets/teintures/amethyste-solarien.webp',
   './assets/sons/clic-1.mp4',
   './assets/sons/clic-2.mp4',
   './assets/sons/selection-1.mp4',

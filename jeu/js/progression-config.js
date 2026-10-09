@@ -405,8 +405,12 @@ export const PROGRESSION = figer({
   //              Leur contenu est affiché pièce par pièce avant l'achat.
   //  raretes   : le nom d'une rareté pour un autocollant (« commun », là où une
   //              troupe est « commune »)
+  //  atelier   : les pièces qui s'achètent une à une, en Éclats, chacune à son
+  //              prix — les teintures des troupes (js/teintures.js). De
+  //              l'apparence : elles ne changent rien au combat.
   collections: {
     raretes: { commune: 'Commun', rare: 'Rare', epique: 'Épique' },
+    atelier: { 'teintures.argent': 300, 'teintures.jade': 600, 'teintures.obsidienne': 600, 'teintures.amethyste': 900 },
     eclats: {
       parCoffre: { bois: 5, argent: 10, or: 20, legendaire: 50 },
       doublon: { commune: 5, rare: 15, epique: 50 },

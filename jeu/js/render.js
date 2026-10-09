@@ -2281,7 +2281,10 @@ export class Renderer {
     const { cellH, ancreY, hauteurMonde, images, colonnes } = clip;
     // (e vaut exactement un demi en cuisson normale : deux pixels d'atlas par pixel monde.)
     const h = hauteurMonde, e = h / cellH;
-    const source = joueur === 0 ? clip.variantes.bleu : clip.variantes.rouge;
+    // Les troupes du joueur portent sa teinture (`this.teinture`, posée au lancement de la partie) ;
+    // les autres, la couleur de leur bord : bleu pour le sien et ses alliés, rouge en face.
+    const source = this.teinture && joueur === this.world.humanIndex ? clip.variantes.teinte(this.teinture)
+      : this.world.bordDe(joueur) === 0 ? clip.variantes.bleu : clip.variantes.rouge;
     const ctx = this.ctx;
     // Cinq directions cuites : nord-ouest, ouest et sud-ouest sont le miroir
     // du nord-est, de l'est et du sud-est, retournées autour de l'ancre.

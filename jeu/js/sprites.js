@@ -27,6 +27,7 @@ const batiment = (src, cellW, cellH, largeurMonde) => ({
 
 import { TILE, UNIT_TYPES, nomDe } from './config.js';
 import { MODELES, modeleCuit, ALPHA_EQUIPE } from './modele3d.js';
+import { reglesDeTeinture, acierDeTeinture, teindrePixels } from './teintures.js';
 import { PIECES_DECOR } from './decor-pieces.js';
 
 /**
@@ -735,14 +736,42 @@ function teinterEquipe(d, canvas) {
 }
 
 /**
- * Les deux camps d'un atlas cuit. Celui d'origine est l'atlas lui-même ;
- * l'autre ne se fabrique qu'au premier dessin d'une unité de ce camp — une
- * partie où seul le joueur forme des Hydres ne garde pas en mémoire des
- * Hydres rouges que personne ne verra.
+ * L'atlas cuit d'une troupe du joueur, dans la matière d'une teinture
+ * (js/teintures.js) : une copie où l'or change de matière et où le tissu du
+ * camp ne bouge pas. `null` quand ce modèle ne se teint pas ; l'atlas
+ * d'origine quand la copie est refusée (mémoire) — la troupe reste alors
+ * comme elle est, sans erreur.
+ */
+function teindre(d, canvas, teinture) {
+  const regles = reglesDeTeinture(teinture, d.modele), acier = acierDeTeinture(teinture, d.modele);
+  if (!regles.length && !acier) return null;
+  const l = canvas.width, h = canvas.height;
+  let toile = null;
+  try {
+    const c = copie(canvas, l, h);
+    toile = c.canvas;
+    const data = c.ctx.getImageData(0, 0, l, h);
+    teindrePixels(data.data, regles, acier);
+    c.ctx.putImageData(data, 0, 0);
+    return toile;
+  } catch {
+    if (toile) toile.width = toile.height = 0;
+    return canvas;
+  }
+}
+
+/**
+ * Les camps d'un atlas cuit. Celui d'origine est l'atlas lui-même ; l'autre ne
+ * se fabrique qu'au premier dessin d'une unité de ce camp — une partie où seul
+ * le joueur forme des Hydres ne garde pas en mémoire des Hydres rouges que
+ * personne ne verra. `teinte(id)` : la copie teinte des troupes du joueur,
+ * fabriquée et rendue de la même façon (une seule teinture à la fois).
  */
 function variantesEquipe(d, canvas) {
-  if (!d.recolorage) return { bleu: canvas, rouge: canvas };
   let autre = null, vu = 0;
+  // La copie teinte : `teintAMoi` dit si c'est une toile à nous (à vider en la rendant) ou, faute de
+  // teinture pour ce modèle ou de mémoire pour la copie, l'atlas du camp lui-même.
+  let teint = null, teintAMoi = false, matiere = null, vuTeint = 0;
   // Fabriqué au premier dessin, donc PENDANT le rendu : rien ne doit en sortir
   // qui arrêterait la boucle du jeu. L'échec est retenu (pas de nouvel essai
   // à chaque image).
@@ -753,19 +782,41 @@ function variantesEquipe(d, canvas) {
     }
     return autre;
   };
-  // Rend la copie de l'autre camp si elle n'a pas été dessinée depuis `avant` :
-  // elle se refera au dessin suivant. JAMAIS la toile d'origine — celle que
-  // teinterEquipe rend quand la reteinte est refusée : on l'oublie seulement,
-  // et le prochain dessin retentera.
-  const rendre = (avant = Infinity) => {
-    if (!autre || vu > avant) return;
-    if (autre !== canvas) autre.width = autre.height = 0;
-    autre = null;
+  // (Les troupes du joueur sont bleues : l'atlas d'origine, ou sa copie quand le modèle est peint en rouge.)
+  const duJoueur = () => (!d.recolorage || d.natif === 'bleu' ? canvas : faire());
+  const lacherTeint = () => {
+    if (teint && teintAMoi) teint.width = teint.height = 0;
+    teint = null; teintAMoi = false;
   };
-  const poids = () => (autre && autre !== canvas ? octetsDe(autre) : 0);
+  /** L'atlas des troupes du joueur dans cette teinture ; pour un modèle qui ne se teint pas, celui de son camp. */
+  const teinte = (id) => {
+    const base = duJoueur();
+    if (matiere !== id) { lacherTeint(); matiere = id; }
+    vuTeint = horloge;
+    if (!teint) {
+      let copieTeinte = null;
+      try { copieTeinte = teindre(d, base, id); } catch { copieTeinte = null; }
+      teintAMoi = !!copieTeinte && copieTeinte !== base;
+      teint = copieTeinte || base;
+    }
+    return teintAMoi ? teint : base;
+  };
+  // Rend les copies qui n'ont pas été dessinées depuis `avant` : elles se
+  // referont au dessin suivant. JAMAIS la toile d'origine — celle qu'une
+  // copie refusée laisse à sa place : on l'oublie seulement, et le prochain
+  // dessin retentera.
+  const rendre = (avant = Infinity) => {
+    if (teint && vuTeint <= avant) { lacherTeint(); matiere = null; }
+    if (autre && vu <= avant) {
+      if (autre !== canvas) autre.width = autre.height = 0;
+      autre = null;
+    }
+  };
+  const poids = () => (autre && autre !== canvas ? octetsDe(autre) : 0) + (teintAMoi ? octetsDe(teint) : 0);
+  if (!d.recolorage) return { bleu: canvas, rouge: canvas, teinte, rendre, poids };
   return d.natif === 'bleu'
-    ? { bleu: canvas, get rouge() { return faire(); }, rendre, poids }
-    : { rouge: canvas, get bleu() { return faire(); }, rendre, poids };
+    ? { bleu: canvas, get rouge() { return faire(); }, teinte, rendre, poids }
+    : { rouge: canvas, get bleu() { return faire(); }, teinte, rendre, poids };
 }
 
 /**

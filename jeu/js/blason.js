@@ -13,6 +13,17 @@ import { PIECES, BLASON_DE_DEPART, piece as pieceDuJeu } from './collections-con
 const ENCRE = '#17120e';
 const n = (v) => Math.round(v * 100) / 100;
 
+/** Le peuple dont les teintures montrent le soldat (voir reglerPeupleDesTeintures). */
+let peuple = 'atlante';
+/** Les peuples qui ont leurs images de teinture (assets/teintures). */
+const PEUPLES_TEINTS = ['atlante', 'solarien'];
+/** Dit de quel peuple montrer le soldat sur les vignettes des teintures. */
+export function reglerPeupleDesTeintures(civ) { peuple = PEUPLES_TEINTS.includes(civ) ? civ : 'atlante'; }
+/** L'image d'une matière (clé de js/teintures.js, ou « origine ») sur le soldat du peuple choisi. */
+export const imageDeTeinture = (matiere) => `assets/teintures/${matiere}-${peuple}.webp`;
+/** La vignette des troupes telles qu'elles sont peintes : le choix « sans teinture ». */
+export const htmlSansTeinture = () => `<span class="piece-vignette piece-teinture"><img src="${imageDeTeinture('origine')}" alt="" decoding="async"></span>`;
+
 // --- L'autocollant ---------------------------------------------------------------
 
 /**
@@ -166,12 +177,14 @@ export function htmlBlason(blason, { sous = '', classe = '' } = {}) {
   return `<span class="blason ${classe}">${svgBanniere(b.banniere)}${htmlMedaillon(b)}<span class="blason-texte"><b>${titreDuBlason(b)}</b>${sous ? `<small>${sous}</small>` : ''}</span></span>`;
 }
 
-/** Une pièce seule, pour une liste : l'autocollant, le cadre vide, un morceau de bannière, ou le mot d'un titre. */
+/** Une pièce seule, pour une liste : l'autocollant, le cadre vide, un morceau de bannière, le soldat d'une teinture, ou le mot d'un titre. */
 export function htmlPiece(id, { manque = false } = {}) {
   const p = pieceDuJeu(id);
   if (!p) return '';
   if (p.genre === 'embleme') return htmlEmbleme(id, { manque });
   if (p.genre === 'cadre') return `<span class="piece-vignette ${manque ? 'manque' : ''}">${svgCadre(id)}</span>`;
   if (p.genre === 'banniere') return `<span class="piece-vignette piece-fanion ${manque ? 'manque' : ''}">${svgBanniere(id)}</span>`;
+  // (Une teinture se montre toujours en couleurs : on voit ce qu'on achète.)
+  if (p.genre === 'teinture') return `<span class="piece-vignette piece-teinture" style="--pastille:${p.pastille}"><img src="${imageDeTeinture(p.matiere)}" alt="" decoding="async"></span>`;
   return `<span class="piece-vignette piece-mot ${manque ? 'manque' : ''}"><b>${p.genre === 'grade' ? p.nom : `… ${p.nom}`}</b></span>`;
 }

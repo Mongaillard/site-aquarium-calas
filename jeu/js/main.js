@@ -15,6 +15,7 @@ import {
 } from './save.js';
 import { brancher as brancherRangementDurable } from './rangement-durable.js';
 import { appliquerResultat, reglagesDePartie, issueDePartie } from './progression.js';
+import { matiereDe } from './collections-config.js';
 import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal } from './progression-ecrans.js';
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
@@ -140,6 +141,8 @@ class Game {
     this.ecouteurs = new AbortController();
     this.camera = new Camera(this.world);
     this.renderer = new Renderer(this.canvas, this.world, this.camera);
+    // La teinture que le joueur a choisie pour ses troupes (js/teintures.js) : de l'apparence, lue au lancement.
+    this.renderer.teinture = matiereDe(lireProgression().blason);
     // Les gestes des ouvriers à l'écran s'entendent : la hache au bois, la pioche à l'or, la cueillette, le marteau au chantier.
     const GESTES = { wood: 'chop', gold: 'mine', food: 'pick', build: 'hammer' };
     this.renderer.surGeste = (quoi) => { if (GESTES[quoi]) audio.play(GESTES[quoi]); };

@@ -17,7 +17,14 @@
 //              (PROGRESSION.collections.lots) ;
 //   saison   : la route d'une saison (PROGRESSION.saisons) ; elle a en plus un
 //              étendard et un grade de champion, pour les plus hautes ligues ;
-//   ligues   : les cadeaux des promotions (PROGRESSION.ligues[…].promotion).
+//   ligues   : les cadeaux des promotions (PROGRESSION.ligues[…].promotion) ;
+//   atelier  : ses pièces s'achètent une à une, en Éclats, chacune à son prix
+//              (PROGRESSION.collections.atelier) — les teintures des troupes.
+//
+// Une teinture (`genre: 'teinture'`) habille les troupes du joueur d'une autre
+// matière : `matiere` est sa clé dans js/teintures.js, `pastille` sa couleur
+// dans les menus. Elle se porte comme le reste du blason, et ne change rien
+// au combat.
 //
 // Les autocollants sont dessinés (par ChatGPT, d'après nos demandes) et rangés
 // par planches de neuf, 3 × 3 : `rang` est la case, de gauche à droite et de
@@ -30,8 +37,8 @@
 // ---------------------------------------------------------------------------
 
 /** Les sortes de pièces, dans l'ordre où le blason les montre. */
-export const GENRES = ['embleme', 'cadre', 'banniere', 'grade', 'epithete'];
-export const NOMS_DES_GENRES = { embleme: 'Autocollant', cadre: 'Cadre', banniere: 'Bannière', grade: 'Titre', epithete: 'Titre' };
+export const GENRES = ['embleme', 'cadre', 'banniere', 'grade', 'epithete', 'teinture'];
+export const NOMS_DES_GENRES = { embleme: 'Autocollant', cadre: 'Cadre', banniere: 'Bannière', grade: 'Titre', epithete: 'Titre', teinture: 'Teinture' };
 
 const C = 'commune', R = 'rare', E = 'epique';
 const planche = (nom) => `assets/collections/${nom}.webp`;
@@ -202,6 +209,15 @@ const DEFINITIONS = [
     ],
   },
   {
+    id: 'teintures', nom: 'Les Teintures', source: 'atelier',
+    pieces: [
+      { id: 'argent', genre: 'teinture', nom: 'Teinture d’argent', matiere: 'argent', pastille: '#d5dae2' },
+      { id: 'jade', genre: 'teinture', nom: 'Teinture de jade', matiere: 'jade', pastille: '#3fbf7f' },
+      { id: 'obsidienne', genre: 'teinture', nom: 'Teinture d’obsidienne', matiere: 'obsidienne', pastille: '#3a3340' },
+      { id: 'amethyste', genre: 'teinture', nom: 'Teinture d’améthyste', matiere: 'amethyste', pastille: '#9a5fd6' },
+    ],
+  },
+  {
     id: 'citrouilles', nom: 'La Nuit des Citrouilles', source: 'saison', planches: ['citrouilles', 'citrouilles2'],
     emblemes: [
       ['citrouille-casquee', 'Citrouille casquée', C],
@@ -338,4 +354,10 @@ export const piece = (id) => (typeof id === 'string' && Object.prototype.hasOwnP
 export const pieceDe = (collectionId, court) => (piece(`${collectionId}.${court}`) ? `${collectionId}.${court}` : null);
 
 /** Ce que tout joueur porte au départ : son blason avant d'avoir rien gagné. */
-export const BLASON_DE_DEPART = Object.freeze({ embleme: null, cadre: 'depart.cadre', banniere: 'depart.banniere', grade: 'depart.grade', epithete: null });
+export const BLASON_DE_DEPART = Object.freeze({ embleme: null, cadre: 'depart.cadre', banniere: 'depart.banniere', grade: 'depart.grade', epithete: null, teinture: null });
+
+/** La matière (clé de js/teintures.js) de la teinture que porte ce blason, ou null : les troupes telles qu'elles sont peintes. */
+export function matiereDe(blason) {
+  const p = blason ? piece(blason.teinture) : null;
+  return p && p.genre === 'teinture' ? p.matiere : null;
+}

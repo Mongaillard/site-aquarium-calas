@@ -17,6 +17,9 @@ import {
 import { FORMES, MOTIFS, htmlEmbleme, svgCadre, svgBanniere, htmlBlason, htmlPiece, titreDuBlason } from '../js/blason.js';
 import { ouvrirProgression, htmlBandeau, htmlFinDePartie, installerProgression, reglerPeuple } from '../js/progression-ecrans.js';
 import { pieceEnPhrase } from '../js/collections-ecrans.js';
+import { TEINTURES, reglesDeTeinture, acierDeTeinture, teindrePixels } from '../js/teintures.js';
+import { MODELES, ALPHA_EQUIPE } from '../js/modele3d.js';
+import { matiereDe } from '../js/collections-config.js';
 import { PROGRESSION_KEY } from '../js/save.js';
 import { ICONES } from '../js/icones.js';
 
@@ -98,7 +101,7 @@ console.log('\n--- Le profil ---');
     egal(p.pieces, ['depart.grade', 'depart.banniere', 'depart.cadre']) && egal(p.blason, BLASON_DE_DEPART) && p.eclats === 0
     && egal(p.route, { points: 0, passe: false, pris: { gratuit: [], passe: [] } }) && egal(p.selection, { jour: '', achats: 0 }) && titreDe(p) === 'Villageois');
   check('il survit tel quel à un aller-retour', egal(migrerProfil(JSON.parse(JSON.stringify(p))), p));
-  const plein = { ...p, pieces: [...p.pieces, 'maree.requin-couronne', 'ligues.recrue', 'sables.cadre'], blason: { embleme: 'maree.requin-couronne', cadre: 'sables.cadre', banniere: 'depart.banniere', grade: 'ligues.recrue', epithete: null },
+  const plein = { ...p, pieces: [...p.pieces, 'maree.requin-couronne', 'ligues.recrue', 'sables.cadre'], blason: { embleme: 'maree.requin-couronne', cadre: 'sables.cadre', banniere: 'depart.banniere', grade: 'ligues.recrue', epithete: null, teinture: null },
     route: { points: 450, passe: true, pris: { gratuit: [1, 2], passe: [1] } } };
   check('… un profil garni aussi', egal(migrerProfil(JSON.parse(JSON.stringify(plein))), plein));
   const ancien = { ...profilNeuf(), elo: 300, ligue: 3, plusHauteLigue: 3, promotions: [2, 3] };
@@ -253,7 +256,7 @@ console.log('\n--- Le blason ---');
   let b = p;
   for (const [genre, id] of [['grade', 'monstres.grade'], ['epithete', 'banquet.epithete'], ['cadre', 'sables.cadre'], ['banniere', 'maree.banniere'], ['embleme', 'gaffes.general-boulette']]) b = equiper(b, genre, id).profil;
   check('porter ses pièces : le titre se compose de deux mots — « Dompteur du Banquet »', titreDe(b) === 'Dompteur du Banquet' && titreDuBlason(b.blason) === 'Dompteur du Banquet'
-    && egal(b.blason, { embleme: 'gaffes.general-boulette', cadre: 'sables.cadre', banniere: 'maree.banniere', grade: 'monstres.grade', epithete: 'banquet.epithete' }));
+    && egal(b.blason, { embleme: 'gaffes.general-boulette', cadre: 'sables.cadre', banniere: 'maree.banniere', grade: 'monstres.grade', epithete: 'banquet.epithete', teinture: null }));
   check('… on peut retirer l’autocollant et la suite du titre, jamais le cadre, la bannière ni le premier mot',
     equiper(b, 'embleme', null).profil.blason.embleme === null && titreDe(equiper(b, 'epithete', null).profil) === 'Dompteur'
     && ['cadre', 'banniere', 'grade'].every((genre) => equiper(b, genre, null).erreur === 'obligatoire'));
@@ -282,6 +285,66 @@ console.log('\n--- Le blason ---');
   check('la carte de joueur : la bannière, le médaillon, l’autocollant, le titre', /piece-banniere/.test(carte) && /blason-medaillon/.test(carte) && /gaffes\.webp/.test(carte) && /<b>Dompteur du Banquet<\/b><small>Ligue de Bois<\/small>/.test(carte));
   check('une pièce inconnue ne casse rien : le cadre et la bannière de départ, pas d’autocollant',
     svgCadre('rien') === svgCadre('depart.cadre') && svgBanniere(null) === svgBanniere('depart.banniere') && htmlPiece('rien') === '' && /blason-vide/.test(htmlBlason(null)));
+}
+
+// --- Les teintures des troupes ---------------------------------------------------------------------
+console.log('\n--- Les teintures ---');
+{
+  const teintures = collection('teintures').pieces;
+  const sw = fs.readFileSync(path.join(RACINE, 'sw.js'), 'utf8');
+  check('quatre teintures, chacune une matière que le jeu sait poser : argent, jade, obsidienne, améthyste',
+    egal(teintures.map((id) => PIECES[id].matiere), ['argent', 'jade', 'obsidienne', 'amethyste'])
+    && teintures.every((id) => PIECES[id].genre === 'teinture' && Object.prototype.hasOwnProperty.call(TEINTURES, PIECES[id].matiere) && /^#[0-9a-f]{6}$/.test(PIECES[id].pastille)));
+  check('elles se vendent une à une, en Éclats : 300, 600, 600, 900 — et nulle part ailleurs (ni coffre, ni route, ni ligue)',
+    egal(teintures.map((id) => C.atelier[id]), [300, 600, 600, 900]) && egal(Object.keys(C.atelier), teintures) && collection('teintures').source === 'atelier'
+    && !JSON.stringify([S.route, R.ligues]).includes('teinture'));
+  const images = ['origine', ...Object.keys(TEINTURES)].flatMap((m) => ['atlante', 'solarien'].map((c) => `assets/teintures/${m}-${c}.webp`));
+  check('chaque matière a son image sur le soldat de chaque peuple, et celle des troupes d’origine : dix images, gardées hors ligne',
+    images.length === 10 && images.every((f) => fs.existsSync(path.join(RACINE, f)) && sw.includes(`'./${f}'`)), images.filter((f) => !fs.existsSync(path.join(RACINE, f))).join(', '));
+  // Acheter, porter, retirer.
+  const riche = { ...profilNeuf(), eclats: 700 };
+  const achat = acheterPiece(riche, 'teintures.jade', '2026-10-09');
+  check('acheter une teinture : 600 Éclats, la pièce arrive — sans toucher à la sélection du jour',
+    achat.profil.eclats === 100 && achat.profil.pieces.includes('teintures.jade') && achat.profil.selection.achats === 0
+    && prixDePiece(riche, 'teintures.jade', '2026-10-09') === 600 && prixDePiece(riche, 'teintures.jade') === 600);
+  check('… pas deux fois, pas sans les Éclats', acheterPiece(achat.profil, 'teintures.jade', '2026-10-09').erreur === 'pasEnVente'
+    && egal(acheterPiece(achat.profil, 'teintures.amethyste', '2026-10-09'), { erreur: 'fonds', manque: 800 }));
+  const porte = equiper(achat.profil, 'teinture', 'teintures.jade').profil;
+  check('la porter : c’est la matière des troupes du joueur en partie ; la retirer : les troupes telles qu’elles sont',
+    porte.blason.teinture === 'teintures.jade' && matiereDe(porte.blason) === 'jade' && matiereDe(equiper(porte, 'teinture', null).profil.blason) === null
+    && matiereDe(profilNeuf().blason) === null && matiereDe(null) === null && equiper(riche, 'teinture', 'teintures.jade').erreur === 'pasPossedee'
+    && equiper(porte, 'teinture', 'sables.cadre').erreur === 'genre' && egal(migrerProfil(JSON.parse(JSON.stringify(porte))), porte));
+  check('une teinture ne change rien au combat : les règles ne la connaissent pas, seul le dessin la lit',
+    !/teinture/i.test(fs.readFileSync(path.join(RACINE, 'js/game.js'), 'utf8') + fs.readFileSync(path.join(RACINE, 'js/ai.js'), 'utf8') + fs.readFileSync(path.join(RACINE, 'js/entities.js'), 'utf8'))
+    && /clip\.variantes\.teinte\(this\.teinture\)/.test(fs.readFileSync(path.join(RACINE, 'js/render.js'), 'utf8'))
+    && /this\.renderer\.teinture = matiereDe\(lireProgression\(\)\.blason\)/.test(fs.readFileSync(path.join(RACINE, 'js/main.js'), 'utf8')));
+  check('… et elle n’habille que les troupes du joueur : ses alliés gardent le bleu de leur bord, ses adversaires le rouge',
+    /this\.teinture && joueur === this\.world\.humanIndex \?/.test(fs.readFileSync(path.join(RACINE, 'js/render.js'), 'utf8'))
+    && /this\.world\.bordDe\(joueur\) === 0 \? clip\.variantes\.bleu : clip\.variantes\.rouge/.test(fs.readFileSync(path.join(RACINE, 'js/render.js'), 'utf8')));
+
+  // Les pixels : ce qui change, ce qui ne change jamais.
+  const hsl = (r, g, b) => { const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, l = (max + min) / 510; if (!d) return [0, 0, l]; const s = max + min > 255 ? d / (510 - max - min) : d / (max + min); const t = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4; return [t * 60, s, l]; };
+  const OR_ = [212, 160, 40], OMBRE = [150, 92, 22], PEAU = [198, 130, 84], BOIS = [150, 104, 62], LIN = [246, 240, 222], ENCRE_ = [40, 28, 14], ACIER_ = [128, 130, 136], TISSU = [40, 90, 220];
+  const essai = (matiere, modele, ...pixels) => { const p = new Uint8ClampedArray(pixels.flatMap(([c, a = 255]) => [...c, a])); teindrePixels(p, reglesDeTeinture(matiere, modele), acierDeTeinture(matiere, modele)); return pixels.map((_, i) => [...p.slice(i * 4, i * 4 + 3)]); };
+  const intacts = (matiere, modele) => egal(essai(matiere, modele, [PEAU], [BOIS], [LIN], [ENCRE_], [TISSU, ALPHA_EQUIPE], [OR_, ALPHA_EQUIPE], [OR_, 0]), [PEAU, BOIS, LIN, ENCRE_, TISSU, OR_, OR_]);
+  check('sur toute troupe, pour toute teinture : la peau, le bois, le lin blanc, le trait d’encre et le tissu du camp ne bougent pas',
+    Object.keys(TEINTURES).every((m) => ['solMilitia', 'militia', 'solHorseArcher', 'villager', 'solVillager'].every((modele) => intacts(m, modele))));
+  check('l’or change de matière, en pleine lumière comme dans l’ombre', Object.keys(TEINTURES).every((m) => { const [a, b] = essai(m, 'solMilitia', [OR_], [OMBRE]); return !egal(a, OR_) && !egal(b, OMBRE); }));
+  const [jade] = essai('jade', 'solMilitia', [OR_]), [amethyste] = essai('amethyste', 'solMilitia', [OR_]), [argent] = essai('argent', 'solMilitia', [OR_]), [obsidienne] = essai('obsidienne', 'solMilitia', [OR_]);
+  check('… le jade est vert, l’améthyste violette, l’argent gris clair, l’obsidienne presque noire',
+    Math.abs(hsl(...jade)[0] - 150) < 6 && Math.abs(hsl(...amethyste)[0] - 280) < 6 && hsl(...argent)[1] < 0.15 && hsl(...argent)[2] > 0.45 && hsl(...obsidienne)[2] < 0.3,
+    [jade, amethyste, argent, obsidienne].map((c) => hsl(...c).map((v) => Math.round(v * 100) / 100).join('/')).join(' · '));
+  check('… aucune ne donne un bleu ou un turquoise d’allié, ni un rouge ou un orangé d’adversaire',
+    [jade, amethyste, argent, obsidienne].every((c) => { const [t, s] = hsl(...c); return s < 0.3 || (!(t >= 170 && t <= 260) && !(t >= 330 || t <= 40)); }));
+  check('les troupes en armure de plates changent aussi d’acier — sauf en argent, qui est déjà leur matière ; les autres gardent leur gris',
+    ['jade', 'obsidienne', 'amethyste'].every((m) => ['militia', 'champion', 'knight'].every((modele) => !egal(essai(m, modele, [ACIER_])[0], ACIER_)) && egal(essai(m, 'villager', [ACIER_])[0], ACIER_) && egal(essai(m, 'solMilitia', [ACIER_])[0], ACIER_))
+    && acierDeTeinture('argent', 'militia') === null && Math.abs(hsl(...essai('jade', 'champion', [ACIER_])[0])[0] - 150) < 8);
+  check('béliers, catapultes, Chacal dressé et Mercenaire atlante ne se teignent pas ; le Sphinx, lui, change de la tête aux pattes',
+    ['ram', 'catapult', 'solRam', 'solCatapult', 'solScout', 'triton'].every((modele) => MODELES[modele] && Object.keys(TEINTURES).every((m) => reglesDeTeinture(m, modele).length === 0 && acierDeTeinture(m, modele) === null))
+    && !egal(essai('jade', 'solHydra', [[214, 150, 84]])[0], [214, 150, 84]) && egal(essai('jade', 'solMilitia', [[214, 150, 84]])[0], [214, 150, 84])
+    && ['solHydra', 'militia', 'champion', 'knight'].every((modele) => MODELES[modele]));
+  check('une matière inconnue ne teint rien, et rien ne lève d’erreur', reglesDeTeinture('rubis', 'militia').length === 0 && acierDeTeinture('rubis', 'militia') === null
+    && teindrePixels(new Uint8ClampedArray([...OR_, 255]), [], null) === 0 && teindrePixels(new Uint8ClampedArray(0), reglesDeTeinture('jade', 'militia')) === 0);
 }
 
 // --- Le calendrier des saisons ---------------------------------------------------------------------
@@ -488,7 +551,7 @@ console.log('\n--- Les écrans ---');
   // Le blason.
   ouvrirProgression('blason');
   page = noeud.innerHTML;
-  check('le blason à composer : cinq rayons — autocollant, cadre, bannière, les deux mots du titre — et seulement ce qu’on possède',
+  check('le blason à composer : six rayons — autocollant, cadre, bannière, les deux mots du titre, la teinture des troupes — et seulement ce qu’on possède',
     egal([...page.matchAll(/class="col-choix-liste" data-genre="(\w+)"/g)].map((m) => m[1]), GENRES) && (page.match(/data-act="porter"/g) || []).length === lu().pieces.length && propre(page));
   toucher({ act: 'porter', arg: `${col.id}.grade`, i: 'b' });
   check('… choisir un titre : il s’écrit sur la carte', lu().blason.grade === `${col.id}.grade` && new RegExp(`<b>${PIECES[`${col.id}.grade`].nom}</b>`).test(noeud.innerHTML) && /<h2>Mon blason<\/h2>/.test(noeud.innerHTML));
@@ -524,7 +587,7 @@ console.log('\n--- Les écrans ---');
   ouvrirProgression('boutique');
   page = noeud.innerHTML; t = texte(page);
   check('la boutique : le Passe de la saison, trois autocollants du jour en Éclats, la collection à vendre en Couronnes',
-    /<b>Passe de saison<\/b>/.test(page) && (page.match(/data-act="acheterPiece"/g) || []).length === 3 && /data-ecran="collection" data-arg="cour">/.test(page) && /environ 3 €/.test(t.replace(/\u00a0/g, ' ')) && propre(page.replace(/\d,99/g, '')));
+    /<b>Passe de saison<\/b>/.test(page) && (page.match(/data-act="acheterPiece" data-arg="(?!teintures)/g) || []).length === 3 && /data-ecran="collection" data-arg="cour">/.test(page) && /environ 3 €/.test(t.replace(/\u00a0/g, ' ')) && propre(page.replace(/\d,99/g, '')));
   check('… les deux monnaies sont expliquées en une phrase', /Les Couronnes s’achètent\. Les Éclats se gagnent en jouant/.test(t));
   const duJour = page.match(/data-act="acheterPiece" data-arg="([\w.-]+)" data-i="s"/)[1];
   toucher({ act: 'acheterPiece', arg: duJour, i: 's' });
@@ -576,9 +639,32 @@ console.log('\n--- Les écrans ---');
     const id = noeud.innerHTML.match(/data-act="acheterPiece" data-arg="([\w.-]+)" data-i="s"/)[1];
     toucher({ act: 'acheterPiece', arg: id, i: 's' });
     toucher({ act: 'acheterPiece', arg: id, i: 's1' });
-    if (k === 0) check('… un acheté : il en reste deux, et le texte le dit', (noeud.innerHTML.match(/data-act="acheterPiece"/g) || []).length === 2 && /Deux autocollants qui te manquent/.test(texte(noeud.innerHTML)));
+    if (k === 0) check('… un acheté : il en reste deux, et le texte le dit', (noeud.innerHTML.match(/data-act="acheterPiece" data-arg="(?!teintures)/g) || []).length === 2 && /Deux autocollants qui te manquent/.test(texte(noeud.innerHTML)));
   }
-  check('… les trois achetés : plus de bouton, « d’autres demain »', !/data-act="acheterPiece"/.test(noeud.innerHTML) && /Tu as pris tes autocollants du jour\. D’autres demain/.test(texte(noeud.innerHTML)) && lu().pieces.length === 6);
+  check('… les trois achetés : plus de bouton, « d’autres demain »', !/data-act="acheterPiece" data-arg="(?!teintures)/.test(noeud.innerHTML) && /Tu as pris tes autocollants du jour\. D’autres demain/.test(texte(noeud.innerHTML)) && lu().pieces.length === 6);
+
+  // Les teintures : à la boutique, dans leur collection, sur le blason.
+  poser({ ...profilNeuf(), saison, eclats: 1000 });
+  ouvrirProgression('boutique');
+  check('la boutique a son rayon des teintures : quatre matières, en Éclats, chacune sur le soldat du peuple du joueur',
+    /<h3>Teintures des troupes<\/h3>/.test(noeud.innerHTML) && (noeud.innerHTML.match(/data-act="acheterPiece" data-arg="teintures\.\w+" data-i="s"/g) || []).length === 4
+    && /assets\/teintures\/jade-atlante\.webp/.test(noeud.innerHTML));
+  toucher({ act: 'acheterPiece', arg: 'teintures.argent', i: 's' });
+  toucher({ act: 'acheterPiece', arg: 'teintures.argent', i: 's1' });
+  check('… deux touchers : la Teinture d’argent est achetée, 300 Éclats en moins, et l’écran dit où la porter',
+    lu().pieces.includes('teintures.argent') && lu().eclats === 700 && /Teinture d’argent : dans ton album\. Porte-la depuis ton blason/.test(texte(noeud.innerHTML)) && /<h2>Boutique<\/h2>/.test(noeud.innerHTML));
+  ouvrirProgression('blason');
+  check('sur le blason : le rayon « Teinture des troupes », avec les troupes d’origine et la teinture achetée',
+    /<h3>Teinture des troupes<\/h3>/.test(noeud.innerHTML) && /data-act="retirer" data-arg="teinture"/.test(noeud.innerHTML) && /assets\/teintures\/origine-atlante\.webp/.test(noeud.innerHTML)
+    && /data-act="porter" data-arg="teintures\.argent" data-i="b"/.test(noeud.innerHTML));
+  toucher({ act: 'porter', arg: 'teintures.argent', i: 'b' });
+  check('… la porter, puis revenir aux troupes d’origine', lu().blason.teinture === 'teintures.argent' && (() => { toucher({ act: 'retirer', arg: 'teinture' }); return lu().blason.teinture === null; })());
+  reglerPeuple('solarien');
+  ouvrirProgression('collection', 'teintures');
+  check('la collection des teintures : ses quatre pièces, leur prix, et le soldat du peuple choisi (ici le Garde solarien)',
+    (noeud.innerHTML.match(/class="col-lot/g) || []).length === 4 && /assets\/teintures\/obsidienne-solarien\.webp/.test(noeud.innerHTML) && /jamais le tissu de ton camp/.test(texte(noeud.innerHTML))
+    && /data-act="acheterPiece" data-arg="teintures\.jade"/.test(noeud.innerHTML) && /data-act="porter" data-arg="teintures\.argent"/.test(noeud.innerHTML));
+  reglerPeuple('atlante');
 
   // Un thème qui revient : l'écran de la saison dit ce qu'on a déjà, Passe compris.
   poser({ ...profilNeuf(), saison, pieces: [...profilNeuf().pieces, ...theme.pieces] });

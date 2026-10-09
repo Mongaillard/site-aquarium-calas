@@ -18,7 +18,7 @@ import { UNIT_TYPES, DEFAULT_CIV, GAME_MODES, nomDe, portraitDe } from './config
 import { iconeSVG } from './icones.js';
 import { ficheDeTroupe } from './fiches-troupes.js';
 import { PIECES } from './collections-config.js';
-import { htmlPiece, htmlMedaillon, titreDuBlason } from './blason.js';
+import { htmlPiece, htmlMedaillon, titreDuBlason, reglerPeupleDesTeintures } from './blason.js';
 import {
   brancherCollections, ECRANS_DES_COLLECTIONS, agirSurLesCollections, eclats, htmlJoueur, htmlBourses,
   aPrendreDansLaSaison, htmlPiecesDuCoffre, htmlRayonDesCollections, pieceEnEtiquette, resumeDesGains,
@@ -589,7 +589,7 @@ export function jourLocal(date = new Date()) {
 brancherCollections({ montrer, retenir, nombre, pluriel, couronnes, euros, coffre, heure, ligueEnPhrase, jour: () => jourLocal() });
 
 /** Le peuple dont les écrans montrent les noms et les portraits. */
-export function reglerPeuple(nouveau) { civ = nouveau || DEFAULT_CIV; }
+export function reglerPeuple(nouveau) { civ = nouveau || DEFAULT_CIV; reglerPeupleDesTeintures(civ); }
 
 /**
  * À appeler une fois : pose les écouteurs. Tout bouton qui porte `data-ecran`

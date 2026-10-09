@@ -16,7 +16,7 @@ import {
   avancementDe, equiper, prixDePiece, acheterPiece, acheterCollection, catalogueBoutique,
   etatDeLaSaison, ouvrirLaSaison, prendrePalier, prendreTout, acheterPasse,
 } from './progression.js';
-import { htmlEmbleme, htmlPiece, htmlBlason, htmlMedaillon, svgBanniere, titreDuBlason } from './blason.js';
+import { htmlEmbleme, htmlPiece, htmlBlason, htmlMedaillon, svgBanniere, titreDuBlason, htmlSansTeinture } from './blason.js';
 import { iconeSVG } from './icones.js';
 
 /** Les outils prêtés par js/progression-ecrans.js : montrer, retenir, nombre, pluriel, couronnes, euros, jour, heure, coffre. */
@@ -32,7 +32,9 @@ function environ(couronnes) {
   return `environ ${Math.round(couronnes * lot.prixCentimes / lot.couronnes / 100)}\u00a0€`;
 }
 
-const SOURCES = { coffres: 'Dans les coffres', boutique: 'À la boutique', ligues: 'Par les ligues', saison: 'Route de saison' };
+const SOURCES = { coffres: 'Dans les coffres', boutique: 'À la boutique', ligues: 'Par les ligues', saison: 'Route de saison', atelier: 'En Éclats' };
+/** Les genres de pièces qui s'accordent au féminin : « la Bannière », « Portée ». */
+const FEMININS = ['banniere', 'teinture'];
 /** La rareté d'un autocollant : « Commun », « Rare », « Épique ». */
 const rarete = (p) => `<span class="prog-categorie" data-categorie="${p.rarete}">${R.collections.raretes[p.rarete]}</span>`;
 /** « le titre « Fermier » », « la Bannière de la Basse-cour », « l'Étendard de la Nuit », « le Cadre d'Or » : une pièce dans une phrase. */
@@ -41,7 +43,7 @@ export function pieceEnPhrase(id) {
   if (p.genre === 'grade') return `le titre «\u00a0${p.nom}\u00a0»`;
   if (p.genre === 'epithete') return `le titre «\u00a0…\u00a0${p.nom}\u00a0»`;
   if (p.genre === 'embleme') return `l’autocollant «\u00a0${p.nom}\u00a0»`;
-  return `${/^[AEÉIOU]/.test(p.nom) ? 'l’' : p.genre === 'banniere' ? 'la ' : 'le '}${p.nom}`;
+  return `${/^[AEÉIOU]/.test(p.nom) ? 'l’' : FEMININS.includes(p.genre) ? 'la ' : 'le '}${p.nom}`;
 }
 /** Une pièce derrière deux points (« Gagné : … ») : un mot de titre se dit « titre « … » », le reste par son nom. */
 export function pieceEnEtiquette(id) {
@@ -91,7 +93,7 @@ function piedDePiece(profil, id, confirmer) {
   const p = PIECES[id];
   if (possede(profil, id)) {
     const porte = profil.blason[p.genre] === id;
-    return porte ? `<span class="col-porte">${p.genre === 'banniere' ? 'Portée' : 'Porté'}</span>` : `<button class="btn small" data-act="porter" data-arg="${id}">Porter</button>`;
+    return porte ? `<span class="col-porte">${FEMININS.includes(p.genre) ? 'Portée' : 'Porté'}</span>` : `<button class="btn small" data-act="porter" data-arg="${id}">Porter</button>`;
   }
   const prix = prixDePiece(profil, id, o.jour());
   if (prix === null) return `<span class="col-verrou">${iconeSVG('cadenas', 12, 'inline')}</span>`;
@@ -150,6 +152,8 @@ function ecranCollection(id, profil, message = '', { confirmer = '' } = {}) {
       chapeau = c.id === saison.theme ? `La collection de la saison ${saison.numero} : elle se gagne palier après palier, sur la route de la saison.`
         : 'La collection d’une autre saison.';
       if (c.id === saison.theme) chapeau += `</p><div class="modal-actions"><button class="btn primary" data-ecran="saison">${iconeSVG('saison', 16, 'inline')} Voir la route</button></div><p class="col-vide">`;
+    } else if (c.source === 'atelier') {
+      chapeau = 'Une teinture habille tes troupes d’une autre matière, en partie : l’or et l’acier changent, jamais le tissu de ton camp. Elle ne change rien au combat. Chacune s’achète en Éclats.';
     } else {
       chapeau = 'Les cadeaux des ligues : ils arrivent à chaque promotion.';
     }
@@ -166,7 +170,7 @@ function ecranCollection(id, profil, message = '', { confirmer = '' } = {}) {
 
 // --- Le blason ---------------------------------------------------------------------
 
-const TITRES_DES_GENRES = { embleme: 'Autocollant', cadre: 'Cadre', banniere: 'Bannière', grade: 'Titre : le premier mot', epithete: 'Titre : la suite' };
+const TITRES_DES_GENRES = { embleme: 'Autocollant', cadre: 'Cadre', banniere: 'Bannière', grade: 'Titre : le premier mot', epithete: 'Titre : la suite', teinture: 'Teinture des troupes' };
 
 function ecranBlason(profil, message = '') {
   const sections = GENRES.map((genre) => {
@@ -174,11 +178,16 @@ function ecranBlason(profil, message = '') {
     const porte = profil.blason[genre];
     const choix = miennes.map((id) => `
       <button class="col-choix ${porte === id ? 'porte' : ''}" data-act="porter" data-arg="${id}" data-i="b" aria-pressed="${porte === id}" aria-label="${PIECES[id].nom}">${htmlPiece(id)}</button>`);
-    // (L'autocollant et la suite du titre peuvent manquer.)
+    // (L'autocollant, la suite du titre et la teinture peuvent manquer.)
     if (genre === 'embleme' || genre === 'epithete') {
       choix.unshift(`<button class="col-choix ${porte === null ? 'porte' : ''}" data-act="retirer" data-arg="${genre}" aria-pressed="${porte === null}"><span class="piece-vignette piece-mot"><b>${genre === 'embleme' ? 'Aucun' : 'Rien'}</b></span></button>`);
+    } else if (genre === 'teinture') {
+      choix.unshift(`<button class="col-choix ${porte === null ? 'porte' : ''}" data-act="retirer" data-arg="teinture" aria-pressed="${porte === null}" aria-label="Sans teinture : les troupes telles qu’elles sont">${htmlSansTeinture()}</button>`);
     }
-    const vide = genre === 'embleme' && !miennes.length ? '<p class="hint">Ton premier autocollant t’attend dans un coffre.</p>' : '';
+    let vide = genre === 'embleme' && !miennes.length ? '<p class="hint">Ton premier autocollant t’attend dans un coffre.</p>' : '';
+    if (genre === 'teinture') {
+      vide = `<p class="hint">En partie, l’or et l’acier de tes troupes changent de matière ; le tissu de ton camp ne change jamais. <button class="btn small" data-ecran="collection" data-arg="teintures">${miennes.length ? 'Les autres teintures' : 'Voir les teintures'}</button></p>`;
+    }
     return `<h3>${TITRES_DES_GENRES[genre]}</h3><div class="col-choix-liste" data-genre="${genre}">${choix.join('')}</div>${vide}`;
   }).join('');
   o.montrer('Mon blason', `
@@ -376,6 +385,19 @@ export function htmlRayonDesCollections(profil, c, confirmer) {
         ${bouton}
       </li>`;
   }).join('');
+  const teintures = c.atelier.map((x) => {
+    const p = PIECES[x.piece];
+    const bouton = x.possedee ? '<span class="prog-acquis">À toi</span>'
+      : c.eclats < x.prix ? `<button class="btn small prog-cher" data-act="acheterPiece" data-arg="${x.piece}" data-i="s">${eclats(x.prix)}</button>`
+        : confirmer === x.piece ? `<button class="btn small danger" data-act="acheterPiece" data-arg="${x.piece}" data-i="s1">Encore : ${eclats(x.prix)}</button>`
+          : `<button class="btn small primary" data-act="acheterPiece" data-arg="${x.piece}" data-i="s">${eclats(x.prix)}</button>`;
+    return `
+      <li class="prog-article ${x.possedee ? 'acquis' : ''}">
+        <span class="prog-vignette col-vignette">${htmlPiece(x.piece)}</span>
+        <span class="prog-offre-texte"><b>${p.nom}</b><small>${x.possedee ? 'À porter depuis ton blason.' : 'Pour toutes tes troupes'}</small></span>
+        ${bouton}
+      </li>`;
+  }).join('');
   const lots = c.collections.map((lot) => {
     const col = collectionDuJeu(lot.collection);
     return `
@@ -395,6 +417,7 @@ export function htmlRayonDesCollections(profil, c, confirmer) {
     <h3>Autocollants du jour</h3>
     <p class="subtitle">${texteDeLaSelection(c)}</p>
     ${selection ? `<ul class="prog-articles">${selection}</ul>` : ''}
+    ${teintures ? `<h3>Teintures des troupes</h3><p class="subtitle">L’or et l’acier de tes troupes dans une autre matière. En Éclats.</p><ul class="prog-articles">${teintures}</ul>` : ''}
     ${lots ? `<h3>Collections</h3><p class="subtitle">Une collection entière d’un coup. Tout son contenu est affiché : rien n’y est tiré au sort.</p><ul class="prog-articles">${lots}</ul>` : ''}`;
 }
 
@@ -452,13 +475,14 @@ export function agirSurLesCollections(act, arg, i, profil, revenir) {
     const montrer = (prof, message, confirmer) => (boutique ? revenir(prof, message, confirmer) : ecranCollection(p ? p.collection : '', prof, message, { confirmer }));
     const prix = prixDePiece(profil, arg, o.jour());
     if (prix === null) { montrer(profil, ''); return true; }
-    if (profil.eclats < prix) { montrer(profil, `Il te manque ${eclats(prix - profil.eclats)} pour cet autocollant.`); return true; }
+    if (profil.eclats < prix) { montrer(profil, `Il te manque ${eclats(prix - profil.eclats)} pour ${p.genre === 'teinture' ? 'cette teinture' : 'cet autocollant'}.`); return true; }
     if (i !== '1' && i !== 's1') { montrer(profil, '', arg); return true; }
     const r = acheterPiece(profil, arg, o.jour());
     if (r.erreur) { montrer(profil, ''); return true; }
     const ok = o.retenir(r.profil);
     const enPlus = r.evenements.filter((e) => e.type === 'piece' && e.origine === 'collection').map((e) => pieceEnPhrase(e.piece));
-    montrer(r.profil, ok ? `${p.nom} : dans ton album.${enPlus.length ? ` La collection te donne ${enPlus.join(' et ')}.` : ''}` : REFUS);
+    const suite = p.genre === 'teinture' ? ' Porte-la depuis ton blason pour la voir en partie.' : enPlus.length ? ` La collection te donne ${enPlus.join(' et ')}.` : '';
+    montrer(r.profil, ok ? `${p.nom} : dans ton album.${suite}` : REFUS);
     return true;
   }
   if (act === 'acheterCollection') {

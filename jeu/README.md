@@ -809,7 +809,7 @@ Basse-cour, La Grande Marée, Les Sables, Le Chantier, Les Gaffes de guerre, Les
 Monstres, Le Banquet, La Cour, et une par saison. Chacune a neuf
 **autocollants** dessinés (cinq communs, trois rares, un épique ; dix-huit pour
 une saison), et à ses couleurs un **grade**, une **épithète**, une **bannière**
-et un **cadre**. 189 pièces en tout. Ce qu'on porte fait le **blason** : le
+et un **cadre**. Avec les quatre teintures des troupes, 193 pièces en tout. Ce qu'on porte fait le **blason** : le
 cadre, l'autocollant posé dessus, la bannière en fond, et un titre en deux mots
 qui se mélangent d'une collection à l'autre (« Dompteur du Banquet »). Le
 blason se voit à l'accueil et à la fin d'une partie classée ; il ne change rien
@@ -823,6 +823,26 @@ au combat (aucune pièce n'entre dans `js/game.js`).
 | Les ligues | Chaque promotion donne une pièce de la collection « Les Ligues » : titres Recrue, Capitaine, Stratège, Empereur, Légende ; bannières de Bronze et de Fer ; cadres d'Or, d'Orichalque et des Légendes |
 | La boutique | La Cour, vendue entière : ses treize pièces pour 300 Couronnes, contenu affiché avant l'achat |
 | La saison | Sa route, ci-dessous |
+| L'atelier | Les quatre teintures des troupes, une à une : 300, 600, 600 ou 900 Éclats |
+
+**Les teintures** (`js/teintures.js`) habillent les troupes du joueur d'une
+autre matière : argent, jade, obsidienne, améthyste. L'or des armures change —
+et l'acier, pour les troupes en armure de plates (Milicien, Champion,
+Cavalier) ; la peau, le pelage d'une monture, le bois, le lin blanc et le
+trait d'encre restent ce qu'ils sont, et **le tissu à la couleur du camp ne
+change jamais** (ses pixels sont marqués à la cuisson : on reconnaît toujours
+un camp à son bleu ou à son rouge). Le Sphinx, d'or de la tête aux pattes,
+change tout entier ; béliers, catapultes, Chacal dressé et Mercenaire atlante
+ne se teignent pas (la teinture n'y laissait que des taches). Une teinture se
+porte depuis le blason et ne vaut que pour ses propres troupes : alliés et
+adversaires gardent leur allure. Techniquement, c'est une copie de plus de
+l'atlas cuit d'une troupe, fabriquée au premier dessin et rendue quand on ne
+la dessine plus, comme la copie de l'autre camp (`variantesEquipe`,
+`js/sprites.js`) ; les règles du jeu n'en savent rien. Pour ajouter une
+matière : une entrée dans `TEINTURES` (éviter les teintes de 170 à 260°, celles
+des camps alliés, et les rouges et orangés des camps adverses), une pièce dans
+la collection « Les Teintures », son prix dans `collections.atelier`, et ses
+deux images dans `assets/teintures`.
 
 **Une saison par mois de calendrier** (`saisons`, `js/progression-config.js` ;
 la saison 1 est octobre 2026 : La Nuit des Citrouilles, puis Le Grand Tournoi
@@ -977,6 +997,7 @@ jeu/
 │   ├── collections-config.js  le catalogue des pièces de collection : autocollants, cadres, bannières, mots de titre
 │   ├── collections-ecrans.js  l'Album, une collection, le blason, la route de la saison et le Passe
 │   ├── blason.js           le dessin des pièces : un autocollant est une case de sa planche, cadres et bannières sont tracés
+│   ├── teintures.js        les teintures des troupes : où est l'or sur un modèle, et ce que chaque matière en fait
 │   ├── rangement-durable.js   second rangement du profil, là où la page en offre un
 │   ├── render.js         Canvas 2D : sol en tronçons, entités, brouillard, minimap
 │   ├── sprites.js        atlas d'illustrations, couleur d'équipe, textures de sol
