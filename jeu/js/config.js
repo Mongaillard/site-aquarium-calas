@@ -6,7 +6,7 @@
 //   - temps en secondes
 // ---------------------------------------------------------------------------
 
-import { LANGUE, txt } from './langue.js';
+import { LANGUE, txt, accord, SANS_TRADUCTION } from './langue.js';
 
 export const TILE = 32;
 export const TICKS_PER_SECOND = 20;
@@ -709,4 +709,33 @@ export function textesDesTables(visite) {
   for (const ressource of Object.keys(RESOURCE_LABELS)) visite(RESOURCE_LABELS, ressource);
 }
 
-if (LANGUE !== 'fr') textesDesTables((objet, champ) => { objet[champ] = txt(objet[champ]); });
+/** Le pluriel français d'un nom : celui qui est écrit, sinon la règle (« s », sauf après s, x ou z). */
+const plurielFrancais = (fiche) => fiche.pluriel || (/[sxz]$/.test(fiche.name) ? fiche.name : `${fiche.name}s`);
+/** Les fiches dont le nom se compte (« 3 Miliciens ») : les unités, et leurs noms propres à un peuple. (Un bâtiment ne se compte nulle part.) */
+const fichesQuiSeComptent = () => [
+  ...Object.values(UNIT_TYPES),
+  ...Object.values(CIVILISATIONS).flatMap((c) => Object.entries(c.noms).filter(([type]) => UNIT_TYPES[type]).map(([, fiche]) => fiche)),
+].filter((fiche) => fiche && typeof fiche.name === 'string');
+
+/**
+ * Les noms qui se comptent, sous la forme « un|plusieurs » que lit `accord`
+ * (js/langue.js) : « Milicien|Miliciens », « Villageois|Villageois ». Le
+ * pluriel ne suit pas la même règle d'une langue à l'autre : chaque langue
+ * écrit les siens (`{ one: 'Militiaman', other: 'Militiamen' }`).
+ */
+export function accordsDesTables() {
+  return [...new Set(fichesQuiSeComptent().map((fiche) => `${fiche.name}|${plurielFrancais(fiche)}`))];
+}
+
+if (LANGUE !== 'fr') {
+  // Les pluriels d'abord, tant que les noms sont encore français ; puis les textes ; puis chaque fiche reçoit
+  // son pluriel écrit. Sans traduction, la règle française s'appliquera au nom traduit (voir nomDe).
+  const pluriels = new Map();
+  for (const fiche of fichesQuiSeComptent()) {
+    const un = fiche.name, plusieurs = plurielFrancais(fiche);
+    const traduit = accord(2, un, plusieurs);
+    if (!SANS_TRADUCTION.has(`${un}|${plusieurs}`)) pluriels.set(fiche, traduit);
+  }
+  textesDesTables((objet, champ) => { objet[champ] = txt(objet[champ]); });
+  for (const [fiche, pluriel] of pluriels) fiche.pluriel = pluriel;
+}

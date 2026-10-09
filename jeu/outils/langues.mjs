@@ -138,8 +138,9 @@ export async function recenser() {
     for (const cle of clesDuCode(lire(`js/${nom}`))) noter(cle, `js/${nom}`);
   }
   for (const cle of clesDeLaPage(lire('index.html'))) noter(cle, 'index.html');
-  const { textesDesTables } = await import('../js/config.js');
+  const { textesDesTables, accordsDesTables } = await import('../js/config.js');
   textesDesTables((objet, champ) => noter(objet[champ], 'js/config.js (tables)'));
+  for (const cle of accordsDesTables()) noter(cle, 'js/config.js (noms qui se comptent)');
   return cles;
 }
 

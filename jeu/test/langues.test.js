@@ -9,7 +9,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { LANGUES, LANGUE, LOCALE, txt, accord, cleDe, nombreLocal, choisirLangue, CLE_LANGUE, SANS_TRADUCTION } from '../js/langue.js';
-import { UNIT_TYPES, GAME_MODES, RESOURCE_LABELS } from '../js/config.js';
+import { UNIT_TYPES, GAME_MODES, RESOURCE_LABELS, nomDe, accordsDesTables } from '../js/config.js';
 import { clesDuCode, clesDeLaPage, recenser, etatDe } from '../outils/langues.mjs';
 
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,6 +36,9 @@ console.log('--- Le français ---');
   check('l’accord français : un, plusieurs', egal([accord(0, 'Couronne'), accord(1, 'Couronne'), accord(2, 'Couronne'), accord(5, 'cheval', 'chevaux')], ['Couronne', 'Couronne', 'Couronnes', 'chevaux']));
   check('les nombres s’écrivent à la française', nombreLocal(1200).replace(/\s/g, ' ') === '1 200');
   check('les tables du jeu sont en français', UNIT_TYPES.militia.name === 'Milicien' && GAME_MODES.escarmouche.name === 'Escarmouche' && RESOURCE_LABELS.gold === 'Or');
+  check('… et le pluriel français des noms suit sa règle, sans qu’aucun champ ne soit ajouté aux fiches',
+    UNIT_TYPES.militia.pluriel === undefined && nomDe('militia', 'atlante', 3) === 'Miliciens' && nomDe('villager', 'atlante', 3) === 'Villageois' && nomDe('horseArcher', 'atlante', 2) === 'Archers montés'
+    && nomDe('hydra', 'solarien', 2) === 'Sphinx' && accordsDesTables().includes('Milicien|Miliciens') && accordsDesTables().includes('Sphinx|Sphinx') && !accordsDesTables().some((cle) => /Centre-Ville|Caserne/.test(cle)));
   check('une langue inconnue ne se choisit pas', choisirLangue('xx') === false && choisirLangue(undefined) === false);
 }
 
@@ -53,6 +56,7 @@ console.log('\n--- L’anglais ---');
       simple: L.txt('Jouer'), gabarit: L.txt\`Classée · \${'x'}\`, deplace: L.txt\`carte \${'medium'}\`, deux: L.txt\`\${'A'} contre \${'B'}\`,
       inconnue: L.txt\`Phrase jamais traduite \${n}\`, inconnueSimple: L.txt('Mot jamais traduit'), manquantes: [...L.SANS_TRADUCTION],
       accord: [L.accord(1, 'Mot jamais traduit'), L.accord(2, 'Mot jamais traduit')], nombre: L.nombreLocal(1200),
+      pluriels: [...['militia', 'spearman', 'priest', 'deer', 'villager', 'horseArcher'].map((t) => C.nomDe(t, 'atlante', 3)), ...['villager', 'hydra', 'triton', 'scout'].map((t) => C.nomDe(t, 'solarien', 2)), C.nomDe('militia', 'atlante', 1)],
       tables: [C.UNIT_TYPES.militia.name, C.BUILDING_TYPES.barracks.name, C.GAME_MODES.escarmouche.name, C.DIFFICULTIES.hard.name, C.RESOURCE_LABELS.gold, C.CIVILISATIONS.solarien.noms.knight.name, C.AGES[1].name, C.AGES[1].short, C.UNIT_TYPES.horseArcher.pluriel],
       identifiants: [C.UNIT_TYPES.militia.id, C.GAME_MODES.escarmouche.id, C.GAME_MODES.escarmouche.mapSize],
       resume: U.resumeReglages({ civAdverse: 'solarien', mode: 'express', difficulty: 'normal', mapSize: 'medium', speed: 'normal' }),
@@ -66,6 +70,8 @@ console.log('\n--- L’anglais ---');
   check('les nombres s’écrivent à l’anglaise', m.nombre === '1,200');
   check('les tables du jeu sont traduites : unités, bâtiments, formats, difficultés, ressources, peuples, âges, pluriels',
     egal(m.tables, ['Militiaman', 'Barracks', 'Skirmish', 'Hard', 'Gold', 'Camel Rider', 'Feudal Age', 'II', 'Horse Archers']));
+  check('les noms qui se comptent ont leur pluriel anglais, écrit — pas la règle française appliquée au mot anglais',
+    egal(m.pluriels, ['Militiamen', 'Spearmen', 'Priestesses', 'Deer', 'Villagers', 'Horse Archers', 'Fellahs', 'Sphinxes', 'Atlantean Mercenaries', 'Trained Jackals', 'Militiaman']), m.pluriels.join(', '));
   check('… pas leurs identifiants, dont les règles dépendent', egal(m.identifiants, ['militia', 'escarmouche', 'tiny']));
   check('le résumé des réglages se lit en anglais', m.resume.replace(/ /g, ' ') === 'vs Solarians · Express · Normal · medium map · speed 100 %', m.resume);
 }
