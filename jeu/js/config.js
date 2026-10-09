@@ -694,14 +694,15 @@ const TABLES_DE_TEXTE = [STANCES, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, GAME_
 /**
  * Passe sur chaque texte des tables : `visite(objet, champ)`. Sert à traduire
  * (ci-dessous) et à recenser ce qui est à traduire (outils/langues.mjs). Un
- * chiffre romain ou un pourcentage n'est pas un texte.
+ * chiffre romain n'est pas un texte.
  */
 export function textesDesTables(visite) {
   const marcher = (objet, profondeur) => {
     if (!objet || typeof objet !== 'object' || profondeur > 6) return;
     for (const [champ, valeur] of Object.entries(objet)) {
       if (typeof valeur === 'string') {
-        if (CHAMPS_DE_TEXTE.includes(champ) && /[A-Za-zÀ-ÿ]{2,}/.test(valeur) && !/^[IVX]+$/.test(valeur)) visite(objet, champ);
+        // (Un pourcentage se traduit aussi : l'anglais n'y met pas d'espace.)
+        if (CHAMPS_DE_TEXTE.includes(champ) && (/[A-Za-zÀ-ÿ]{2,}/.test(valeur) || valeur.includes('%')) && !/^[IVX]+$/.test(valeur)) visite(objet, champ);
       } else marcher(valeur, profondeur + 1);
     }
   };

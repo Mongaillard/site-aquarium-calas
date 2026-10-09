@@ -177,4 +177,8 @@ export default {
   "Prêtre du Soleil|Prêtres du Soleil": { "one": "Sun Priest", "other": "Sun Priests" },
   "Mercenaire atlante|Mercenaires atlantes": { "one": "Atlantean Mercenary", "other": "Atlantean Mercenaries" },
   "Sphinx|Sphinx": { "one": "Sphinx", "other": "Sphinxes" },
+  "75 %": "75%",
+  "100 %": "100%",
+  "150 %": "150%",
+  "200 %": "200%",
 };

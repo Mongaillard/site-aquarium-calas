@@ -690,6 +690,8 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
   font-weight: 900;
 }
 #hud #btn-allie::after { content: "Allié"; }
+/* (Dans une autre langue, le code pose le libellé : js/ui.js.) */
+#hud #btn-allie[data-libelle]::after { content: attr(data-libelle); }
 @media (min-width: 720px) { #hud #btn-allie { top: calc(220px + var(--safe-top)); width: 160px; } }
 @media (orientation: landscape) and (max-height: 480px) { #hud #btn-allie { top: calc(154px + var(--safe-top)); width: 94px; height: 34px; } }
 

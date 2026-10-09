@@ -39,7 +39,7 @@
  */
 export const LANGUES = Object.freeze([
   Object.freeze({ id: 'fr', nom: 'Français', locale: 'fr-FR', prete: true }),
-  Object.freeze({ id: 'en', nom: 'English', locale: 'en-US', prete: false }),
+  Object.freeze({ id: 'en', nom: 'English', locale: 'en-US', prete: true }),
 ]);
 
 /** Où le choix du joueur est rangé (stockage du navigateur). */

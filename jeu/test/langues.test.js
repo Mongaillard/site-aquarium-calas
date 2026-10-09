@@ -77,7 +77,7 @@ console.log('\n--- L’anglais ---');
   check('les noms qui se comptent ont leur pluriel anglais, écrit — pas la règle française appliquée au mot anglais',
     egal(m.pluriels, ['Militiamen', 'Spearmen', 'Priestesses', 'Deer', 'Villagers', 'Horse Archers', 'Fellahs', 'Sphinxes', 'Atlantean Mercenaries', 'Trained Jackals', 'Militiaman']), m.pluriels.join(', '));
   check('… pas leurs identifiants, dont les règles dépendent', egal(m.identifiants, ['militia', 'escarmouche', 'tiny']));
-  check('le résumé des réglages se lit en anglais', m.resume.replace(/ /g, ' ') === 'vs Solarians · Express · Normal · medium map · speed 100 %', m.resume);
+  check('le résumé des réglages se lit en anglais', m.resume.replace(/ /g, ' ') === 'vs Solarians · Express · Normal · medium map · speed 100%', m.resume);
 }
 
 // --- Le choix de la langue ----------------------------------------------------------------------

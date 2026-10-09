@@ -209,4 +209,5 @@ export default {
   "Score : la moitié des ressources récoltées, le prix de ce qui est encore debout, et deux fois le prix de ce qui a été abattu chez l’autre.": "Score: half the resources gathered, the cost of what is still standing, and twice the cost of what was taken down on the other side.",
   "Nouvelle partie": "New game",
   "Menu principal": "Main menu",
+  "Allié": "Ally",
 };

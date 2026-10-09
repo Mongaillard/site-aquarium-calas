@@ -293,6 +293,7 @@ export class UI {
     // Par équipes, avec un allié tenu par l'ordinateur : le bouton des consignes. (Le HUD survit à la partie : on le remet dans l'état de celle qui commence.)
     const allie = el('btn-allie');
     if (allie) {
+      allie.dataset.libelle = txt('Allié');   // (le mot du bouton est écrit par la feuille de style : voir css/boite.css)
       allie.classList.toggle('hidden', !this.game.allieOrdinateur());
       allie.addEventListener('click', () => this.showConsignes(), opts);
     }
