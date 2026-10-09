@@ -9,9 +9,15 @@
 // les jetons au pluriel derrière « les », « des », « aux », « tes » — jamais
 // derrière un article qui s'accorde ou s'élide. Les chiffres cités sont ceux de
 // js/config.js (bonus, portée) : test/fiches-coffres.test.js les recoupe.
+//
+// Le français est la source : dans une autre langue, les titres et les phrases
+// sont remplacés une fois, à la fin de ce module, par leur traduction
+// (js/langue.js ; cahier js/langues/<langue>/fiches.js). La traduction garde les
+// jetons, au singulier ou au pluriel selon ce que sa grammaire demande.
 // ---------------------------------------------------------------------------
 
 import { nomDe } from './config.js';
+import { LANGUE, txt } from './langue.js';
 
 export const RUBRIQUES = [['role', 'Rôle'], ['bat', 'Bat'], ['craint', 'Craint'], ['conseil', 'Conseil']];
 
@@ -153,3 +159,19 @@ export function ficheDeTroupe(type, civ) {
   // (Une espace insécable devant « : » et « ; » : la ponctuation ne passe jamais seule à la ligne.)
   return RUBRIQUES.map(([cle, titre]) => ({ cle, titre, texte: nommer(fiche[cle], civ).replace(/ ([:;])/g, '\u00a0$1') }));
 }
+
+// --- La langue -----------------------------------------------------------------
+
+/**
+ * Passe sur chaque texte des fiches : `visite(objet, champ)` — le titre de
+ * chaque rubrique, puis chaque phrase des fiches communes et de celles qu'un
+ * peuple réécrit. Sert à traduire (ci-dessous) et à recenser ce qui est à
+ * traduire (outils/langues.mjs).
+ */
+export function textesATraduire(visite) {
+  for (const rubrique of RUBRIQUES) visite(rubrique, 1);
+  const fiches = [...Object.values(FICHES), ...Object.values(FICHES_CIV).flatMap((propres) => Object.values(propres))];
+  for (const fiche of fiches) for (const [cle] of RUBRIQUES) visite(fiche, cle);
+}
+
+if (LANGUE !== 'fr') textesATraduire((objet, champ) => { objet[champ] = txt(objet[champ]); });
