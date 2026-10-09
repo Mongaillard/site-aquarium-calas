@@ -7,10 +7,11 @@
    (#start-screen), les écrans de la progression (#progression : ligues,
    coffres, troupes, boutique), et la partie — sa barre du haut, sa barre du
    bas (#hud), ses menus (#build-menu, #worker-menu) et ses fenêtres (#modal :
-   pause, aide, consignes, fin de partie). Les feuilles d'avant (css/jeu.css,
-   css/progression.css) gardent la mise en place — tailles, positions, cibles
-   de toucher — et celle-ci pose la matière par-dessus : chaque règle d'ici
-   passe par l'un de ces écrans.
+   pause, aide, consignes, fin de partie). css/jeu.css et css/progression.css
+   portent la mise en place — tailles, positions, cibles de toucher — et les
+   couleurs de la boîte (:root) ; celle-ci pose la matière, écran par écran :
+   contours d'encre, ombres pleines, aplats. Chaque règle d'ici passe par l'un
+   de ces écrans.
 
    Les caractères : « Lilita One » (titres) et « Nunito » (texte), livrés avec
    le jeu (assets/polices, licence SIL OFL à côté) : rien ne vient du réseau,
@@ -43,17 +44,6 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-#start-screen, #progression, #hud, #build-menu, #worker-menu, #modal {
-  --b-papier: #fff4dc;
-  --b-blanc: #fffaf0;
-  --b-sable: #ffe9b8;
-  --b-encre: #17120e;
-  --b-gris: #4a3f33;
-  --b-jaune: #ffc93c;
-  --b-rouge: #f0562d;
-  --b-titres: "Lilita One", ui-rounded, "Arial Rounded MT Bold", "Arial Black", system-ui, sans-serif;
-  --b-texte: "Nunito", ui-rounded, "Arial Rounded MT Bold", system-ui, -apple-system, "Segoe UI", sans-serif;
-}
 #start-screen {
   /* Le couvercle prend les couleurs du peuple choisi (voir plus bas). */
   --b-ciel: #3aa0e8;
@@ -76,6 +66,12 @@ body[data-civ="solarien"] #start-screen {
   --b-bande: #ffc93c;
   --b-socle: #7c2413;
   --b-etiquette: #3aa0e8;
+}
+/* Tant que le jeu n'a pas dit quel peuple on joue (une fraction de seconde au lancement), le
+   couvercle est neutre : du sable, pas les couleurs d'un peuple à la place d'un autre. */
+body:not([data-civ]) #start-screen {
+  --b-ciel: #ffe9b8;
+  --b-socle: #4a3f33;
 }
 
 /* La carte : sur un téléphone, tout l'écran — le couvercle touche les bords.
@@ -451,32 +447,11 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
 
 /* ---------------------------------------------------------------------------
    Les écrans de la progression : ligues, coffres, troupes, fiche, boutique.
-   Les feuilles d'avant y lisent leurs couleurs dans des variables : ici elles
-   prennent celles de la boîte (l'encre pour le texte et les bords, le papier
-   pour le fond), puis chaque pièce reçoit son contour et son ombre.
+   Chaque pièce y reçoit son contour d'encre et son ombre pleine.
    --------------------------------------------------------------------------- */
 
 #progression {
-  --text: #17120e;
-  --muted: #4a3f33;
-  --border: #17120e;
-  --panel-solid: #fff4dc;
-  /* (L'or des accents ne se lirait pas sur le papier : ici c'est un rouge de brique.) */
-  --gold: #a8420c;
-  --gold-dark: #8a3408;
-  --good: #1c7a3c;
-  --error: #b3261e;
-  --titre: var(--b-titres);
-  --radius: 14px;
-  --commune: #56626e;
-  --rare: #1c6bb5;
-  --epique: #7437c2;
-  --coffre-bois: #8a5a2b;
-  --coffre-argent: #5b6875;
-  --coffre-or: #9c6200;
-  --coffre-legendaire: #7437c2;
   padding: 12px;
-  background: rgba(23, 18, 14, .62);
   color: var(--b-encre);
   font-family: var(--b-texte);
   font-weight: 700;
@@ -628,43 +603,16 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
 #progression .prog-article-fiche { display: grid; flex: none; padding: 0; border: 0; border-radius: 12px; background: none; cursor: pointer; }
 
 /* ---------------------------------------------------------------------------
-   La partie. Les feuilles d'avant y lisent leurs couleurs dans des variables :
-   ici elles prennent celles de la boîte, puis chaque pièce reçoit son contour
-   d'encre et son ombre pleine. Plus petites que celles des menus (deux points
-   de bord, trois d'ombre) : la carte doit rester le sujet.
+   La partie. Chaque pièce y reçoit son contour d'encre et son ombre pleine,
+   plus petits que ceux des menus (deux points de bord, trois d'ombre) : la
+   carte doit rester le sujet.
    --------------------------------------------------------------------------- */
 
 #hud, #build-menu, #worker-menu, #modal {
-  --text: #17120e;
-  --muted: #4a3f33;
-  --border: #17120e;
-  --panel: #fff4dc;
-  --panel-solid: #fff4dc;
-  --lisere: #17120e;
-  --fond-bouton: #fffaf0;
-  /* (L'or des accents ne se lirait pas sur le papier : ici c'est un rouge de brique.) */
-  --gold: #a8420c;
-  --gold-dark: #8a3408;
-  --good: #1c7a3c;
-  --warn: #9c6200;
-  --error: #b3261e;
-  --titre: var(--b-titres);
-  --angle: 10px;
-  --radius: 14px;
-  --commune: #56626e;
-  --rare: #1c6bb5;
-  --epique: #7437c2;
-  --coffre-bois: #8a5a2b;
-  --coffre-argent: #5b6875;
-  --coffre-or: #9c6200;
-  --coffre-legendaire: #7437c2;
   color: var(--b-encre);
   font-family: var(--b-texte);
   font-weight: 700;
 }
-/* Le fond d'un portrait : un aplat à la couleur du peuple de ce qu'il montre. */
-body[data-civ="atlante"] #hud, #hud .portrait[data-civ="atlante"] { --fond-portrait: #9fd4f6; --fond-vignette: #b9d48a; }
-body[data-civ="solarien"] #hud, #hud .portrait[data-civ="solarien"] { --fond-portrait: #f7c783; --fond-vignette: #efd592; }
 #hud :focus-visible, #build-menu :focus-visible, #worker-menu :focus-visible, #modal :focus-visible { outline: 3px solid var(--b-rouge); outline-offset: 2px; }
 /* (Un bouton ne prend pas de lui-même les caractères de ce qui l'entoure.) */
 #hud button, #build-menu button, #worker-menu button, #modal button { font-family: var(--b-texte); }
@@ -850,7 +798,6 @@ body[data-civ="solarien"] #hud, #hud .portrait[data-civ="solarien"] { --fond-por
 
 /* --- Les menus qui montent du bas : Construire, Ouvriers ---------------------------- */
 
-#build-menu, #worker-menu, #modal { background: rgba(23, 18, 14, .62); }
 #build-menu .sheet,
 #worker-menu .sheet {
   border: 0;

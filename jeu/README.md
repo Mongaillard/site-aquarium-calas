@@ -570,16 +570,20 @@ de papier, contour d'encre épais, ombre pleine sous ce qui se touche, jaune
 pour ce qui est choisi, rouge pour ce qui alerte, titres en « Lilita One »,
 texte en « Nunito » (livrés dans `assets/polices`, licence SIL OFL jointe).
 Chaque règle y passe par l'un de ces écrans (`#start-screen`, `#progression`,
-`#hud`, `#build-menu`, `#worker-menu`, `#modal`). Les feuilles d'avant
-(`css/jeu.css`, `css/progression.css`) gardent la mise en place — tailles,
-positions, cibles de toucher — et lisent leurs couleurs dans des variables que
-`css/boite.css` redéfinit ; ce qui suit décrit donc la matière d'origine, que
-la boîte recouvre. En partie, les pièces sont plus fines (deux points de bord,
-trois d'ombre) pour que la carte reste le sujet, la barre du haut n'a plus de
-bandeau, et le bouton de l'allié (2 contre 2) se range sous la mini-carte.
-Les couleurs de camp écrites en texte prennent leur ton sombre, lisible sur le
-papier. Reste à faire : retirer des feuilles d'avant les règles de matière que
-la boîte recouvre, et les essais qui les lisent encore.
+`#hud`, `#build-menu`, `#worker-menu`, `#modal`). `css/jeu.css` et
+`css/progression.css` portent la mise en place — tailles, positions, cibles de
+toucher — et les couleurs de la boîte (`:root` : `--b-papier`, `--b-encre`,
+`--b-jaune`, `--b-rouge`… et les noms d'avant, `--text`, `--border`, `--panel`,
+qui valent maintenant les mêmes couleurs). L'habillage sombre par peuple a été
+retiré, avec ses dégradés, ses halos et ses voiles : il n'y a plus qu'un
+design. Le peuple se lit au couvercle de l'accueil et au fond des portraits.
+En partie, les pièces sont plus fines (deux points de bord, trois d'ombre)
+pour que la carte reste le sujet, la barre du haut n'a plus de bandeau, et le
+bouton de l'allié (2 contre 2) se range sous la mini-carte. Les couleurs de
+camp écrites en texte prennent leur ton sombre, lisible sur le papier. Le fond
+de la page, la couleur donnée au navigateur et l'icône de l'application sont
+ceux de la boîte. (La suite de cette section décrit le travail d'origine sur
+la carte, le brouillard et les troupes, qui n'a pas changé.)
 
 Un principe : **les bâtiments et les arbres sont la référence** — un dessin à
 l'encre, trait sombre, ombres peintes, lumière venue d'en haut à gauche — et

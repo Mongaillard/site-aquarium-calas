@@ -158,16 +158,21 @@ console.log('\n--- L’accueil ---');
   const tardif = toucherNouvellePartie(true, premier.armeJusqua, T0 + DELAI_EFFACER);
   check('… passé le délai, il faut recommencer : le toucher réarme', tardif.lancer === false && tardif.armeJusqua === T0 + 2 * DELAI_EFFACER
     && toucherNouvellePartie(true, premier.armeJusqua, T0 + DELAI_EFFACER + 5000).lancer === false);
-  const arme = regle('.start-actions .btn.arme');
-  check('css : armé, le bouton est rouge et sa question, plus petite, ne fait pas bouger la barre',
-    /border-color:\s*#e0604c/.test(arme) && /font-size:\s*14px/.test(arme) && /line-height:\s*1\.15/.test(arme));
+  // (La matière est dans la feuille des menus ; la mise en place, ici.)
+  const boiteAccueil = lire('../css/boite.css');
+  const dansLaBoite = (selecteur) => (boiteAccueil.match(new RegExp('(?:^|\\n)' + selecteur.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}')) || ['', ''])[1];
+  const arme = dansLaBoite('#start-screen #btn-play.arme');
+  check('css : armé, le bouton est rouge et sa question, plus petite, tient sur une ligne',
+    /background:\s*var\(--b-rouge\)/.test(arme) && /font-size:\s*19px/.test(arme) && /font-size:\s*44px/.test(dansLaBoite('#start-screen #btn-play.primary'))
+    && !css.includes('.start-actions .btn.arme'));
   const actions = regle('.start-actions');
   check('css : la barre « Jouer » colle au bas de l’écran, sur un fond plein',
     /position:\s*sticky/.test(actions) && /bottom:\s*0/.test(actions) && actions.includes('var(--panel-solid)') && actions.includes('var(--safe-bottom)'));
   check('css : la marge du bas de l’accueil n’est pas un retrait du conteneur (la barre collante s’y arrêterait)',
     /padding:\s*calc\(12px \+ var\(--safe-top\)\) 12px 0;/.test(regle('.screen')) && /\.screen::after\s*\{[^}]*var\(--safe-bottom\)/.test(css));
-  check('css : chaque peuple a sa tuile à ses couleurs', civs.every((c) => regle(`.option.peuple[data-civ="${c}"]`).includes('linear-gradient')),
-    civs.filter((c) => !regle(`.option.peuple[data-civ="${c}"]`)).join(', '));
+  const tuilesDesPeuples = civs.map((c) => variable(dansLaBoite(`#start-screen .option.peuple[data-civ="${c}"]`), '--b-tuile'));
+  check('css : chaque peuple a sa tuile à sa couleur, en aplat — plus de dégradé',
+    tuilesDesPeuples.every((t) => /^#[0-9a-f]{6}$/i.test(t)) && new Set(tuilesDesPeuples).size === civs.length && !/\.option\.peuple[^{]*\{[^}]*gradient/.test(css), tuilesDesPeuples.join(', '));
 }
 
 // ---------------------------------------------------------------------------
@@ -213,8 +218,8 @@ console.log('\n--- L’accueil, direction « Boîte de jeu » ---');
   const hex = (c) => { const m = /^#([0-9a-f]{6})$/i.exec(c); return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null; };
   const lum = (c) => { const [r, g, b] = hex(c).map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const contraste = (a, b) => { const [h, l] = [lum(a), lum(b)].sort((x, y) => y - x); return (h + 0.05) / (l + 0.05); };
-  // (Les couleurs de la boîte sont communes à tout ce qui est habillé ; celles du couvercle, à l'accueil seul.)
-  const racine = `${regleB('#start-screen, #progression, #hud, #build-menu, #worker-menu, #modal')};${(sansCommentaires.match(/(?:^|\n|\})\s*#start-screen\s*\{([^}]*)\}/) || ['', ''])[1]}`;
+  // (Les couleurs de la boîte sont celles de toute la page — :root, dans css/jeu.css ; celles du couvercle, à l'accueil seul.)
+  const racine = `${regle(':root')};${(sansCommentaires.match(/(?:^|\n|\})\s*#start-screen\s*\{([^}]*)\}/) || ['', ''])[1]}`;
   const v = (nom) => variable(racine, nom);
 
   check('la feuille des menus vient après les deux autres, et elle est gardée hors ligne',
@@ -263,12 +268,15 @@ console.log('\n--- L’accueil, direction « Boîte de jeu » ---');
   check('rien que la page embarquée refuserait, et pas d’emoji', !/data:|blob:/.test(boite) && !/\p{Extended_Pictographic}/u.test(boite));
 
   // La partie : barres, menus, fenêtres.
-  // (La règle qui commence par #hud : celle des couleurs communes le cite aussi, plus haut.)
-  const partie = (sansCommentaires.match(/(?:^|\n|\})\s*#hud, #build-menu, #worker-menu, #modal\s*\{([^}]*)\}/) || ['', ''])[1];
-  check('en partie, les feuilles d’avant lisent les couleurs de la boîte : texte et bords à l’encre, fonds de papier',
-    ['--text', '--border', '--lisere'].every((n) => variable(partie, n) === v('--b-encre')) && ['--panel', '--panel-solid'].every((n) => variable(partie, n) === v('--b-papier'))
-    && variable(partie, '--muted') === v('--b-gris') && /font-family:\s*var\(--b-texte\)/.test(partie));
-  const accents = ['--gold', '--good', '--warn', '--error', '--commune', '--rare', '--epique', '--coffre-bois', '--coffre-argent', '--coffre-or', '--coffre-legendaire'].map((n) => [n, variable(partie, n)]);
+  // Les noms de couleurs que lisent les règles de mise en place : ceux de la boîte, pour toute la page.
+  const base = regle(':root'), progressionCss = lire('../css/progression.css');
+  const baseProgression = (progressionCss.match(/(?:^|\n):root\s*\{([^}]*)\}/) || ['', ''])[1];
+  check('toute la page lit les couleurs de la boîte : texte et bords à l’encre, fonds de papier, caractères des menus',
+    ['--text', '--border', '--lisere'].every((n) => variable(base, n) === v('--b-encre')) && ['--bg', '--panel', '--panel-solid'].every((n) => variable(base, n) === v('--b-papier'))
+    && variable(base, '--muted') === v('--b-gris') && variable(base, '--titre') === 'var(--b-titres)'
+    && /background:\s*var\(--b-papier\)/.test(regle('html, body')) && /font-family:\s*var\(--b-texte\)/.test(regle('html, body')));
+  const accents = [...['--gold', '--good', '--warn', '--error'].map((n) => [n, variable(base, n)]),
+    ...['--commune', '--rare', '--epique', '--coffre-bois', '--coffre-argent', '--coffre-or', '--coffre-legendaire'].map((n) => [n, variable(baseProgression, n)])];
   check('… et leurs accents s’y lisent (contraste d’au moins 4,5 sur le papier)', accents.every(([, c]) => hex(c) && contraste(c, v('--b-papier')) >= 4.5),
     accents.map(([n, c]) => `${n.slice(2)} ${hex(c) ? contraste(c, v('--b-papier')).toFixed(1) : c}`).join(', '));
   check('la barre du haut n’a plus de bandeau : des pastilles posées sur la carte, la barre du bas est le bord de la boîte',
@@ -293,29 +301,26 @@ console.log('\n--- L’habillage ---');
   const hex = (c) => { const m = /^#([0-9a-f]{6})$/i.exec(c); return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null; };
   const lum = (c) => { const [r, g, b] = hex(c).map((v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const contraste = (a, b) => { const [h, l] = [lum(a), lum(b)].sort((x, y) => y - x); return (h + 0.05) / (l + 0.05); };
-  const texte = variable(regle(':root'), '--text');
-  for (const c of civs) {
-    const bloc = regle(`body[data-civ="${c}"]`);
-    const manquantes = ['--bg', '--panel', '--panel-solid', '--border', '--muted', '--lisere', '--lueur', '--fond-bouton'].filter((v) => !variable(bloc, v));
-    check(`${CIVILISATIONS[c].name} : le thème définit fonds, liseré et texte secondaire`, manquantes.length === 0, manquantes.join(', '));
-    const fond = variable(bloc, '--panel-solid'), sourd = variable(bloc, '--muted');
-    const lisibles = hex(fond) && hex(sourd) && contraste(texte, fond) >= 7 && contraste(sourd, fond) >= 4.5;
-    check(`${CIVILISATIONS[c].name} : le texte se lit sur son panneau (contraste d’au moins 7, et 4,5 pour le texte secondaire)`, lisibles,
-      hex(fond) && hex(sourd) ? `${contraste(texte, fond).toFixed(1)} et ${contraste(sourd, fond).toFixed(1)}` : `${fond} / ${sourd}`);
-    const portrait = (css.match(new RegExp(`body\\[data-civ="${c}"\\], \\.portrait\\[data-civ="${c}"\\]\\s*\\{([^}]*)\\}`)) || ['', ''])[1];
-    check(`${CIVILISATIONS[c].name} : le fond des portraits suit le peuple de ce qu’ils montrent`,
-      !!variable(portrait, '--fond-portrait') && !!variable(portrait, '--fond-vignette'));
+  const texte = variable(regle(':root'), '--text'), fond = variable(regle(':root'), '--panel-solid'), sourd = variable(regle(':root'), '--muted');
+  const boite = lire('../css/boite.css');
+  check('le texte se lit sur le papier (contraste d’au moins 7, et 4,5 pour le texte secondaire)',
+    hex(texte) && hex(fond) && hex(sourd) && contraste(texte, fond) >= 7 && contraste(sourd, fond) >= 4.5, `${contraste(texte, fond).toFixed(1)} et ${contraste(sourd, fond).toFixed(1)}`);
+  check('plus d’habillage sombre par peuple : aucun peuple ne redéfinit les fonds, les bords ni le texte',
+    civs.every((c) => !new RegExp(`body\\[data-civ="${c}"\\]\\s*\\{`).test(css)) && !/--lueur|--creme/.test(css) && !/#0c1f2b|#11303f|#1f1409|#2c1c0c|#141b24/i.test(css));
+  const portraits = civs.map((c) => (css.match(new RegExp(`body\\[data-civ="${c}"\\], \\.portrait\\[data-civ="${c}"\\]\\s*\\{([^}]*)\\}`)) || ['', ''])[1]);
+  for (const [i, c] of civs.entries()) {
+    check(`${CIVILISATIONS[c].name} : le fond des portraits suit le peuple de ce qu’ils montrent, en aplat`,
+      hex(variable(portraits[i], '--fond-portrait')) !== null && hex(variable(portraits[i], '--fond-vignette')) !== null);
   }
-  const themes = civs.map((c) => variable(regle(`body[data-civ="${c}"]`), '--panel-solid') + variable(regle(`body[data-civ="${c}"]`), '--lisere'));
-  check('deux peuples, deux habillages', new Set(themes).size === civs.length, themes.join(' / '));
-  // (Cachée pour de bon, elle laissait un écran vide tant que les scripts n'étaient pas arrivés — et à jamais
-  // devant un script d'une version d'avant, qui ne pose pas le peuple.)
-  const attente = regle('body:not([data-civ]) .start-card');
-  const delai = Number((attente.match(/animation:\s*attente-habillage 0s linear ([\d.]+)s both/) || [])[1]);
-  check('la carte d’accueil attend ses couleurs, mais une seconde et demie au plus : elle n’est jamais cachée pour de bon',
-    delai > 0 && delai <= 1.5 && !/visibility/.test(attente)
-    && /@keyframes attente-habillage\s*\{\s*from\s*\{\s*visibility:\s*hidden;\s*\}\s*to\s*\{\s*visibility:\s*visible;\s*\}\s*\}/.test(css)
-    && !/\.start-card[^{]*\{[^}]*visibility:\s*hidden/.test(css), `${delai} s`);
+  const couvercles = civs.map((c) => (c === 'atlante' ? variable((boite.match(/(?:^|\n)#start-screen\s*\{([^}]*)\}/) || ['', ''])[1], '--b-ciel')
+    : variable((boite.match(new RegExp(`body\\[data-civ="${c}"\\] #start-screen\\s*\\{([^}]*)\\}`)) || ['', ''])[1], '--b-ciel')));
+  check('deux peuples : deux couvercles à l’accueil, deux fonds de portrait en partie',
+    new Set(couvercles).size === civs.length && couvercles.every((x) => hex(x)) && new Set(portraits.map((p) => variable(p, '--fond-portrait'))).size === civs.length, couvercles.join(' / '));
+  // (Cachée en attendant ses couleurs, la carte laissait un écran sombre au lancement. Elle se montre tout de
+  // suite, sous un couvercle neutre tant que le jeu n'a pas dit le peuple.)
+  const neutre = (boite.match(/(?:^|\n)body:not\(\[data-civ\]\) #start-screen\s*\{([^}]*)\}/) || ['', ''])[1];
+  check('au lancement, la carte d’accueil se montre tout de suite, sous un couvercle neutre : jamais cachée, jamais aux couleurs d’un autre peuple',
+    hex(variable(neutre, '--b-ciel')) !== null && !couvercles.includes(variable(neutre, '--b-ciel')) && !/attente-habillage/.test(css) && !/\.start-card[^{]*\{[^}]*visibility:\s*hidden/.test(css));
   check('la page attend le jeu pour s’habiller (pas de couleurs d’un peuple à la place d’un autre), puis porte celui que l’on joue',
     /<body>/.test(html)
     && /document\.body\.dataset\.civ = civDe\(civ\);/.test(main)
@@ -324,13 +329,13 @@ console.log('\n--- L’habillage ---');
     && /if \(illustre\) habiller\(settings\[cle\]\);/.test(main));
   check('une sauvegarde d’avant les civilisations s’habille en Atlantes', civDe(undefined) === 'atlante' && civDe('martien') === 'atlante' && civDe('solarien') === 'solarien');
 
-  const bas = regle('#bottombar');
-  check('la barre du bas a un bord franc au liseré du peuple, sur un panneau plein',
-    /border-top:\s*2px solid var\(--lisere\)/.test(bas) && bas.includes('var(--panel-solid)') && !/rgba\([^)]*,\s*\.?0\)/.test(bas));
+  const bas = (boite.match(/(?:^|\n)#hud #bottombar\s*\{([^}]*)\}/) || ['', ''])[1];
+  check('la barre du bas a un bord d’encre franc, sur un panneau de papier plein',
+    /border-top:\s*4px solid var\(--b-encre\)/.test(bas) && /background:\s*var\(--b-papier\)/.test(bas) && !/gradient|rgba/.test(bas) && !/gradient|rgba/.test(regle('#bottombar')));
   check('plus aucune pastille en gélule', !/999px/.test(css));
   check('la mini-carte a son cadre au liseré', /border:\s*2px solid var\(--lisere\)/.test(regle('#minimap-wrap')));
-  check('les titres sont en caractères de titre déjà sur le téléphone, le reste garde la police du système',
-    /--titre:\s*"Palatino"[^;]*Georgia, serif;/.test(css) && /font-family:\s*system-ui/.test(regle('html, body'))
+  check('les titres sont en « Lilita One », le reste en « Nunito » : les caractères de la boîte, livrés avec le jeu',
+    /--titre:\s*var\(--b-titres\);/.test(css) && /--b-titres:\s*"Lilita One", ui-rounded/.test(css) && /--b-texte:\s*"Nunito", ui-rounded/.test(css) && /font-family:\s*var\(--b-texte\)/.test(regle('html, body'))
     && ['.start-card h1', '#selection-panel .name', '.sheet-head h2', '.bc-name', '.modal-card h2'].every((s) => regle(s).includes('var(--titre)'))
     && !regle('.cmd-label').includes('--titre') && !regle('.bc-desc').includes('--titre'));
   // Les cibles de toucher ne bougent pas.
@@ -469,8 +474,8 @@ essai('écran de fin', () => {
     && /padding-bottom:\s*0/.test(regle('.modal-card.fin')));
   const court = (css.match(/@media \(max-height: (\d+)px\) \{ \.fin-illustration \{ height: (\d+)px; \} \}/) || []).slice(1).map(Number);
   check('css : sur un écran court, la capitale laisse la place au tableau des scores', court.length === 2 && court[0] >= 667 && court[1] < 132 && court[1] >= 60, court.join(' / '));
-  check('css : debout elle est dorée, tombée elle est éteinte',
-    /drop-shadow\(0 0 20px rgba\(232, 182, 76/.test(regle('.fin-illustration.debout')) && /grayscale/.test(regle('.fin-illustration.tombe')));
+  check('css : debout elle est posée sur son ombre d’encre, sans halo ; tombée elle est éteinte',
+    /filter:\s*drop-shadow\(0 6px 0 rgba\(23, 18, 14/.test(regle('.fin-illustration.debout')) && !/232, 182, 76/.test(css) && /grayscale/.test(regle('.fin-illustration.tombe')));
 });
 
 // ---------------------------------------------------------------------------
