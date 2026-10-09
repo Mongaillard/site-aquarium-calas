@@ -1,7 +1,9 @@
 // ---------------------------------------------------------------------------
 // Les écrans de la progression : le bandeau de ligue de l'accueil, la route
-// des ligues, les coffres et leur ouverture, les probabilités, la collection,
-// la fiche d'une troupe, et ce que la fin d'une partie classée annonce.
+// des ligues, les coffres et leur ouverture, les probabilités, les troupes,
+// la fiche d'une troupe, la boutique, et ce que la fin d'une partie classée
+// annonce. Ceux des collections (album, blason, saison) sont dans
+// js/collections-ecrans.js, branché ici.
 //
 // Aucune règle ici : tout vient de js/progression.js, tous les nombres de
 // js/progression-config.js. Le profil se lit et se range par js/save.js. Tant
@@ -10,15 +12,21 @@
 
 import { PROGRESSION as R } from './progression-config.js';
 import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour } from './progression.js';
-import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai } from './progression.js';
+import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai, saisonDuJour } from './progression.js';
 import { lireProgression, ecrireProgression } from './save.js';
 import { UNIT_TYPES, DEFAULT_CIV, GAME_MODES, nomDe, portraitDe } from './config.js';
 import { iconeSVG } from './icones.js';
 import { ficheDeTroupe } from './fiches-troupes.js';
+import { PIECES } from './collections-config.js';
+import { htmlPiece, htmlMedaillon, titreDuBlason } from './blason.js';
+import {
+  brancherCollections, ECRANS_DES_COLLECTIONS, agirSurLesCollections, eclats, htmlJoueur, htmlBourses,
+  aPrendreDansLaSaison, htmlPiecesDuCoffre, htmlRayonDesCollections,
+} from './collections-ecrans.js';
 
 /** Les troupes que le jeu sait former, dans l'ordre des réglages. */
 const TROUPES = Object.keys(R.troupes).filter((type) => !R.troupes[type].aVenir && UNIT_TYPES[type]);
-const ORIGINES = { victoire: 'Victoire', defaite: 'Défaite', egalite: 'Égalité', promotion: 'Promotion', semaine: 'Semaine jouée', saison: 'Fin de saison', bataille: 'Points de bataille' };
+const ORIGINES = { victoire: 'Victoire', defaite: 'Défaite', egalite: 'Égalité', promotion: 'Promotion', semaine: 'Semaine jouée', saison: 'Fin de saison', route: 'Route de saison', bataille: 'Points de bataille' };
 
 let civ = DEFAULT_CIV;          // le peuple dont on montre les noms et les portraits
 let surChangement = () => {};   // l'accueil se redessine quand le profil change
@@ -61,7 +69,7 @@ const ameliorables = (profil) => TROUPES.filter((type) => { const v = versLeNive
 /** L'heure, en secondes : elle date la fin des offres. */
 const heure = () => Date.now() / 1000;
 /** Un montant en Couronnes : le pictogramme, puis le nombre. */
-const couronnes = (n, taille = 14) => `<span class="prog-couronnes">${iconeSVG('couronne', taille, 'inline')}${nombre(n)}</span>`;
+export const couronnes = (n, taille = 14) => `<span class="prog-couronnes">${iconeSVG('couronne', taille, 'inline')}${nombre(n)}</span>`;
 /** Un prix en euros, à partir de centimes : « 0,99 € ». */
 export const euros = (centimes) => `${(centimes / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
 /** Ce qu'il reste d'une offre, en clair : « 2 j », « 47 h », « 12 min ». */
@@ -72,26 +80,39 @@ export function resteEnClair(secondes) {
   return `${Math.max(1, Math.ceil(secondes / 60))} min`;
 }
 
-/** Le bandeau de l'accueil : la ligue, le score, le chemin vers la suivante, les coffres, les troupes et la boutique. */
+/**
+ * Le bandeau de l'accueil : le blason du joueur et sa ligue (le titre, le
+ * score, le chemin vers la suivante), ses deux bourses, puis les tuiles —
+ * coffres, troupes, album, saison, boutique.
+ */
 export function htmlBandeau(profil) {
   const ligue = R.ligues[profil.ligue - 1], suivante = R.ligues[profil.ligue];
   const avance = suivante ? (profil.elo - ligue.seuil) / (suivante.seuil - ligue.seuil) : 1;
   const coffres = profil.coffres.length, prets = ameliorables(profil).length;
   // (La pastille de la boutique : une offre qui se paie en Couronnes court en ce moment.)
-  const offres = catalogueBoutique(profil, heure()).offres.filter((o) => o.id === 'ligue').length;
+  const offres = catalogueBoutique(profil, heure(), jourLocal()).offres.filter((o) => o.id === 'ligue').length;
+  // (La pastille de la saison : des paliers à prendre — ou « ! » quand le mois a tourné : une nouvelle saison attend d'être ouverte.)
+  const paliers = saisonDuJour(jourLocal()) > profil.saison ? '!' : aPrendreDansLaSaison(profil);
+  const tuile = (ecran, icone, nom, n) => `<button class="btn small ${n ? 'prog-attend' : ''}" data-ecran="${ecran}">${iconeSVG(icone, 16, 'inline')} ${nom}${n ? ` <b class="prog-pastille">${n}</b>` : ''}</button>`;
   return `
-    <button class="prog-bandeau-ligue" data-ecran="ligues" aria-label="Voir les ligues">
-      ${ecu(ligue.numero)}
-      <span class="prog-bandeau-texte">
-        <b>${nomDeLigue(ligue)}</b>
-        <span class="prog-barre"><span style="width:${part(avance)}"></span></span>
-        <small>${nombre(profil.elo)} Elo${suivante ? ` · ${ligueEnPhrase(suivante)} à ${nombre(suivante.seuil)}` : ''}</small>
-      </span>
-    </button>
+    <div class="prog-carte-joueur">
+      ${htmlJoueur(profil)}
+      <button class="prog-bandeau-ligue" data-ecran="ligues" aria-label="Voir les ligues">
+        <span class="prog-bandeau-texte">
+          <b>${titreDuBlason(profil.blason)}</b>
+          <small>${nomDeLigue(ligue)} · ${nombre(profil.elo)} Elo</small>
+          <span class="prog-barre"><span style="width:${part(avance)}"></span></span>
+          <small class="prog-vers">${suivante ? `${ligueEnPhrase(suivante)} à ${nombre(suivante.seuil)}` : 'la plus haute ligue'}</small>
+        </span>
+      </button>
+    </div>
+    ${htmlBourses(profil)}
     <div class="prog-bandeau-actions">
-      <button class="btn small ${coffres ? 'prog-attend' : ''}" data-ecran="coffres">${iconeSVG('coffre', 16, 'inline')} Coffres${coffres ? ` <b class="prog-pastille">${coffres}</b>` : ''}</button>
-      <button class="btn small ${prets ? 'prog-attend' : ''}" data-ecran="troupes">${iconeSVG('militia', 16, 'inline')} Troupes${prets ? ` <b class="prog-pastille">${prets}</b>` : ''}</button>
-      <button class="btn small ${offres ? 'prog-attend' : ''}" data-ecran="boutique">${iconeSVG('couronne', 16, 'inline')} Boutique${offres ? ` <b class="prog-pastille">${offres}</b>` : ''}</button>
+      ${tuile('coffres', 'coffre', 'Coffres', coffres)}
+      ${tuile('troupes', 'militia', 'Troupes', prets)}
+      ${tuile('album', 'album', 'Album', 0)}
+      ${tuile('saison', 'saison', 'Saison', paliers)}
+      ${tuile('boutique', 'couronne', 'Boutique', offres)}
     </div>`;
 }
 
@@ -127,6 +148,11 @@ function ecranLigues(profil) {
     const lots = [];
     if (l.promotion) lots.push(R.coffres[l.promotion.coffre].nom);
     if (l.troupe && UNIT_TYPES[l.troupe]) lots.push(nomTroupe(l.troupe));
+    for (const cadeau of (l.promotion && l.promotion.cadeaux) || []) {
+      const p = PIECES[cadeau.piece];
+      if (p) lots.push(p.genre === 'grade' ? `titre «\u00a0${p.nom}\u00a0»` : p.nom);
+    }
+    if (l.promotion) lots.push(`${R.boutique.parLigue} Couronnes`);
     return `
       <li class="prog-ligue ${etat}">
         ${ecu(l.numero)}
@@ -218,13 +244,21 @@ function ecranProbas(type) {
     <p class="subtitle">${pluriel(t.tirages, 'tirage')}. Sur 100 coffres, en moyenne : ${pluriel(t.surCent.commune, 'fragment commun', 'fragments communs')},
       ${pluriel(t.surCent.rare, 'rare')}, ${pluriel(t.surCent.epique, 'épique')}.</p>
     ${groupes}
+    ${t.pieces.nombre ? `
+    <h3>${t.pieces.nombre > 1 ? `Autocollants — ${t.pieces.nombre} tirages` : 'Autocollant — 1 tirage'}</h3>
+    <table class="scores prog-probas">
+      <tr><th>Rareté</th><th>Chance</th><th>Un doublon rend</th></tr>
+      ${t.pieces.lignes.map((l) => `<tr><td><span class="prog-categorie" data-categorie="${l.categorie}">${l.nom}</span></td><td>${nombre(l.pourCent)} %</td><td>${eclats(l.doublon)}</td></tr>`).join('')}
+      <tr class="total"><td>Total</td><td>${nombre(t.pieces.total / 10)} %</td><td></td></tr>
+    </table>
+    <p class="subtitle">Dans la rareté tirée, chaque autocollant des collections des coffres a la même chance. Et dans chaque ${t.nom.toLowerCase()} : ${eclats(t.eclats)} Éclats, toujours.</p>` : ''}
     <h3>Comment un tirage se fait</h3>
     <ol class="prog-regles">
       <li>Il choisit une catégorie selon le tableau.</li>
       <li>Dans cette catégorie, il choisit à chances égales une de tes troupes débloquées qui n’est pas au niveau maximum.</li>
       <li>Il donne le nombre de fragments indiqué, toujours le même.</li>
       <li>Si tu n’as aucune troupe disponible dans la catégorie, le tirage passe à une autre : celle du dessous d’abord, sinon celle du dessus.</li>
-      <li>Si toutes tes troupes sont au niveau maximum, les fragments deviennent des éclats.</li>
+      <li>Si toutes tes troupes sont au niveau maximum, les fragments deviennent des Éclats.</li>
     </ol>
     <p class="hint">Aucun coffre ne se vend.</p>`, { retour: 'coffres' });
 }
@@ -246,11 +280,12 @@ function ecranOuverture(resultat, profil) {
   // Le coffre s'ouvre en trois images, l'une après l'autre (jamais de fondu) ; ses tirages paraissent ensuite.
   montrer(R.coffres[resultat.coffre].nom, `
     <div class="prog-ouverture" data-type="${resultat.coffre}">${ETATS_DE_COFFRE.map((etat, i) => coffre(resultat.coffre, etat, 190, `e${i + 1}`)).join('')}</div>
-    <ul class="prog-tirages">${lignes}</ul>
+    <ul class="prog-tirages">${lignes}${htmlPiecesDuCoffre(resultat, OUVERTURE_MS + resultat.tirages.length * 140)}</ul>
     ${prets.length ? `<p class="prog-annonce">Tu peux améliorer : ${prets.map((e) => `<button class="btn small prog-attend" data-ecran="fiche" data-arg="${e.troupe}">${nomTroupe(e.troupe)}</button>`).join(' ')}</p>` : ''}
     <div class="modal-actions">
       ${profil.coffres.length ? `<button class="btn primary" data-act="ouvrir" data-i="0">Coffre suivant (${profil.coffres.length})</button>` : ''}
       <button class="btn ${profil.coffres.length ? '' : 'primary'}" data-ecran="troupes">Mes troupes</button>
+      <button class="btn" data-ecran="album">Mon album</button>
       <button class="btn" data-act="fermer">Fermer</button>
     </div>`);
 }
@@ -388,7 +423,7 @@ function boutonAcheter(act, arg, prix, solde, confirmer) {
  * second toucher (un type de troupe, ou « tout »).
  */
 function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
-  const c = catalogueBoutique(profil, heure());
+  const c = catalogueBoutique(profil, heure(), jourLocal());
   const offres = c.offres.map((o) => {
     if (o.id === 'ligue') {
       return `
@@ -438,9 +473,12 @@ function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
       <button class="btn small" disabled>${euros(l.prixCentimes)}</button>
     </li>`).join('');
   montrer('Boutique', `
-    <p class="prog-bourse">${couronnes(c.couronnes, 22)} <span>${c.couronnes > 1 ? 'Couronnes' : 'Couronne'}</span></p>
+    <p class="prog-bourse">${couronnes(c.couronnes, 22)} <span>${c.couronnes > 1 ? 'Couronnes' : 'Couronne'}</span>
+      <span class="prog-bourse-eclats">${eclats(c.eclats, 22)} <span>${c.eclats > 1 ? 'Éclats' : 'Éclat'}</span></span></p>
+    <p class="hint prog-monnaies">Les Couronnes s’achètent. Les Éclats se gagnent en jouant : dans chaque coffre, et pour chaque autocollant en double.</p>
     ${message ? `<p class="prog-annonce">${message}</p>` : ''}
     ${offres ? `<h3>Offres du moment</h3><ul class="prog-articles">${offres}</ul>` : ''}
+    ${htmlRayonDesCollections(profil, c, confirmer)}
     <h3>Troupes</h3>
     <p class="subtitle">Une troupe avancée s’obtient gratuitement par sa ligue. Ici, tu l’as tout de suite : c’est la même troupe.</p>
     <ul class="prog-articles">
@@ -463,8 +501,6 @@ function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
       <button class="btn" data-act="essaiCouronnes">Porte-monnaie d’essai : +${nombre(c.essai.couronnes)} Couronnes</button>
     </div>
     <p class="hint">Version d’essai : ce bouton sert à essayer la boutique, il disparaîtra avec l’arrivée des vrais achats.</p>` : ''}
-    <h3>Apparence</h3>
-    <p class="subtitle">Bientôt : habillages de troupes et de bâtiment principal, bannières, titres.</p>
     <p class="hint">Rien d’aléatoire ne se vend ici : ni coffre, ni fragment, ni niveau.</p>`);
 }
 
@@ -477,9 +513,14 @@ const ECRANS = {
   probas: (p, arg) => ecranProbas(arg),
   fiche: (p, arg) => ecranFiche(arg, p),
   boutique: (p) => ecranBoutique(p),
+  ...ECRANS_DES_COLLECTIONS,
 };
 
-/** Ouvre un écran de la progression : « ligues », « coffres », « troupes », « probas » (un type de coffre), « fiche » (une troupe), « boutique ». */
+/**
+ * Ouvre un écran de la progression : « ligues », « coffres », « troupes »,
+ * « probas » (un type de coffre), « fiche » (une troupe), « boutique »,
+ * « album », « collection » (son identifiant), « blason », « saison ».
+ */
 export function ouvrirProgression(ecran, arg) {
   if (ECRANS[ecran]) ECRANS[ecran](lireProgression(), arg);
 }
@@ -494,6 +535,7 @@ function retenir(profil) {
 function agir(act, arg, i) {
   if (act === 'fermer') return fermerProgression();
   const profil = lireProgression();
+  if (agirSurLesCollections(act, arg, i, profil, (p, message, confirmer) => ecranBoutique(p, message, { confirmer }))) return undefined;
   if (act === 'ouvrir') {
     const r = ouvrirCoffre(profil, Number(i) || 0, Math.random);
     if (r.erreur) return ecranCoffres(profil);
@@ -508,7 +550,7 @@ function agir(act, arg, i) {
   }
   if (act === 'acheter' || act === 'acheterTout') {
     // Premier toucher : le bouton demande confirmation — ou dit ce qu'il manque. Second : l'achat.
-    const c = catalogueBoutique(profil, heure());
+    const c = catalogueBoutique(profil, heure(), jourLocal());
     const prix = act === 'acheter' ? (c.troupes.find((t) => t.type === arg && !t.debloquee) || {}).prix : c.lotTroupes && c.lotTroupes.prix;
     if (!(prix > 0)) return ecranBoutique(profil);
     if (c.couronnes < prix) return ecranBoutique(profil, `Il te manque ${couronnes(prix - c.couronnes)} pour cet achat.`);
@@ -543,6 +585,8 @@ export function jourLocal(date = new Date()) {
   return `${date.getFullYear()}-${deux(date.getMonth() + 1)}-${deux(date.getDate())}`;
 }
 
+brancherCollections({ montrer, retenir, nombre, pluriel, couronnes, euros, coffre, heure, jour: () => jourLocal() });
+
 /** Le peuple dont les écrans montrent les noms et les portraits. */
 export function reglerPeuple(nouveau) { civ = nouveau || DEFAULT_CIV; }
 
@@ -575,7 +619,8 @@ export function htmlFinDePartie(evenements, profil) {
     return `<div class="prog-fin"><p>${annulee.raison === 'dejaComptee'
       ? 'Cette partie a déjà été comptée au classement.' : 'Partie annulée : elle ne compte pas au classement.'}</p></div>`;
   }
-  const lignes = [];
+  // (Le joueur d'abord : son médaillon et son titre.)
+  const lignes = [`<p class="prog-fin-joueur">${htmlMedaillon(profil.blason)}<b>${titreDuBlason(profil.blason)}</b></p>`];
   const elo = de('elo')[0];
   if (elo) {
     const signe = elo.variation > 0 ? '+' : elo.variation < 0 ? '−' : '';
@@ -586,7 +631,20 @@ export function htmlFinDePartie(evenements, profil) {
   for (const e of de('retrogradation')) lignes.push(`<p>Retour en ${ligueEnPhrase(e.a)}.</p>`);
   for (const e of de('troupeDebloquee')) lignes.push(`<p class="prog-fin-troupe">${vignette(e.troupe, 'petite')} Nouvelle troupe : <b>${nomTroupe(e.troupe)}</b></p>`);
   for (const e of de('ouvrierAuPlafond')) lignes.push(`<p>${nomTroupe(e.troupe)} monte au niveau ${e.a}, comme la ligue.</p>`);
-  for (const e of de('couronnes')) if (e.variation > 0) lignes.push(`<p class="prog-fin-couronnes">+${couronnes(e.variation)} Couronnes pour ta nouvelle ligue.</p>`);
+  for (const e of de('couronnes')) if (e.variation > 0 && e.origine === 'ligue') lignes.push(`<p class="prog-fin-couronnes">+${couronnes(e.variation)} Couronnes pour ta nouvelle ligue.</p>`);
+  for (const e of de('piece')) {
+    if (e.doublon) continue;
+    const p = PIECES[e.piece];
+    lignes.push(`<p class="prog-fin-piece">${htmlPiece(e.piece)} <span>${e.origine === 'ligue' ? 'Cadeau de ligue' : 'Gagné'} : <b>${p.genre === 'grade' ? `titre «\u00a0${p.nom}\u00a0»` : p.nom}</b></span></p>`);
+  }
+  for (const e of de('remiseDeSaison')) {
+    lignes.push(`<p class="prog-fin-saison">La saison est finie${e.variation < 0 ? ` : au-dessus de ${nombre(R.saison.pivot)}, le score se resserre, et le tien repart de ${nombre(e.apres)}` : ''}.</p>`);
+  }
+  for (const e of de('saison')) lignes.push(`<p class="prog-fin-saison">La saison ${e.numero} commence : une nouvelle route t’attend.</p>`);
+  for (const e of de('pointsDeSaison')) {
+    if (!(e.variation > 0)) continue;
+    lignes.push(`<p class="prog-fin-saison">${iconeSVG('saison', 16, 'inline')} <b>+${e.variation}</b> points de saison${e.premiereVictoireDuJour ? ' (première victoire du jour)' : ''}${e.paliersGagnes > 0 ? ` : <button class="btn small prog-attend" data-ecran="saison">palier ${e.palier} à prendre</button>` : ''}</p>`);
+  }
   for (const e of de('offreOuverte')) {
     if (e.offre === 'ligue') lignes.push(`<p class="prog-fin-offre"><button class="btn small prog-attend" data-ecran="boutique">${iconeSVG('couronne', 16, 'inline')} Offre de ligue : ${nomTroupe(e.troupe)} à moitié prix, ${R.boutique.offres.ligue.heures} h</button></p>`);
   }

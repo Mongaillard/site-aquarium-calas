@@ -14,6 +14,7 @@
   --b-gris: #4a3f33;
   --b-jaune: #ffc93c;
   --b-rouge: #f0562d;
+  --b-eclat: #37c2e0;
   /* Les caractères, livrés avec le jeu (assets/polices, déclarés dans css/boite.css) ; sinon ceux, ronds, du téléphone. */
   --b-titres: "Lilita One", ui-rounded, "Arial Rounded MT Bold", "Arial Black", system-ui, sans-serif;
   --b-texte: "Nunito", ui-rounded, "Arial Rounded MT Bold", system-ui, -apple-system, "Segoe UI", sans-serif;

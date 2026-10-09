@@ -776,8 +776,8 @@ du profil (`js/progression.js`) : `catalogueBoutique`, `acheterTroupe`,
 
 **Ce qui ne s'y vend pas, et ne s'y vendra pas** : ni coffre, ni fragment, ni
 niveau. Rien d'aléatoire, et pas de puissance — la boutique vend du temps gagné
-(une troupe plus tôt) et, plus tard, de l'apparence (habillages, bannières,
-titres : à créer).
+(une troupe plus tôt) et de l'apparence : le Passe de saison, une collection
+entière, les autocollants du jour (voir « Collections, blason et saisons »).
 
 **Offres**, à contenu fixe et à vraie date de fin (pas de faux compte à
 rebours) : l'**offre de ligue** — à chaque ligue atteinte pour la première
@@ -795,6 +795,71 @@ les lots s'affichent avec leur prix mais ne s'achètent pas, et un
 permet d'essayer la boutique ; le mettre à `null` le jour où l'argent réel
 arrive. Un achat en Couronnes demande deux touchers, comme « Détruire ».
 Tests : `node test/boutique.test.js`.
+
+### Collections, blason et saisons
+
+**Deux monnaies.** Les **Couronnes** s'achètent (ci-dessus). Les **Éclats** se
+gagnent en jouant, et seulement en jouant : chaque coffre en donne (5, 10, 20
+ou 50 selon son rang), un autocollant en double en devient (5, 15 ou 50 selon
+sa rareté), la route de saison en donne. Les Éclats n'achètent que de
+l'apparence.
+
+**Les collections** (`js/collections-config.js`) sont des thèmes : La
+Basse-cour, La Grande Marée, Les Sables, Le Chantier, Les Gaffes de guerre, Les
+Monstres, Le Banquet, La Cour, et une par saison. Chacune a neuf
+**autocollants** dessinés (cinq communs, trois rares, un épique ; dix-huit pour
+une saison), et à ses couleurs un **grade**, une **épithète**, une **bannière**
+et un **cadre**. 165 pièces en tout. Ce qu'on porte fait le **blason** : le
+cadre, l'autocollant posé dessus, la bannière en fond, et un titre en deux mots
+qui se mélangent d'une collection à l'autre (« Dompteur du Banquet »). Le
+blason se voit à l'accueil et à la fin d'une partie classée ; il ne change rien
+au combat (aucune pièce n'entre dans `js/game.js`).
+
+| D'où vient une pièce | Règle |
+|---|---|
+| Les coffres | Chaque coffre contient un autocollant (deux pour un légendaire), tiré dans les sept collections « coffres » : bois 90 % commun / 10 % rare ; argent 75 / 22 / 3 ; or 50 / 40 / 10 ; légendaire 60 % rare / 40 % épique. Affiché avec les chances du coffre. |
+| Une collection qui avance | 3 autocollants : son grade ; 6 : sa bannière ; 9 : son cadre et son épithète |
+| Les Éclats | Un autocollant choisi qui manque : 30, 100 ou 300 selon sa rareté ; les trois « autocollants du jour » de la boutique sont à moitié prix |
+| Les ligues | Chaque promotion donne une pièce de la collection « Les Ligues » : titres Recrue, Capitaine, Stratège, Empereur, Légende ; bannières de Bronze et de Fer ; cadres d'Or, d'Orichalque et des Légendes |
+| La boutique | La Cour, vendue entière : ses treize pièces pour 300 Couronnes, contenu affiché avant l'achat |
+| La saison | Sa route, ci-dessous |
+
+**Une saison par mois de calendrier** (`saisons`, `js/progression-config.js` ;
+la saison 1 est octobre 2026). Une partie classée comptée rapporte 20 points,
+une victoire 20 de plus, la première victoire du jour encore 40 ; tous les 100
+points, un palier s'ouvre, trente en tout, sur deux voies. La **voie gratuite**
+donne 8 coffres, 150 Couronnes, 6 autocollants de la saison et des Éclats. La
+**voie du Passe** (500 Couronnes, environ 5 €, pour la saison en cours) donne
+les 12 autres autocollants, la bannière, le cadre et les deux mots de titre de
+la saison, 400 Couronnes et des Éclats. **Elle ne contient ni coffre, ni
+fragment, ni niveau** : un Passe payant qui contient des coffres reviendrait à
+vendre des coffres — un test le vérifie sur chaque palier. Acheté en cours de
+saison, le Passe donne aussi les paliers déjà atteints.
+
+Quand le mois tourne (`ouvrirLaSaison`, à l'ouverture de l'écran de la saison
+ou à la partie classée suivante), la saison se clôt une seule fois, quel que
+soit le nombre de mois passés : les paliers atteints et pas encore pris sont
+donnés, puis la récompense de la ligue (coffre dès la ligue 5 ; l'étendard de
+la saison en ligue 9, son grade de champion en ligue 10), puis ce qui dépasse
+750 points de classement est réduit de moitié. À deux parties par jour et une
+victoire sur deux, un joueur monte ainsi jusqu'aux ligues 6 ou 7 et y oscille.
+Les thèmes se suivent dans l'ordre de `saisons.themes` puis recommencent ; une
+pièce déjà gagnée devient alors des Éclats.
+
+Tout est fonction pure du profil dans `js/progression.js` (`ouvrirCoffre`,
+`avancementDe`, `equiper`, `titreDe`, `prixDePiece`, `acheterPiece`,
+`acheterCollection`, `saisonDuJour`, `etatDeLaSaison`, `prendrePalier`,
+`prendreTout`, `acheterPasse`, `ouvrirLaSaison`). Le dessin des pièces est dans
+`js/blason.js` (cadres et bannières sont tracés d'après leurs réglages, les
+autocollants sont des cases de leur planche), les écrans dans
+`js/collections-ecrans.js`, leur feuille dans `css/collections.css`. La date
+vient de l'appareil tant qu'aucun serveur ne fait foi : avancer l'horloge
+avance la saison. Tests : `node test/collections.test.js`.
+
+**Ajouter une collection** : demander une planche de neuf autocollants (grille
+3 × 3, fond transparent, dans le style des autres), la passer par le script de
+découpe (voir `assets/SOURCES.md`), la poser dans `assets/collections`, ajouter
+son entrée dans `js/collections-config.js` et son nom dans `sw.js`.
 
 ## Les sons
 

@@ -74,48 +74,53 @@ export const PROGRESSION = figer({
   abandon: { precoceAvant: 120, pauseDeconnexion: 30, pauseMaxParJoueur: 60, precocesParJour: 3, fermetureRecherche: 600 },
 
   // --- Saisons -----------------------------------------------------------------
-  // À la fin d'une saison, on ne garde que la part `garde` de ce qui dépasse
+  // Une saison dure un mois de calendrier (voir `saisons`, plus bas : la route
+  // et le Passe). À sa fin, on ne garde que la part `garde` de ce qui dépasse
   // `pivot` (2 350 repart à 1 550) ; le reste est arrondi à l'entier inférieur
   // (choix). Sous le pivot, rien ne bouge. La fin de saison peut faire
   // redescendre de ligue, jamais sous `jamaisSousLaLigue`.
-  saison: { jours: 56, pivot: 750, garde: 0.5, jamaisSousLaLigue: 5 },
+  saison: { pivot: 750, garde: 0.5, jamaisSousLaLigue: 5 },
 
   // --- Ligues ------------------------------------------------------------------
   //  seuil    : Elo d'entrée — la promotion est immédiate dès qu'il est atteint
   //  plafond  : niveau maximal des troupes en partie classée
   //  troupe   : troupe offerte à l'entrée (voir aussi troupes[…].gratuite)
-  //  promotion: récompense donnée une seule fois, à la première entrée
-  //  finDeSaison : récompense de celui qui finit la saison dans cette ligue
+  //  promotion: récompense donnée une seule fois, à la première entrée — un
+  //             coffre et des `cadeaux`, chacun une pièce de la collection
+  //             « Les Ligues » (`piece`, voir js/collections-config.js)
+  //  finDeSaison : récompense de celui qui finit la saison dans cette ligue —
+  //             ses cadeaux sont des pièces de la collection de la saison
+  //             (`saison` : « etendard », « champion »)
   // Les seuils sont tous des hypothèses : rapprochés au début (ligue 2 en trois
   // victoires), écartés ensuite.
   ligues: [
     { numero: 1, nom: 'Bois', seuil: 0, plafond: 1, troupe: null, promotion: null, finDeSaison: null },
     { numero: 2, nom: 'Pierre', seuil: 90, plafond: 1, troupe: 'triton',
-      promotion: { coffre: 'or', cadeaux: [{ genre: 'titre', nom: 'Recrue' }] }, finDeSaison: null },
+      promotion: { coffre: 'or', cadeaux: [{ piece: 'ligues.recrue' }] }, finDeSaison: null },
     { numero: 3, nom: 'Bronze', seuil: 240, plafond: 2, troupe: 'horseArcher',
-      promotion: { coffre: 'or', cadeaux: [{ genre: 'couleur', nom: 'Couleur du camp au choix' }] }, finDeSaison: null },
+      promotion: { coffre: 'or', cadeaux: [{ piece: 'ligues.bronze' }] }, finDeSaison: null },
     { numero: 4, nom: 'Fer', seuil: 450, plafond: 2, troupe: 'catapult',
-      promotion: { coffre: 'or', cadeaux: [{ genre: 'banniere', nom: 'Bannière' }] }, finDeSaison: null },
+      promotion: { coffre: 'or', cadeaux: [{ piece: 'ligues.fer' }] }, finDeSaison: null },
     { numero: 5, nom: 'Argent', seuil: 750, plafond: 3, troupe: 'hydra',
-      promotion: { coffre: 'legendaire', cadeaux: [{ genre: 'titre', nom: 'Capitaine' }] },
+      promotion: { coffre: 'legendaire', cadeaux: [{ piece: 'ligues.capitaine' }] },
       finDeSaison: { coffre: 'or', cadeaux: [] } },
     { numero: 6, nom: 'Or', seuil: 1150, plafond: 3, troupe: 'pavoisier',
-      promotion: { coffre: 'or', cadeaux: [{ genre: 'skin', nom: 'Skin de troupe' }] },
+      promotion: { coffre: 'or', cadeaux: [{ piece: 'ligues.or' }] },
       finDeSaison: { coffre: 'or', cadeaux: [] } },
     { numero: 7, nom: 'Cristal', seuil: 1650, plafond: 4, troupe: 'frondeur',
-      promotion: { coffre: 'or', cadeaux: [{ genre: 'titre', nom: 'Stratège' }] },
+      promotion: { coffre: 'or', cadeaux: [{ piece: 'ligues.stratege' }] },
       finDeSaison: { coffre: 'legendaire', cadeaux: [] } },
     { numero: 8, nom: 'Orichalque', seuil: 2300, plafond: 4, troupe: 'sapeur',
-      promotion: { coffre: 'legendaire', cadeaux: [{ genre: 'capitale', nom: 'Capitale dorée' }] },
+      promotion: { coffre: 'legendaire', cadeaux: [{ piece: 'ligues.orichalque' }] },
       finDeSaison: { coffre: 'legendaire', cadeaux: [] } },
     { numero: 9, nom: 'Soleil', seuil: 3100, plafond: 5, troupe: null,
-      promotion: { coffre: 'or', cadeaux: [{ genre: 'titre', nom: 'Empereur' }] },
-      finDeSaison: { coffre: 'legendaire', cadeaux: [{ genre: 'banniere', nom: 'Bannière de la saison' }] } },
+      promotion: { coffre: 'or', cadeaux: [{ piece: 'ligues.empereur' }] },
+      finDeSaison: { coffre: 'legendaire', cadeaux: [{ saison: 'etendard' }] } },
     // « Le tout et un titre de saison » : lu comme la récompense de la ligue 9
     // plus le titre, sans coffre d'or en supplément (choix).
     { numero: 10, nom: 'Légendes', seuil: 4000, plafond: 5, troupe: null,
-      promotion: { coffre: 'legendaire', cadeaux: [{ genre: 'titre', nom: 'Légende' }, { genre: 'cadre', nom: 'Cadre de profil' }] },
-      finDeSaison: { coffre: 'legendaire', cadeaux: [{ genre: 'banniere', nom: 'Bannière de la saison' }, { genre: 'titre', nom: 'Titre de la saison' }] } },
+      promotion: { coffre: 'legendaire', cadeaux: [{ piece: 'ligues.legende' }, { piece: 'ligues.legendes' }] },
+      finDeSaison: { coffre: 'legendaire', cadeaux: [{ saison: 'etendard' }, { saison: 'champion' }] } },
   ],
 
   // Les ligues 1 à 4 sont des planchers. À partir de `aPartirDe`, on redescend
@@ -330,8 +335,9 @@ export const PROGRESSION = figer({
   },
 
   // --- Boutique ----------------------------------------------------------------
-  // La monnaie : les Couronnes. On les achète en argent réel (les lots), on les
-  // dépense à la boutique. Repère : 100 Couronnes pour 1 €.
+  // La monnaie payante : les Couronnes. On les achète en argent réel (les
+  // lots), on les dépense à la boutique. Repère : 100 Couronnes pour 1 €.
+  // (La monnaie gratuite, les Éclats, est avec les collections, plus bas.)
   //
   // Ce qui s'y vend a toujours un contenu connu d'avance : une troupe avancée
   // tout de suite (sinon gratuite par la ligue — c'est du temps gagné) et, plus
@@ -371,5 +377,107 @@ export const PROGRESSION = figer({
       bienvenue: { prixCentimes: 299, troupes: ['triton', 'horseArcher'], couronnes: 300, heures: 72 },
       ligue: { part: 50, heures: 48 },
     },
+  },
+
+  // --- Collections -------------------------------------------------------------
+  // Le jeu a deux monnaies. Les COURONNES s'achètent (boutique, ci-dessus) ;
+  // les ÉCLATS se gagnent en jouant, et seulement en jouant : chaque coffre en
+  // donne, un autocollant en double en devient. Les Éclats n'achètent que de
+  // l'apparence — les autocollants qui manquent à une collection.
+  //
+  // Les pièces elles-mêmes (noms, dessins, couleurs) sont dans
+  // js/collections-config.js. Leurs raretés sont les `categories` des troupes.
+  //
+  //  eclats.parCoffre : ce que chaque coffre donne d'office, selon son rang
+  //  eclats.doublon   : ce que devient un autocollant déjà possédé
+  //  eclats.prix      : un autocollant choisi, dans une collection des coffres
+  //  eclats.selection : chaque jour, `nombre` autocollants qui manquent au
+  //                     joueur sont proposés à `part` pour-cent de leur prix
+  //  tirages   : les autocollants d'un coffre — `nombre` tirages dans la
+  //              `table` (pour-mille, total 1000), puis un autocollant de
+  //              cette rareté à chances égales parmi ceux des collections
+  //              « coffres ». Les coffres sont gratuits : ce hasard-là ne se
+  //              vend pas.
+  //  paliers   : dans une collection des coffres, le nombre d'autocollants qui
+  //              donne chacune de ses autres pièces (elle en a neuf)
+  //  lots      : les collections vendues entières à la boutique, en Couronnes.
+  //              Leur contenu est affiché pièce par pièce avant l'achat.
+  collections: {
+    eclats: {
+      parCoffre: { bois: 5, argent: 10, or: 20, legendaire: 50 },
+      doublon: { commune: 5, rare: 15, epique: 50 },
+      prix: { commune: 30, rare: 100, epique: 300 },
+      selection: { nombre: 3, part: 50 },
+    },
+    tirages: {
+      bois: { nombre: 1, table: { commune: 900, rare: 100 } },
+      argent: { nombre: 1, table: { commune: 750, rare: 220, epique: 30 } },
+      or: { nombre: 1, table: { commune: 500, rare: 400, epique: 100 } },
+      legendaire: { nombre: 2, table: { rare: 600, epique: 400 } },
+    },
+    paliers: { grade: 3, banniere: 6, cadre: 9, epithete: 9 },
+    lots: { cour: { prix: 300 } },
+  },
+
+  // --- Saisons : la route et le Passe ---------------------------------------------
+  // Une saison par mois de calendrier, du premier au dernier jour. Chacune a
+  // sa collection (`themes`, dans l'ordre ; arrivé au bout, on recommence) et
+  // une route de `paliers` paliers à deux voies.
+  //
+  //  premiere : le mois de la saison 1, « AAAA-MM »
+  //  points   : ce que rapporte une partie classée comptée — toute partie,
+  //             plus un supplément pour une victoire, plus un autre pour la
+  //             première victoire du jour. Trois parties par jour dont deux
+  //             gagnées : 140 points ; la route se finit en trois semaines.
+  //  passe.prix : en Couronnes. Il ouvre la seconde voie de la saison en cours.
+  //  route    : une ligne par palier, `gratuit` et `passe`. Une récompense est
+  //             un coffre (son rang), des `couronnes`, des `eclats`, un
+  //             autocollant de la collection de la saison (`embleme` : son rang
+  //             dans la collection, de 0 à 17) ou une autre de ses pièces
+  //             (`piece` : « grade », « banniere », « cadre », « epithete »).
+  //
+  // LA RÈGLE : la voie du Passe ne contient que de l'apparence, des Couronnes
+  // et des Éclats (qui n'achètent que de l'apparence). Jamais un coffre,
+  // jamais un fragment, jamais un niveau : un Passe payant qui contient des
+  // coffres revient à vendre des coffres. Les essais le vérifient.
+  saisons: {
+    premiere: '2026-10',
+    themes: ['citrouilles', 'tournoi'],
+    paliers: 30,
+    pointsParPalier: 100,
+    points: { partie: 20, victoire: 20, premiereVictoireDuJour: 40 },
+    passe: { prix: 500 },
+    route: [
+      { gratuit: { eclats: 20 }, passe: { embleme: 6 } },
+      { gratuit: { coffre: 'bois' }, passe: { eclats: 40 } },
+      { gratuit: { embleme: 0 }, passe: { couronnes: 100 } },
+      { gratuit: { eclats: 20 }, passe: { embleme: 7 } },
+      { gratuit: { coffre: 'argent' }, passe: { piece: 'banniere' } },
+      { gratuit: { couronnes: 50 }, passe: { eclats: 40 } },
+      { gratuit: { embleme: 1 }, passe: { embleme: 8 } },
+      { gratuit: { eclats: 20 }, passe: { eclats: 40 } },
+      { gratuit: { coffre: 'argent' }, passe: { embleme: 9 } },
+      { gratuit: { eclats: 20 }, passe: { piece: 'grade' } },
+      { gratuit: { eclats: 20 }, passe: { couronnes: 100 } },
+      { gratuit: { embleme: 2 }, passe: { embleme: 10 } },
+      { gratuit: { eclats: 20 }, passe: { eclats: 40 } },
+      { gratuit: { coffre: 'or' }, passe: { embleme: 11 } },
+      { gratuit: { couronnes: 50 }, passe: { piece: 'epithete' } },
+      { gratuit: { embleme: 3 }, passe: { eclats: 40 } },
+      { gratuit: { eclats: 20 }, passe: { embleme: 12 } },
+      { gratuit: { coffre: 'argent' }, passe: { couronnes: 100 } },
+      { gratuit: { eclats: 20 }, passe: { embleme: 13 } },
+      { gratuit: { eclats: 20 }, passe: { piece: 'cadre' } },
+      { gratuit: { embleme: 4 }, passe: { eclats: 40 } },
+      { gratuit: { eclats: 20 }, passe: { embleme: 14 } },
+      { gratuit: { coffre: 'or' }, passe: { eclats: 40 } },
+      { gratuit: { couronnes: 50 }, passe: { embleme: 15 } },
+      { gratuit: { embleme: 5 }, passe: { eclats: 40 } },
+      { gratuit: { eclats: 20 }, passe: { couronnes: 100 } },
+      { gratuit: { coffre: 'or' }, passe: { embleme: 16 } },
+      { gratuit: { eclats: 20 }, passe: { eclats: 40 } },
+      { gratuit: { eclats: 20 }, passe: { eclats: 40 } },
+      { gratuit: { coffre: 'legendaire' }, passe: { embleme: 17 } },
+    ],
   },
 });

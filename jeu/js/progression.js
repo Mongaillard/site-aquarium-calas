@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Moteur de progression : classement, ligues, coffres, fragments et niveaux
-// des troupes.
+// des troupes ; boutique ; collections, blason et saisons.
 //
 // Rien que des fonctions PURES sur un objet « profil » ordinaire (du JSON) :
 // aucun accès au stockage, à l'horloge ni à Math.random. Le hasard (`alea`),
@@ -16,6 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { PROGRESSION as R } from './progression-config.js';
+import { COLLECTIONS, PIECES, GENRES, BLASON_DE_DEPART, collection as collectionDuJeu, pieceDe } from './collections-config.js';
 
 export const VERSION_PROFIL = R.profil.version;
 
@@ -70,12 +71,28 @@ const AVANCEES = EXISTANTES.filter((type) => R.troupes[type].gratuite);
 /** Parmi elles, celles que l'ordinateur ne forme que si la partie les lui donne (voir reglagesDePartie). */
 const EN_PLUS = AVANCEES.filter((type) => R.troupes[type].enPlus);
 const ORIGINES = ['ligue', 'parties', 'achat'];   // d'une troupe avancée ; une troupe de base est « base »
-const ORIGINES_DE_COFFRE = ['victoire', 'defaite', 'egalite', 'promotion', 'semaine', 'saison', 'bataille', 'autre'];
+const ORIGINES_DE_COFFRE = ['victoire', 'defaite', 'egalite', 'promotion', 'semaine', 'saison', 'route', 'bataille', 'autre'];
 const ISSUES = ['victoire', 'defaite', 'egalite', 'abandon', 'abandonAdverse', 'annulee'];
 const COMPTEURS = { victoire: 'victoires', defaite: 'defaites', egalite: 'egalites' };
 
 const existe = (type) => typeof type === 'string' && possede(R.troupes, type) && !R.troupes[type].aVenir;
 const ligueValide = (ligue) => entier(ligue, 1, NB_LIGUES, 1);
+
+// Les collections (js/collections-config.js), relevées une fois.
+const existePiece = (id) => typeof id === 'string' && possede(PIECES, id);
+/** Ce que tout profil possède d'office. */
+const PIECES_DE_DEPART = COLLECTIONS.filter((c) => c.source === 'depart').flatMap((c) => c.pieces);
+/** Les autocollants que les coffres donnent, par rareté : ceux des collections « coffres ». */
+const RESERVE = {};
+for (const rarete of R.categories) RESERVE[rarete] = [];
+for (const c of COLLECTIONS) {
+  if (c.source === 'coffres') for (const id of c.emblemes) RESERVE[PIECES[id].rarete].push(id);
+}
+const DANS_LES_COFFRES = R.categories.flatMap((rarete) => RESERVE[rarete]);
+/** Les deux voies de la route d'une saison. */
+const VOIES = ['gratuit', 'passe'];
+/** Les pièces du blason dont on peut se passer. */
+const FACULTATIVES = ['embleme', 'epithete'];
 
 // --- Dates ---------------------------------------------------------------------
 
@@ -130,8 +147,14 @@ function semaineDe(jour) {
  *   coffres         : ceux qui attendent d'être ouverts, `{ type, origine }`
  *   troupes         : niveau et fragments de chaque troupe du jeu
  *   debloquees      : type → d'où vient la troupe (base, ligue, parties, achat)
- *   eclats          : fragments en trop, pour les apparences
- *   couronnes       : la monnaie de la boutique (voir « Boutique », plus bas)
+ *   eclats          : la monnaie gratuite — donnée par les coffres et par les
+ *                     autocollants en double ; elle n'achète que de l'apparence
+ *   couronnes       : la monnaie payante (voir « Boutique », plus bas)
+ *   pieces          : les pièces de collection possédées (leurs identifiants)
+ *   blason          : celles que l'on porte — `embleme` et `epithete` peuvent
+ *                     manquer (null), `cadre`, `banniere` et `grade` jamais
+ *   route           : la route de la saison en cours — ses `points`, le Passe
+ *                     (`passe`), les paliers déjà pris sur chaque voie (`pris`)
  *   boutique        : ses offres en cours — `offreLigue` (une troupe à prix
  *                     réduit jusqu'à une heure, en secondes), `bienvenueJusqua`
  *                     (fin de l'offre de bienvenue ; 0 tant qu'elle n'est pas
@@ -142,6 +165,11 @@ function semaineDe(jour) {
  *                     d'adversaire est fermée ; 0 si elle est ouverte
  *   operations, journal : nombre d'opérations faites, et les dernières
  */
+/** La route d'une saison qui commence. */
+function routeNeuve() {
+  return { points: 0, passe: false, pris: { gratuit: [], passe: [] } };
+}
+
 export function profilNeuf() {
   const troupes = {};
   const debloquees = {};
@@ -161,9 +189,12 @@ export function profilNeuf() {
     eclats: 0,
     couronnes: 0,
     boutique: { offreLigue: null, bienvenueJusqua: 0, bienvenuePrise: false },
+    pieces: [...PIECES_DE_DEPART],
+    blason: { ...BLASON_DE_DEPART },
+    route: routeNeuve(),
     saison: 1,
     saisons: [],
-    jour: { date: '', parties: 0, abandonsPrecoces: 0 },
+    jour: { date: '', parties: 0, abandonsPrecoces: 0, victoires: 0 },
     semaine: { numero: 0, jours: 0, coffre: false },
     rechercheFermeeJusqua: 0,
     operations: 0,
@@ -225,6 +256,29 @@ function lireProfil(o) {
     p.boutique.bienvenueJusqua = estNombre(o.boutique.bienvenueJusqua) && o.boutique.bienvenueJusqua > 0 ? o.boutique.bienvenueJusqua : 0;
     p.boutique.bienvenuePrise = o.boutique.bienvenuePrise === true;
   }
+  if (Array.isArray(o.pieces)) {
+    for (const id of o.pieces) {
+      if (existePiece(id) && !p.pieces.includes(id)) p.pieces.push(id);
+    }
+  }
+  if (estObjet(o.blason)) {
+    for (const genre of GENRES) {
+      const id = o.blason[genre];
+      if (id === null && FACULTATIVES.includes(genre)) p.blason[genre] = null;
+      else if (existePiece(id) && PIECES[id].genre === genre && p.pieces.includes(id)) p.blason[genre] = id;
+    }
+  }
+  if (estObjet(o.route)) {
+    p.route.points = entier(o.route.points, 0, R.saisons.paliers * R.saisons.pointsParPalier, 0);
+    p.route.passe = o.route.passe === true;
+    for (const voie of VOIES) {
+      const pris = estObjet(o.route.pris) ? o.route.pris[voie] : null;
+      if (!Array.isArray(pris)) continue;
+      for (let palier = 1; palier <= R.saisons.paliers; palier++) {
+        if (pris.includes(palier)) p.route.pris[voie].push(palier);
+      }
+    }
+  }
   p.saison = entier(o.saison, 1, GRAND, 1);
   if (Array.isArray(o.saisons)) {
     for (const s of o.saisons.slice(-R.profil.saisons)) {
@@ -236,6 +290,7 @@ function lireProfil(o) {
     p.jour.date = rangDuJour(o.jour.date) === null ? '' : o.jour.date;
     p.jour.parties = entier(o.jour.parties, 0, GRAND, 0);
     p.jour.abandonsPrecoces = entier(o.jour.abandonsPrecoces, 0, GRAND, 0);
+    p.jour.victoires = entier(o.jour.victoires, 0, GRAND, 0);
   }
   if (estObjet(o.semaine)) {
     p.semaine.numero = entier(o.semaine.numero, -GRAND, GRAND, 0);
@@ -368,8 +423,10 @@ function promouvoir(p, evenements, instant = null) {
     evenements.push({ type: 'promotion', de, a: p.ligue, nom: ligue.nom, plafond: ligue.plafond });
     if (ligue.promotion && !p.promotions.includes(p.ligue)) {
       p.promotions.push(p.ligue);
-      evenements.push({ type: 'recompensePromotion', ligue: p.ligue, coffre: ligue.promotion.coffre, cadeaux: copier(ligue.promotion.cadeaux) });
+      const cadeaux = cadeauxDeLigue(ligue.promotion);
+      evenements.push({ type: 'recompensePromotion', ligue: p.ligue, coffre: ligue.promotion.coffre, cadeaux });
       donnerCoffre(p, ligue.promotion.coffre, 'promotion', evenements);
+      for (const id of cadeaux) donnerPiece(p, id, 'ligue', evenements);
       crediter(p, R.boutique.parLigue, 'ligue', evenements);
       ouvrirOffreDeLigue(p, instant, evenements);
     }
@@ -391,18 +448,19 @@ function retrograder(p, evenements, plancher) {
   }
 }
 
-/** Met la ligue, l'ouvrier et les troupes gratuites d'accord avec le score et les compteurs. */
+/** Met la ligue, l'ouvrier, les troupes gratuites et les pièces dues d'accord avec le score et les compteurs. */
 function mettreAJour(p, evenements) {
   promouvoir(p, evenements);
   retrograder(p, evenements, 1);
   monterOuvrier(p, evenements);
   debloquerGratuites(p, evenements);
+  rattraperLesPieces(p, evenements);
 }
 
 /**
  * Donne à un profil ce que les règles lui doivent et qu'il n'a pas encore :
  * une promotion due, une troupe dont la condition gratuite est remplie,
- * l'ouvrier au plafond. Sans effet sur un profil à jour. À appeler après un
+ * l'ouvrier au plafond, les pièces de collection des ligues déjà passées. Sans effet sur un profil à jour. À appeler après un
  * changement de réglages ou l'arrivée d'une nouvelle troupe : appliquerResultat
  * le fait de lui-même à chaque partie.
  */
@@ -424,7 +482,7 @@ function changerDeJour(p, jour) {
   // corrigée ; sans cela plus aucun coffre jusqu'à la fausse date.
   const avant = rangDuJour(p.jour.date);
   if (avant !== null && rang < avant && avant - rang <= 1) return;
-  p.jour = { date: jour, parties: 0, abandonsPrecoces: 0 };
+  p.jour = { date: jour, parties: 0, abandonsPrecoces: 0, victoires: 0 };
 }
 
 /** Une partie de plus aujourd'hui ; la première de la journée compte pour le coffre d'or de la semaine. */
@@ -454,8 +512,10 @@ function compterLeJour(p, evenements) {
  * }
  *
  * Renvoie `{ profil, evenements }`. Les événements, par leur `type` :
- *   partieAnnulee, elo, promotion, recompensePromotion, coffre,
- *   ouvrierAuPlafond, retrogradation, troupeDebloquee, rechercheFermee.
+ *   partieAnnulee, elo, promotion, recompensePromotion, coffre, piece,
+ *   ouvrierAuPlafond, retrogradation, troupeDebloquee, rechercheFermee,
+ *   pointsDeSaison — et ceux d'un changement de saison, si le mois a tourné
+ *   depuis la dernière partie (voir ouvrirLaSaison).
  *
  * Les règles :
  *   - un abandon est une défaite ; avant abandon.precoceAvant, une défaite —
@@ -498,6 +558,7 @@ export function appliquerResultat(profil, partie) {
   const precoce = !(partie.duree >= R.abandon.precoceAvant);   // une durée illisible vaut « précoce »
   const jour = rangDuJour(partie.jour) === null ? '' : partie.jour;
   changerDeJour(p, jour);
+  changerDeSaison(p, jour, evenements);
 
   let issue = issueDite;
   if (issue === 'abandonAdverse') issue = precoce ? 'annulee' : 'victoire';
@@ -533,6 +594,7 @@ export function appliquerResultat(profil, partie) {
   if (!sansValeur) {
     donnerCoffre(p, tirerRang(tableDesCoffres(partie.format)[issue], aleaDeLaPartie(partie, p, id)), issue, evenements);
     compterLeJour(p, evenements);
+    compterLaSaison(p, issue, evenements);
   }
 
   // Trop de défaites précoces dans la journée : la recherche se ferme.
@@ -567,20 +629,19 @@ export function pauseAccordee(dejaPrise) {
 // --- Fin de saison ---------------------------------------------------------------
 
 /**
- * Clôt la saison : récompense selon la ligue où l'on finit, puis ce qui
- * dépasse saison.pivot est réduit (2 350 repart à 1 550) et la saison suivante
- * commence. Sous le pivot, rien ne bouge. Les récompenses déjà gagnées et la
- * plus haute ligue atteinte restent. Renvoie `{ profil, evenements }`
- * (recompenseSaison, coffre, remiseDeSaison, retrogradation, saison).
+ * Clôt la saison du profil : ce que sa route lui devait encore, la récompense
+ * de la ligue où il finit, le classement resserré au-dessus du pivot, puis la
+ * saison `suivante` commence avec une route neuve.
  */
-export function finDeSaison(profil) {
-  const p = migrerProfil(profil);
-  const evenements = [];
+function clore(p, evenements, suivante = p.saison + 1) {
+  prendreCeQuiEstDu(p, evenements);
   const finie = { numero: p.saison, ligue: p.ligue, elo: p.elo };
   const recompense = R.ligues[p.ligue - 1].finDeSaison;
   if (recompense) {
-    evenements.push({ type: 'recompenseSaison', saison: p.saison, ligue: p.ligue, coffre: recompense.coffre, cadeaux: copier(recompense.cadeaux) });
+    const cadeaux = cadeauxDeLigue(recompense, p.saison);
+    evenements.push({ type: 'recompenseSaison', saison: p.saison, ligue: p.ligue, coffre: recompense.coffre, cadeaux });
     donnerCoffre(p, recompense.coffre, 'saison', evenements);
+    for (const id of cadeaux) donnerPiece(p, id, 'saison', evenements);
   }
   const { pivot, garde, jamaisSousLaLigue } = R.saison;
   if (p.elo > pivot) p.elo = pivot + Math.floor((p.elo - pivot) * garde);
@@ -588,9 +649,27 @@ export function finDeSaison(profil) {
   retrograder(p, evenements, jamaisSousLaLigue);
   p.saisons.push(finie);
   if (p.saisons.length > R.profil.saisons) p.saisons.splice(0, p.saisons.length - R.profil.saisons);
-  p.saison++;
+  p.saison = suivante;
+  p.route = routeNeuve();
   evenements.push({ type: 'saison', numero: p.saison });
   noter(p, { op: 'saison', numero: finie.numero, ligue: finie.ligue, elo: p.elo, variation: p.elo - finie.elo });
+}
+
+/**
+ * Clôt la saison : les paliers de la route atteints et pas encore pris sont
+ * donnés, puis la récompense selon la ligue où l'on finit ; ce qui dépasse
+ * saison.pivot est réduit (2 350 repart à 1 550) et la saison suivante
+ * commence. Sous le pivot, rien ne bouge. Les récompenses déjà gagnées et la
+ * plus haute ligue atteinte restent. Renvoie `{ profil, evenements }`
+ * (palierPris, recompenseSaison, coffre, piece, remiseDeSaison,
+ * retrogradation, saison).
+ *
+ * C'est le calendrier qui décide du moment : voir ouvrirLaSaison.
+ */
+export function finDeSaison(profil) {
+  const p = migrerProfil(profil);
+  const evenements = [];
+  clore(p, evenements);
   return { profil: p, evenements };
 }
 
@@ -685,11 +764,18 @@ function tirer(p, regles, groupe, alea) {
  * Ouvre le coffre en attente de rang `indice`. `alea()` rend un nombre dans
  * [0, 1) : c'est tout le hasard de l'ouverture.
  *
- * Renvoie `{ profil, coffre, tirages, evenements }`, ou `{ erreur }` ('alea',
- * 'coffre'). Chaque tirage dit son `genre` (ordinaire, garanti), la catégorie
- * `tiree`, la `categorie` où il a fini (null s'il n'a rien trouvé), la
- * `troupe`, ses `fragments`, ou les `eclats` qu'il est devenu. Les événements :
- * coffreOuvert (le total par troupe), ameliorationPossible.
+ * Renvoie `{ profil, coffre, tirages, pieces, eclats, evenements }`, ou
+ * `{ erreur }` ('alea', 'coffre'). Chaque tirage dit son `genre` (ordinaire,
+ * garanti), la catégorie `tiree`, la `categorie` où il a fini (null s'il n'a
+ * rien trouvé), la `troupe`, ses `fragments`, ou les `eclats` qu'il est
+ * devenu. `pieces` : les autocollants du coffre, chacun avec sa `rarete`, et
+ * `doublon` et ses `eclats` quand on l'avait déjà. `eclats` : ce que le coffre
+ * a donné d'Éclats en tout — sa part fixe, les doublons, les fragments en trop.
+ *
+ * Les autocollants se tirent APRÈS les fragments : la suite des fragments ne
+ * dépend pas d'eux. Les événements : coffreOuvert (le total par troupe, les
+ * Éclats, les pièces nouvelles), piece (une par pièce reçue, celles qu'une
+ * collection avancée donne comprises), ameliorationPossible.
  */
 export function ouvrirCoffre(profil, indice, alea) {
   if (typeof alea !== 'function') return { erreur: 'alea' };
@@ -709,7 +795,25 @@ export function ouvrirCoffre(profil, indice, alea) {
     if (t.troupe) fragments[t.troupe] = (fragments[t.troupe] || 0) + t.fragments;
     eclats += t.eclats;
   }
-  const evenements = [{ type: 'coffreOuvert', coffre: coffre.type, origine: coffre.origine, fragments, eclats }];
+
+  // Les autocollants, puis la part fixe d'Éclats.
+  const recues = [];
+  const pieces = [];
+  const regle = R.collections.tirages[coffre.type];
+  for (let i = 0; regle && i < regle.nombre; i++) {
+    const id = autocollantTire(regle.table, alea);
+    if (!id) continue;
+    const nouvelle = donnerPiece(p, id, 'coffre', recues);
+    const rendu = nouvelle ? 0 : R.collections.eclats.doublon[PIECES[id].rarete] || 0;
+    pieces.push({ piece: id, rarete: PIECES[id].rarete, doublon: !nouvelle, eclats: rendu });
+    eclats += rendu;
+  }
+  const fixes = R.collections.eclats.parCoffre[coffre.type] || 0;
+  p.eclats += fixes;
+  eclats += fixes;
+
+  const nouvelles = recues.filter((e) => !e.doublon).map((e) => e.piece);
+  const evenements = [{ type: 'coffreOuvert', coffre: coffre.type, origine: coffre.origine, fragments, eclats, pieces: nouvelles }, ...recues];
   for (const type of Object.keys(fragments)) {
     const troupe = p.troupes[type];
     if (troupe.fragments >= coutAmelioration(type, troupe.niveau)) {
@@ -718,8 +822,29 @@ export function ouvrirCoffre(profil, indice, alea) {
   }
   // Le journal garde ce que le coffre a donné, pas le détail de chaque tirage :
   // il est recopié à chaque opération, autant qu'il reste léger.
-  noter(p, { op: 'coffre', coffre: coffre.type, origine: coffre.origine, fragments: { ...fragments }, eclats });
-  return { profil: p, coffre: coffre.type, tirages, evenements };
+  noter(p, { op: 'coffre', coffre: coffre.type, origine: coffre.origine, fragments: { ...fragments }, eclats, pieces: nouvelles });
+  return { profil: p, coffre: coffre.type, tirages, pieces, eclats, evenements };
+}
+
+/**
+ * Un autocollant de coffre : sa rareté selon la table, puis un autocollant de
+ * cette rareté à chances égales parmi ceux des collections « coffres » — qu'on
+ * l'ait déjà ou non : un doublon devient des Éclats (voir donnerPiece). Une
+ * rareté sans autocollant passe à celle du dessous, puis à celles du dessus.
+ * Consomme toujours deux nombres. null si aucune collection n'est dans les coffres.
+ */
+function autocollantTire(table, alea) {
+  const tiree = categorieTiree(table, alea());
+  const hasard = alea();
+  const depart = R.categories.indexOf(tiree);
+  const ordre = [];
+  for (let r = depart; r >= 0; r--) ordre.push(r);
+  for (let r = depart + 1; r < R.categories.length; r++) ordre.push(r);
+  for (const r of ordre) {
+    const reserve = RESERVE[R.categories[r]];
+    if (reserve.length > 0) return reserve[rangAuHasard(hasard, reserve.length)];
+  }
+  return null;
 }
 
 /**
@@ -759,14 +884,27 @@ export function probabilitesDe(typeDeCoffre) {
     moyenne[categorie] = parts[categorie] / 1000;
     surCent[categorie] = parts[categorie] / 10;
   }
-  return { coffre: typeDeCoffre, nom: regles.nom, tirages, groupes, moyenne, surCent };
+  // Les autocollants : leurs chances par rareté, et ce que rend un doublon.
+  const regle = R.collections.tirages[typeDeCoffre];
+  const pieces = { nombre: regle ? regle.nombre : 0, lignes: [], total: 0 };
+  for (const categorie of R.categories) {
+    if (!regle || !possede(regle.table, categorie)) continue;
+    const pourMille = regle.table[categorie];
+    pieces.total += pourMille;
+    pieces.lignes.push({
+      categorie, nom: R.nomsDesCategories[categorie], pourMille, pourCent: pourMille / 10,
+      autocollants: RESERVE[categorie].length, doublon: R.collections.eclats.doublon[categorie],
+    });
+  }
+  return { coffre: typeDeCoffre, nom: regles.nom, tirages, groupes, moyenne, surCent, pieces, eclats: R.collections.eclats.parCoffre[typeDeCoffre] || 0 };
 }
 
 /**
  * Vérifie les tables de tous les coffres : des parts entières, positives, en
  * pour-cent ronds, qui somment à 1000 ; des catégories connues ; un nombre de
  * fragments pour chacune. Et les tables du coffre d'une partie, par issue :
- * des pour-cent entiers qui somment à 100. Renvoie `{ valide, erreurs }`.
+ * des pour-cent entiers qui somment à 100. Et les tables des autocollants,
+ * aux mêmes conditions. Renvoie `{ valide, erreurs }`.
  */
 export function verifierProbabilites() {
   const erreurs = [];
@@ -810,6 +948,23 @@ export function verifierProbabilites() {
       }
       if (total !== 100) erreurs.push(`${ou} : la table somme à ${total}, pas à 100`);
     }
+  }
+  // Les autocollants : une table par rang de coffre, des pour-cent ronds, des raretés qui ont de quoi donner.
+  for (const type of Object.keys(R.coffres)) {
+    const regle = R.collections.tirages[type];
+    const ou = `autocollants du coffre « ${type} »`;
+    if (!estObjet(regle)) { erreurs.push(`${ou} : pas de table`); continue; }
+    if (!Number.isInteger(regle.nombre) || regle.nombre <= 0) erreurs.push(`${ou} : nombre de tirages invalide`);
+    let total = 0;
+    for (const rarete of Object.keys(regle.table)) {
+      const part = regle.table[rarete];
+      if (!R.categories.includes(rarete)) erreurs.push(`${ou} : rareté inconnue « ${rarete} »`);
+      else if (part > 0 && RESERVE[rarete].length === 0) erreurs.push(`${ou} : aucun autocollant « ${rarete} » à donner`);
+      if (!Number.isInteger(part) || part < 0) erreurs.push(`${ou} : part invalide pour « ${rarete} »`);
+      if (part % 10 !== 0) erreurs.push(`${ou} : la part de « ${rarete} » n'est pas un pour-cent rond`);
+      total += part;
+    }
+    if (total !== 1000) erreurs.push(`${ou} : la table somme à ${total}, pas à 1000`);
   }
   return { valide: erreurs.length === 0, erreurs };
 }
@@ -1011,9 +1166,15 @@ function lotDeTroupes(p) {
  *               `reste` — « ligue » se paie en Couronnes, « bienvenue » en
  *               argent réel (`disponible` dit si on peut l'acheter ici) ;
  *   lots      : les lots de Couronnes, et s'ils sont `disponible`s ;
- *   essai     : le porte-monnaie d'essai, ou null.
+ *   essai     : le porte-monnaie d'essai, ou null ;
+ *   eclats    : sa monnaie gratuite ;
+ *   selection : les autocollants du jour (`jour`, « AAAA-MM-JJ »), en Éclats —
+ *               chacun son `prix` et son `prixPlein` ;
+ *   collections : celles qui se vendent entières, en Couronnes — leur `prix`,
+ *               leurs `pieces`, celles qui lui manquent (`manquantes`) ;
+ *   passe     : celui de la saison en cours — son `prix`, et s'il est `pris`.
  */
-export function catalogueBoutique(profil, maintenant) {
+export function catalogueBoutique(profil, maintenant, jour) {
   const p = migrerProfil(profil);
   const t = estNombre(maintenant) ? maintenant : null;
   const offre = offreDeLigue(p, t);
@@ -1036,6 +1197,10 @@ export function catalogueBoutique(profil, maintenant) {
     offres,
     lots: R.boutique.lots.map((lot) => ({ ...lot, disponible: reel })),
     essai: R.boutique.essai ? { couronnes: R.boutique.essai.couronnes } : null,
+    eclats: p.eclats,
+    selection: selectionDuJour(p, jour).map((id) => ({ piece: id, prix: prixDePiece(p, id, jour), prixPlein: R.collections.eclats.prix[PIECES[id].rarete] })),
+    collections: COLLECTIONS.map((c) => lotDeCollection(p, c.id)).filter(Boolean),
+    passe: { saison: p.saison, prix: R.saisons.passe.prix, pris: p.route.passe },
   };
 }
 
@@ -1129,6 +1294,403 @@ export function prendreOffreDeBienvenue(profil, preuve, maintenant) {
   crediter(p, b.couronnes, 'bienvenue', evenements);
   noter(p, { op: 'boutique', article: 'bienvenue' });
   return { profil: p, evenements };
+}
+
+// --- Collections et blason -------------------------------------------------------
+//
+// Deux monnaies. Les Couronnes s'achètent ; les Éclats se gagnent en jouant
+// (les coffres, les autocollants en double, la route de saison) et n'achètent
+// que de l'apparence. Une pièce de collection ne change rien à une partie.
+
+/** Ajoute des Éclats au profil et le dit. */
+function donnerEclats(p, eclats, origine, evenements) {
+  if (!(eclats > 0)) return;
+  p.eclats += eclats;
+  evenements.push({ type: 'eclats', variation: eclats, origine, total: p.eclats });
+}
+
+/**
+ * Donne une pièce de collection. Déjà possédée, elle devient des Éclats (selon
+ * sa rareté) : renvoie alors false. Le premier autocollant reçu se porte
+ * d'office. Une pièce de plus peut en amener d'autres : celles que sa
+ * collection donne à qui avance (voir completer).
+ */
+function donnerPiece(p, id, origine, evenements) {
+  const piece = PIECES[id];
+  if (!piece) return false;
+  if (p.pieces.includes(id)) {
+    const eclats = R.collections.eclats.doublon[piece.rarete] || 0;
+    p.eclats += eclats;
+    evenements.push({ type: 'piece', piece: id, origine, doublon: true, eclats });
+    return false;
+  }
+  p.pieces.push(id);
+  if (piece.genre === 'embleme' && !p.blason.embleme) p.blason.embleme = id;
+  evenements.push({ type: 'piece', piece: id, origine, doublon: false, eclats: 0 });
+  completer(p, piece.collection, evenements);
+  return true;
+}
+
+/** Les pièces qu'une collection des coffres doit à qui a réuni assez de ses autocollants : grade, bannière, cadre, épithète. */
+function completer(p, collectionId, evenements) {
+  const c = collectionDuJeu(collectionId);
+  if (!c || c.source !== 'coffres') return;
+  const reunis = c.emblemes.filter((id) => p.pieces.includes(id)).length;
+  for (const court of Object.keys(R.collections.paliers)) {
+    const id = pieceDe(c.id, court);
+    if (!id || reunis < R.collections.paliers[court] || p.pieces.includes(id)) continue;
+    p.pieces.push(id);
+    evenements.push({ type: 'piece', piece: id, origine: 'collection', doublon: false, eclats: 0 });
+  }
+}
+
+/**
+ * Les cadeaux d'une récompense de ligue, en identifiants de pièces : ceux
+ * qu'elle nomme (`piece`), et ceux de la collection de la saison `numero`
+ * (`saison` : « etendard », « champion »).
+ */
+function cadeauxDeLigue(recompense, numero) {
+  const ids = [];
+  for (const cadeau of (recompense && recompense.cadeaux) || []) {
+    const id = cadeau.piece || (cadeau.saison && Number.isInteger(numero) ? pieceDe(themeDeSaison(numero), cadeau.saison) : null);
+    if (existePiece(id)) ids.push(id);
+  }
+  return ids;
+}
+
+/** Ce qu'un profil aurait dû recevoir et n'a pas : les cadeaux des promotions déjà passées, les pièces d'une collection déjà avancée. */
+function rattraperLesPieces(p, evenements) {
+  for (const numero of p.promotions) {
+    for (const id of cadeauxDeLigue(R.ligues[numero - 1].promotion)) {
+      if (!p.pieces.includes(id)) donnerPiece(p, id, 'ligue', evenements);
+    }
+  }
+  for (const c of COLLECTIONS) completer(p, c.id, evenements);
+}
+
+/** Où en est une collection pour ce profil : `reunis` autocollants sur `total`, et `complete`. null si elle n'existe pas. */
+export function avancementDe(profil, collectionId) {
+  const c = collectionDuJeu(collectionId);
+  if (!c) return null;
+  const p = migrerProfil(profil);
+  const reunis = c.emblemes.filter((id) => p.pieces.includes(id)).length;
+  const pieces = c.pieces.filter((id) => p.pieces.includes(id)).length;
+  return { reunis, total: c.emblemes.length, pieces, toutes: c.pieces.length, complete: pieces === c.pieces.length };
+}
+
+/** Le titre que porte ce profil : son grade, puis son épithète s'il en a une — « Dompteur du Banquet ». */
+export function titreDe(profil) {
+  const b = migrerProfil(profil).blason;
+  return `${PIECES[b.grade].nom}${b.epithete ? ` ${PIECES[b.epithete].nom}` : ''}`;
+}
+
+/**
+ * Porte une pièce possédée à la place de celle du même genre (`embleme`,
+ * `cadre`, `banniere`, `grade`, `epithete`) ; `null` retire l'autocollant ou
+ * l'épithète. Renvoie `{ profil, evenements }` (blason), ou `{ erreur }` :
+ * 'genre', 'obligatoire', 'pasPossedee'.
+ */
+export function equiper(profil, genre, id) {
+  if (!GENRES.includes(genre)) return { erreur: 'genre' };
+  const p = migrerProfil(profil);
+  if (id === null) {
+    if (!FACULTATIVES.includes(genre)) return { erreur: 'obligatoire' };
+  } else {
+    if (!existePiece(id) || PIECES[id].genre !== genre) return { erreur: 'genre' };
+    if (!p.pieces.includes(id)) return { erreur: 'pasPossedee' };
+  }
+  p.blason[genre] = id;
+  return { profil: p, evenements: [{ type: 'blason', genre, piece: id }] };
+}
+
+/** Le rang que le jour donne à une pièce dans la sélection : un nombre de [0, 1) qui ne dépend que du jour et d'elle. */
+const rangDuJourPour = (jour, id) => aleaDeGraine(`selection|${jour}|${id}`)();
+
+/**
+ * La sélection du jour : parmi les autocollants des coffres qui manquent à ce
+ * profil, ceux que ce jour met en avant, à prix réduit. La même pour tous ceux
+ * à qui il manque les mêmes ; vide sans jour lisible, ou quand il ne manque rien.
+ */
+function selectionDuJour(p, jour) {
+  if (rangDuJour(jour) === null) return [];
+  return DANS_LES_COFFRES.filter((id) => !p.pieces.includes(id))
+    .map((id) => [rangDuJourPour(jour, id), id])
+    .sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : 1))
+    .slice(0, R.collections.eclats.selection.nombre)
+    .map(([, id]) => id);
+}
+
+/**
+ * Le prix d'un autocollant en Éclats, ce jour-là : son prix selon sa rareté,
+ * réduit s'il est dans la sélection du jour. null s'il ne se vend pas — seuls
+ * se vendent les autocollants des collections « coffres » qu'on n'a pas.
+ */
+export function prixDePiece(profil, id, jour) {
+  if (!DANS_LES_COFFRES.includes(id)) return null;
+  const p = migrerProfil(profil);
+  if (p.pieces.includes(id)) return null;
+  const plein = R.collections.eclats.prix[PIECES[id].rarete];
+  return selectionDuJour(p, jour).includes(id) ? Math.round(plein * R.collections.eclats.selection.part / 100) : plein;
+}
+
+/**
+ * Achète un autocollant choisi avec des Éclats, au prix de ce jour. Renvoie
+ * `{ profil, evenements }` (eclats, piece — et les pièces que sa collection
+ * donne alors), ou `{ erreur }` : 'pasEnVente', 'fonds' (avec `manque`).
+ */
+export function acheterPiece(profil, id, jour) {
+  const p = migrerProfil(profil);
+  const prix = prixDePiece(p, id, jour);
+  if (prix === null) return { erreur: 'pasEnVente' };
+  if (p.eclats < prix) return { erreur: 'fonds', manque: prix - p.eclats };
+  p.eclats -= prix;
+  const evenements = [{ type: 'eclats', variation: -prix, origine: 'piece', total: p.eclats }];
+  donnerPiece(p, id, 'achat', evenements);
+  noter(p, { op: 'boutique', article: 'piece', piece: id, eclats: prix });
+  return { profil: p, evenements };
+}
+
+/** Une collection vendue entière : son prix, ses pièces, et celles que ce profil n'a pas encore. null si elle ne se vend pas. */
+function lotDeCollection(p, collectionId) {
+  const c = collectionDuJeu(collectionId);
+  const lot = c && c.source === 'boutique' && possede(R.collections.lots, c.id) ? R.collections.lots[c.id] : null;
+  if (!lot) return null;
+  return { collection: c.id, prix: lot.prix, pieces: [...c.pieces], manquantes: c.pieces.filter((id) => !p.pieces.includes(id)) };
+}
+
+/**
+ * Achète une collection de la boutique avec des Couronnes : toutes ses pièces,
+ * d'un coup. Renvoie `{ profil, evenements }`, ou `{ erreur }` : 'pasEnVente',
+ * 'dejaPossedee', 'fonds' (avec `manque`).
+ */
+export function acheterCollection(profil, collectionId) {
+  const p = migrerProfil(profil);
+  const lot = lotDeCollection(p, collectionId);
+  if (!lot) return { erreur: 'pasEnVente' };
+  if (lot.manquantes.length === 0) return { erreur: 'dejaPossedee' };
+  if (p.couronnes < lot.prix) return { erreur: 'fonds', manque: lot.prix - p.couronnes };
+  p.couronnes -= lot.prix;
+  const evenements = [{ type: 'couronnes', variation: -lot.prix, origine: 'collection', total: p.couronnes }];
+  for (const id of lot.manquantes) donnerPiece(p, id, 'achat', evenements);
+  noter(p, { op: 'boutique', article: 'collection', collection: lot.collection, prix: lot.prix });
+  return { profil: p, evenements };
+}
+
+// --- Saisons : le calendrier, la route, le Passe ----------------------------------
+//
+// Une saison par mois de calendrier. Chaque partie classée comptée rapporte
+// des points ; tous les `pointsParPalier`, un palier de la route s'ouvre sur
+// les deux voies. La voie gratuite se prend toujours, celle du Passe quand on
+// l'a acheté — à n'importe quel moment de la saison : les paliers déjà
+// atteints se prennent alors d'un coup.
+
+const FORME_DU_MOIS = /^(\d{4})-(\d{2})$/;
+const moisDe = (annee, mois) => annee * 12 + mois - 1;
+
+/** Le numéro de la saison d'un jour « AAAA-MM-JJ » : 1 pour le mois `saisons.premiere` (et avant), un de plus chaque mois. null si le jour est illisible. */
+export function saisonDuJour(jour) {
+  if (rangDuJour(jour) === null) return null;
+  const premiere = FORME_DU_MOIS.exec(R.saisons.premiere);
+  const ecart = moisDe(Number(jour.slice(0, 4)), Number(jour.slice(5, 7))) - moisDe(Number(premiere[1]), Number(premiere[2]));
+  return Math.max(1, ecart + 1);
+}
+
+/** La collection d'une saison : les thèmes dans l'ordre, puis on recommence. */
+export function themeDeSaison(numero) {
+  const themes = R.saisons.themes;
+  return themes[(entier(numero, 1, GRAND, 1) - 1) % themes.length];
+}
+
+/** Les jours qu'il reste à la saison, celui-ci compris ; null si le jour est illisible. */
+export function joursRestants(jour) {
+  const rang = rangDuJour(jour);
+  if (rang === null) return null;
+  const annee = Number(jour.slice(0, 4)), mois = Number(jour.slice(5, 7));
+  const deux = (n) => String(n).padStart(2, '0');
+  const suivant = mois === 12 ? `${annee + 1}-01-01` : `${annee}-${deux(mois + 1)}-01`;
+  return rangDuJour(suivant) - rang;
+}
+
+/** Le dernier palier que ces points ouvrent. */
+const palierAtteint = (points) => Math.min(R.saisons.paliers, Math.floor(points / R.saisons.pointsParPalier));
+
+/**
+ * La récompense d'un palier, sur une voie, pour la saison `numero` :
+ *   { genre: 'coffre', coffre } · { genre: 'couronnes', couronnes } ·
+ *   { genre: 'eclats', eclats } · { genre: 'piece', piece }
+ * null si le palier n'existe pas.
+ */
+export function recompenseDePalier(numero, voie, palier) {
+  const ligne = Number.isInteger(palier) ? R.saisons.route[palier - 1] : null;
+  const brute = ligne && VOIES.includes(voie) ? ligne[voie] : null;
+  if (!brute) return null;
+  if (brute.coffre) return { genre: 'coffre', coffre: brute.coffre };
+  if (brute.couronnes) return { genre: 'couronnes', couronnes: brute.couronnes };
+  if (brute.eclats) return { genre: 'eclats', eclats: brute.eclats };
+  const theme = collectionDuJeu(themeDeSaison(numero));
+  const id = Number.isInteger(brute.embleme) ? theme.emblemes[brute.embleme] : pieceDe(theme.id, brute.piece);
+  return existePiece(id) ? { genre: 'piece', piece: id } : null;
+}
+
+/** Prend un palier : le marque, et donne sa récompense. */
+function prendre(p, voie, palier, evenements) {
+  p.route.pris[voie].push(palier);
+  p.route.pris[voie].sort((a, b) => a - b);
+  const r = recompenseDePalier(p.saison, voie, palier);
+  evenements.push({ type: 'palierPris', saison: p.saison, voie, palier, recompense: r });
+  if (!r) return;
+  if (r.genre === 'coffre') donnerCoffre(p, r.coffre, 'route', evenements);
+  else if (r.genre === 'couronnes') crediter(p, r.couronnes, 'route', evenements);
+  else if (r.genre === 'eclats') donnerEclats(p, r.eclats, 'route', evenements);
+  else donnerPiece(p, r.piece, 'route', evenements);
+}
+
+/** Les paliers atteints et pas encore pris, voie par voie (celle du Passe seulement si on l'a). */
+function dus(p) {
+  const atteint = palierAtteint(p.route.points);
+  const liste = [];
+  for (let palier = 1; palier <= atteint; palier++) {
+    for (const voie of VOIES) {
+      if (voie === 'passe' && !p.route.passe) continue;
+      if (!p.route.pris[voie].includes(palier)) liste.push({ voie, palier });
+    }
+  }
+  return liste;
+}
+
+function prendreCeQuiEstDu(p, evenements) {
+  const liste = dus(p);
+  for (const { voie, palier } of liste) prendre(p, voie, palier, evenements);
+  return liste.length;
+}
+
+/** Les points de saison d'une partie classée comptée. */
+function compterLaSaison(p, issue, evenements) {
+  const s = R.saisons.points;
+  let points = s.partie;
+  let premiere = false;
+  if (issue === 'victoire') {
+    points += s.victoire;
+    premiere = p.jour.victoires === 0;
+    if (premiere) points += s.premiereVictoireDuJour;
+    p.jour.victoires++;
+  }
+  const avant = palierAtteint(p.route.points);
+  const plein = R.saisons.paliers * R.saisons.pointsParPalier;
+  const gagnes = Math.min(points, plein - p.route.points);
+  p.route.points += gagnes;
+  const palier = palierAtteint(p.route.points);
+  evenements.push({ type: 'pointsDeSaison', variation: gagnes, total: p.route.points, palier, paliersGagnes: palier - avant, premiereVictoireDuJour: premiere });
+}
+
+/**
+ * Fait passer le profil à la saison de ce jour s'il en est resté à une
+ * précédente : la saison qu'il jouait est close (voir clore), une seule fois
+ * quel que soit le nombre de mois passés, et la route repart de zéro. Sans
+ * effet quand le profil est à jour, que le jour est illisible ou que
+ * l'horloge a reculé.
+ */
+function changerDeSaison(p, jour, evenements) {
+  const numero = saisonDuJour(jour);
+  if (numero === null || numero <= p.saison) return false;
+  clore(p, evenements, numero);
+  return true;
+}
+
+/**
+ * À appeler à l'ouverture du jeu et de l'écran de la saison : met le profil à
+ * la saison de ce jour. Renvoie `{ profil, evenements }` — sans événement
+ * quand rien n'a changé ; sinon ceux de la fin de la saison passée
+ * (palierPris, recompenseSaison, coffre, piece, remiseDeSaison,
+ * retrogradation, saison).
+ */
+export function ouvrirLaSaison(profil, jour) {
+  const p = migrerProfil(profil);
+  const evenements = [];
+  changerDeSaison(p, jour, evenements);
+  return { profil: p, evenements };
+}
+
+/**
+ * Ce que l'écran de la saison montre : son `numero`, sa collection (`theme`),
+ * les `points`, le `palier` atteint et les points `versLeSuivant`, le Passe
+ * (`passe`, `prixDuPasse`), les `joursRestants`, le nombre de paliers
+ * `aPrendre`, et la `route` — par palier, chaque voie avec sa `recompense` et
+ * son `etat` : 'pris', 'aPrendre', 'aVenir', ou 'ferme' (voie du Passe sans le Passe).
+ */
+export function etatDeLaSaison(profil, jour) {
+  const p = migrerProfil(profil);
+  const atteint = palierAtteint(p.route.points);
+  const route = R.saisons.route.map((ligne, i) => {
+    const palier = i + 1;
+    const voies = {};
+    for (const voie of VOIES) {
+      const pris = p.route.pris[voie].includes(palier);
+      const etat = pris ? 'pris' : voie === 'passe' && !p.route.passe ? 'ferme' : palier <= atteint ? 'aPrendre' : 'aVenir';
+      voies[voie] = { recompense: recompenseDePalier(p.saison, voie, palier), etat };
+    }
+    return { palier, atteint: palier <= atteint, ...voies };
+  });
+  return {
+    numero: p.saison,
+    theme: themeDeSaison(p.saison),
+    points: p.route.points,
+    palier: atteint,
+    paliers: R.saisons.paliers,
+    parPalier: R.saisons.pointsParPalier,
+    versLeSuivant: atteint >= R.saisons.paliers ? 0 : p.route.points - atteint * R.saisons.pointsParPalier,
+    passe: p.route.passe,
+    prixDuPasse: R.saisons.passe.prix,
+    joursRestants: joursRestants(jour),
+    aPrendre: dus(p).length,
+    route,
+  };
+}
+
+/**
+ * Prend la récompense d'un palier atteint. Renvoie `{ profil, evenements }`
+ * (palierPris, puis coffre, couronnes, eclats ou piece), ou `{ erreur }` :
+ * 'palier', 'pasAtteint', 'passe' (voie du Passe sans le Passe), 'dejaPris'.
+ */
+export function prendrePalier(profil, voie, palier) {
+  if (!VOIES.includes(voie) || !Number.isInteger(palier) || palier < 1 || palier > R.saisons.paliers) return { erreur: 'palier' };
+  const p = migrerProfil(profil);
+  if (palier > palierAtteint(p.route.points)) return { erreur: 'pasAtteint' };
+  if (voie === 'passe' && !p.route.passe) return { erreur: 'passe' };
+  if (p.route.pris[voie].includes(palier)) return { erreur: 'dejaPris' };
+  const evenements = [];
+  prendre(p, voie, palier, evenements);
+  noter(p, { op: 'route', saison: p.saison, voie, palier });
+  return { profil: p, evenements };
+}
+
+/** Prend d'un coup tout ce que la route doit. `{ erreur: 'rien' }` s'il n'y a rien à prendre. */
+export function prendreTout(profil) {
+  const p = migrerProfil(profil);
+  const evenements = [];
+  const nombre = prendreCeQuiEstDu(p, evenements);
+  if (!nombre) return { erreur: 'rien' };
+  noter(p, { op: 'route', saison: p.saison, paliers: nombre });
+  return { profil: p, evenements };
+}
+
+/**
+ * Achète le Passe de la saison en cours, en Couronnes : il ouvre la seconde
+ * voie, paliers déjà atteints compris. Renvoie `{ profil, evenements }`
+ * (couronnes, passe), ou `{ erreur }` : 'dejaPris', 'fonds' (avec `manque`).
+ */
+export function acheterPasse(profil) {
+  const p = migrerProfil(profil);
+  if (p.route.passe) return { erreur: 'dejaPris' };
+  const prix = R.saisons.passe.prix;
+  if (p.couronnes < prix) return { erreur: 'fonds', manque: prix - p.couronnes };
+  p.couronnes -= prix;
+  p.route.passe = true;
+  noter(p, { op: 'boutique', article: 'passe', saison: p.saison, prix });
+  return { profil: p, evenements: [
+    { type: 'couronnes', variation: -prix, origine: 'passe', total: p.couronnes },
+    { type: 'passe', saison: p.saison },
+  ] };
 }
 
 // --- La partie ---------------------------------------------------------------

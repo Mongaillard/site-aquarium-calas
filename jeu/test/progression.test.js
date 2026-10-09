@@ -16,6 +16,7 @@ import {
 } from '../js/progression.js';
 import { UNIT_TYPES } from '../js/config.js';
 import { RNG } from '../js/utils.js';
+import { PIECES } from '../js/collections-config.js';
 
 let failures = 0;
 
@@ -87,6 +88,10 @@ function aleaEcrit(...nombres) {
 }
 
 const R = PROGRESSION;
+// Ce qu'un coffre donne d'Éclats en dehors de ses fragments : sa part fixe, et ses autocollants en double.
+const FIXES = R.collections.eclats.parCoffre;
+const eclatsDesFragments = (o) => o.tirages.reduce((s, t) => s + t.eclats, 0);
+const eclatsDesDoublons = (o) => o.pieces.reduce((s, x) => s + x.eclats, 0);
 const QUATORZE = ['villager', 'militia', 'spearman', 'archer', 'scout', 'knight', 'champion', 'crossbowman',
   'priest', 'ram', 'triton', 'horseArcher', 'catapult', 'hydra'];
 const NOUVELLES = ['pavoisier', 'frondeur', 'sapeur'];   // celles des ligues 6 à 8, arrivées après les quatorze
@@ -109,8 +114,8 @@ console.log('--- Les réglages ---');
     egal(R.recherche, { fenetre: 60, pas: 30, periode: 5, fenetreMax: 400, ordinateurApres: 60, ordinateurClasseJusqua: 4 }));
   check('abandons : précoce avant 120 s, pause de 30 s, 60 s au plus par joueur, trois par jour ferment la recherche 10 min',
     egal(R.abandon, { precoceAvant: 120, pauseDeconnexion: 30, pauseMaxParJoueur: 60, precocesParJour: 3, fermetureRecherche: 600 }));
-  check('saison : 56 jours, pivot 750, on garde la moitié de l’excédent',
-    R.saison.jours === 56 && R.saison.pivot === 750 && R.saison.garde === 0.5 && R.saison.jamaisSousLaLigue === 5);
+  check('saison : un mois de calendrier (voir test/collections.test.js), pivot 750, on garde la moitié de l’excédent',
+    !('jours' in R.saison) && R.saison.pivot === 750 && R.saison.garde === 0.5 && R.saison.jamaisSousLaLigue === 5);
 
   const l = R.ligues;
   check('dix ligues, numérotées de 1 à 10', l.length === 10 && l.every((ligue, i) => ligue.numero === i + 1));
@@ -122,7 +127,7 @@ console.log('--- Les réglages ---');
   check('… le coffre de promotion : légendaire en ligues 5, 8 et 10, d’or ailleurs',
     egal(l.map((x) => x.promotion && x.promotion.coffre), [null, 'or', 'or', 'or', 'legendaire', 'or', 'or', 'legendaire', 'or', 'legendaire']));
   check('… les titres de promotion',
-    egal(l.map((x) => (x.promotion ? x.promotion.cadeaux.filter((c) => c.genre === 'titre').map((c) => c.nom).join() : '')),
+    egal(l.map((x) => (x.promotion ? x.promotion.cadeaux.map((c) => PIECES[c.piece]).filter((p) => p.genre === 'grade').map((p) => p.nom).join() : '')),
       ['', 'Recrue', '', '', 'Capitaine', '', 'Stratège', '', 'Empereur', 'Légende']));
   check('… le coffre de fin de saison : rien avant la ligue 5, or en 5 et 6, légendaire ensuite',
     egal(l.map((x) => x.finDeSaison && x.finDeSaison.coffre), [null, null, null, null, 'or', 'or', 'legendaire', 'legendaire', 'legendaire', 'legendaire']));
@@ -254,7 +259,7 @@ console.log('\n--- Le profil ---');
   check('… les dix troupes de base débloquées d’office, les avancées verrouillées',
     egal(p.debloquees, Object.fromEntries([...COMMUNES, ...RARES].map((t) => [t, 'base']))));
   check('… ses compteurs du jour : parties et abandons précoces (plus de plafond de coffres : chaque partie en donne un)',
-    egal(p.jour, { date: '', parties: 0, abandonsPrecoces: 0 }) && p.rechercheFermeeJusqua === 0);
+    egal(p.jour, { date: '', parties: 0, abandonsPrecoces: 0, victoires: 0 }) && p.rechercheFermeeJusqua === 0);
   check('… les trois nouvelles y sont, verrouillées comme les autres avancées',
     NOUVELLES.every((t) => egal(p.troupes[t], { niveau: 1, fragments: 0 }) && !(t in p.debloquees)));
   const autre = profilNeuf();
@@ -420,12 +425,13 @@ console.log('\n--- Promotion ---');
     p.elo === 90 && p.ligue === 2 && p.plusHauteLigue === 2
     && egal(parType(trois.evenements, 'promotion'), [{ type: 'promotion', de: 1, a: 2, nom: 'Pierre', plafond: 1 }]));
   check('… avec sa récompense : coffre d’or et titre « Recrue »',
-    egal(parType(trois.evenements, 'recompensePromotion'), [{ type: 'recompensePromotion', ligue: 2, coffre: 'or', cadeaux: [{ genre: 'titre', nom: 'Recrue' }] }])
+    egal(parType(trois.evenements, 'recompensePromotion'), [{ type: 'recompensePromotion', ligue: 2, coffre: 'or', cadeaux: ['ligues.recrue'] }])
+    && p.pieces.includes('ligues.recrue') && egal(parType(trois.evenements, 'piece'), [{ type: 'piece', piece: 'ligues.recrue', origine: 'ligue', doublon: false, eclats: 0 }])
     && coffresDe(p, 'or') === 1 && p.coffres.find((c) => c.type === 'or').origine === 'promotion' && egal(p.promotions, [2]));
   check('… et la troupe de la ligue : l’Atlante, débloqué par la ligue',
     p.debloquees.triton === 'ligue' && egal(parType(trois.evenements, 'troupeDebloquee'), [{ type: 'troupeDebloquee', troupe: 'triton', origine: 'ligue' }]));
   check('… les événements disent tout, dans l’ordre',
-    egal(trois.evenements.map((x) => x.type), ['elo', 'promotion', 'recompensePromotion', 'coffre', 'couronnes', 'troupeDebloquee', 'coffre']),
+    egal(trois.evenements.map((x) => x.type), ['elo', 'promotion', 'recompensePromotion', 'coffre', 'piece', 'couronnes', 'troupeDebloquee', 'coffre', 'pointsDeSaison']),
     trois.evenements.map((x) => x.type).join(', '));
   check('… dont les 50 Couronnes de la nouvelle ligue (voir test/boutique.test.js)',
     p.couronnes === R.boutique.parLigue && egal(parType(trois.evenements, 'couronnes'), [{ type: 'couronnes', variation: 50, origine: 'ligue', total: 50 }]));
@@ -445,7 +451,7 @@ console.log('\n--- Promotion ---');
   const montee = jouer(profilA(720), 'V');
   check('ligue 5 à 750 points : coffre légendaire, Hydre, ouvrier au niveau 3',
     montee.profil.ligue === 5 && coffresDe(montee.profil, 'legendaire') === 1 && montee.profil.debloquees.hydra === 'ligue'
-    && montee.profil.troupes.villager.niveau === 3 && parType(montee.evenements, 'recompensePromotion')[0].cadeaux[0].nom === 'Capitaine');
+    && montee.profil.troupes.villager.niveau === 3 && parType(montee.evenements, 'recompensePromotion')[0].cadeaux[0] === 'ligues.capitaine');
 
   // La récompense ne se donne qu'une fois.
   const chute = jouer(profilA(750), 'DDDDD');
@@ -705,7 +711,9 @@ console.log('\n--- Ouvrir un coffre ---');
   const depart = geler(avecCoffre(profilNeuf(), 'argent'));
   const alea = aleaEcrit(0.1, 0, 0.9, 0.99, 0.99, 0.5);
   const o = ouvrirCoffre(depart, 0, alea);
-  check('un coffre d’argent : trois tirages, deux nombres de hasard chacun', o.coffre === 'argent' && o.tirages.length === 3 && alea.appels() === 6);
+  // (Après ses trois tirages de fragments, le coffre tire son autocollant : deux nombres de plus. Voir test/collections.test.js.)
+  check('un coffre d’argent : trois tirages, deux nombres de hasard chacun — puis deux pour son autocollant',
+    o.coffre === 'argent' && o.tirages.length === 3 && o.pieces.length === 1 && alea.appels() === 8);
   check('un coffre de bois : deux tirages', ouvrirCoffre(avecCoffre(profilNeuf(), 'bois'), 0, aleaEcrit()).tirages.length === 2);
   check('… la catégorie vient de la table, la troupe du second nombre, la quantité est fixe',
     egal(o.tirages[0], { genre: 'ordinaire', tiree: 'commune', categorie: 'commune', troupe: 'villager', fragments: 5, eclats: 0 })
@@ -717,7 +725,8 @@ console.log('\n--- Ouvrir un coffre ---');
     o.profil.troupes.villager.fragments === 5 && o.profil.troupes.ram.fragments === 2 && o.profil.troupes.crossbowman.fragments === 2
     && o.profil.coffres.length === 0 && depart.coffres.length === 1 && depart.troupes.villager.fragments === 0);
   check('… l’événement résume ce que le coffre a donné',
-    egal(o.evenements[0], { type: 'coffreOuvert', coffre: 'argent', origine: 'victoire', fragments: { villager: 5, ram: 2, crossbowman: 2 }, eclats: 0 }));
+    egal(o.evenements[0], { type: 'coffreOuvert', coffre: 'argent', origine: 'victoire', fragments: { villager: 5, ram: 2, crossbowman: 2 },
+      eclats: FIXES.argent, pieces: [o.pieces[0].piece] }));
   const limites = ouvrirCoffre(avecCoffre(toutDebloque(), 'argent', 'argent'), 0, aleaEcrit(0.7495, 0, 0.7505, 0, 0.9495, 0));
   const hautes = ouvrirCoffre(avecCoffre(toutDebloque(), 'argent'), 0, aleaEcrit(0.9505, 0, 0.9999, 0.9999, 0, 0));
   check('les bornes de la table : 749 commune, 750 et 949 rare, 950 et 999 épique, 0 commune',
@@ -760,26 +769,28 @@ console.log('\n--- Ouvrir un coffre ---');
   const perdu = ouvrirCoffre(avecCoffre(communesMax, 'argent'), 0, aleaEcrit(0.1, 0, 0.9, 0, 0.99, 0));
   check('toutes les communes au maximum : rien en dessous, le tirage monte aux rares, avec la quantité des rares — aucun éclat',
     egal(perdu.tirages[0], { genre: 'ordinaire', tiree: 'commune', categorie: 'rare', troupe: 'knight', fragments: 2, eclats: 0 })
-    && perdu.tirages[1].troupe === 'knight' && perdu.tirages[2].troupe === 'triton' && perdu.profil.eclats === 0
-    && perdu.evenements[0].eclats === 0);
+    && perdu.tirages[1].troupe === 'knight' && perdu.tirages[2].troupe === 'triton' && eclatsDesFragments(perdu) === 0
+    && perdu.profil.eclats === FIXES.argent && perdu.evenements[0].eclats === FIXES.argent);
   const resteLHydre = toutDebloque();
   for (const t of DIX_SEPT) if (t !== 'hydra') resteLHydre.troupes[t].niveau = 5;
   const versLHydre = ouvrirCoffre(avecCoffre(resteLHydre, 'argent'), 0, aleaEcrit(0.1, 0, 0.9, 0, 0.99, 0));
   check('tout au maximum sauf l’Hydre : chaque tirage finit sur elle, avec la quantité des épiques',
     versLHydre.tirages.every((t) => t.troupe === 'hydra' && t.categorie === 'epique' && t.fragments === 1 && t.eclats === 0)
-    && versLHydre.profil.troupes.hydra.fragments === 3 && versLHydre.profil.eclats === 0);
+    && versLHydre.profil.troupes.hydra.fragments === 3 && versLHydre.profil.eclats === FIXES.argent);
   const toutMax = toutDebloque();
   for (const t of DIX_SEPT) toutMax.troupes[t].niveau = 5;
   const eclats = ouvrirCoffre(avecCoffre(toutMax, 'legendaire'), 0, aleaDeGraine(4));
   check('tout au maximum : le coffre entier devient des éclats, aucun fragment',
     eclats.tirages.length === 8 && eclats.tirages.every((t) => t.troupe === null && t.fragments === 0 && t.eclats === 10)
-    && eclats.profil.eclats === 80 && DIX_SEPT.every((t) => eclats.profil.troupes[t].fragments === 0));
+    && eclatsDesFragments(eclats) === 80 && eclats.profil.eclats === 80 + FIXES.legendaire + eclatsDesDoublons(eclats)
+    && DIX_SEPT.every((t) => eclats.profil.troupes[t].fragments === 0));
   const resteUneNouvelle = toutDebloque();
   for (const t of DIX_SEPT) if (t !== 'frondeur') resteUneNouvelle.troupes[t].niveau = 5;
   const versLeFrondeur = ouvrirCoffre(avecCoffre(resteUneNouvelle, 'legendaire'), 0, aleaDeGraine(4));
   check('tout au maximum sauf le Frondeur : pas un éclat tant qu’une nouvelle peut encore monter',
     versLeFrondeur.tirages.every((t) => t.troupe === 'frondeur' && t.fragments === 2 && t.eclats === 0)
-    && versLeFrondeur.profil.eclats === 0 && versLeFrondeur.profil.troupes.frondeur.fragments === 16);
+    && eclatsDesFragments(versLeFrondeur) === 0 && versLeFrondeur.profil.eclats === FIXES.legendaire + eclatsDesDoublons(versLeFrondeur)
+    && versLeFrondeur.profil.troupes.frondeur.fragments === 16);
 
   // Tirages garantis.
   const or = ouvrirCoffre(avecCoffre(toutDebloque(), 'or'), 0, aleaEcrit(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
@@ -1119,11 +1130,12 @@ console.log('\n--- Fin de saison ---');
   const recompense = (elo) => {
     const r = finDeSaison(profilA(elo));
     const e = parType(r.evenements, 'recompenseSaison')[0];
-    return e ? [e.coffre, ...e.cadeaux.map((c) => c.genre)].join('+') : '';
+    return e ? [e.coffre, ...e.cadeaux].join('+') : '';
   };
-  check('récompenses : rien en ligues 1 à 4, or en 5 et 6, légendaire en 7 et 8, bannière en plus en 9, titre de saison en plus en 10',
+  check('récompenses : rien en ligues 1 à 4, or en 5 et 6, légendaire en 7 et 8, l’étendard de la saison en plus en 9, son titre de champion en plus en 10',
     egal([0, 90, 240, 450, 750, 1150, 1650, 2300, 3100, 4000].map(recompense),
-      ['', '', '', '', 'or', 'or', 'legendaire', 'legendaire', 'legendaire+banniere', 'legendaire+banniere+titre']));
+      ['', '', '', '', 'or', 'or', 'legendaire', 'legendaire', 'legendaire+citrouilles.etendard', 'legendaire+citrouilles.etendard+citrouilles.champion']),
+    [3100, 4000].map(recompense).join(' | '));
   const legende = finDeSaison(profilA(4100));
   check('une Légende à 4 100 repart à 2 425, en ligue 8', legende.profil.elo === 2425 && legende.profil.ligue === 8 && legende.profil.plusHauteLigue === 10);
   const tous = [750, 800, 1150, 1200, 1650, 2300, 3100, 4000, 9000].map((elo) => finDeSaison(profilA(elo)).profil);
@@ -1285,11 +1297,19 @@ console.log('\n--- Le journal ---');
 // dès qu'il le peut ; pas de fin de saison, comme dans le tableau.
 console.log('\n--- Simulation : 400 parties ---');
 {
+  // Deux parties par jour : la simulation dure deux cents jours, donc six
+  // fins de saison. Chacune réduit de moitié ce qui dépasse 750 : le joueur
+  // moyen (une victoire sur deux) monte jusqu'à la ligue 6 ou 7 puis y oscille,
+  // là où le document, écrit sans compter les saisons, annonçait 7 puis 9. Les
+  // niveaux des troupes ne dépendent pas du classement — mais chaque fin de
+  // saison donne les coffres de sa route (huit sur la voie gratuite) et celui
+  // de la ligue : passé le premier mois, les troupes montent un peu plus vite
+  // que le document ne le prévoyait (4,6 – 4,0 – 3,1 à 240 parties).
   const TABLEAU = {   // parties → ligue, niveau moyen des communes, des rares, des épiques
     60: [4, 3.1, 2.9, 2.5],
     120: [5, 4.0, 3.5, 2.8],
-    240: [7, 4.6, 4.0, 3.1],
-    400: [9, 5.0, 5.0, 3.6],
+    240: [6, 5.0, 4.4, 3.3],
+    400: [6, 5.0, 5.0, 3.6],
   };
   const JOUEURS = 60;
   const alea = aleaDeGraine(600);

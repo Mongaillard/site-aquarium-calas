@@ -102,6 +102,10 @@ export const ICONES = {
   ligue: { n: 'écu (dessin original)', d: ['M256 28l188 62v150c0 116-76 208-188 244C144 448 68 356 68 240V90z'] },
   coffre: { n: 'coffre (dessin original)', d: ['M88 232v-36c0-64 52-116 116-116h104c64 0 116 52 116 116v36z', 'M88 264h136v40c0 18 14 32 32 32s32-14 32-32v-40h136v144c0 13-11 24-24 24H112c-13 0-24-11-24-24z', 'M244 252h24v52c0 7-5 12-12 12s-12-5-12-12z'] },
   cadenas: { n: 'cadenas (dessin original)', d: ['M144 224v-64c0-62 50-112 112-112s112 50 112 112v64h24c13 0 24 11 24 24v192c0 13-11 24-24 24H120c-13 0-24-11-24-24V248c0-13 11-24 24-24zm48 0h128v-64c0-35-29-64-64-64s-64 29-64 64z'] },
+  // Dessinées pour le jeu : l'éclat (la monnaie gratuite), l'album des collections, le fanion de la saison.
+  eclat: { n: 'éclat (dessin original)', d: ['M244 40L116 212h128z', 'M268 40l128 172H268z', 'M116 236h280L256 476z'] },
+  album: { n: 'album (dessin original)', d: ['M88 136h320v328H88zM248 196L222 264L149 268L206 314L187 384L248 344L309 384L290 314L347 268L274 264z', 'M136 56h328v328h-32V88H136z'] },
+  saison: { n: 'fanion (dessin original)', d: ['M92 36h40v440H92z', 'M152 60l308 100l-308 100z'] },
   couronne: { n: 'couronne (dessin original)', d: ['M60 372L36 148l112 92L256 76l108 164l112-92l-24 224z', 'M68 404h376v52H68z'] },
   info: { n: 'information (dessin original)', d: ['M256 48a208 208 0 1 0 0 416a208 208 0 0 0 0-416zm-26 176h52v148h-52zm0-84h52v52h-52z'] },
   retour: { n: 'chevron (dessin original)', d: ['M328 72l44 44l-140 140l140 140l-44 44l-184-184z'] },

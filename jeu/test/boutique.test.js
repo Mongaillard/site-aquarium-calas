@@ -187,11 +187,12 @@ console.log('\n--- L’écran ---');
     couronnes: 250, boutique: { offreLigue: { troupe: 'horseArcher', jusqua: maintenant + 30 * HEURE }, bienvenueJusqua: maintenant + 60 * HEURE, bienvenuePrise: false } }));
   ouvrirProgression('boutique');
   let page = noeud.innerHTML, t = texte(page);
-  check('la boutique s’ouvre : le porte-monnaie, les offres du moment, les troupes, les lots, l’apparence à venir',
-    /<h2>Boutique<\/h2>/.test(page) && /class="prog-bourse">[\s\S]*250/.test(page) && ['Offres du moment', 'Troupes', 'Couronnes', 'Apparence'].every((titre) => page.includes(`<h3>${titre}</h3>`)));
+  check('la boutique s’ouvre : les deux bourses, les offres du moment, les autocollants du jour, les collections, les troupes, les lots',
+    /<h2>Boutique<\/h2>/.test(page) && /class="prog-bourse">[\s\S]*250/.test(page) && /class="prog-bourse-eclats"/.test(page)
+    && ['Offres du moment', 'Autocollants du jour', 'Collections', 'Troupes', 'Couronnes'].every((titre) => page.includes(`<h3>${titre}</h3>`)) && !page.includes('<h3>Apparence</h3>'));
   check('l’offre de ligue : la troupe, son prix barré, ce qu’il reste', /Offre de ligue : Archer monté à moitié prix/.test(t) && /100 au lieu de 200 · encore 30 h/.test(t));
   check('l’offre de bienvenue : son contenu, son prix, « Bientôt »', /Offre de bienvenue : Archer monté \+ 300 Couronnes/.test(t) && /2,99 €, une seule fois · encore 2 j/.test(t) && /<button class="btn small" disabled>Bientôt<\/button>/.test(page));
-  check('les noms sont ceux du peuple du joueur : le Sphinx, pas l’Hydre', t.includes('Sphinx') && !t.includes('Hydre') && t.includes('Mercenaire atlante'));
+  check('les noms sont ceux du peuple du joueur : le Sphinx, pas l’Hydre', t.includes('Sphinx') && !/Hydre(?! aux trois glaces| fantôme)/.test(t) && t.includes('Mercenaire atlante'));
   check('une troupe déjà gagnée est dite « Débloquée », sans bouton', /Mercenaire atlante<\/b>\s*<small>Déjà à toi\.<\/small>\s*<\/span>\s*<span class="prog-acquis">Débloquée<\/span>/.test(page));
   check('les lots montrent leur prix en euros, pas encore achetables', B.lots.every((l) => page.includes(`<button class="btn small" disabled>${euros(l.prixCentimes)}</button>`)) && /arrivera avec l’application/.test(t));
   check('la règle est dite : rien d’aléatoire ne se vend ici', /Rien d’aléatoire ne se vend ici : ni coffre, ni fragment, ni niveau\./.test(t));

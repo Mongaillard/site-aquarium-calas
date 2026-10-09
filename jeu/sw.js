@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v67';
+const CACHE = 'age-empires-mobile-v68';
 // La musique (js/musique.js) : trois morceaux lourds. Ils ne sont pas pris à
 // l'installation mais à la première écoute, et gardés à part, comme les unités
 // en 3D : une mise à jour du jeu ne les fait pas retélécharger.
@@ -26,11 +26,15 @@ const ASSETS = [
   './js/progression.js',
   './js/progression-config.js',
   './js/progression-ecrans.js',
+  './js/collections-config.js',
+  './js/collections-ecrans.js',
+  './js/blason.js',
   './js/fiches-troupes.js',
   './js/musique.js',
   './js/rangement-durable.js',
   './css/progression.css',
   './css/boite.css',
+  './css/collections.css',
   './assets/polices/lilita-one.woff2',
   './assets/polices/nunito.woff2',
   './js/render.js',
@@ -126,6 +130,18 @@ const ASSETS = [
   './assets/coffres/coffre-legendaire-ferme.webp',
   './assets/coffres/coffre-legendaire-entrouvert.webp',
   './assets/coffres/coffre-legendaire-ouvert.webp',
+  './assets/collections/bassecour.webp',
+  './assets/collections/maree.webp',
+  './assets/collections/sables.webp',
+  './assets/collections/chantier.webp',
+  './assets/collections/gaffes.webp',
+  './assets/collections/monstres.webp',
+  './assets/collections/banquet.webp',
+  './assets/collections/cour.webp',
+  './assets/collections/citrouilles.webp',
+  './assets/collections/citrouilles2.webp',
+  './assets/collections/tournoi.webp',
+  './assets/collections/tournoi2.webp',
   './assets/sons/clic-1.mp4',
   './assets/sons/clic-2.mp4',
   './assets/sons/selection-1.mp4',
