@@ -87,7 +87,7 @@ console.log('\n--- L’écran « Confidentialité » ---');
   check('… il nomme les licences : pictogrammes et leurs auteurs, caractères, three.js, sons', /CC BY 3\.0/.test(t) && /Lorc/.test(t) && /SIL OFL/.test(t) && /three\.js, licence MIT/.test(t) && /CC0/.test(t));
   check('… sans emoji, et sans éditeur fantôme tant qu’il n’est pas renseigné', !/\p{Extended_Pictographic}/u.test(noeud.innerHTML) && (EDITEUR.nom ? /<h3>Éditeur<\/h3>/.test(noeud.innerHTML) : !/<h3>Éditeur<\/h3>/.test(noeud.innerHTML)));
   check('il s’ouvre depuis l’accueil et depuis le menu de pause',
-    /id="btn-confidentialite"[^>]*data-ecran="confidentialite"/.test(lire('index.html')) && /data-ecran="confidentialite">Confidentialité<\/button>/.test(lire('js/ui.js')));
+    /id="btn-confidentialite"[^>]*data-ecran="confidentialite"/.test(lire('index.html')) && /data-ecran="confidentialite">\$\{txt\('Confidentialité'\)\}<\/button>/.test(lire('js/ui.js')));
 
   // Effacer : deux touchers, tout part.
   const joue = appliquerResultat({ ...profilNeuf(), couronnes: 300, eclats: 80 }, { issue: 'victoire', duree: 600, contreOrdinateur: 'echelle', jour: '2026-10-09', instant: 1e9, id: 'x' }).profil;
@@ -157,7 +157,7 @@ console.log('\n--- L’édition « magasin » ---');
   check('… après un incident, l’accueil parle au joueur, pas au développeur', m.incident === 'Le jeu s’est relancé en pleine partie : elle t’attend.' && /Mo d’images/.test(phraseIncident({ genre: 'rechargee', min: 3, mo: 120, unites: 40 })));
   const pause = lire('js/ui.js');
   check('… le menu de pause n’y montre ni le « Style des personnages » ni les mesures de mise au point',
-    /\$\{EN_MAGASIN \? '' : `<h3 class="modal-sub">Style des personnages<\/h3>/.test(pause) && /\$\{EN_MAGASIN \? '' : `<p class="hint" data-role="mesures">/.test(pause));
+    /\$\{EN_MAGASIN \? '' : `<h3 class="modal-sub">\$\{txt\('Style des personnages'\)\}<\/h3>/.test(pause) && /\$\{EN_MAGASIN \? '' : `<p class="hint" data-role="mesures">/.test(pause));
 }
 
 // --- Le dossier de l'application -----------------------------------------------------------------------

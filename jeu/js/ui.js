@@ -5,7 +5,7 @@
 // accessibilité et zoom navigateur gratuits.
 // ---------------------------------------------------------------------------
 
-import { txt } from './langue.js';
+import { txt, accord, nombreLocal, LOCALE } from './langue.js';
 import {
   AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES, GAME_SPEEDS,
   ficheDe, nomDe, portraitDe,
@@ -22,6 +22,11 @@ const el = (id) => document.getElementById(id);
 
 /** Icône en ligne dans une phrase, calée sur la taille du texte. */
 const ic = (cle) => iconeSVG(cle, 13, 'inline');
+
+/** Un nombre à deux décimales au plus, écrit à la manière de la langue : « 2,63 ». */
+const decimal = (v) => nombreLocal(Math.round(v * 100) / 100);
+/** La finesse d'une image, en toutes lettres : « 2 pixels par point » (en français, le pluriel commence à deux). */
+const pixelsParPoint = (v) => txt`${decimal(v)} pixel${v >= 2 ? 's' : ''} par point`;
 
 /** Remplace les marqueurs de coût (`<i data-cout="wood">`) par leur pictogramme. */
 function poserIconesDeCout(racine) {
@@ -101,12 +106,12 @@ export function illustrationDeFin(result, civ) {
  * qui tient la place de l'allié (AIPlayer) ; la consigne l'attend 2 minutes.
  */
 export function texteDeConsigne(ia, type) {
-  if (!ia) return 'Votre allié est hors de combat';
-  if (ia.attaqueChezLui) return 'Votre allié est attaqué chez lui : il repousse d’abord l’ennemi';
+  if (!ia) return txt('Votre allié est hors de combat');
+  if (ia.attaqueChezLui) return txt('Votre allié est attaqué chez lui : il repousse d’abord l’ennemi');
   const n = ia.disponibles().length;
-  if (n === 0) return 'Votre allié n’a aucun soldat au camp : il attend d’en avoir, 2 minutes au plus';
-  const soldats = `${n} soldat${n > 1 ? 's' : ''}`;
-  return type === 'defendre' ? `Votre allié envoie ${soldats} vous défendre` : `Votre allié envoie ${soldats} à l’attaque`;
+  if (n === 0) return txt('Votre allié n’a aucun soldat au camp : il attend d’en avoir, 2 minutes au plus');
+  const soldats = accord(n, 'soldat');
+  return type === 'defendre' ? txt`Votre allié envoie ${n} ${soldats} vous défendre` : txt`Votre allié envoie ${n} ${soldats} à l’attaque`;
 }
 
 /**
@@ -423,16 +428,16 @@ export class UI {
     const stats = this.game.workerStats();
     const sites = this.game.constructionSites().length;
     const rows = [
-      { task: 'food', icon: 'food', name: 'Nourriture', hint: 'buissons et fermes', assignable: true },
-      { task: 'wood', icon: 'wood', name: 'Bois', hint: 'forêts', assignable: true },
-      { task: 'gold', icon: 'gold', name: 'Or', hint: 'filons', assignable: true },
+      { task: 'food', icon: 'food', name: txt('Nourriture'), hint: txt('buissons et fermes'), assignable: true },
+      { task: 'wood', icon: 'wood', name: txt('Bois'), hint: txt('forêts'), assignable: true },
+      { task: 'gold', icon: 'gold', name: txt('Or'), hint: txt('filons'), assignable: true },
       {
-        task: 'build', icon: 'chantier', name: 'Chantiers', assignable: true, noSource: sites === 0,
+        task: 'build', icon: 'chantier', name: txt('Chantiers'), assignable: true, noSource: sites === 0,
         hint: sites > 0
-          ? `${sites} chantier${sites > 1 ? 's' : ''} ouvert${sites > 1 ? 's' : ''}`
-          : 'aucun chantier ouvert',
+          ? `${sites} ${accord(sites, 'chantier ouvert', 'chantiers ouverts')}`
+          : txt('aucun chantier ouvert'),
       },
-      { task: 'idle', icon: 'idle', name: 'Sans affectation', hint: 'en attente d’ordres', assignable: false },
+      { task: 'idle', icon: 'idle', name: txt('Sans affectation'), hint: txt('en attente d’ordres'), assignable: false },
     ];
 
     if (rebuild || !this.workerRows) {
@@ -494,8 +499,8 @@ export class UI {
     // nomme ici, au lieu de les compter « sans affectation ».
     const moving = stats.move || 0, abrites = stats.abri || 0;
     this.workerMoving.textContent = [
-      moving > 0 ? `${moving} en déplacement` : '',
-      abrites > 0 ? `${abrites} à l’abri` : '',
+      moving > 0 ? txt`${moving} en déplacement` : '',
+      abrites > 0 ? txt`${abrites} à l’abri` : '',
     ].filter(Boolean).join(' · ');
   }
 
@@ -567,7 +572,7 @@ export class UI {
 
     if (selection.length === 0) {
       if (this.selectionSignature !== 'none' || force) {
-        this.nodes.selection.innerHTML = '<div class="hint">Touchez une unité pour la sélectionner · appui long pour un rectangle</div>';
+        this.nodes.selection.innerHTML = `<div class="hint">${txt('Touchez une unité pour la sélectionner · appui long pour un rectangle')}</div>`;
         this.nodes.commands.innerHTML = '';
         this.commandNodes = [];
         this.commandButtons = [];
@@ -600,19 +605,19 @@ export class UI {
       const vignette = first.kind === 'building' ? imageBatiment(first.type, first.player.civ) : null;
       const rows = [];
       if (first.kind === 'unit' && first.isAnimal) {
-        rows.push(`${ic('food')} ${def.food} de nourriture`);
+        rows.push(`${ic('food')} ${txt`${def.food} de nourriture`}`);
         rows.push(first.playerIndex < 0
-          ? (def.capturable ? `sauvage — approchez un ${this.game.ouvrier()}` : `gibier — envoyez des ${this.game.ouvrier(2)}`)
-          : `capturé — un ${this.game.ouvrier()} l’abat`);
+          ? (def.capturable ? txt`sauvage — approchez un ${this.game.ouvrier()}` : txt`gibier — envoyez des ${this.game.ouvrier(2)}`)
+          : txt`capturé — un ${this.game.ouvrier()} l’abat`);
       } else if (first.kind === 'unit') {
         rows.push(def.heal
           ? `${ic('pointsDeVie')} +${def.heal} · ${ic('defensive')} ${first.meleeArmor()}/${first.pierceArmor()}`
           : `${ic('aggressive')} ${def.attack} · ${ic('defensive')} ${first.meleeArmor()}/${first.pierceArmor()}`);
         rows.push(`${ic(first.stanceDef.icon)} ${first.stanceDef.name}`);
         if (first.buildQueue && first.buildQueue.length > 0) {
-          rows.push(`${ic('chantier')} ${first.buildQueue.length} chantier(s) en file`);
+          rows.push(`${ic('chantier')} ${txt`${first.buildQueue.length} chantier(s) en file`}`);
         }
-        if (def.range > 1.5) rows.push(`${ic('attaquer')} portée ${def.range}`);
+        if (def.range > 1.5) rows.push(`${ic('attaquer')} ${txt`portée ${def.range}`}`);
         if (first.isVillager && first.carry.amount > 0.5) {
           rows.push(`${ic(RESOURCE_ICONS[first.carry.type])} ${Math.floor(first.carry.amount)}/${first.carryCapacity()}`);
         }
@@ -622,13 +627,13 @@ export class UI {
         if (def.garrison) rows.push(`${ic('garrison')} ${first.garrison.length}/${def.garrison.capacity}`);
         if (first.type === 'farm') rows.push(`${ic('food')} ${Math.max(0, Math.round(first.foodLeft))}`);
         if (!first.complete) {
-          rows.push(`${ic('chantier')} ${Math.round(first.progressRatio * 100)} %`);
+          rows.push(`${ic('chantier')} ${txt`${Math.round(first.progressRatio * 100)} %`}`);
           // On compte aussi ceux qui marchent vers le chantier : sinon le
           // renfort qu'on vient d'envoyer semble n'avoir servi à rien.
           const ouvriers = this.world.buildersOn(first);
           rows.push(ouvriers > 0
-            ? `${ic('ouvriers')} ${ouvriers} ouvrier${ouvriers > 1 ? 's' : ''}`
-            : `${ic('ouvriers')} aucun ouvrier — touchez le chantier avec des ${this.game.ouvrier(2)}`);
+            ? `${ic('ouvriers')} ${ouvriers} ${accord(ouvriers, 'ouvrier')}`
+            : `${ic('ouvriers')} ${txt`aucun ouvrier — touchez le chantier avec des ${this.game.ouvrier(2)}`}`);
         }
       }
       node.innerHTML = `
@@ -640,7 +645,7 @@ export class UI {
             : vignette ? `<img src="${vignette}" alt="" decoding="sync">`
             : iconeSVG(def.icon, 30)}</div>
         <div class="info">
-          <div class="name">${fiche.name}${mine ? '' : first.isAnimal && first.playerIndex < 0 ? ' <span class="enemy">(sauvage)</span>' : allie ? ' <span class="allie">(allié)</span>' : ' <span class="enemy">(ennemi)</span>'}</div>
+          <div class="name">${fiche.name}${mine ? '' : first.isAnimal && first.playerIndex < 0 ? ` <span class="enemy">${txt('(sauvage)')}</span>` : allie ? ` <span class="allie">${txt('(allié)')}</span>` : ` <span class="enemy">${txt('(ennemi)')}</span>`}</div>
           <div class="hp"><span style="width:${Math.round((first.hp / first.maxHp) * 100)}%"></span></div>
           <div class="stats">${ic('pointsDeVie')} ${Math.ceil(first.hp)}/${first.maxHp} · ${rows.join(' · ')}</div>
         </div>`;
@@ -669,7 +674,7 @@ export class UI {
       const def = UNIT_TYPES[type] || BUILDING_TYPES[type];
       return `<button class="chip" data-filter="${type}">${this.visage(type, first.player.civ, def.icon, 17)}<span>${count}</span></button>`;
     }).join('');
-    node.innerHTML = `<div class="multi"><div class="multi-title">${selection.length} unités sélectionnées</div>
+    node.innerHTML = `<div class="multi"><div class="multi-title">${txt`${selection.length} unités sélectionnées`}</div>
       <div class="chips">${chips}</div></div>`;
     node.querySelectorAll('[data-filter]').forEach((btn) => {
       btn.addEventListener('click', () => this.game.filterSelection(btn.dataset.filter), this.ecoute());
@@ -690,7 +695,7 @@ export class UI {
     const items = building.queue.map((item, index) => {
       const def = UNIT_TYPES[item.id] || TECHS[item.id];
       const ratio = 1 - item.timeLeft / item.total;
-      return `<button class="queue-item" data-cancel="${index}" title="Annuler">
+      return `<button class="queue-item" data-cancel="${index}" title="${txt('Annuler')}">
         <span class="qicon">${this.visage(item.id, building.player.civ, def.icon, 17)}</span>
         <span class="qbar"><span style="width:${Math.round(ratio * 100)}%"></span></span>
       </button>`;
@@ -710,20 +715,20 @@ export class UI {
     const betes = selection.filter((e) => e.kind === 'unit' && e.isAnimal);
     const units = selection.filter((e) => e.kind === 'unit' && !e.isAnimal);
     if (betes.length > 0 && units.length === 0) {
-      buttons.push({ icon: 'stop', label: 'Stop', action: () => this.game.stopSelection() });
+      buttons.push({ icon: 'stop', label: txt('Stop'), action: () => this.game.stopSelection() });
     }
     const villagers = units.filter((u) => u.isVillager);
     const military = units.filter((u) => !u.isVillager);
 
     if (villagers.length > 0) {
-      buttons.push({ icon: 'chantier', label: 'Construire', action: () => this.game.openBuildMenu() });
+      buttons.push({ icon: 'chantier', label: txt('Construire'), action: () => this.game.openBuildMenu() });
     }
     if (units.length > 0) {
-      buttons.push({ icon: 'stop', label: 'Stop', action: () => this.game.stopSelection() });
+      buttons.push({ icon: 'stop', label: txt('Stop'), action: () => this.game.stopSelection() });
     }
     if (military.length > 0) {
       buttons.push({
-        icon: 'attaquer', label: 'Attaquer ici', toggled: this.game.attackMoveArmed,
+        icon: 'attaquer', label: txt('Attaquer ici'), toggled: this.game.attackMoveArmed,
         action: () => this.game.toggleAttackMove(),
       });
     }
@@ -731,7 +736,7 @@ export class UI {
       (b) => !b.dead && b.complete && b.playerIndex === this.world.humanIndex
         && b.def.garrison && units.some((u) => b.canGarrison(u)))) {
       buttons.push({
-        icon: 'garrison', label: 'Abriter', toggled: this.game.garrisonArmed,
+        icon: 'garrison', label: txt('Abriter'), toggled: this.game.garrisonArmed,
         action: () => this.game.toggleGarrison(),
       });
     }
@@ -752,14 +757,14 @@ export class UI {
       const b = first;
       if (!b.complete) {
         buttons.push({
-          icon: 'ouvriers', label: '+1 ouvrier',
+          icon: 'ouvriers', label: txt('+1 ouvrier'),
           check: () => (this.game.hasSpareWorker()
-            ? { ok: true } : { ok: false, reason: `Aucun ${this.game.ouvrier()} disponible` }),
+            ? { ok: true } : { ok: false, reason: txt`Aucun ${this.game.ouvrier()} disponible` }),
           action: () => this.game.reinforceSite(b),
         });
         // Le chantier qui tient seul le camp en jeu s'annule en deux appuis (voir Game.cancelConstruction).
         const armee = this.game.demolitionEnAttente(b);
-        buttons.push({ icon: 'annuler', label: armee ? 'Confirmer' : 'Annuler', danger: armee, action: () => this.game.cancelConstruction(b) });
+        buttons.push({ icon: 'annuler', label: armee ? txt('Confirmer') : txt('Annuler'), danger: armee, action: () => this.game.cancelConstruction(b) });
       } else {
         const def = b.def;
         for (const unitType of def.trains || []) {
@@ -769,7 +774,7 @@ export class UI {
             // Une troupe pas encore débloquée : montrée, sous cadenas (voir js/progression.js).
             verrou: this.world.players[this.world.humanIndex].interdites.has(unitType),
             check: () => (this.world.players[this.world.humanIndex].interdites.has(unitType)
-              ? { ok: false, reason: `${nomDe(unitType, this.game.civ)} : troupe à débloquer — vois « Troupes » à l’accueil` }
+              ? { ok: false, reason: txt`${nomDe(unitType, this.game.civ)} : troupe à débloquer — vois « Troupes » à l’accueil` }
               : this.world.canTrain(b, unitType)),
             action: () => this.game.trainUnit(b, unitType),
           });
@@ -806,24 +811,24 @@ export class UI {
         if (def.garrison) {
           if (b.type === 'towncenter') {
             buttons.push({
-              icon: 'cloche', label: 'Cloche', action: () => this.game.ringTownBell(),
+              icon: 'cloche', label: txt('Cloche'), action: () => this.game.ringTownBell(),
             });
           }
           buttons.push({
-            icon: 'sortir', label: `Libérer (${b.garrison.length})`,
-            check: () => (b.garrison.length > 0 ? { ok: true } : { ok: false, reason: 'Personne à l’intérieur' }),
+            icon: 'sortir', label: txt`Libérer (${b.garrison.length})`,
+            check: () => (b.garrison.length > 0 ? { ok: true } : { ok: false, reason: txt('Personne à l’intérieur') }),
             action: () => this.game.releaseGarrison(b),
           });
         }
         if (def.trains) {
           buttons.push({
-            icon: 'ralliement', label: 'Ralliement', toggled: this.game.rallyArmed,
+            icon: 'ralliement', label: txt('Ralliement'), toggled: this.game.rallyArmed,
             action: () => this.game.toggleRally(),
           });
         }
         // Deux appuis pour détruire : le premier arme le bouton (voir Game.demolish).
         const armee = this.game.demolitionEnAttente(b);
-        buttons.push({ icon: 'detruire', label: armee ? 'Confirmer' : 'Détruire', danger: armee, action: () => this.game.demolish(b) });
+        buttons.push({ icon: 'detruire', label: armee ? txt('Confirmer') : txt('Détruire'), danger: armee, action: () => this.game.demolish(b) });
       }
     }
 
@@ -852,7 +857,7 @@ export class UI {
       const command = buttons[Number(btn.dataset.cmd)];
       btn.addEventListener('click', () => {
         if (btn.classList.contains('disabled')) {
-          this.toast(btn.dataset.reason || 'Indisponible', 'error');
+          this.toast(btn.dataset.reason || txt('Indisponible'), 'error');
           this.game.audio.play('error');
           return;
         }
@@ -883,13 +888,13 @@ export class UI {
     const player = this.world.players[this.world.humanIndex];
     if (def.requires && !this.world.buildings.some(
       (b) => b.playerIndex === player.index && b.type === def.requires && b.complete && !b.dead)) {
-      return `Nécessite : ${nomDe(def.requires, this.game.civ)}`;
+      return txt`Nécessite : ${nomDe(def.requires, this.game.civ)}`;
     }
     if (def.limit && this.world.buildings.filter(
       (b) => b.playerIndex === player.index && b.type === def.id && !b.dead).length >= def.limit) {
-      return 'Nombre maximum atteint';
+      return txt('Nombre maximum atteint');
     }
-    return canAfford(player.resources, def.cost) ? '' : 'Ressources insuffisantes';
+    return canAfford(player.resources, def.cost) ? '' : txt('Ressources insuffisantes');
   }
 
   /** La partie continue menu ouvert : les cartes suivent les ressources, sans être recréées. */
@@ -920,7 +925,7 @@ export class UI {
     list.querySelectorAll('[data-type]').forEach((btn) => {
       btn.addEventListener('click', () => {
         if (btn.classList.contains('disabled')) {
-          this.toast(btn.dataset.reason || 'Indisponible', 'error');
+          this.toast(btn.dataset.reason || txt('Indisponible'), 'error');
           this.game.audio.play('error');
           return;
         }
@@ -944,11 +949,11 @@ export class UI {
   texteModeles3d() {
     const e = etatModeles3d();
     const texte = {
-      cuisson: 'Tes personnages 3D se préparent (au premier lancement seulement) : les dessins servent en attendant.',
+      cuisson: txt('Tes personnages 3D se préparent (au premier lancement seulement) : les dessins servent en attendant.'),
       pret: e.alleges && e.alleges.length
-        ? `Tes personnages 3D sont prêts, mais allégés faute de mémoire (${e.alleges.join(', ')}) : ils paraissent plus flous. Ferme les autres onglets puis relance le jeu.`
-        : 'Tes personnages 3D sont prêts, à pleine finesse.',
-      absent: `Tes personnages 3D n’ont pas pu se préparer sur cet appareil (${e.raison}) : les dessins les remplacent.`,
+        ? txt`Tes personnages 3D sont prêts, mais allégés faute de mémoire (${e.alleges.join(', ')}) : ils paraissent plus flous. Ferme les autres onglets puis relance le jeu.`
+        : txt('Tes personnages 3D sont prêts, à pleine finesse.'),
+      absent: txt`Tes personnages 3D n’ont pas pu se préparer sur cet appareil (${e.raison}) : les dessins les remplacent.`,
     }[e.etat];
     return texte ? `<p class="hint">${texte}</p>` : '';
   }
@@ -957,16 +962,15 @@ export class UI {
   texteFinesse() {
     const r = this.game.renderer;
     const ecran = Math.min(window.devicePixelRatio || 1, 3);
-    const n = (v) => String(Math.round(v * 100) / 100).replace('.', ',');
-    const px = (v) => `${n(v)} pixel${v >= 2 ? 's' : ''} par point`;
-    if (r.dpr >= ecran) return `Affichée : ${px(r.dpr)}, toute la finesse de cet écran.`;
+    const affichee = pixelsParPoint(r.dpr), pleine = decimal(ecran);
+    if (r.dpr >= ecran) return txt`Affichée : ${affichee}, toute la finesse de cet écran.`;
     // `fige` dit seulement « on ne surveille plus » : il est vrai aussi pour le
     // réglage « Légère » et pour « ?dpr= ». La cause se lit donc d'abord ailleurs.
-    const cause = r.dprForce ? ' — imposée par « ?dpr= » dans l’adresse.'
-      : this.game.finesse === 'legere' ? ' — c’est ton réglage « Légère ».'
-      : r.cadence && r.cadence.fige ? ' — réduite automatiquement, le jeu ralentissait.'
-      : '.';
-    return `Affichée : ${px(r.dpr)} au lieu de ${n(ecran)}${cause}`;
+    // (Une phrase entière par cause : chacune se traduit d'un bloc.)
+    if (r.dprForce) return txt`Affichée : ${affichee} au lieu de ${pleine} — imposée par « ?dpr= » dans l’adresse.`;
+    if (this.game.finesse === 'legere') return txt`Affichée : ${affichee} au lieu de ${pleine} — c’est ton réglage « Légère ».`;
+    if (r.cadence && r.cadence.fige) return txt`Affichée : ${affichee} au lieu de ${pleine} — réduite automatiquement, le jeu ralentissait.`;
+    return txt`Affichée : ${affichee} au lieu de ${pleine}.`;
   }
 
   /**
@@ -978,16 +982,14 @@ export class UI {
   texteMesures() {
     try {
       const m = this.game.mesures();
-      const n = (v) => String(Math.round(v * 100) / 100).replace('.', ',');
-      const cadence = m.ips ? `${Math.round(m.ips)} images par seconde` : 'cadence pas encore mesurée';
-      const mesures = `Mesures : ${cadence} · ${Math.round(m.mo)} Mo d’images de troupes`
-        + ` (${m.troupes} troupe${m.troupes > 1 ? 's' : ''} en mémoire) · ${n(m.dpr)} pixel${m.dpr >= 2 ? 's' : ''} par point.`;
+      const cadence = m.ips ? txt`${Math.round(m.ips)} images par seconde` : txt('cadence pas encore mesurée');
+      const mesures = txt`Mesures : ${cadence} · ${Math.round(m.mo)} Mo d’images de troupes (${m.troupes} ${accord(m.troupes, 'troupe')} en mémoire) · ${pixelsParPoint(m.dpr)}.`;
       const dernier = m.incidents[m.incidents.length - 1];
       if (!dernier) return mesures;
-      const quand = new Date(dernier.h).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-      const titre = dernier.genre === 'rechargee' ? 'Dernier rechargement en pleine partie' : 'Dernière coupure relevée';
-      const total = m.incidents.length > 1 ? ` (${m.incidents.length} incidents en tout)` : '';
-      return `${mesures} ${titre} : le ${quand}, ${resumeIncident(dernier)}${total}.`;
+      const quand = new Date(dernier.h).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const titre = dernier.genre === 'rechargee' ? txt('Dernier rechargement en pleine partie') : txt('Dernière coupure relevée');
+      const total = m.incidents.length > 1 ? txt` (${m.incidents.length} incidents en tout)` : '';
+      return txt`${mesures} ${titre} : le ${quand}, ${resumeIncident(dernier)}${total}.`;
     } catch {
       return '';
     }
@@ -1044,17 +1046,17 @@ export class UI {
     const allie = this.game.allieOrdinateur();
     if (!allie) return;
     const modal = this.showModal(`
-      <h2>Votre allié</h2>
-      <p class="hint">Il joue seul. Une consigne lui dit quoi faire de ses soldats, une fois ; ensuite il reprend sa conduite.</p>
+      <h2>${txt('Votre allié')}</h2>
+      <p class="hint">${txt('Il joue seul. Une consigne lui dit quoi faire de ses soldats, une fois ; ensuite il reprend sa conduite.')}</p>
       <div class="options">
-        <button class="option" data-consigne="attaquer"><span class="option-name">${ic('attaquer')} Attaque ici</span>
-          <span class="option-desc">Touchez ensuite l'endroit sur la carte : ses soldats y marchent.</span></button>
-        <button class="option" data-consigne="defendre"><span class="option-name">${ic('defensive')} Défends-moi</span>
-          <span class="option-desc">Ses soldats viennent tenir votre ${nomDe('towncenter', this.game.civ)} 3 minutes.</span></button>
-        <button class="option" data-consigne="libre"><span class="option-name">${ic('ouvriers')} À toi de voir</span>
-          <span class="option-desc">Il rappelle ses soldats et fait comme il l'entend.</span></button>
+        <button class="option" data-consigne="attaquer"><span class="option-name">${ic('attaquer')} ${txt('Attaque ici')}</span>
+          <span class="option-desc">${txt`Touchez ensuite l'endroit sur la carte : ses soldats y marchent.`}</span></button>
+        <button class="option" data-consigne="defendre"><span class="option-name">${ic('defensive')} ${txt('Défends-moi')}</span>
+          <span class="option-desc">${txt`Ses soldats viennent tenir votre ${nomDe('towncenter', this.game.civ)} 3 minutes.`}</span></button>
+        <button class="option" data-consigne="libre"><span class="option-name">${ic('ouvriers')} ${txt('À toi de voir')}</span>
+          <span class="option-desc">${txt`Il rappelle ses soldats et fait comme il l'entend.`}</span></button>
       </div>
-      <div class="modal-actions"><button class="btn" data-act="close">Fermer</button></div>`);
+      <div class="modal-actions"><button class="btn" data-act="close">${txt('Fermer')}</button></div>`);
     modal.querySelectorAll('[data-consigne]').forEach((btn) => {
       btn.addEventListener('click', () => { this.hideModal(); this.game.consigner(btn.dataset.consigne); }, this.ecoute());
     });
@@ -1073,41 +1075,41 @@ export class UI {
         <span class="option-desc">${st.desc}</span>
       </button>`).join('');
     const finesses = [
-      { id: 'fine', nom: 'Fine', desc: 'Tous les pixels de l’écran' },
-      { id: 'legere', nom: 'Légère', desc: 'Si le jeu rame ou chauffe' },
+      { id: 'fine', nom: txt('Fine'), desc: txt('Tous les pixels de l’écran') },
+      { id: 'legere', nom: txt('Légère'), desc: txt('Si le jeu rame ou chauffe') },
     ].map((f) => `
       <button class="option compact ${f.id === this.game.finesse ? 'active' : ''}" data-finesse="${f.id}">
         <span class="option-name">${f.nom}</span>
         <span class="option-desc">${f.desc}</span>
       </button>`).join('');
     const musiques = [
-      { id: 'oui', nom: 'Oui', desc: 'Elle change quand un combat commence' },
-      { id: 'non', nom: 'Non', desc: 'Les bruitages seuls' },
+      { id: 'oui', nom: txt('Oui'), desc: txt('Elle change quand un combat commence') },
+      { id: 'non', nom: txt('Non'), desc: txt('Les bruitages seuls') },
     ].map((m) => `
       <button class="option compact ${(m.id === 'oui') === this.game.musique.voulue ? 'active' : ''}" data-musique="${m.id}">
         <span class="option-name">${m.nom}</span>
         <span class="option-desc">${m.desc}</span>
       </button>`).join('');
     const modal = this.showModal(`
-      <h2>Partie en pause</h2>
-      <p class="hint">La partie est sauvegardée : vous pouvez fermer l'onglet et la reprendre plus tard.</p>
-      <h3 class="modal-sub">Vitesse de jeu</h3>
+      <h2>${txt('Partie en pause')}</h2>
+      <p class="hint">${txt`La partie est sauvegardée : vous pouvez fermer l'onglet et la reprendre plus tard.`}</p>
+      <h3 class="modal-sub">${txt('Vitesse de jeu')}</h3>
       <div class="options row">${vitesses}</div>
-      ${EN_MAGASIN ? '' : `<h3 class="modal-sub">Style des personnages</h3>
+      ${EN_MAGASIN ? '' : `<h3 class="modal-sub">${txt('Style des personnages')}</h3>
       <div class="options row">${styles}</div>`}
       ${this.texteModeles3d()}
-      <h3 class="modal-sub">Finesse de l’image</h3>
+      <h3 class="modal-sub">${txt('Finesse de l’image')}</h3>
       <div class="options row">${finesses}</div>
       <p class="hint" data-role="finesse-reelle">${this.texteFinesse()}</p>
       ${EN_MAGASIN ? '' : `<p class="hint" data-role="mesures">${this.texteMesures()}</p>`}
-      <h3 class="modal-sub">Musique</h3>
+      <h3 class="modal-sub">${txt('Musique')}</h3>
       <div class="options row">${musiques}</div>
       <div class="modal-actions">
-        <button class="btn primary" data-act="resume">Reprendre</button>
-        <button class="btn" data-act="help">Comment jouer</button>
-        <button class="btn" data-act="credits">Crédits</button>
-        <button class="btn" data-ecran="confidentialite">Confidentialité</button>
-        <button class="btn danger" data-act="resign">Abandonner</button>
+        <button class="btn primary" data-act="resume">${txt('Reprendre')}</button>
+        <button class="btn" data-act="help">${txt('Comment jouer')}</button>
+        <button class="btn" data-act="credits">${txt('Crédits')}</button>
+        <button class="btn" data-ecran="confidentialite">${txt('Confidentialité')}</button>
+        <button class="btn danger" data-act="resign">${txt('Abandonner')}</button>
       </div>`);
     modal.querySelectorAll('[data-speed]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1148,29 +1150,29 @@ export class UI {
     const militaires = Object.values(BUILDING_TYPES)
       .filter((b) => b.trains && b.id !== 'towncenter').map((b) => nomDe(b.id, civAdverse)).join(', ');
     const modal = this.showModal(`
-      <h2>Comment jouer</h2>
+      <h2>${txt('Comment jouer')}</h2>
       <ul class="help">
-        <li><b>Glisser</b> : déplacer la vue · <b>pincer</b> : zoomer</li>
-        <li><b>Toucher</b> une unité : la sélectionner · <b>double tap</b> : toutes les unités du même type visibles</li>
-        <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
-        <li><b>${ic('forging')} Armée</b>, au bout de la barre des ouvriers : un toucher prend tous vos soldats, où qu'ils soient ; un second amène la vue sur eux. La <b>${ic('fermer')} croix</b> du panneau lâche la sélection</li>
-        <li><b>« Vous êtes attaqué ! »</b> : touchez le message pour aller voir ; l'endroit pulse en rouge sur la mini-carte</li>
-        <li>Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant. Un appui au sol se suit jusqu'au bout, même en plein combat : c'est le geste pour replier vos troupes</li>
-        <li><b>Réparer</b> : des ${this.game.ouvrier(2)} sélectionnés, touchez un de vos bâtiments abîmés. <b>Soigner</b> : sélectionnez votre ${nomDe('priest', this.game.civ)}, puis touchez un allié blessé. (Double tap pour sélectionner à la place.)</li>
-        <li><b>${ic('chantier')} Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les ${this.game.ouvrier(2)} sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant</li>
-        <li><b>Affecter quelqu'un à un chantier</b> : touchez un ${this.game.ouvrier()}, puis touchez le chantier — le même geste que pour l'envoyer au bois ou à la nourriture. La ligne <b>${ic('chantier')} Chantiers</b> de la barre <b>${ic('ouvriers')} Ouvriers</b> fait pareil avec ses <b>+ / −</b>, et un chantier sélectionné a son bouton <b>${ic('ouvriers')} +1 ouvrier</b>. (Double tap sur un chantier pour le sélectionner sans y envoyer personne.)</li>
-        <li>Les ${this.game.ouvrier(2)} récoltent ${ic('food')} nourriture, ${ic('wood')} bois et ${ic('gold')} or ; il faut des <b>maisons</b> pour agrandir la population</li>
-        <li><b>Attitudes</b> (unité sélectionnée) : ${ic('aggressive')} agressif poursuit loin, ${ic('defensive')} défensif revient à son poste, ${ic('standGround')} position tenue ne bouge pas, ${ic('passive')} sans attaque ignore l'ennemi</li>
-        <li><b>Garnison</b> : des soldats sélectionnés s'abritent d'un appui sur votre ${nomDe('towncenter', this.game.civ)} ou une tour ; des ${this.game.ouvrier(2)}, par le bouton <b>${ic('garrison')} Abriter</b> puis l'abri. Les occupants s'y soignent et chacun ajoute une flèche. La <b>${ic('cloche')} cloche</b> y envoie tous les ${this.game.ouvrier(2)} d'un coup ; un second coup renvoie chacun à son poste</li>
-        <li><b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le ${this.game.ouvrier()} rapporte son chargement puis attend vos ordres. La barre <b>${ic('ouvriers')} Ouvriers</b> montre qui fait quoi et permet de réaffecter d'un doigt</li>
-        <li>Passez les <b>âges</b> depuis le ${nomDe('towncenter', this.game.civ)} pour débloquer de nouvelles unités</li>
-        <li><b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil</li>
-        <li><b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>Reprendre</b></li>
-        <li><b>Objectif</b> : ne laisser à l'adversaire ni ${nomDe('towncenter', civAdverse)} ni bâtiment militaire (${militaires}), achevé ou en chantier — inutile de raser la dernière ferme. En ${ic('barracks')} Escarmouche, en ${ic('modeExpress')} Express et en ${ic('ralliement')} Prise de positions, son dernier ${nomDe('towncenter', civAdverse)} suffit ; sinon, au bout du temps, le meilleur score l'emporte</li>
-        ${this.world.positions.length ? `<li><b>${ic('ralliement')} Positions</b> : ${this.world.positions.length} monuments sur la ligne du milieu, chacun dans son cercle. Tenez des <b>soldats</b> dans le cercle pendant ${this.world.mode.positions.prise} secondes, sans soldat adverse dedans, et la position est à vous — elle le reste même si vous partez, jusqu'à ce que l'adversaire la reprenne. Chaque position tenue rapporte <b>1 point toutes les ${this.world.mode.positions.pas} secondes</b> ; le premier à <b>${this.world.mode.positions.but} points</b> gagne. Les losanges en haut de l'écran et sur la mini-carte disent à qui elles sont</li>` : ''}
-        ${this.world.mode.timeLimit && !this.world.positions.length ? `<li><b>Score</b> ${ic('score')} : la moitié de ce que vous récoltez, le prix de vos troupes et bâtiments encore debout, et deux fois le prix de ce que vous abattez. Il s'affiche en haut, à côté du chrono : le vôtre, puis celui de l'adversaire</li>` : ''}
+        <li>${txt`<b>Glisser</b> : déplacer la vue · <b>pincer</b> : zoomer`}</li>
+        <li>${txt`<b>Toucher</b> une unité : la sélectionner · <b>double tap</b> : toutes les unités du même type visibles`}</li>
+        <li>${txt`<b>Appui long puis glisser</b> : sélection rectangulaire`}</li>
+        <li>${txt`<b>${ic('forging')} Armée</b>, au bout de la barre des ouvriers : un toucher prend tous vos soldats, où qu'ils soient ; un second amène la vue sur eux. La <b>${ic('fermer')} croix</b> du panneau lâche la sélection`}</li>
+        <li>${txt`<b>« Vous êtes attaqué ! »</b> : touchez le message pour aller voir ; l'endroit pulse en rouge sur la mini-carte`}</li>
+        <li>${txt`Avec une sélection, <b>toucher</b> le sol, un arbre, une mine ou un ennemi donne l'ordre correspondant. Un appui au sol se suit jusqu'au bout, même en plein combat : c'est le geste pour replier vos troupes`}</li>
+        <li>${txt`<b>Réparer</b> : des ${this.game.ouvrier(2)} sélectionnés, touchez un de vos bâtiments abîmés. <b>Soigner</b> : sélectionnez votre ${nomDe('priest', this.game.civ)}, puis touchez un allié blessé. (Double tap pour sélectionner à la place.)`}</li>
+        <li>${txt`<b>${ic('chantier')} Construire</b> : choisissez un bâtiment, puis touchez l'emplacement. Les ${this.game.ouvrier(2)} sélectionnés s'y mettent <b>tous</b> — à plusieurs, ça va bien plus vite. Enchaînez les poses : elles se mettent <b>en file</b> et l'ouvrier passe à la suivante en terminant`}</li>
+        <li>${txt`<b>Affecter quelqu'un à un chantier</b> : touchez un ${this.game.ouvrier()}, puis touchez le chantier — le même geste que pour l'envoyer au bois ou à la nourriture. La ligne <b>${ic('chantier')} Chantiers</b> de la barre <b>${ic('ouvriers')} Ouvriers</b> fait pareil avec ses <b>+ / −</b>, et un chantier sélectionné a son bouton <b>${ic('ouvriers')} +1 ouvrier</b>. (Double tap sur un chantier pour le sélectionner sans y envoyer personne.)`}</li>
+        <li>${txt`Les ${this.game.ouvrier(2)} récoltent ${ic('food')} nourriture, ${ic('wood')} bois et ${ic('gold')} or ; il faut des <b>maisons</b> pour agrandir la population`}</li>
+        <li>${txt`<b>Attitudes</b> (unité sélectionnée) : ${ic('aggressive')} agressif poursuit loin, ${ic('defensive')} défensif revient à son poste, ${ic('standGround')} position tenue ne bouge pas, ${ic('passive')} sans attaque ignore l'ennemi`}</li>
+        <li>${txt`<b>Garnison</b> : des soldats sélectionnés s'abritent d'un appui sur votre ${nomDe('towncenter', this.game.civ)} ou une tour ; des ${this.game.ouvrier(2)}, par le bouton <b>${ic('garrison')} Abriter</b> puis l'abri. Les occupants s'y soignent et chacun ajoute une flèche. La <b>${ic('cloche')} cloche</b> y envoie tous les ${this.game.ouvrier(2)} d'un coup ; un second coup renvoie chacun à son poste`}</li>
+        <li>${txt`<b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le ${this.game.ouvrier()} rapporte son chargement puis attend vos ordres. La barre <b>${ic('ouvriers')} Ouvriers</b> montre qui fait quoi et permet de réaffecter d'un doigt`}</li>
+        <li>${txt`Passez les <b>âges</b> depuis le ${nomDe('towncenter', this.game.civ)} pour débloquer de nouvelles unités`}</li>
+        <li>${txt`<b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil`}</li>
+        <li>${txt`<b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>Reprendre</b>`}</li>
+        <li>${txt`<b>Objectif</b> : ne laisser à l'adversaire ni ${nomDe('towncenter', civAdverse)} ni bâtiment militaire (${militaires}), achevé ou en chantier — inutile de raser la dernière ferme. En ${ic('barracks')} Escarmouche, en ${ic('modeExpress')} Express et en ${ic('ralliement')} Prise de positions, son dernier ${nomDe('towncenter', civAdverse)} suffit ; sinon, au bout du temps, le meilleur score l'emporte`}</li>
+        ${this.world.positions.length ? `<li>${txt`<b>${ic('ralliement')} Positions</b> : ${this.world.positions.length} monuments sur la ligne du milieu, chacun dans son cercle. Tenez des <b>soldats</b> dans le cercle pendant ${this.world.mode.positions.prise} secondes, sans soldat adverse dedans, et la position est à vous — elle le reste même si vous partez, jusqu'à ce que l'adversaire la reprenne. Chaque position tenue rapporte <b>1 point toutes les ${this.world.mode.positions.pas} secondes</b> ; le premier à <b>${this.world.mode.positions.but} points</b> gagne. Les losanges en haut de l'écran et sur la mini-carte disent à qui elles sont`}</li>` : ''}
+        ${this.world.mode.timeLimit && !this.world.positions.length ? `<li>${txt`<b>Score</b> ${ic('score')} : la moitié de ce que vous récoltez, le prix de vos troupes et bâtiments encore debout, et deux fois le prix de ce que vous abattez. Il s'affiche en haut, à côté du chrono : le vôtre, puis celui de l'adversaire`}</li>` : ''}
       </ul>
-      <div class="modal-actions"><button class="btn primary" data-act="close">J'ai compris</button></div>`, { wide: true });
+      <div class="modal-actions"><button class="btn primary" data-act="close">${txt`J'ai compris`}</button></div>`, { wide: true });
     modal.querySelector('[data-act="close"]').addEventListener('click', () => {
       if (this.game.paused) this.showPause(); else this.hideModal();
     }, this.ecoute());
@@ -1182,31 +1184,34 @@ export class UI {
    */
   showCredits() {
     const l = ICONES_LICENCE;
+    // Un lien est du balisage : la phrase à traduire n'en garde que la place. (Les
+    // retours à la ligne des phrases longues font partie de leur clé de traduction.)
+    const lien = (adresse, texte) => `<a href="${adresse}" target="_blank" rel="noopener">${texte}</a>`;
     const modal = this.showModal(`
-      <h2>Crédits</h2>
+      <h2>${txt('Crédits')}</h2>
       <ul class="help">
-        <li><b>Icônes</b> — <a href="${l.url}" target="_blank" rel="noopener">${l.source}</a>,
-          sous licence <a href="${l.licenceUrl}" target="_blank" rel="noopener">${l.licence}</a>.
+        <li>${txt`<b>Icônes</b> — ${lien(l.url, l.source)},
+          sous licence ${lien(l.licenceUrl, l.licence)}.`}
           <small class="credits-auteurs">${l.auteurs.join(' · ')}</small></li>
-        <li><b>Illustrations</b> (personnages, bâtiments, arbres, décor, textures de sol et
+        <li>${txt`<b>Illustrations</b> (personnages, bâtiments, arbres, décor, textures de sol et
           d'eau, coffres, autocollants des collections) — générées par l'auteur du jeu, puis
-          découpées et détourées pour le jeu.</li>
-        <li><b>Chevalier, villageois, archer, lancier, Atlante, Champion, Arbalétrier, Archer monté, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse et Hydre 3D ; Fellah, Garde, Lancier, Archer, Arbalétrier, Archer monté, Chacal dressé, Méhariste, Garde masqué, Prêtre du Soleil et Sphinx des Solariens</b> — modèles et animations de l'auteur du
+          découpées et détourées pour le jeu.`}</li>
+        <li>${txt`<b>Chevalier, villageois, archer, lancier, Atlante, Champion, Arbalétrier, Archer monté, Éclaireur, Cavalier, Bélier, Catapulte, Prêtresse et Hydre 3D ; Fellah, Garde, Lancier, Archer, Arbalétrier, Archer monté, Chacal dressé, Méhariste, Garde masqué, Prêtre du Soleil et Sphinx des Solariens</b> — modèles et animations de l'auteur du
           jeu, faits dans son Atelier 3D ; icônes du trident, de l'Hydre et du Temple dessinées pour le jeu ; cuits par
-          <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (licence MIT).</li>
-        <li><b>Chevalier 3D d'essai</b> (styles « 3D précalculée » et « 3D en direct ») — KayKit Adventurers, par
-          <a href="https://www.kaylousberg.com" target="_blank" rel="noopener">Kay Lousberg</a>,
+          ${lien('https://threejs.org', 'three.js')} (licence MIT).`}</li>
+        <li>${txt`<b>Chevalier 3D d'essai</b> (styles « 3D précalculée » et « 3D en direct ») — KayKit Adventurers, par
+          ${lien('https://www.kaylousberg.com', 'Kay Lousberg')},
           domaine public (CC0) ; rendu en direct par
-          <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> (licence MIT).</li>
-        <li><b>Bruitages</b> — paquets audio de <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a>, domaine public (CC0).</li>
-        <li><b>Musique</b> — « Minstrel Dance » et « Harvest Season » de RandomMind, « Determined Pursuit » d'Emma_MA,
-          publiés sur <a href="https://opengameart.org" target="_blank" rel="noopener">OpenGameArt</a>, domaine public (CC0).</li>
-        <li><b>Caractères</b> — « Lilita One » de Juan Montoreano et « Nunito » de The Nunito Project Authors,
-          sous licence <a href="https://openfontlicense.org" target="_blank" rel="noopener">SIL Open Font License 1.1</a>.</li>
-        <li><b>Jeu</b> — inspiré des classiques de la stratégie en temps réel, sans en
-          reprendre aucun contenu.</li>
+          ${lien('https://threejs.org', 'three.js')} (licence MIT).`}</li>
+        <li>${txt`<b>Bruitages</b> — paquets audio de ${lien('https://kenney.nl', 'Kenney')}, domaine public (CC0).`}</li>
+        <li>${txt`<b>Musique</b> — « Minstrel Dance » et « Harvest Season » de RandomMind, « Determined Pursuit » d'Emma_MA,
+          publiés sur ${lien('https://opengameart.org', 'OpenGameArt')}, domaine public (CC0).`}</li>
+        <li>${txt`<b>Caractères</b> — « Lilita One » de Juan Montoreano et « Nunito » de The Nunito Project Authors,
+          sous licence ${lien('https://openfontlicense.org', 'SIL Open Font License 1.1')}.`}</li>
+        <li>${txt`<b>Jeu</b> — inspiré des classiques de la stratégie en temps réel, sans en
+          reprendre aucun contenu.`}</li>
       </ul>
-      <div class="modal-actions"><button class="btn primary" data-act="close">Fermer</button></div>`,
+      <div class="modal-actions"><button class="btn primary" data-act="close">${txt('Fermer')}</button></div>`,
       { wide: true });
     modal.querySelector('[data-act="close"]').addEventListener('click', () => {
       if (this.game.paused) this.showPause(); else this.hideModal();
@@ -1219,29 +1224,32 @@ export class UI {
     // (Prise de positions : le but atteint, ou les points au bout du temps.)
     if (result.positions) {
       const but = this.world.mode.positions.but;
-      return result.winner === -1 ? `Les deux camps atteignent ${but} points ensemble, en ${duree}`
-        : result.victory ? `Vous tenez les positions : ${but} points atteints en ${duree}`
-          : `L’adversaire a tenu les positions : ${but} points atteints en ${duree}`;
+      return result.winner === -1 ? txt`Les deux camps atteignent ${but} points ensemble, en ${duree}`
+        : result.victory ? txt`Vous tenez les positions : ${but} points atteints en ${duree}`
+          : txt`L’adversaire a tenu les positions : ${but} points atteints en ${duree}`;
     }
-    if (result.timeUp && this.world.positions.length) return `Temps écoulé après ${duree} — les points des positions départagent`;
-    if (result.timeUp && this.world.parEquipes) return `Temps écoulé après ${duree} — la somme des scores de chaque équipe départage`;
-    if (result.timeUp) return `Temps écoulé après ${duree} — le score départage`;
-    if (result.resigned) return `Vous avez abandonné après ${duree}`;
-    if (result.winner === -1) return `Durée de la partie : ${duree}`;
+    if (result.timeUp && this.world.positions.length) return txt`Temps écoulé après ${duree} — les points des positions départagent`;
+    if (result.timeUp && this.world.parEquipes) return txt`Temps écoulé après ${duree} — la somme des scores de chaque équipe départage`;
+    if (result.timeUp) return txt`Temps écoulé après ${duree} — le score départage`;
+    if (result.resigned) return txt`Vous avez abandonné après ${duree}`;
+    if (result.winner === -1) return txt`Durée de la partie : ${duree}`;
     const moi = this.world.humanIndex;
     // (Par équipes : une équipe est battue quand ses deux bâtiments principaux sont tombés.)
     if (this.world.parEquipes) {
-      return result.victory ? `Les deux bâtiments principaux adverses sont tombés en ${duree}`
-        : `Votre équipe n’a plus de bâtiment principal — durée de la partie : ${duree}`;
+      return result.victory ? txt`Les deux bâtiments principaux adverses sont tombés en ${duree}`
+        : txt`Votre équipe n’a plus de bâtiment principal — durée de la partie : ${duree}`;
     }
     const centre = ficheDe('towncenter', this.world.players[result.victory ? this.world.adversaire(moi).index : moi].civ);
     if (this.world.mode.victory === 'towncenter') {
-      const tombe = `${centre.name}${result.victory ? ' adverse' : ''} est tombé${centre.fem ? 'e' : ''}`;
+      // (Une phrase entière par issue ; l'article et l'accord français restent des trous, qu'une autre langue laisse de côté.)
+      const accorde = centre.fem ? 'e' : '';
       return result.victory
-        ? `${centre.fem ? 'La' : 'Le'} ${tombe} en ${duree}`
-        : `Votre ${tombe} — durée de la partie : ${duree}`;
+        ? txt`${centre.fem ? 'La' : 'Le'} ${centre.name} adverse est tombé${accorde} en ${duree}`
+        : txt`Votre ${centre.name} est tombé${accorde} — durée de la partie : ${duree}`;
     }
-    return `${result.victory ? 'L’adversaire n’a' : 'Vous n’avez'} plus ni ${centre.name} ni bâtiment militaire — durée de la partie : ${duree}`;
+    return result.victory
+      ? txt`L’adversaire n’a plus ni ${centre.name} ni bâtiment militaire — durée de la partie : ${duree}`
+      : txt`Vous n’avez plus ni ${centre.name} ni bâtiment militaire — durée de la partie : ${duree}`;
   }
 
   /**
@@ -1255,16 +1263,15 @@ export class UI {
     const lignes = [];
     if (temps && temps.record) {
       lignes.push(`<p class="record">${temps.ancien
-        ? `<b>Nouveau record !</b> Victoire en ${formatTime(temps.valeur)} — le précédent était de ${formatTime(temps.ancien)}`
-        : `<b>Premier temps au palmarès :</b> victoire en ${formatTime(temps.valeur)}`}</p>`);
-    } else if (temps) lignes.push(`<p>Meilleur temps à battre : ${formatTime(temps.ancien)}</p>`);
+        ? txt`<b>Nouveau record !</b> Victoire en ${formatTime(temps.valeur)} — le précédent était de ${formatTime(temps.ancien)}`
+        : txt`<b>Premier temps au palmarès :</b> victoire en ${formatTime(temps.valeur)}`}</p>`);
+    } else if (temps) lignes.push(`<p>${txt`Meilleur temps à battre : ${formatTime(temps.ancien)}`}</p>`);
     if (score && score.record) {
       lignes.push(`<p class="record">${score.ancien
-        ? `<b>Nouveau record !</b> ${exact(score.valeur)} points — le précédent était de ${exact(score.ancien)}`
-        : `<b>Premier score au palmarès :</b> ${exact(score.valeur)} points`}</p>`);
-    } else if (score && score.ancien) lignes.push(`<p>Meilleur score à battre : ${exact(score.ancien)} points</p>`);
-    const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
-    lignes.push(`<p>${this.world.mode.name} · ${this.world.difficulty.name} : ${pluriel(ligne.victoires, 'victoire')}, ${pluriel(ligne.defaites, 'défaite')}</p>`);
+        ? txt`<b>Nouveau record !</b> ${exact(score.valeur)} points — le précédent était de ${exact(score.ancien)}`
+        : txt`<b>Premier score au palmarès :</b> ${exact(score.valeur)} points`}</p>`);
+    } else if (score && score.ancien) lignes.push(`<p>${txt`Meilleur score à battre : ${exact(score.ancien)} points`}</p>`);
+    lignes.push(`<p>${txt`${this.world.mode.name} · ${this.world.difficulty.name} : ${ligne.victoires} ${accord(ligne.victoires, 'victoire')}, ${ligne.defaites} ${accord(ligne.defaites, 'défaite')}`}</p>`);
     return `<div class="fin-palmares">${lignes.join('')}</div>`;
   }
 
@@ -1272,10 +1279,10 @@ export class UI {
     const player = this.world.players[this.world.humanIndex];
     const enemy = this.world.adversaire(this.world.humanIndex);
     const egalite = result.winner === -1;
-    const title = egalite ? 'Égalité' : (result.victory ? 'Victoire !' : 'Défaite');
+    const title = egalite ? txt('Égalité') : (result.victory ? txt('Victoire !') : txt('Défaite'));
     // Chiffres exacts : arrondis (« 4,0k » contre « 4,0k »), un score serré
     // départagé au temps écoulé ne se lisait plus.
-    const exact = (n) => Math.floor(n).toLocaleString('fr-FR');
+    const exact = (n) => Math.floor(n).toLocaleString(LOCALE);
     // D'où vient le score, part par part (formats chronométrés : voir World.detailScore).
     // (Une part que ce format ne compte pas ne s'affiche pas.)
     const part = (cle, libelle) => (result.detail && result.detail[player.index][cle] !== undefined ? `<tr><td>${libelle}</td>
@@ -1283,38 +1290,38 @@ export class UI {
     // Par équipes : une colonne par place, à sa couleur, et la somme de chaque bord.
     const tableDesEquipes = () => {
       const js = this.world.players, sommes = result.scoresEquipes;
-      const tete = js.map((p) => `<th style="color:${p.color.dark}">${p.index === player.index ? 'Vous' : p.name.replace('Adversaire', 'Adv.')}</th>`).join('');
+      const tete = js.map((p) => `<th style="color:${p.color.dark}">${p.index === player.index ? txt('Vous') : p.name.replace(txt('Adversaire'), txt('Adv.'))}</th>`).join('');
       const ligne = (libelle, f) => `<tr><td>${libelle}</td>${js.map((p) => `<td>${f(p)}</td>`).join('')}</tr>`;
       return `
       <table class="scores equipes">
         <tr><th></th>${tete}</tr>
-        ${ligne('Bâtiment principal', (p) => (p.defeated ? 'tombé' : 'debout'))}
-        ${ligne('Unités formées', (p) => p.stats.trained)}
-        ${ligne('Unités perdues', (p) => p.stats.lost)}
-        ${result.scores ? ligne('Score', (p) => exact(result.scores[p.index])) : ''}
-        ${sommes ? `<tr class="total"><td><b>Par équipe</b></td><td colspan="2"><b>${exact(sommes[js[0].equipe])}</b></td><td colspan="2"><b>${exact(sommes[js[js.length - 1].equipe])}</b></td></tr>` : ''}
+        ${ligne(txt('Bâtiment principal'), (p) => (p.defeated ? txt('tombé') : txt('debout')))}
+        ${ligne(txt('Unités formées'), (p) => p.stats.trained)}
+        ${ligne(txt('Unités perdues'), (p) => p.stats.lost)}
+        ${result.scores ? ligne(txt('Score'), (p) => exact(result.scores[p.index])) : ''}
+        ${sommes ? `<tr class="total"><td><b>${txt('Par équipe')}</b></td><td colspan="2"><b>${exact(sommes[js[0].equipe])}</b></td><td colspan="2"><b>${exact(sommes[js[js.length - 1].equipe])}</b></td></tr>` : ''}
       </table>
-      ${result.scores ? '<p class="fin-note">Au bout du temps, la somme des scores de chaque équipe départage.</p>' : ''}`;
+      ${result.scores ? `<p class="fin-note">${txt('Au bout du temps, la somme des scores de chaque équipe départage.')}</p>` : ''}`;
     };
     const summary = this.world.parEquipes ? tableDesEquipes() : `
       <table class="scores">
-        <tr><th></th><th>Vous</th><th>Adversaire</th></tr>
-        <tr><td>Ressources récoltées</td>
+        <tr><th></th><th>${txt('Vous')}</th><th>${txt('Adversaire')}</th></tr>
+        <tr><td>${txt('Ressources récoltées')}</td>
             <td>${exact(this.total(player))}</td><td>${exact(this.total(enemy))}</td></tr>
-        <tr><td>Unités formées</td><td>${player.stats.trained}</td><td>${enemy.stats.trained}</td></tr>
-        <tr><td>Unités perdues</td><td>${player.stats.lost}</td><td>${enemy.stats.lost}</td></tr>
-        <tr><td>Bâtiments construits</td><td>${player.stats.built}</td><td>${enemy.stats.built}</td></tr>
-        <tr><td>Âge atteint</td><td>${AGES[player.age].name}</td><td>${AGES[enemy.age].name}</td></tr>
-        ${part('recolte', 'Points de récolte')}
-        ${part('debout', 'Troupes et bâtiments debout')}
-        ${part('abattu', 'Ennemis abattus')}
-        ${part('positions', 'Points des positions')}
-        ${result.scores ? `<tr class="total"><td><b>Score final</b></td>
+        <tr><td>${txt('Unités formées')}</td><td>${player.stats.trained}</td><td>${enemy.stats.trained}</td></tr>
+        <tr><td>${txt('Unités perdues')}</td><td>${player.stats.lost}</td><td>${enemy.stats.lost}</td></tr>
+        <tr><td>${txt('Bâtiments construits')}</td><td>${player.stats.built}</td><td>${enemy.stats.built}</td></tr>
+        <tr><td>${txt('Âge atteint')}</td><td>${AGES[player.age].name}</td><td>${AGES[enemy.age].name}</td></tr>
+        ${part('recolte', txt('Points de récolte'))}
+        ${part('debout', txt('Troupes et bâtiments debout'))}
+        ${part('abattu', txt('Ennemis abattus'))}
+        ${part('positions', txt('Points des positions'))}
+        ${result.scores ? `<tr class="total"><td><b>${txt('Score final')}</b></td>
           <td><b>${exact(result.scores[player.index])}</b></td>
           <td><b>${exact(result.scores[enemy.index])}</b></td></tr>` : ''}
       </table>
-      ${result.detail && this.world.positions.length ? `<p class="fin-note">Score : un point toutes les ${this.world.mode.positions.pas} secondes par position tenue.</p>`
-    : result.detail ? '<p class="fin-note">Score : la moitié des ressources récoltées, le prix de ce qui est encore debout, et deux fois le prix de ce qui a été abattu chez l’autre.</p>' : ''}`;
+      ${result.detail && this.world.positions.length ? `<p class="fin-note">${txt`Score : un point toutes les ${this.world.mode.positions.pas} secondes par position tenue.`}</p>`
+    : result.detail ? `<p class="fin-note">${txt('Score : la moitié des ressources récoltées, le prix de ce qui est encore debout, et deux fois le prix de ce qui a été abattu chez l’autre.')}</p>` : ''}`;
     // La capitale du joueur, telle que la carte la dessine : debout ou éteinte, pour les deux peuples.
     const image = illustrationDeFin(result, player.civ);
     const illustration = image
@@ -1327,8 +1334,8 @@ export class UI {
       ${this.textePalmares(palmares, exact)}
       ${summary}
       <div class="modal-actions">
-        <button class="btn primary" data-act="again">Nouvelle partie</button>
-        <button class="btn" data-act="menu">Menu principal</button>
+        <button class="btn primary" data-act="again">${txt('Nouvelle partie')}</button>
+        <button class="btn" data-act="menu">${txt('Menu principal')}</button>
       </div>`, { wide: true, fin: true });   // « fin » : ces deux boutons restent à l'écran (voir la feuille de style)
     modal.querySelector('[data-act="again"]').addEventListener('click', () => this.game.restart(), this.ecoute());
     modal.querySelector('[data-act="menu"]').addEventListener('click', () => this.game.quitToMenu(), this.ecoute());
