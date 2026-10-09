@@ -18,6 +18,7 @@ import {
 } from './progression.js';
 import { htmlEmbleme, htmlPiece, htmlBlason, htmlMedaillon, svgBanniere, titreDuBlason, htmlSansTeinture } from './blason.js';
 import { iconeSVG } from './icones.js';
+import { EN_MAGASIN } from './edition.js';
 
 /** Les outils prêtés par js/progression-ecrans.js : montrer, retenir, nombre, pluriel, couronnes, euros, jour, heure, coffre. */
 let o = null;
@@ -30,6 +31,16 @@ export const eclats = (n, taille = 14) => `<span class="prog-eclats">${iconeSVG(
 function environ(couronnes) {
   const lot = R.boutique.lots[0];
   return `environ ${Math.round(couronnes * lot.prixCentimes / lot.couronnes / 100)}\u00a0€`;
+}
+/**
+ * Le prix en euros à écrire à côté d'un prix en Couronnes (« , environ 5 € ») :
+ * les autorités européennes le demandent pour toute monnaie de jeu qui
+ * s'achète en argent réel. Rien dans l'application des magasins tant que les
+ * achats intégrés n'y sont pas ouverts : les Couronnes ne s'y achètent pas, un
+ * prix en euros y serait une fausse promesse.
+ */
+export function enEuros(couronnes, avant = ', ', apres = '') {
+  return EN_MAGASIN && !R.boutique.argentReel ? '' : `${avant}${environ(couronnes)}${apres}`;
 }
 
 const SOURCES = { coffres: 'Dans les coffres', boutique: 'À la boutique', ligues: 'Par les ligues', saison: 'Route de saison', atelier: 'En Éclats' };
@@ -146,7 +157,7 @@ function ecranCollection(id, profil, message = '', { confirmer = '' } = {}) {
   } else {
     if (c.source === 'boutique') {
       const lot = catalogueBoutique(profil, o.heure(), o.jour()).collections.find((x) => x.collection === c.id);
-      chapeau = lot && lot.manquantes.length ? `Une collection de la boutique : ses ${c.pieces.length} pièces d’un coup, pour ${o.nombre(lot.prix)} Couronnes (${environ(lot.prix)}).` : 'Cette collection est à toi.';
+      chapeau = lot && lot.manquantes.length ? `Une collection de la boutique : ses ${c.pieces.length} pièces d’un coup, pour ${o.nombre(lot.prix)} Couronnes${enEuros(lot.prix, ' (', ')')}.` : 'Cette collection est à toi.';
       if (lot && lot.manquantes.length) chapeau += `</p><div class="modal-actions">${boutonDeLot(lot, profil.couronnes, confirmer)}</div><p class="col-vide">`;
     } else if (c.source === 'saison') {
       chapeau = c.id === saison.theme ? `La collection de la saison ${saison.numero} : elle se gagne palier après palier, sur la route de la saison.`
@@ -260,7 +271,7 @@ function ecranSaison(profil, message = '', { confirmer = false } = {}) {
         <p><b>Le Passe de saison</b> ouvre la voie de droite : ${contenuDuPasse()}. Ni coffre, ni fragment, ni niveau.</p>
         ${dejaLa ? `<p class="col-deja-passe">Cette collection est déjà passée par ici : tu as ${dejaLa} de ces pièces. Celles-là te rendront des Éclats à la place (${eclats(eclatsRendus)} en tout).</p>` : ''}
         <div class="modal-actions">${bouton}</div>
-        <p class="hint">${o.nombre(s.prixDuPasse)} Couronnes, ${environ(s.prixDuPasse)}. Acheté en cours de saison, il donne aussi les paliers déjà atteints.</p>
+        <p class="hint">${o.nombre(s.prixDuPasse)} Couronnes${enEuros(s.prixDuPasse)}. Acheté en cours de saison, il donne aussi les paliers déjà atteints.</p>
       </div>`;
   }
   o.montrer(`Saison ${s.numero}`, `
@@ -363,7 +374,7 @@ export function htmlRayonDesCollections(profil, c, confirmer) {
         <span class="prog-vignette col-vignette">${htmlEmbleme(theme.emblemes[theme.emblemes.length - 1])}</span>
         <span class="prog-offre-texte">
           <b>Passe de saison</b>
-          <small>${c.passe.pris ? 'Les deux voies sont ouvertes.' : `${o.nombre(c.passe.prix)} Couronnes, ${environ(c.passe.prix)} · ni coffre, ni fragment, ni niveau`}</small>
+          <small>${c.passe.pris ? 'Les deux voies sont ouvertes.' : `${o.nombre(c.passe.prix)} Couronnes${enEuros(c.passe.prix)} · ni coffre, ni fragment, ni niveau`}</small>
         </span>
         <button class="btn small ${c.passe.pris ? '' : 'primary'}" data-ecran="saison">${c.passe.pris ? 'La route' : 'Voir'}</button>
       </li>
@@ -405,7 +416,7 @@ export function htmlRayonDesCollections(profil, c, confirmer) {
         <button class="col-bande" data-ecran="collection" data-arg="${col.id}" aria-label="Voir la collection : ${col.nom}">${col.emblemes.map((id) => htmlEmbleme(id)).join('')}</button>
         <span class="prog-offre-texte">
           <b>${col.nom}</b>
-          <small>${col.emblemes.length} autocollants, sa bannière, son cadre et ses deux mots de titre${lot.manquantes.length ? ` · ${environ(lot.prix)}` : ''}</small>
+          <small>${col.emblemes.length} autocollants, sa bannière, son cadre et ses deux mots de titre${lot.manquantes.length ? enEuros(lot.prix, ' · ') : ''}</small>
         </span>
         ${lot.manquantes.length
     ? `<button class="btn small ${c.couronnes < lot.prix ? 'prog-cher' : 'primary'}" data-ecran="collection" data-arg="${col.id}">${o.couronnes(lot.prix)}</button>`

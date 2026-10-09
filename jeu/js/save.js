@@ -16,7 +16,7 @@ import { World } from './game.js';
 import { Projectile } from './entities.js';
 import { entityDef } from './config.js';
 import { formatTime } from './utils.js';
-import { migrerProfil, regulariser } from './progression.js';
+import { migrerProfil, regulariser, profilNeuf } from './progression.js';
 
 export const SAVE_KEY = 'aem.partie';
 export const SAVE_VERSION = 1;
@@ -626,8 +626,9 @@ export function resumeIncident(incident) {
   return `${duree} — ${incident.mo} Mo d’images, ${incident.unites} unité${incident.unites > 1 ? 's' : ''}`;
 }
 
-/** La ligne de l'écran d'accueil. */
-export function phraseIncident(incident) {
+/** La ligne de l'écran d'accueil. `court` : sans les mesures (poids des images, nombre d'unités), qui ne parlent qu'à qui met le jeu au point. */
+export function phraseIncident(incident, court = false) {
+  if (court) return incident.genre === 'rechargee' ? 'Le jeu s’est relancé en pleine partie : elle t’attend.' : 'La dernière partie s’est interrompue : elle t’attend.';
   return incident.genre === 'rechargee'
     ? `La page a été rechargée en pleine partie, ${resumeIncident(incident)}`
     : `La dernière partie s’est interrompue ${resumeIncident(incident)}`;
@@ -699,6 +700,27 @@ export function ecrireProgression(profil) {
   try { store.setItem(PROGRESSION_KEY, JSON.stringify(range)); } catch { return false; }
   if (apresEcriture) { try { apresEcriture(range); } catch { /* le second rangement ne doit jamais gêner le premier */ } }
   return true;
+}
+
+/**
+ * Efface tout ce que le jeu garde sur cet appareil : la partie en cours, le
+ * palmarès, les réglages, et la progression — classement, coffres, troupes,
+ * collections, monnaies. Le profil repart de zéro avec une opération de plus
+ * que l'ancien : là où un second rangement existe (js/rangement-durable.js),
+ * il ne retient que le profil le plus avancé, et c'est ainsi qu'il oublie
+ * l'ancien. Renvoie false si l'appareil refuse d'écrire.
+ */
+export function effacerLesDonnees() {
+  const store = storage();
+  if (!store) return false;
+  const ancien = lireProgression();
+  const cles = new Set(['aem.partie', 'aem.temoin.v1', 'aem.palmares.v1', 'aem.autoWorkers', 'aem.vitesse', 'aem.reglages', 'aem.styleUnites.v2', 'aem.finesse.v1', 'aem.musique', 'aem.empreintes.v1']);
+  try {
+    // (Et toute autre clé du jeu, s'il en est né une depuis : elles commencent toutes par « aem. ».)
+    for (let i = 0; i < (store.length || 0); i++) { const cle = store.key(i); if (cle && cle.startsWith('aem.')) cles.add(cle); }
+    for (const cle of cles) if (cle !== PROGRESSION_KEY) store.removeItem(cle);
+  } catch { return false; }
+  return ecrireProgression({ ...profilNeuf(), operations: ancien.operations + 1 });
 }
 
 // --- Palmarès ------------------------------------------------------------------

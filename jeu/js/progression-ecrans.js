@@ -13,15 +13,16 @@
 import { PROGRESSION as R } from './progression-config.js';
 import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour } from './progression.js';
 import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai, ouvrirLaSaison } from './progression.js';
-import { lireProgression, ecrireProgression } from './save.js';
+import { lireProgression, ecrireProgression, effacerLesDonnees } from './save.js';
+import { EN_MAGASIN, EDITEUR, nomComplet } from './edition.js';
 import { UNIT_TYPES, DEFAULT_CIV, GAME_MODES, nomDe, portraitDe } from './config.js';
-import { iconeSVG } from './icones.js';
+import { iconeSVG, ICONES_LICENCE } from './icones.js';
 import { ficheDeTroupe } from './fiches-troupes.js';
 import { PIECES } from './collections-config.js';
 import { htmlPiece, htmlMedaillon, titreDuBlason, reglerPeupleDesTeintures } from './blason.js';
 import {
   brancherCollections, ECRANS_DES_COLLECTIONS, agirSurLesCollections, eclats, htmlJoueur, htmlBourses,
-  aPrendreDansLaSaison, htmlPiecesDuCoffre, htmlRayonDesCollections, pieceEnEtiquette, resumeDesGains,
+  aPrendreDansLaSaison, htmlPiecesDuCoffre, htmlRayonDesCollections, pieceEnEtiquette, resumeDesGains, enEuros,
 } from './collections-ecrans.js';
 
 /** Les troupes que le jeu sait former, dans l'ordre des réglages. */
@@ -425,7 +426,10 @@ function boutonAcheter(act, arg, prix, solde, confirmer) {
  */
 function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
   const c = catalogueBoutique(profil, heure(), jourLocal());
-  const offres = c.offres.map((o) => {
+  // Dans l'application des magasins, rien ne s'annonce « bientôt » : ce qui se paie en argent réel
+  // ne se montre que le jour où il s'achète (Apple 2.1 ; voir js/edition.js).
+  const montrerLArgentReel = c.lots.some((l) => l.disponible) || !EN_MAGASIN;
+  const offres = c.offres.filter((o) => o.id === 'ligue' || montrerLArgentReel).map((o) => {
     if (o.id === 'ligue') {
       return `
         <li class="prog-offre">
@@ -458,7 +462,7 @@ function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
         <button class="prog-article-fiche" data-ecran="fiche" data-arg="${t.type}" aria-label="Voir la fiche : ${nomTroupe(t.type)}">${vignette(t.type)}</button>
         <span class="prog-offre-texte">
           <b>${nomTroupe(t.type)}</b>
-          <small>${t.debloquee ? 'Déjà à toi.' : `${t.offre ? `<s>${nombre(t.prixPlein)}</s> · ` : ''}Sinon offerte en ${ligueEnPhrase(g.ligue)}`}</small>
+          <small>${t.debloquee ? 'Déjà à toi.' : `${t.offre ? `<s>${nombre(t.prixPlein)}</s> · ` : ''}Sinon offerte en ${ligueEnPhrase(g.ligue)}${enEuros(t.prix, ' · ')}`}</small>
         </span>
         ${droite}
       </li>`;
@@ -473,10 +477,21 @@ function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
       </span>
       <button class="btn small" disabled>${euros(l.prixCentimes)}</button>
     </li>`).join('');
+  const rayonDesCouronnes = !montrerLArgentReel ? `
+    <h3>Couronnes</h3>
+    <p class="subtitle">Elles se gagnent en jouant : ${R.boutique.parLigue} à chaque nouvelle ligue, et sur la route de la saison.</p>` : `
+    <h3>Couronnes</h3>
+    <p class="subtitle">${c.lots.some((l) => l.disponible) ? 'Les Couronnes servent ici, et seulement ici.' : `L’achat de Couronnes arrivera avec l’application. D’ici là, elles se gagnent : ${R.boutique.parLigue} à chaque nouvelle ligue, et sur la route de la saison.`}</p>
+    <ul class="prog-articles">${lots}</ul>
+    ${c.essai ? `
+    <div class="modal-actions">
+      <button class="btn" data-act="essaiCouronnes">Porte-monnaie d’essai : +${nombre(c.essai.couronnes)} Couronnes</button>
+    </div>
+    <p class="hint">Version d’essai : ce bouton sert à essayer la boutique, il disparaîtra avec l’arrivée des vrais achats.</p>` : ''}`;
   montrer('Boutique', `
     <p class="prog-bourse">${couronnes(c.couronnes, 22)} <span>${c.couronnes > 1 ? 'Couronnes' : 'Couronne'}</span>
       <span class="prog-bourse-eclats">${eclats(c.eclats, 22)} <span>${c.eclats > 1 ? 'Éclats' : 'Éclat'}</span></span></p>
-    <p class="hint prog-monnaies">Les Couronnes s’achètent. Les Éclats se gagnent en jouant : dans chaque coffre, et pour chaque autocollant en double.</p>
+    <p class="hint prog-monnaies">${montrerLArgentReel ? 'Les Couronnes s’achètent.' : 'Les Couronnes se gagnent aux ligues et sur la route de la saison.'} Les Éclats se gagnent en jouant : dans chaque coffre, et pour chaque autocollant en double.</p>
     ${message ? `<p class="prog-annonce">${message}</p>` : ''}
     ${offres ? `<h3>Offres du moment</h3><ul class="prog-articles">${offres}</ul>` : ''}
     ${htmlRayonDesCollections(profil, c, confirmer)}
@@ -489,20 +504,51 @@ function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
         <span class="prog-vignette">${iconeSVG('militia', 30)}</span>
         <span class="prog-offre-texte">
           <b>Toutes les troupes (${lot.troupes.length})</b>
-          <small>au lieu de <s>${nombre(lot.prixPlein)}</s></small>
+          <small>au lieu de <s>${nombre(lot.prixPlein)}</s>${enEuros(lot.prix, ' · ')}</small>
         </span>
         ${boutonAcheter('acheterTout', 'tout', lot.prix, c.couronnes, confirmer === 'tout')}
       </li>` : ''}
     </ul>
-    <h3>Couronnes</h3>
-    <p class="subtitle">${c.lots.some((l) => l.disponible) ? 'Les Couronnes servent ici, et seulement ici.' : `L’achat de Couronnes arrivera avec l’application. D’ici là, elles se gagnent : ${R.boutique.parLigue} à chaque nouvelle ligue, et sur la route de la saison.`}</p>
-    <ul class="prog-articles">${lots}</ul>
-    ${c.essai ? `
-    <div class="modal-actions">
-      <button class="btn" data-act="essaiCouronnes">Porte-monnaie d’essai : +${nombre(c.essai.couronnes)} Couronnes</button>
-    </div>
-    <p class="hint">Version d’essai : ce bouton sert à essayer la boutique, il disparaîtra avec l’arrivée des vrais achats.</p>` : ''}
+    ${rayonDesCouronnes}
     <p class="hint">Rien d’aléatoire ne se vend ici : ni coffre, ni fragment, ni niveau.</p>`);
+}
+
+// --- Confidentialité, données et mentions ------------------------------------------------
+//
+// Les deux magasins demandent que la politique de confidentialité se lise DANS
+// le jeu, en plus de sa page publique (Apple 5.1.1 ; Google, « User Data »), et
+// que le joueur puisse effacer ce qui le concerne. Le jeu ne collecte rien :
+// l'écran le dit, et dit ce qu'il garde sur l'appareil.
+
+function ecranConfidentialite(message = '', { confirmer = false } = {}) {
+  const l = ICONES_LICENCE;
+  const editeur = EDITEUR.nom.trim()
+    ? `<p>${nomComplet()} est édité par <b>${EDITEUR.nom}</b>.${EDITEUR.courriel ? ` Pour toute question : <span class="prog-selection">${EDITEUR.courriel}</span>.` : ''}${EDITEUR.mentions ? `<br><small>${EDITEUR.mentions}</small>` : ''}</p>`
+    : '';
+  montrer('Confidentialité', `
+    ${message ? `<p class="prog-annonce">${message}</p>` : ''}
+    <h3>Ce que le jeu garde</h3>
+    <p>Ta progression (classement, coffres, troupes, collections), ta partie en cours et tes réglages sont gardés <b>sur cet appareil</b>.${EN_MAGASIN ? '' : ' Sur cette page web, ta progression est aussi rangée avec ton compte, là où la page le permet, pour la retrouver si le navigateur l’efface.'}</p>
+    <h3>Ce que le jeu ne fait pas</h3>
+    <ul class="prog-regles">
+      <li>Aucun compte à créer, aucune donnée personnelle demandée.</li>
+      <li>Aucune publicité, aucun traceur, aucune mesure d’audience.</li>
+      <li>${EN_MAGASIN ? 'Aucune donnée ne quitte ton appareil : le jeu fonctionne sans connexion.' : 'Rien n’est envoyé à un serveur de jeu : une fois chargé, le jeu fonctionne sans connexion.'}</li>
+    </ul>
+    <h3>Effacer mes données</h3>
+    <p class="subtitle">Tout repart de zéro : classement, coffres, troupes, collections, monnaies, partie en cours, réglages. C’est définitif.</p>
+    <div class="modal-actions">
+      <button class="btn ${confirmer ? 'danger' : ''}" data-act="effacerDonnees" ${confirmer ? 'data-i="1"' : ''}>${confirmer ? 'Toucher encore : tout effacer, pour de bon' : 'Effacer toutes mes données'}</button>
+    </div>
+    ${editeur ? `<h3>Éditeur</h3>${editeur}` : ''}
+    <h3>Licences</h3>
+    <ul class="prog-regles">
+      <li>Pictogrammes : ${l.source}, licence ${l.licence}. <small>${l.auteurs.join(' · ')}</small></li>
+      <li>Caractères « Lilita One » (Juan Montoreano) et « Nunito » (The Nunito Project Authors) : licence SIL OFL 1.1.</li>
+      <li>Rendu 3D : three.js, licence MIT.</li>
+      <li>Bruitages (Kenney) et musiques (RandomMind, Emma_MA) : domaine public, CC0.</li>
+      <li>Illustrations, modèles et autocollants : créés pour le jeu par son auteur.</li>
+    </ul>`);
 }
 
 // --- Ouvrir un écran, agir ----------------------------------------------------------
@@ -514,13 +560,15 @@ const ECRANS = {
   probas: (p, arg) => ecranProbas(arg),
   fiche: (p, arg) => ecranFiche(arg, p),
   boutique: (p) => ecranBoutique(p),
+  confidentialite: () => ecranConfidentialite(),
   ...ECRANS_DES_COLLECTIONS,
 };
 
 /**
  * Ouvre un écran de la progression : « ligues », « coffres », « troupes »,
  * « probas » (un type de coffre), « fiche » (une troupe), « boutique »,
- * « album », « collection » (son identifiant), « blason », « saison ».
+ * « album », « collection » (son identifiant), « blason », « saison »,
+ * « confidentialite ».
  */
 export function ouvrirProgression(ecran, arg) {
   if (ECRANS[ecran]) ECRANS[ecran](lireProgression(), arg);
@@ -535,6 +583,15 @@ function retenir(profil) {
 
 function agir(act, arg, i) {
   if (act === 'fermer') return fermerProgression();
+  if (act === 'effacerDonnees') {
+    // Deux touchers, comme tout ce qui ne se rattrape pas ; puis la page repart de zéro.
+    if (i !== '1') return ecranConfidentialite('', { confirmer: true });
+    if (!effacerLesDonnees()) return ecranConfidentialite('Effacement impossible sur cet appareil : le stockage est fermé.');
+    surChangement(lireProgression());
+    ecranConfidentialite('Tes données sont effacées. Le jeu repart de zéro.');
+    try { if (typeof location !== 'undefined' && location.reload) setTimeout(() => location.reload(), 1200); } catch { /* sans page : rien à recharger */ }
+    return undefined;
+  }
   const profil = lireProgression();
   if (agirSurLesCollections(act, arg, i, profil, (p, message, confirmer) => ecranBoutique(p, message, { confirmer }))) return undefined;
   if (act === 'ouvrir') {

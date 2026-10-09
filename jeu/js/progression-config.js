@@ -18,6 +18,8 @@
 //     niveau 1 : elle est toujours neutre (×1000, +0, rien à poser).
 // ---------------------------------------------------------------------------
 
+import { EN_MAGASIN } from './edition.js';
+
 // Règle générale (H) : +5 % par niveau, soit +20 % au niveau 5 — arrondi à
 // l'entier pour les points de vie et les dégâts (`entiers`) : le joueur ne lit
 // que des chiffres ronds, et c'est le chiffre rond qui joue.
@@ -363,7 +365,8 @@ export const PROGRESSION = figer({
   //                la ligue suivante à `part` pour-cent de son prix.
   boutique: {
     argentReel: false,
-    essai: { couronnes: 500 },
+    // (Jamais dans l'application des magasins : une version soumise n'a pas de bouton d'essai. Voir js/edition.js.)
+    essai: EN_MAGASIN ? null : { couronnes: 500 },
     parLigue: 50,
     lots: [
       { id: 'poignee', nom: 'Poignée', prixCentimes: 99, couronnes: 100, bonus: 0 },

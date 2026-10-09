@@ -443,6 +443,8 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
 #start-screen .howto { order: 2; margin-top: 14px; }
 #start-screen .howto ul { color: var(--b-gris); font-weight: 700; }
 #start-screen .howto b { color: var(--b-encre); font-weight: 900; }
+#start-screen #btn-confidentialite { order: 4; justify-self: center; min-height: 36px; margin: 2px 0 6px; font-size: 13px; }
+#progression .prog-selection { user-select: all; -webkit-user-select: all; font-weight: 900; }
 #start-screen .credits { order: 3; margin-top: 12px; font-size: 12.5px; font-weight: 700; color: var(--b-gris); opacity: 1; }
 
 /* ---------------------------------------------------------------------------

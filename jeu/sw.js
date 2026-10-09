@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v69';
+const CACHE = 'age-empires-mobile-v70';
 // La musique (js/musique.js) : trois morceaux lourds. Ils ne sont pas pris à
 // l'installation mais à la première écoute, et gardés à part, comme les unités
 // en 3D : une mise à jour du jeu ne les fait pas retélécharger.
@@ -30,6 +30,7 @@ const ASSETS = [
   './js/collections-ecrans.js',
   './js/blason.js',
   './js/teintures.js',
+  './js/edition.js',
   './js/fiches-troupes.js',
   './js/musique.js',
   './js/rangement-durable.js',

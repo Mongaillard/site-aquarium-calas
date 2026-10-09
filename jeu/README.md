@@ -885,6 +885,43 @@ avance la saison. Tests : `node test/collections.test.js`.
 découpe (voir `assets/SOURCES.md`), la poser dans `assets/collections`, ajouter
 son entrée dans `js/collections-config.js` et son nom dans `sw.js`.
 
+## Vers les magasins d'applications
+
+Ce que l'App Store et Google Play demandent, et que le jeu tient déjà dans son
+code (le reste — comptes, fiches, questionnaires — se fait dans leurs consoles).
+
+**Deux éditions** (`js/edition.js`). « web » : la page et l'artefact, où tout
+se montre. « magasin » : l'application, reconnue à son enveloppe native
+(`window.Capacitor`) ou à la marque que pose `npm run magasin`
+(`window.__EDITION`) ; pour la voir dans un navigateur, `?edition=magasin`.
+Une version soumise doit être finie (Apple, articles 2.1, 2.2 et 2.3.1) :
+l'édition magasin n'a donc ni porte-monnaie d'essai (`boutique.essai` y vaut
+`null`), ni article annoncé « bientôt » (lots de Couronnes et offre de
+bienvenue ne paraissent que le jour où ils s'achètent), ni réglage de mise au
+point dans la pause (« Style des personnages », mesures), ni prix en euros
+tant que rien ne s'achète en argent réel.
+
+**Confidentialité** (Apple 5.1.1 ; Google, « User Data »). L'écran
+« Confidentialité », ouvert depuis l'accueil et la pause, dit ce que le jeu
+garde (tout sur l'appareil), ce qu'il ne fait pas (ni compte, ni publicité, ni
+traceur), nomme les licences, et porte le bouton « Effacer toutes mes
+données » (`effacerLesDonnees`, `js/save.js` : deux touchers, tout repart de
+zéro, second rangement compris).
+
+**Prix en euros** à côté de tout prix en Couronnes (`enEuros`), comme le
+demandent les autorités européennes pour une monnaie de jeu qui s'achète.
+
+**`npm run magasin`** (`outils/magasin.mjs`) prépare `magasin/www`, le contenu
+web que l'enveloppe native embarque : sans service worker ni manifeste web,
+page marquée « magasin », feuilles de style sans aucune adresse extérieure,
+et `confidentialite.html` (la politique de confidentialité, en français et en
+anglais — à publier aussi à une adresse publique pour les fiches). **La
+commande refuse de continuer** tant que le nom du jeu reprend une marque
+(« Âge des Empires » : Microsoft) ou que l'éditeur n'est pas renseigné
+(`NOM_DU_JEU`, `EDITEUR` dans `js/edition.js`).
+
+Tests : `node test/magasin.test.js`.
+
 ## Les sons
 
 Le jeu joue de vrais sons, des échantillons courts rangés dans `assets/sons/`
@@ -998,6 +1035,7 @@ jeu/
 │   ├── collections-ecrans.js  l'Album, une collection, le blason, la route de la saison et le Passe
 │   ├── blason.js           le dessin des pièces : un autocollant est une case de sa planche, cadres et bannières sont tracés
 │   ├── teintures.js        les teintures des troupes : où est l'or sur un modèle, et ce que chaque matière en fait
+│   ├── edition.js          l'édition (web ou magasin), le nom du jeu, l'éditeur
 │   ├── rangement-durable.js   second rangement du profil, là où la page en offre un
 │   ├── render.js         Canvas 2D : sol en tronçons, entités, brouillard, minimap
 │   ├── sprites.js        atlas d'illustrations, couleur d'équipe, textures de sol

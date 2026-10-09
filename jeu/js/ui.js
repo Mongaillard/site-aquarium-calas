@@ -15,6 +15,7 @@ import { iconeSVG, ICONES_LICENCE } from './icones.js';
 import { STYLES, etatModeles3d, portraitAdverse } from './sprites.js';
 import { ficheCiv, spriteDe, imagePourJoueur } from './sprites.js';
 import { resumeIncident } from './save.js';
+import { EN_MAGASIN } from './edition.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -1091,19 +1092,20 @@ export class UI {
       <p class="hint">La partie est sauvegardée : vous pouvez fermer l'onglet et la reprendre plus tard.</p>
       <h3 class="modal-sub">Vitesse de jeu</h3>
       <div class="options row">${vitesses}</div>
-      <h3 class="modal-sub">Style des personnages</h3>
-      <div class="options row">${styles}</div>
+      ${EN_MAGASIN ? '' : `<h3 class="modal-sub">Style des personnages</h3>
+      <div class="options row">${styles}</div>`}
       ${this.texteModeles3d()}
       <h3 class="modal-sub">Finesse de l’image</h3>
       <div class="options row">${finesses}</div>
       <p class="hint" data-role="finesse-reelle">${this.texteFinesse()}</p>
-      <p class="hint" data-role="mesures">${this.texteMesures()}</p>
+      ${EN_MAGASIN ? '' : `<p class="hint" data-role="mesures">${this.texteMesures()}</p>`}
       <h3 class="modal-sub">Musique</h3>
       <div class="options row">${musiques}</div>
       <div class="modal-actions">
         <button class="btn primary" data-act="resume">Reprendre</button>
         <button class="btn" data-act="help">Comment jouer</button>
         <button class="btn" data-act="credits">Crédits</button>
+        <button class="btn" data-ecran="confidentialite">Confidentialité</button>
         <button class="btn danger" data-act="resign">Abandonner</button>
       </div>`);
     modal.querySelectorAll('[data-speed]').forEach((btn) => {
@@ -1123,7 +1125,8 @@ export class UI {
         this.game.setFinesse(btn.dataset.finesse);
         modal.querySelectorAll('[data-finesse]').forEach((b) => b.classList.toggle('active', b === btn));
         modal.querySelector('[data-role="finesse-reelle"]').textContent = this.texteFinesse();
-        modal.querySelector('[data-role="mesures"]').textContent = this.texteMesures();
+        const mesures = modal.querySelector('[data-role="mesures"]');
+        if (mesures) mesures.textContent = this.texteMesures();
       }, this.ecoute());
     });
     modal.querySelectorAll('[data-musique]').forEach((btn) => {

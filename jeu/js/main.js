@@ -16,6 +16,7 @@ import {
 import { brancher as brancherRangementDurable } from './rangement-durable.js';
 import { appliquerResultat, reglagesDePartie, issueDePartie } from './progression.js';
 import { matiereDe } from './collections-config.js';
+import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
 import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal } from './progression-ecrans.js';
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
@@ -1569,7 +1570,7 @@ function afficherIncident() {
     ligne.className = 'resume-info';
     box.insertAdjacentElement('afterend', ligne);
   }
-  ligne.textContent = phraseIncident(incidentAccueil);
+  ligne.textContent = phraseIncident(incidentAccueil, EN_MAGASIN);
 }
 
 /**
@@ -1898,6 +1899,18 @@ for (const geste of ['pointerup', 'touchend', 'click', 'keydown']) {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') audio.suspendre(); else if (audio.ctx) audio.resume();
 });
+// Le nom du jeu vient d'un seul endroit (js/edition.js) : le titre de la page et celui du couvercle le suivent.
+{
+  const titre = document.querySelector('#start-screen h1');
+  if (titre) {
+    titre.textContent = `${NOM_DU_JEU.titre} `;
+    if (NOM_DU_JEU.suite) { const suite = document.createElement('em'); suite.textContent = NOM_DU_JEU.suite; titre.append(suite); }
+  }
+  document.title = nomComplet();
+  // (L'application n'est pas une page web, et n'a pas de compte où ranger la progression.)
+  const note = document.getElementById('note-autonome');
+  if (note && EN_MAGASIN) note.textContent = 'Le jeu fonctionne sans connexion. Ta progression est gardée sur cet appareil.';
+}
 // Les illustrations se chargent — et les unités en 3D se cuisent — pendant
 // que le joueur choisit sa partie : elles sont prêtes quand elle commence.
 setStyleUnites(loadStyle());
