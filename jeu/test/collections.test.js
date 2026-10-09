@@ -16,6 +16,7 @@ import {
 } from '../js/progression.js';
 import { FORMES, MOTIFS, htmlEmbleme, svgCadre, svgBanniere, htmlBlason, htmlPiece, titreDuBlason } from '../js/blason.js';
 import { ouvrirProgression, htmlBandeau, htmlFinDePartie, installerProgression, reglerPeuple } from '../js/progression-ecrans.js';
+import { pieceEnPhrase } from '../js/collections-ecrans.js';
 import { PROGRESSION_KEY } from '../js/save.js';
 import { ICONES } from '../js/icones.js';
 
@@ -52,7 +53,7 @@ console.log('--- Le catalogue ---');
     ids.length === somme(COLLECTIONS.map((c) => c.pieces.length))
     && ids.every((id) => { const p = PIECES[id]; return p.id === id && id.startsWith(`${p.collection}.`) && GENRES.includes(p.genre) && p.nom && R.categories.includes(p.rarete) && collection(p.collection).pieces.includes(id); }));
   check(`${DES_COFFRES.length} collections sortent des coffres, 1 se vend entière, ${DE_SAISON.length} sont de saison, 1 vient des ligues — ${ids.length} pièces en tout`,
-    DES_COFFRES.length === 7 && COLLECTIONS.filter((c) => c.source === 'boutique').length === 1 && DE_SAISON.length === 2
+    DES_COFFRES.length === 7 && COLLECTIONS.filter((c) => c.source === 'boutique').length === 1 && DE_SAISON.length === 3
     && COLLECTIONS.filter((c) => c.source === 'ligues').length === 1 && COLLECTIONS.filter((c) => c.source === 'depart').length === 1,
     COLLECTIONS.map((c) => `${c.id} ${c.pieces.length}`).join(', '));
   const themes = COLLECTIONS.filter((c) => c.emblemes.length);
@@ -69,13 +70,13 @@ console.log('--- Le catalogue ---');
   const planches = [...new Set(COLLECTIONS.flatMap((c) => c.planches))];
   const sw = fs.readFileSync(path.join(RACINE, 'sw.js'), 'utf8');
   check(`les ${planches.length} planches sont livrées avec le jeu, et gardées pour le hors-ligne`,
-    planches.length === 12 && planches.every((p) => fs.existsSync(path.join(RACINE, p)) && sw.includes(`'./${p}'`)),
+    planches.length === 14 && planches.every((p) => fs.existsSync(path.join(RACINE, p)) && sw.includes(`'./${p}'`)),
     planches.filter((p) => !fs.existsSync(path.join(RACINE, p))).join(', '));
   check('chaque cadre a une forme que l’on sait tracer, chaque bannière un motif — et leurs couleurs',
     ids.every((id) => { const p = PIECES[id]; return p.genre === 'cadre' ? FORMES.includes(p.forme) && /^#/.test(p.couleur) && /^#/.test(p.fond) : p.genre === 'banniere' ? MOTIFS.includes(p.motif) && /^#/.test(p.fond) && /^#/.test(p.trait) : true; }));
   check('aucun nom de pièce ne porte d’emoji ni de chiffre', ids.every((id) => !/\p{Extended_Pictographic}|\d/u.test(PIECES[id].nom)));
-  check('les grades et les épithètes font des titres : 18 premiers mots, 10 suites',
-    ids.filter((id) => PIECES[id].genre === 'grade').length === 18 && ids.filter((id) => PIECES[id].genre === 'epithete').length === 10
+  check('les grades et les épithètes font des titres : 20 premiers mots, 11 suites',
+    ids.filter((id) => PIECES[id].genre === 'grade').length === 20 && ids.filter((id) => PIECES[id].genre === 'epithete').length === 11
     && ids.filter((id) => PIECES[id].genre === 'epithete').every((id) => /^(de la|des|du|de l’) /.test(PIECES[id].nom)));
   // Les ligues donnent des pièces qui existent.
   const cadeaux = R.ligues.flatMap((l) => (l.promotion ? l.promotion.cadeaux.map((c) => c.piece) : []));
@@ -95,7 +96,7 @@ console.log('\n--- Le profil ---');
   const p = profilNeuf();
   check('un profil neuf : les trois pièces de départ, le blason de départ, zéro Éclat, une route vide',
     egal(p.pieces, ['depart.grade', 'depart.banniere', 'depart.cadre']) && egal(p.blason, BLASON_DE_DEPART) && p.eclats === 0
-    && egal(p.route, { points: 0, passe: false, pris: { gratuit: [], passe: [] } }) && titreDe(p) === 'Villageois');
+    && egal(p.route, { points: 0, passe: false, pris: { gratuit: [], passe: [] } }) && egal(p.selection, { jour: '', achats: 0 }) && titreDe(p) === 'Villageois');
   check('il survit tel quel à un aller-retour', egal(migrerProfil(JSON.parse(JSON.stringify(p))), p));
   const plein = { ...p, pieces: [...p.pieces, 'maree.requin-couronne', 'ligues.recrue', 'sables.cadre'], blason: { embleme: 'maree.requin-couronne', cadre: 'sables.cadre', banniere: 'depart.banniere', grade: 'ligues.recrue', epithete: null },
     route: { points: 450, passe: true, pris: { gratuit: [1, 2], passe: [1] } } };
@@ -198,8 +199,22 @@ console.log('\n--- Les Éclats ---');
     choix.length === 3 && choix.every((x) => !riche.pieces.includes(x.piece) && x.prix * 2 === x.prixPlein && prixDePiece(riche, x.piece, JOUR) === x.prix));
   check('… la même toute la journée, une autre le lendemain',
     egal(catalogueBoutique(riche, 99, JOUR).selection, choix) && !egal(catalogueBoutique(riche, 0, '2026-10-10').selection, choix));
-  check('… un autocollant acheté en sort, un autre prend sa place',
-    (() => { const apres = catalogueBoutique(acheterPiece(riche, choix[0].piece, JOUR).profil, 0, JOUR).selection; return apres.length === 3 && !apres.some((x) => x.piece === choix[0].piece); })());
+  const unDeMoins = acheterPiece(riche, choix[0].piece, JOUR).profil;
+  check('… un autocollant acheté en sort, et aucun autre ne prend sa place : il en reste deux, les mêmes',
+    egal(catalogueBoutique(unDeMoins, 0, JOUR).selection.map((x) => x.piece), [choix[1].piece, choix[2].piece]) && catalogueBoutique(unDeMoins, 0, JOUR).selectionPrise === 1);
+  let vide = riche, payes = 0;
+  for (const x of choix) { payes += x.prix; vide = acheterPiece(vide, x.piece, JOUR).profil; }
+  check('… les trois pris, la sélection est vide jusqu’au lendemain, et tout autre autocollant est à son prix',
+    catalogueBoutique(vide, 0, JOUR).selection.length === 0 && catalogueBoutique(vide, 0, JOUR).selectionPrise === 3 && vide.eclats === 1000 - payes
+    && DES_COFFRES.flatMap((c) => c.emblemes).filter((id) => !vide.pieces.includes(id)).every((id) => prixDePiece(vide, id, JOUR) === C.eclats.prix[PIECES[id].rarete])
+    && catalogueBoutique(vide, 0, '2026-10-10').selection.length === 3);
+  check('… en une journée, on n’achète jamais plus de trois autocollants à prix réduit',
+    (() => { let p = { ...profilNeuf(), eclats: 99999 }, reduits = 0; for (const id of DES_COFFRES.flatMap((c) => c.emblemes)) { const prix = prixDePiece(p, id, JOUR); if (prix === null) continue; if (prix < C.eclats.prix[PIECES[id].rarete]) reduits++; p = acheterPiece(p, id, JOUR).profil; } return reduits === 3 && DES_COFFRES.every((c) => avancementDe(p, c.id).complete); })());
+  check('… un autocollant acheté à son prix, hors sélection, n’entame pas la sélection',
+    (() => { const hors = DES_COFFRES.flatMap((c) => c.emblemes).find((id) => !choix.some((x) => x.piece === id)); const p = acheterPiece(riche, hors, JOUR).profil; return catalogueBoutique(p, 0, JOUR).selection.length === 3 && catalogueBoutique(p, 0, JOUR).selectionPrise === 0; })());
+  check('… le compte des achats du jour survit à un aller-retour, et un compte abîmé repart de zéro',
+    egal(migrerProfil(JSON.parse(JSON.stringify(unDeMoins))).selection, { jour: JOUR, achats: 1 })
+    && [{ jour: 'hier', achats: 2 }, { jour: JOUR, achats: -4 }, 'trois', null].every((v) => { const s = migrerProfil({ ...profilNeuf(), selection: v }).selection; return s.achats === 0 || (s.jour === JOUR && s.achats >= 0); }));
   check('… sans jour lisible, pas de sélection : chacun à son prix', catalogueBoutique(riche, 0).selection.length === 0 && prixDePiece(riche, choix[0].piece) === choix[0].prixPlein);
   const achat = acheterPiece(riche, choix[0].piece, JOUR);
   check('acheter un autocollant : les Éclats partent, la pièce arrive',
@@ -245,6 +260,11 @@ console.log('\n--- Le blason ---');
   check('… on ne porte ni ce qu’on n’a pas, ni une pièce à la place d’une autre',
     equiper(p, 'embleme', 'maree.requin-couronne').erreur === 'pasPossedee' && equiper(p, 'cadre', 'maree.banniere').erreur === 'genre'
     && equiper(p, 'chapeau', 'sables.cadre').erreur === 'genre' && equiper(p, 'grade', 'rien').erreur === 'genre');
+  const sansRien = equiper(b, 'embleme', null).profil;
+  const apresCoffre = ouvrirCoffre(avecCoffre(sansRien, 'bois'), 0, aleaEcrit(0, 0, 0, 0, 0.5, 0)).profil;
+  check('« aucun autocollant » est un choix qu’on respecte : le suivant ne se pose pas tout seul', apresCoffre.pieces.length === sansRien.pieces.length + 1 && apresCoffre.blason.embleme === null);
+  check('porter une pièce compte comme une opération : c’est ce qui la fait recopier dans le rangement durable',
+    equiper(p, 'cadre', 'sables.cadre').profil.operations === (p.operations || 0) + 1 && equiper(p, 'cadre', 'sables.cadre').profil.journal.at(-1).op === 'blason');
   check('le blason ne change rien à une partie : il n’est dans aucun réglage de partie', !/blason|pieces/.test(fs.readFileSync(path.join(RACINE, 'js/game.js'), 'utf8')));
   // Le dessin.
   const embleme = htmlEmbleme('bassecour.roi-des-cochons');
@@ -272,7 +292,7 @@ console.log('\n--- Le calendrier ---');
   check('… avant la première, c’est encore la saison 1 ; un jour illisible n’a pas de saison', saisonDuJour('2026-09-30') === 1 && saisonDuJour('demain') === null && saisonDuJour('2026-13-01') === null);
   check('ce qu’il reste d’une saison, ce jour compris : 23 jours le 9 octobre, 1 le dernier jour, 29 le 1er février 2028',
     egal(['2026-10-09', '2026-10-31', '2026-12-31', '2028-02-01', '2027-02-01'].map(joursRestants), [23, 1, 1, 29, 28]) && joursRestants('hier') === null);
-  check('les thèmes se suivent, puis recommencent : Citrouilles, Tournoi, Citrouilles', egal([1, 2, 3, 4].map(themeDeSaison), ['citrouilles', 'tournoi', 'citrouilles', 'tournoi']));
+  check('les thèmes se suivent, puis recommencent : Citrouilles, Tournoi, Grand Froid, Citrouilles', egal([1, 2, 3, 4, 5].map(themeDeSaison), ['citrouilles', 'tournoi', 'froid', 'citrouilles', 'tournoi']));
 }
 
 // --- La route ----------------------------------------------------------------------------------------
@@ -293,7 +313,7 @@ console.log('\n--- La route ---');
     egal(rangs, [...Array(18).keys()]) && route[29].passe.embleme === 17 && DE_SAISON.every((c) => PIECES[c.emblemes[17]].rarete === 'epique'));
   check('le Passe : 500 Couronnes, dont 400 reviennent à qui finit la route', S.passe.prix === 500);
   check('toute récompense de la route existe, pour chaque saison, sur les deux voies',
-    [1, 2].every((n) => route.every((l, i) => ['gratuit', 'passe'].every((voie) => { const r = recompenseDePalier(n, voie, i + 1); return r && (r.genre !== 'piece' || PIECES[r.piece].collection === themeDeSaison(n)); }))));
+    [1, 2, 3].every((n) => route.every((l, i) => ['gratuit', 'passe'].every((voie) => { const r = recompenseDePalier(n, voie, i + 1); return r && (r.genre !== 'piece' || PIECES[r.piece].collection === themeDeSaison(n)); }))));
   check('… une récompense : un coffre, des Couronnes, des Éclats ou une pièce de la collection de la saison',
     egal(recompenseDePalier(1, 'gratuit', 2), { genre: 'coffre', coffre: 'bois' }) && egal(recompenseDePalier(1, 'gratuit', 3), { genre: 'piece', piece: 'citrouilles.citrouille-casquee' })
     && egal(recompenseDePalier(2, 'passe', 5), { genre: 'piece', piece: 'tournoi.banniere' }) && egal(recompenseDePalier(1, 'passe', 3), { genre: 'couronnes', couronnes: 100 })
@@ -371,6 +391,15 @@ console.log('\n--- D’une saison à l’autre ---');
   const loin = ouvrirLaSaison(p, '2027-03-15');
   check('trois mois d’absence : une seule remise, et l’on reprend à la saison du jour', loin.profil.saison === 6 && loin.profil.elo === 850 && loin.profil.saisons.length === 1 && parType(loin.evenements, 'remiseDeSaison').length === 1);
   check('une horloge qui recule ne ramène pas à la saison d’avant', ouvrirLaSaison(r.profil, '2026-10-15').profil.saison === 2 && ouvrirLaSaison(r.profil, 'n’importe quoi').evenements.length === 0);
+  const nouveau = appliquerResultat(profilNeuf(), partie('victoire', '2026-11-03'));
+  check('un joueur arrivé en novembre n’a pas de saison à finir : il rejoint la saison 2 sans annonce ni saison fantôme',
+    nouveau.profil.saison === 2 && nouveau.profil.saisons.length === 0 && !nouveau.evenements.some((e) => ['saison', 'remiseDeSaison', 'recompenseSaison'].includes(e.type))
+    && nouveau.profil.route.points === 80);
+  const arrive = ouvrirLaSaison(profilNeuf(), '2026-12-05');
+  check('… pareil à l’ouverture du jeu : la saison du jour, aucun événement', arrive.profil.saison === 3 && arrive.evenements.length === 0 && arrive.profil.journal.length === 0);
+  check('… mais qui a joué, même une seule partie, a bien une saison à clore', ouvrirLaSaison(nouveau.profil, '2026-12-05').evenements.some((e) => e.type === 'saison'));
+  check('au journal, la fin de saison garde son numéro d’opération et dit la saison finie',
+    (() => { const e = r.profil.journal.at(-1); return e.op === 'saison' && e.saison === 1 && e.numero === r.profil.operations; })());
   const jouee = appliquerResultat(p, partie('victoire', '2026-11-02'));
   check('une partie jouée le mois suivant ferme d’abord la saison, puis compte pour la nouvelle',
     jouee.profil.saison === 2 && jouee.profil.route.points === 80 && jouee.profil.elo === 880 && jouee.evenements.findIndex((e) => e.type === 'saison') < jouee.evenements.findIndex((e) => e.type === 'elo'));
@@ -383,8 +412,14 @@ console.log('\n--- D’une saison à l’autre ---');
     && egal(parType(haut.evenements, 'recompenseSaison')[0].cadeaux, ['citrouilles.etendard']));
   const legende = finDeSaison({ ...profilNeuf(), saison: 2, elo: 4100, ligue: 10, plusHauteLigue: 10 });
   check('finir en ligue 10, saison 2 : l’étendard du Tournoi et le grade « Roi de la joute »', ['tournoi.etendard', 'tournoi.champion'].every((id) => legende.profil.pieces.includes(id)) && PIECES['tournoi.champion'].nom === 'Roi de la joute');
-  const redite = finDeSaison({ ...haut.profil, saison: 3, elo: 3200, ligue: 9 });
-  check('la même collection, deux saisons plus tard : une pièce déjà gagnée devient des Éclats', parType(redite.evenements, 'piece').some((e) => e.piece === 'citrouilles.etendard' && e.doublon && e.eclats === C.eclats.doublon.epique)
+  // Un thème qui revient : la route dit d'avance ce qu'on a déjà.
+  const collectionneur = { ...enRoute(0), saison: 4, pieces: [...profilNeuf().pieces, ...collection('citrouilles').pieces] };
+  const revenue = etatDeLaSaison(collectionneur, '2027-01-05');
+  check('quand le thème d’une saison revient, chaque pièce déjà possédée est signalée sur la route, avec les Éclats qu’elle rendra',
+    revenue.theme === 'citrouilles' && revenue.route.every((l) => ['gratuit', 'passe'].every((v) => (l[v].recompense.genre === 'piece') === l[v].dejaLa && (l[v].dejaLa ? l[v].eclats > 0 : l[v].eclats === 0)))
+    && revenue.route.filter((l) => l.passe.dejaLa).length === 16 && etatDeLaSaison(enRoute(0), '2026-10-09').route.every((l) => !l.gratuit.dejaLa && !l.passe.dejaLa));
+  const redite = finDeSaison({ ...haut.profil, saison: 4, elo: 3200, ligue: 9 });
+  check('la même collection, trois saisons plus tard : une pièce déjà gagnée devient des Éclats', parType(redite.evenements, 'piece').some((e) => e.piece === 'citrouilles.etendard' && e.doublon && e.eclats === C.eclats.doublon.epique)
     && redite.profil.eclats === haut.profil.eclats + C.eclats.doublon.epique);
 }
 
@@ -443,7 +478,7 @@ console.log('\n--- Les écrans ---');
   check('acheter un autocollant : le premier toucher demande confirmation, rien n’est dépensé', new RegExp(`data-arg="${manquante}" data-i="1">Encore`).test(noeud.innerHTML) && lu().eclats === 400);
   toucher({ act: 'acheterPiece', arg: manquante, i: '1' });
   check('… le second l’achète : c’est le troisième de la collection, elle donne son grade, et l’écran le dit',
-    lu().pieces.includes(manquante) && lu().pieces.includes(`${col.id}.grade`) && lu().eclats < 400 && /dans ton album\. La collection te donne le titre « /.test(texte(noeud.innerHTML).replace(/ /g, ' ')));
+    lu().pieces.includes(manquante) && lu().pieces.includes(`${col.id}.grade`) && lu().eclats < 400 && /dans ton album\. La collection te donne le titre « /.test(texte(noeud.innerHTML).replace(/\u00a0/g, ' ')));
   toucher({ act: 'porter', arg: col.emblemes[1] });
   check('porter un autocollant depuis sa collection', lu().blason.embleme === col.emblemes[1] && /c’est sur ton blason/.test(texte(noeud.innerHTML)));
   poser({ ...lu(), eclats: 3 });
@@ -470,7 +505,7 @@ console.log('\n--- Les écrans ---');
     (page.match(/class="col-palier /g) || []).length === 30 && /class="col-case pris" data-voie="gratuit"/.test(page) && /data-act="palier" data-arg="gratuit" data-i="2"/.test(page)
     && (page.match(/class="col-case ferme" data-voie="passe"/g) || []).length === 30 && propre(page));
   check('… le Passe dit son prix, son équivalent en euros et ce qu’il contient — et ce qu’il ne contient pas',
-    /500 Couronnes, environ 5 €/.test(t.replace(/ /g, ' ')) && /12 autocollants, 4 pièces de blason/.test(t) && /400 Couronnes et 400 Éclats/.test(t) && /Ni coffre, ni fragment, ni niveau/.test(t));
+    /500 Couronnes, environ 5 €/.test(t.replace(/\u00a0/g, ' ')) && /12 autocollants, 4 pièces de blason/.test(t) && /400 Couronnes et 400 Éclats/.test(t) && /Ni coffre, ni fragment, ni niveau/.test(t));
   toucher({ act: 'palier', arg: 'gratuit', i: '2' });
   check('prendre un palier : la récompense arrive, l’écran la nomme', egal(lu().route.pris.gratuit, [1, 2]) && lu().coffres.length === 1 && /Tu reçois : un coffre de bois\./.test(texte(noeud.innerHTML)));
   toucher({ act: 'passe' });
@@ -489,7 +524,7 @@ console.log('\n--- Les écrans ---');
   ouvrirProgression('boutique');
   page = noeud.innerHTML; t = texte(page);
   check('la boutique : le Passe de la saison, trois autocollants du jour en Éclats, la collection à vendre en Couronnes',
-    /<b>Passe de saison<\/b>/.test(page) && (page.match(/data-act="acheterPiece"/g) || []).length === 3 && /data-ecran="collection" data-arg="cour">/.test(page) && /environ 3 €/.test(t.replace(/ /g, ' ')) && propre(page.replace(/\d,99/g, '')));
+    /<b>Passe de saison<\/b>/.test(page) && (page.match(/data-act="acheterPiece"/g) || []).length === 3 && /data-ecran="collection" data-arg="cour">/.test(page) && /environ 3 €/.test(t.replace(/\u00a0/g, ' ')) && propre(page.replace(/\d,99/g, '')));
   check('… les deux monnaies sont expliquées en une phrase', /Les Couronnes s’achètent\. Les Éclats se gagnent en jouant/.test(t));
   const duJour = page.match(/data-act="acheterPiece" data-arg="([\w.-]+)" data-i="s"/)[1];
   toucher({ act: 'acheterPiece', arg: duJour, i: 's' });
@@ -498,7 +533,7 @@ console.log('\n--- Les écrans ---');
   check('… acheté à moitié prix, et la boutique le dit', lu().pieces.includes(duJour) && lu().eclats === 400 - C.eclats.prix[PIECES[duJour].rarete] / 2 && /dans ton album/.test(texte(noeud.innerHTML)) && /<h2>Boutique<\/h2>/.test(noeud.innerHTML));
   ouvrirProgression('collection', 'cour');
   check('la collection de la boutique : tout son contenu sous les yeux avant l’achat, son prix, son équivalent en euros',
-    (noeud.innerHTML.match(/class="col-piece/g) || []).length === 9 && /13 pièces d’un coup, pour 300 Couronnes \(environ 3 €\)/.test(texte(noeud.innerHTML).replace(/ /g, ' ')) && /data-act="acheterCollection" data-arg="cour"/.test(noeud.innerHTML));
+    (noeud.innerHTML.match(/class="col-piece/g) || []).length === 9 && /13 pièces d’un coup, pour 300 Couronnes \(environ 3 €\)/.test(texte(noeud.innerHTML).replace(/\u00a0/g, ' ')) && /data-act="acheterCollection" data-arg="cour"/.test(noeud.innerHTML));
   toucher({ act: 'acheterCollection', arg: 'cour' });
   toucher({ act: 'acheterCollection', arg: 'cour', i: '1' });
   check('… deux touchers : toute la collection est à toi', lu().couronnes === 50 && collection('cour').pieces.every((id) => lu().pieces.includes(id)) && /toute la collection est à toi/.test(texte(noeud.innerHTML)));
@@ -511,14 +546,76 @@ console.log('\n--- Les écrans ---');
   ouvrirProgression('probas', 'or');
   check('les chances d’un coffre disent celles de son autocollant et ce que rend un doublon', /Autocollant — 1 tirage/.test(texte(noeud.innerHTML)) && /Un doublon rend/.test(texte(noeud.innerHTML)) && /50 %/.test(texte(noeud.innerHTML)));
   ouvrirProgression('ligues');
-  t = texte(noeud.innerHTML).replace(/ /g, ' ');
+  t = texte(noeud.innerHTML).replace(/\u00a0/g, ' ');
   check('la route des ligues nomme ses cadeaux : titre « Recrue », Bannière de Bronze, Cadre d’Or, 50 Couronnes',
     /titre « Recrue »/.test(t) && /Bannière de Bronze/.test(t) && /Cadre d’Or/.test(t) && /Cadre des Légendes/.test(t) && /50 Couronnes/.test(t));
   const promue = appliquerResultat({ ...profilNeuf(), elo: 60 }, partie('victoire', aujourdhui, { instant: Date.now() / 1000 }));
-  const fin = texte(htmlFinDePartie(promue.evenements, promue.profil)).replace(/ /g, ' ');
+  const fin = texte(htmlFinDePartie(promue.evenements, promue.profil)).replace(/\u00a0/g, ' ');
   check('fin de partie : le cadeau de la ligue et les points de saison', /Cadeau de ligue : titre « Recrue »/.test(fin) && /\+80 points de saison \(première victoire du jour\)/.test(fin), fin.slice(0, 200));
   const palier = appliquerResultat({ ...enRoute(90), saison }, partie('defaite', aujourdhui));
   check('… un palier atteint se propose aussitôt', /data-ecran="saison">palier 1 à prendre/.test(htmlFinDePartie(palier.evenements, palier.profil)));
+  check('… une épithète gagnée se dit comme un titre, pas comme un bout de phrase',
+    /Gagné : titre « … des Citrouilles »/.test(texte(htmlFinDePartie([{ type: 'piece', piece: 'citrouilles.epithete', origine: 'saison', doublon: false, eclats: 0 }], profilNeuf())).replace(/\u00a0/g, ' ')));
+
+  // Le français des phrases.
+  check('une pièce dans une phrase porte son article : la Bannière, le Cadre, l’Étendard',
+    egal(['bassecour.banniere', 'ligues.or', 'citrouilles.etendard', 'monstres.grade'].map((id) => pieceEnPhrase(id).replace(/\u00a0/g, ' ')),
+      ['la Bannière de la Basse-cour', 'le Cadre d’Or', 'l’Étendard de la Nuit', 'le titre « Dompteur »']));
+  poser({ ...avecPieces(profilNeuf(), 'ligues.bronze', 'ligues.or'), saison, blason: { ...BLASON_DE_DEPART, banniere: 'ligues.bronze', cadre: 'ligues.or' } });
+  ouvrirProgression('collection', 'ligues');
+  check('une bannière est « Portée », un cadre « Porté »', (noeud.innerHTML.match(/class="col-porte">Portée</g) || []).length === 1 && (noeud.innerHTML.match(/class="col-porte">Porté</g) || []).length === 1);
+  ouvrirProgression('saison');
+  check('« 0 point », pas « 0 points »', /Palier 0 sur 30 · 0 point sur 100/.test(texte(noeud.innerHTML)));
+  check('un autocollant est « Commun », pas « Commune »', (() => { ouvrirProgression('collection', col.id); return />Commun</.test(noeud.innerHTML) && !/>Commune</.test(noeud.innerHTML); })());
+
+  // Les autocollants du jour : la boutique dit combien il en reste.
+  poser({ ...profilNeuf(), saison, eclats: 2000 });
+  ouvrirProgression('boutique');
+  check('la boutique annonce la règle : trois par jour, et pas de remplaçant avant demain', /Trois autocollants qui te manquent : 3 par jour, à moitié prix, en Éclats\. Un autocollant acheté n’est pas remplacé avant demain\./.test(texte(noeud.innerHTML)));
+  for (let k = 0; k < 3; k++) {
+    const id = noeud.innerHTML.match(/data-act="acheterPiece" data-arg="([\w.-]+)" data-i="s"/)[1];
+    toucher({ act: 'acheterPiece', arg: id, i: 's' });
+    toucher({ act: 'acheterPiece', arg: id, i: 's1' });
+    if (k === 0) check('… un acheté : il en reste deux, et le texte le dit', (noeud.innerHTML.match(/data-act="acheterPiece"/g) || []).length === 2 && /Deux autocollants qui te manquent/.test(texte(noeud.innerHTML)));
+  }
+  check('… les trois achetés : plus de bouton, « d’autres demain »', !/data-act="acheterPiece"/.test(noeud.innerHTML) && /Tu as pris tes autocollants du jour\. D’autres demain/.test(texte(noeud.innerHTML)) && lu().pieces.length === 6);
+
+  // Un thème qui revient : l'écran de la saison dit ce qu'on a déjà, Passe compris.
+  poser({ ...profilNeuf(), saison, pieces: [...profilNeuf().pieces, ...theme.pieces] });
+  ouvrirProgression('saison');
+  page = noeud.innerHTML; t = texte(page);
+  check('une saison dont on a déjà la collection : chaque pièce de la route est dite « Déjà à toi », avec ses Éclats',
+    (page.match(/class="col-deja">Déjà à toi/g) || []).length === 22 && /tu as 16 de ces pièces\. Celles-là te rendront des Éclats à la place/.test(t) && propre(page));
+  poser({ ...profilNeuf(), saison });
+  ouvrirProgression('saison');
+  check('… et rien de tel quand la collection est neuve', !/Déjà à toi/.test(noeud.innerHTML) && !/déjà passée par ici/.test(noeud.innerHTML));
+
+  // Le mois a tourné pendant que le jeu dormait : la tuile, l'écran, et ce qu'il dit.
+  const VraieDate = Date;
+  const leDeux = new VraieDate(mois.getFullYear(), mois.getMonth() + 1, 2, 12).getTime();   // le 2 du mois suivant, à midi
+  globalThis.Date = class extends VraieDate { constructor(...a) { super(...(a.length ? a : [leDeux])); } static now() { return leDeux; } };
+  try {
+    const joue = { ...profilNeuf(), saison, parties: 40, victoires: 30, defaites: 10, elo: 2350, ligue: 8, plusHauteLigue: 8, promotions: [2, 3, 4, 5, 6, 7, 8],
+      couronnes: 600, route: { points: 250, passe: false, pris: { gratuit: [1], passe: [] } } };
+    check('le mois suivant, la tuile de la saison porte un « ! » pour qui a joué — pas pour un profil neuf',
+      /Saison <b class="prog-pastille">!<\/b>/.test(htmlBandeau(migrerProfil(joue))) && !/prog-pastille">!/.test(htmlBandeau(profilNeuf())));
+    poser(joue);
+    toucher({ act: 'passe', i: '1' });
+    check('l’écran resté ouvert pendant que le mois tournait : on n’achète pas le Passe d’une saison finie — la nouvelle s’ouvre d’abord',
+      lu().saison === saison + 1 && lu().route.passe === false && lu().couronnes === 600 && new RegExp(`<h2>Saison ${saison + 1}</h2>`).test(noeud.innerHTML));
+    poser(joue);
+    ouvrirProgression('saison');
+    const dit = texte(noeud.innerHTML).replace(/[\u00a0\u202f]/g, ' ');
+    check('ouvrir la saison le mois suivant : l’écran dit ce qu’elle donne ET ce qu’elle reprend au classement',
+      lu().saison === saison + 1 && lu().elo === 1550 && lu().ligue === 6 && /La saison passée est finie, une nouvelle commence\./.test(dit)
+      && /ton score repart de 1 550, en ligue d’Or\./.test(dit) && /Tu reçois : un coffre de bois, un coffre légendaire\./.test(dit), dit.slice(0, 320));
+    poser(profilNeuf());
+    ouvrirProgression('saison');
+    check('… un profil neuf, lui, arrive dans la saison du jour sans annonce, et le profil est rangé à la bonne saison',
+      lu().saison === saison + 1 && !/saison passée/.test(noeud.innerHTML) && lu().saisons.length === 0);
+  } finally {
+    globalThis.Date = VraieDate;
+  }
 }
 
 // --- La page -----------------------------------------------------------------------------------------

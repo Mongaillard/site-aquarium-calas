@@ -29,18 +29,24 @@ export const eclats = (n, taille = 14) => `<span class="prog-eclats">${iconeSVG(
 /** Ce que valent des Couronnes en euros, à peu près : le repère de la boutique (le premier lot). */
 function environ(couronnes) {
   const lot = R.boutique.lots[0];
-  return `environ ${Math.round(couronnes * lot.prixCentimes / lot.couronnes / 100)} €`;
+  return `environ ${Math.round(couronnes * lot.prixCentimes / lot.couronnes / 100)}\u00a0€`;
 }
 
 const SOURCES = { coffres: 'Dans les coffres', boutique: 'À la boutique', ligues: 'Par les ligues', saison: 'Route de saison' };
-const rarete = (p) => `<span class="prog-categorie" data-categorie="${p.rarete}">${R.nomsDesCategories[p.rarete]}</span>`;
-/** « le titre « Fermier » », « la Bannière de la Basse-cour » : une pièce dans une phrase. */
-function pieceEnPhrase(id) {
+/** La rareté d'un autocollant : « Commun », « Rare », « Épique ». */
+const rarete = (p) => `<span class="prog-categorie" data-categorie="${p.rarete}">${R.collections.raretes[p.rarete]}</span>`;
+/** « le titre « Fermier » », « la Bannière de la Basse-cour », « l'Étendard de la Nuit », « le Cadre d'Or » : une pièce dans une phrase. */
+export function pieceEnPhrase(id) {
   const p = PIECES[id];
-  if (p.genre === 'grade') return `le titre « ${p.nom} »`;
-  if (p.genre === 'epithete') return `le titre « … ${p.nom} »`;
-  if (p.genre === 'embleme') return `l’autocollant « ${p.nom} »`;
-  return p.nom;
+  if (p.genre === 'grade') return `le titre «\u00a0${p.nom}\u00a0»`;
+  if (p.genre === 'epithete') return `le titre «\u00a0…\u00a0${p.nom}\u00a0»`;
+  if (p.genre === 'embleme') return `l’autocollant «\u00a0${p.nom}\u00a0»`;
+  return `${/^[AEÉIOU]/.test(p.nom) ? 'l’' : p.genre === 'banniere' ? 'la ' : 'le '}${p.nom}`;
+}
+/** Une pièce derrière deux points (« Gagné : … ») : un mot de titre se dit « titre « … » », le reste par son nom. */
+export function pieceEnEtiquette(id) {
+  const p = PIECES[id];
+  return p.genre === 'grade' ? `titre «\u00a0${p.nom}\u00a0»` : p.genre === 'epithete' ? `titre «\u00a0…\u00a0${p.nom}\u00a0»` : p.nom;
 }
 
 // --- L'Album ---------------------------------------------------------------------
@@ -74,7 +80,7 @@ function ecranAlbum(profil) {
       ${htmlBlason(profil.blason, { sous: 'Toucher pour composer ton blason' })}
     </button>
     <p class="col-bourses">${eclats(profil.eclats, 18)} <span>${profil.eclats > 1 ? 'Éclats' : 'Éclat'}</span> · ${o.couronnes(profil.couronnes, 18)} <span>${profil.couronnes > 1 ? 'Couronnes' : 'Couronne'}</span></p>
-    <p class="subtitle">${o.pluriel(total.reunis, 'pièce')} sur ${total.toutes}. Chaque coffre contient un autocollant ; un doublon devient des Éclats, qui achètent ceux qui te manquent.</p>
+    <p class="subtitle">${o.pluriel(total.reunis, 'pièce')} sur ${total.toutes}. Chaque coffre contient au moins un autocollant ; un doublon devient des Éclats, qui achètent ceux qui te manquent.</p>
     <ul class="col-liste">${lignes}</ul>`);
 }
 
@@ -85,7 +91,7 @@ function piedDePiece(profil, id, confirmer) {
   const p = PIECES[id];
   if (possede(profil, id)) {
     const porte = profil.blason[p.genre] === id;
-    return porte ? '<span class="col-porte">Porté</span>' : `<button class="btn small" data-act="porter" data-arg="${id}">Porter</button>`;
+    return porte ? `<span class="col-porte">${p.genre === 'banniere' ? 'Portée' : 'Porté'}</span>` : `<button class="btn small" data-act="porter" data-arg="${id}">Porter</button>`;
   }
   const prix = prixDePiece(profil, id, o.jour());
   if (prix === null) return `<span class="col-verrou">${iconeSVG('cadenas', 12, 'inline')}</span>`;
@@ -134,7 +140,7 @@ function ecranCollection(id, profil, message = '', { confirmer = '' } = {}) {
       return `<li class="${a.reunis >= seuil ? 'atteint' : ''}"><span class="col-seuil">${seuil}</span>
         <span class="col-palier-pieces">${pieces.map((x) => `<span class="col-lot">${htmlPiece(x, { manque: cache(x) })}<small>${legende(x)}</small>${possede(profil, x) ? piedDePiece(profil, x) : ''}</span>`).join('')}</span></li>`;
     }).join('')}</ul>
-      <p class="hint">Un autocollant commun vaut ${R.collections.eclats.prix.commune} Éclats, un rare ${R.collections.eclats.prix.rare}, un épique ${R.collections.eclats.prix.epique}. Ceux de la sélection du jour, à la boutique, sont à moitié prix.</p>`;
+      <p class="hint">Un autocollant commun vaut ${R.collections.eclats.prix.commune} Éclats, un rare ${R.collections.eclats.prix.rare}, un épique ${R.collections.eclats.prix.epique}. Les ${R.collections.eclats.selection.nombre} autocollants du jour, à la boutique, sont à moitié prix.</p>`;
   } else {
     if (c.source === 'boutique') {
       const lot = catalogueBoutique(profil, o.heure(), o.jour()).collections.find((x) => x.collection === c.id);
@@ -142,10 +148,10 @@ function ecranCollection(id, profil, message = '', { confirmer = '' } = {}) {
       if (lot && lot.manquantes.length) chapeau += `</p><div class="modal-actions">${boutonDeLot(lot, profil.couronnes, confirmer)}</div><p class="col-vide">`;
     } else if (c.source === 'saison') {
       chapeau = c.id === saison.theme ? `La collection de la saison ${saison.numero} : elle se gagne palier après palier, sur la route de la saison.`
-        : 'La collection d’une saison passée.';
+        : 'La collection d’une autre saison.';
       if (c.id === saison.theme) chapeau += `</p><div class="modal-actions"><button class="btn primary" data-ecran="saison">${iconeSVG('saison', 16, 'inline')} Voir la route</button></div><p class="col-vide">`;
     } else {
-      chapeau = 'Les cadeaux des ligues : un à chaque promotion.';
+      chapeau = 'Les cadeaux des ligues : ils arrivent à chaque promotion.';
     }
     suite = autres.length ? `<h3>${c.emblemes.length ? 'Et avec elle' : 'Ses pièces'}</h3><ul class="col-autres">${autres.map((x) => `
       <li class="col-lot ${possede(profil, x) ? '' : 'manque'}">${htmlPiece(x, { manque: cache(x) })}<small>${legende(x)}</small>${piedDePiece(profil, x, confirmer)}</li>`).join('')}</ul>` : '';
@@ -184,8 +190,8 @@ function ecranBlason(profil, message = '') {
 
 // --- La saison -----------------------------------------------------------------------
 
-/** Une récompense de la route, en petit : l'image, et ce que c'est. */
-function htmlRecompense(r) {
+/** Une récompense de la route, en petit : l'image, et ce que c'est. `deja` : les Éclats qu'elle rendra si on a déjà la pièce. */
+function htmlRecompense(r, deja = 0) {
   if (!r) return '';
   if (r.genre === 'coffre') return `<span class="col-recompense">${o.coffre(r.coffre, 'ferme', 40)}<small>${R.coffres[r.coffre].nom}</small></span>`;
   if (r.genre === 'couronnes') return `<span class="col-recompense"><span class="col-monnaie">${iconeSVG('couronne', 24)}</span><small>${o.nombre(r.couronnes)} Couronnes</small></span>`;
@@ -193,7 +199,7 @@ function htmlRecompense(r) {
   const p = PIECES[r.piece];
   // (Un cadre ou une bannière portent leur genre dans leur nom ; un mot de titre, non.)
   const nom = p.genre === 'grade' ? `Titre : ${p.nom}` : p.genre === 'epithete' ? `Titre : … ${p.nom}` : p.nom;
-  return `<span class="col-recompense">${htmlPiece(r.piece)}<small>${nom}</small></span>`;
+  return `<span class="col-recompense">${htmlPiece(r.piece)}<small>${nom}</small>${deja ? `<small class="col-deja">Déjà à toi : ${eclats(deja)}</small>` : ''}</span>`;
 }
 
 /** Ce que contient la voie du Passe, compté sur la route : « 12 autocollants, la bannière… ». */
@@ -215,7 +221,7 @@ function celluleDePalier(voie, palier, c) {
   else if (c.etat === 'aPrendre') pied = `<button class="btn small primary prog-attend" data-act="palier" data-arg="${voie}" data-i="${palier}">Prendre</button>`;
   else if (c.etat === 'ferme') pied = `<span class="col-verrou">${iconeSVG('cadenas', 12, 'inline')}</span>`;
   else pied = '';
-  return `<span class="col-case ${c.etat}" data-voie="${voie}">${htmlRecompense(c.recompense)}${pied}</span>`;
+  return `<span class="col-case ${c.etat}" data-voie="${voie}">${htmlRecompense(c.recompense, c.dejaLa ? c.eclats : 0)}${pied}</span>`;
 }
 
 function ecranSaison(profil, message = '', { confirmer = false } = {}) {
@@ -228,6 +234,9 @@ function ecranSaison(profil, message = '', { confirmer = false } = {}) {
       ${celluleDePalier('passe', l.palier, l.passe)}
     </li>`).join('');
   const p = R.saisons.points;
+  // (Un thème qui revient : ce que le Passe donnerait de pièces déjà possédées, et ce qu'elles rendraient.)
+  const doublons = s.route.filter((l) => l.passe.dejaLa);
+  const dejaLa = doublons.length, eclatsRendus = doublons.reduce((somme, l) => somme + l.passe.eclats, 0);
   let passe;
   if (s.passe) {
     passe = '<p class="col-passe pris"><b>Passe de saison : à toi.</b> Les deux voies sont ouvertes.</p>';
@@ -239,7 +248,8 @@ function ecranSaison(profil, message = '', { confirmer = false } = {}) {
         : `<button class="btn primary" data-act="passe">${o.couronnes(s.prixDuPasse)}</button>`;
     passe = `
       <div class="col-passe">
-        <p><b>Le Passe de saison</b> ouvre la voie de droite : ${contenuDuPasse()}. Ni coffre, ni fragment, ni niveau : rien que de l’apparence.</p>
+        <p><b>Le Passe de saison</b> ouvre la voie de droite : ${contenuDuPasse()}. Ni coffre, ni fragment, ni niveau.</p>
+        ${dejaLa ? `<p class="col-deja-passe">Cette collection est déjà passée par ici : tu as ${dejaLa} de ces pièces. Celles-là te rendront des Éclats à la place (${eclats(eclatsRendus)} en tout).</p>` : ''}
         <div class="modal-actions">${bouton}</div>
         <p class="hint">${o.nombre(s.prixDuPasse)} Couronnes, ${environ(s.prixDuPasse)}. Acheté en cours de saison, il donne aussi les paliers déjà atteints.</p>
       </div>`;
@@ -251,7 +261,7 @@ function ecranSaison(profil, message = '', { confirmer = false } = {}) {
     </div>
     <div class="prog-cout">
       <span class="prog-barre"><span style="width:${s.palier >= s.paliers ? 100 : Math.round(s.versLeSuivant / s.parPalier * 100)}%"></span></span>
-      <small>Palier ${s.palier} sur ${s.paliers}${s.palier >= s.paliers ? ' : la route est finie' : ` · ${s.versLeSuivant} points sur ${s.parPalier} vers le suivant`}</small>
+      <small>Palier ${s.palier} sur ${s.paliers}${s.palier >= s.paliers ? ' : la route est finie' : ` · ${o.pluriel(s.versLeSuivant, 'point')} sur ${s.parPalier} vers le suivant`}</small>
     </div>
     ${message ? `<p class="prog-annonce">${message}</p>` : ''}
     <p class="subtitle">Une partie classée : ${p.partie} points. Une victoire : ${p.victoire} de plus. La première victoire du jour : encore ${p.premiereVictoireDuJour}.</p>
@@ -324,6 +334,15 @@ export function htmlPiecesDuCoffre(resultat, delai) {
   return lignes.join('');
 }
 
+/** Ce que la boutique dit des autocollants du jour : combien il en reste, ou pourquoi il n'y en a plus. */
+function texteDeLaSelection(c) {
+  const n = c.selection.length, max = R.collections.eclats.selection.nombre;
+  const regle = `${max} par jour, à moitié prix, en Éclats`;
+  if (n === 0) return c.selectionPrise ? `Tu as pris tes autocollants du jour. D’autres demain : ${regle}.` : 'Il ne te manque aucun autocollant des coffres.';
+  const debut = n === 1 ? 'Un autocollant qui te manque' : `${['', '', 'Deux', 'Trois'][n] || n} autocollants qui te manquent`;
+  return `${debut} : ${regle}. Un autocollant acheté n’est pas remplacé avant demain.`;
+}
+
 /** À la boutique : le Passe, la sélection du jour (en Éclats), les collections vendues entières (en Couronnes). */
 export function htmlRayonDesCollections(profil, c, confirmer) {
   const saison = etatDeLaSaison(profil, o.jour());
@@ -335,7 +354,7 @@ export function htmlRayonDesCollections(profil, c, confirmer) {
         <span class="prog-vignette col-vignette">${htmlEmbleme(theme.emblemes[theme.emblemes.length - 1])}</span>
         <span class="prog-offre-texte">
           <b>Passe de saison</b>
-          <small>${c.passe.pris ? 'Les deux voies sont ouvertes.' : `${o.nombre(c.passe.prix)} Couronnes, ${environ(c.passe.prix)} · rien que de l’apparence`}</small>
+          <small>${c.passe.pris ? 'Les deux voies sont ouvertes.' : `${o.nombre(c.passe.prix)} Couronnes, ${environ(c.passe.prix)} · ni coffre, ni fragment, ni niveau`}</small>
         </span>
         <button class="btn small ${c.passe.pris ? '' : 'primary'}" data-ecran="saison">${c.passe.pris ? 'La route' : 'Voir'}</button>
       </li>
@@ -374,7 +393,7 @@ export function htmlRayonDesCollections(profil, c, confirmer) {
   return `
     ${passe}
     <h3>Autocollants du jour</h3>
-    <p class="subtitle">${selection ? 'Trois autocollants qui te manquent, à moitié prix, en Éclats. Ils changent chaque jour.' : 'Il ne te manque aucun autocollant des coffres.'}</p>
+    <p class="subtitle">${texteDeLaSelection(c)}</p>
     ${selection ? `<ul class="prog-articles">${selection}</ul>` : ''}
     ${lots ? `<h3>Collections</h3><p class="subtitle">Une collection entière d’un coup. Tout son contenu est affiché : rien n’y est tiré au sort.</p><ul class="prog-articles">${lots}</ul>` : ''}`;
 }
@@ -387,12 +406,26 @@ export const ECRANS_DES_COLLECTIONS = {
   collection: (p, arg) => ecranCollection(arg, p),
   blason: (p) => ecranBlason(p),
   // (L'écran de la saison met d'abord le profil à la saison du jour.)
-  saison: (p) => {
-    const r = ouvrirLaSaison(p, o.jour());
-    if (r.evenements.length) o.retenir(r.profil);
-    ecranSaison(r.profil, r.evenements.length ? `Une nouvelle saison commence. ${resumeDesGains(r.evenements) ? `Tu reçois : ${resumeDesGains(r.evenements)}.` : ''}` : '');
-  },
+  saison: (p) => ecranSaison(...aLaSaisonDuJour(p)),
 };
+
+/**
+ * Met le profil à la saison du jour, le range s'il a changé, et rend
+ * `[profil, message]` : le message dit ce que la fin de la saison passée a
+ * donné, et ce qu'elle a repris au classement. Sans message quand rien n'a été clos.
+ */
+function aLaSaisonDuJour(profil) {
+  const r = ouvrirLaSaison(profil, o.jour());
+  if (r.profil.saison !== profil.saison) o.retenir(r.profil);
+  if (!r.evenements.length) return [r.profil, ''];
+  const remise = r.evenements.find((e) => e.type === 'remiseDeSaison');
+  const chute = r.evenements.filter((e) => e.type === 'retrogradation').pop();
+  const gains = resumeDesGains(r.evenements);
+  const phrases = ['La saison passée est finie, une nouvelle commence.'];
+  if (remise && remise.variation < 0) phrases.push(`Au-dessus de ${o.nombre(R.saison.pivot)} points, le classement se resserre : ton score repart de ${o.nombre(remise.apres)}${chute ? `, en ${o.ligueEnPhrase(chute.a)}` : ''}.`);
+  if (gains) phrases.push(`Tu reçois : ${gains}.`);
+  return [r.profil, phrases.join(' ')];
+}
 
 const REFUS = 'Sauvegarde impossible sur cet appareil : ce ne sera pas retenu.';
 
@@ -441,6 +474,11 @@ export function agirSurLesCollections(act, arg, i, profil, revenir) {
     const ok = o.retenir(r.profil);
     ecranCollection(arg, r.profil, ok ? `${c.nom} : toute la collection est à toi.` : REFUS);
     return true;
+  }
+  if (act === 'palier' || act === 'toutPrendre' || act === 'passe') {
+    // (L'écran est resté ouvert pendant que le mois tournait : on ouvre d'abord la nouvelle saison, sans rien prendre ni vendre.)
+    const [aJour, message] = aLaSaisonDuJour(profil);
+    if (aJour.saison !== profil.saison) { ecranSaison(aJour, message); return true; }
   }
   if (act === 'palier' || act === 'toutPrendre') {
     const r = act === 'palier' ? prendrePalier(profil, arg, Number(i)) : prendreTout(profil);

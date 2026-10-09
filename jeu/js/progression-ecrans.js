@@ -12,7 +12,7 @@
 
 import { PROGRESSION as R } from './progression-config.js';
 import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour } from './progression.js';
-import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai, saisonDuJour } from './progression.js';
+import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai, ouvrirLaSaison } from './progression.js';
 import { lireProgression, ecrireProgression } from './save.js';
 import { UNIT_TYPES, DEFAULT_CIV, GAME_MODES, nomDe, portraitDe } from './config.js';
 import { iconeSVG } from './icones.js';
@@ -21,7 +21,7 @@ import { PIECES } from './collections-config.js';
 import { htmlPiece, htmlMedaillon, titreDuBlason } from './blason.js';
 import {
   brancherCollections, ECRANS_DES_COLLECTIONS, agirSurLesCollections, eclats, htmlJoueur, htmlBourses,
-  aPrendreDansLaSaison, htmlPiecesDuCoffre, htmlRayonDesCollections,
+  aPrendreDansLaSaison, htmlPiecesDuCoffre, htmlRayonDesCollections, pieceEnEtiquette, resumeDesGains,
 } from './collections-ecrans.js';
 
 /** Les troupes que le jeu sait former, dans l'ordre des réglages. */
@@ -91,8 +91,9 @@ export function htmlBandeau(profil) {
   const coffres = profil.coffres.length, prets = ameliorables(profil).length;
   // (La pastille de la boutique : une offre qui se paie en Couronnes court en ce moment.)
   const offres = catalogueBoutique(profil, heure(), jourLocal()).offres.filter((o) => o.id === 'ligue').length;
-  // (La pastille de la saison : des paliers à prendre — ou « ! » quand le mois a tourné : une nouvelle saison attend d'être ouverte.)
-  const paliers = saisonDuJour(jourLocal()) > profil.saison ? '!' : aPrendreDansLaSaison(profil);
+  // (La pastille de la saison : des paliers à prendre — ou « ! » quand le mois a tourné et qu'une saison jouée
+  // attend d'être close. Un profil qui n'a jamais joué n'a rien à clore : pas de pastille pour lui.)
+  const paliers = ouvrirLaSaison(profil, jourLocal()).evenements.length ? '!' : aPrendreDansLaSaison(profil);
   const tuile = (ecran, icone, nom, n) => `<button class="btn small ${n ? 'prog-attend' : ''}" data-ecran="${ecran}">${iconeSVG(icone, 16, 'inline')} ${nom}${n ? ` <b class="prog-pastille">${n}</b>` : ''}</button>`;
   return `
     <div class="prog-carte-joueur">
@@ -274,7 +275,7 @@ function ecranOuverture(resultat, profil) {
         <b>${t.troupe ? nomTroupe(t.troupe) : 'Éclats'}</b>
         <small><span class="prog-categorie" data-categorie="${t.categorie || t.tiree}">${R.nomsDesCategories[t.categorie || t.tiree] || ''}</span>${t.genre === 'garanti' ? ' · garanti' : ''}</small>
       </span>
-      <span class="prog-gain">+${t.fragments ? pluriel(t.fragments, 'fragment') : pluriel(t.eclats, 'éclat')}</span>
+      <span class="prog-gain">+${t.fragments ? pluriel(t.fragments, 'fragment') : pluriel(t.eclats, 'Éclat')}</span>
     </li>`).join('');
   const prets = resultat.evenements.filter((e) => e.type === 'ameliorationPossible');
   // Le coffre s'ouvre en trois images, l'une après l'autre (jamais de fondu) ; ses tirages paraissent ensuite.
@@ -494,7 +495,7 @@ function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
       </li>` : ''}
     </ul>
     <h3>Couronnes</h3>
-    <p class="subtitle">${c.lots.some((l) => l.disponible) ? 'Les Couronnes servent ici, et seulement ici.' : 'L’achat de Couronnes arrivera avec l’application. D’ici là, elles se gagnent : 50 à chaque nouvelle ligue.'}</p>
+    <p class="subtitle">${c.lots.some((l) => l.disponible) ? 'Les Couronnes servent ici, et seulement ici.' : `L’achat de Couronnes arrivera avec l’application. D’ici là, elles se gagnent : ${R.boutique.parLigue} à chaque nouvelle ligue, et sur la route de la saison.`}</p>
     <ul class="prog-articles">${lots}</ul>
     ${c.essai ? `
     <div class="modal-actions">
@@ -585,7 +586,7 @@ export function jourLocal(date = new Date()) {
   return `${date.getFullYear()}-${deux(date.getMonth() + 1)}-${deux(date.getDate())}`;
 }
 
-brancherCollections({ montrer, retenir, nombre, pluriel, couronnes, euros, coffre, heure, jour: () => jourLocal() });
+brancherCollections({ montrer, retenir, nombre, pluriel, couronnes, euros, coffre, heure, ligueEnPhrase, jour: () => jourLocal() });
 
 /** Le peuple dont les écrans montrent les noms et les portraits. */
 export function reglerPeuple(nouveau) { civ = nouveau || DEFAULT_CIV; }
@@ -633,9 +634,15 @@ export function htmlFinDePartie(evenements, profil) {
   for (const e of de('ouvrierAuPlafond')) lignes.push(`<p>${nomTroupe(e.troupe)} monte au niveau ${e.a}, comme la ligue.</p>`);
   for (const e of de('couronnes')) if (e.variation > 0 && e.origine === 'ligue') lignes.push(`<p class="prog-fin-couronnes">+${couronnes(e.variation)} Couronnes pour ta nouvelle ligue.</p>`);
   for (const e of de('piece')) {
-    if (e.doublon) continue;
-    const p = PIECES[e.piece];
-    lignes.push(`<p class="prog-fin-piece">${htmlPiece(e.piece)} <span>${e.origine === 'ligue' ? 'Cadeau de ligue' : 'Gagné'} : <b>${p.genre === 'grade' ? `titre «\u00a0${p.nom}\u00a0»` : p.nom}</b></span></p>`);
+    // (Les pièces des paliers de la saison passée sont dites plus bas, avec le reste de ce qu'elle donne.)
+    if (e.doublon || e.origine === 'route') continue;
+    lignes.push(`<p class="prog-fin-piece">${htmlPiece(e.piece)} <span>${e.origine === 'ligue' ? 'Cadeau de ligue' : 'Gagné'} : <b>${pieceEnEtiquette(e.piece)}</b></span></p>`);
+  }
+  // Le mois a tourné : ce que la saison passée devait encore (ses paliers atteints, sa récompense de ligue).
+  if (de('saison').length) {
+    const fin = evenements.findIndex((e) => e.type === 'saison');
+    const gains = resumeDesGains(evenements.slice(0, fin).filter((e) => e.type !== 'coffre' && (e.type !== 'piece' || e.origine === 'route')));
+    if (gains) lignes.push(`<p class="prog-fin-saison">La saison passée te donne encore : ${gains}.</p>`);
   }
   for (const e of de('remiseDeSaison')) {
     lignes.push(`<p class="prog-fin-saison">La saison est finie${e.variation < 0 ? ` : au-dessus de ${nombre(R.saison.pivot)}, le score se resserre, et le tien repart de ${nombre(e.apres)}` : ''}.</p>`);

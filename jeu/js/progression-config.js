@@ -392,7 +392,8 @@ export const PROGRESSION = figer({
   //  eclats.doublon   : ce que devient un autocollant déjà possédé
   //  eclats.prix      : un autocollant choisi, dans une collection des coffres
   //  eclats.selection : chaque jour, `nombre` autocollants qui manquent au
-  //                     joueur sont proposés à `part` pour-cent de leur prix
+  //                     joueur sont proposés à `part` pour-cent de leur prix ;
+  //                     un autocollant acheté n'est pas remplacé avant le lendemain
   //  tirages   : les autocollants d'un coffre — `nombre` tirages dans la
   //              `table` (pour-mille, total 1000), puis un autocollant de
   //              cette rareté à chances égales parmi ceux des collections
@@ -402,7 +403,10 @@ export const PROGRESSION = figer({
   //              donne chacune de ses autres pièces (elle en a neuf)
   //  lots      : les collections vendues entières à la boutique, en Couronnes.
   //              Leur contenu est affiché pièce par pièce avant l'achat.
+  //  raretes   : le nom d'une rareté pour un autocollant (« commun », là où une
+  //              troupe est « commune »)
   collections: {
+    raretes: { commune: 'Commun', rare: 'Rare', epique: 'Épique' },
     eclats: {
       parCoffre: { bois: 5, argent: 10, or: 20, legendaire: 50 },
       doublon: { commune: 5, rare: 15, epique: 50 },
@@ -442,7 +446,7 @@ export const PROGRESSION = figer({
   // coffres revient à vendre des coffres. Les essais le vérifient.
   saisons: {
     premiere: '2026-10',
-    themes: ['citrouilles', 'tournoi'],
+    themes: ['citrouilles', 'tournoi', 'froid'],
     paliers: 30,
     pointsParPalier: 100,
     points: { partie: 20, victoire: 20, premiereVictoireDuJour: 40 },

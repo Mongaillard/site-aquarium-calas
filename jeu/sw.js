@@ -142,6 +142,8 @@ const ASSETS = [
   './assets/collections/citrouilles2.webp',
   './assets/collections/tournoi.webp',
   './assets/collections/tournoi2.webp',
+  './assets/collections/froid.webp',
+  './assets/collections/froid2.webp',
   './assets/sons/clic-1.mp4',
   './assets/sons/clic-2.mp4',
   './assets/sons/selection-1.mp4',

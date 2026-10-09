@@ -41,6 +41,7 @@ const ENCRE = '#17120e', PAPIER = '#fff4dc', BLANC = '#fffaf0', SABLE = '#ffe9b8
 const JAUNE = '#ffc93c', ROUGE = '#f0562d', BLEU = '#3aa0e8', MARINE = '#173a7a';
 const PRE = '#7cc45a', ROSE = '#f29aa6', CYAN = '#5fd3e6', BOIS = '#d98b45', FER = '#9aa3ad';
 const VIOLET = '#7a4fc4', JADE = '#3fbf7f', CITROUILLE = '#ff8a1f', NUIT = '#3b2a66', BRONZE = '#c9803a', CUIVRE = '#e2725b';
+const GLACE = '#bfe6f5';
 
 const DEFINITIONS = [
   {
@@ -255,6 +256,34 @@ const DEFINITIONS = [
     cadre: { forme: 'creneaux', dents: 12, couleur: BLEU, fond: BLANC },
     etendard: { nom: 'Étendard du Tournoi', fond: MARINE, trait: JAUNE, motif: 'bandes' },
     champion: 'Roi de la joute',
+  },
+  {
+    id: 'froid', nom: 'Le Grand Froid', source: 'saison', planches: ['froid', 'froid2'],
+    emblemes: [
+      ['bonhomme-de-garde', 'Bonhomme de garde', C],
+      ['manchot-glisseur', 'Manchot glisseur', C],
+      ['villageois-emmitoufle', 'Villageois emmitouflé', C],
+      ['chocolat-chaud', 'Chocolat chaud', C],
+      ['luge-de-combat', 'Luge de combat', C],
+      ['moufles-geantes', 'Moufles géantes', C],
+      ['sapin-de-caserne', 'Sapin de caserne', R],
+      ['dromadaire-frileux', 'Dromadaire frileux', R],
+      ['triton-patineur', 'Triton patineur', R],
+      ['ours-calin', 'Ours câlin', R],
+      ['sphinx-en-glacon', 'Sphinx en glaçon', R],
+      ['yeti-timide', 'Yéti timide', R],
+      ['renne-eclaireur', 'Renne éclaireur', R],
+      ['igloo-fortifie', 'Igloo fortifié', R],
+      ['treve-du-feu', 'La Trêve du feu', R],
+      ['hydre-enrhumee', 'L’Hydre enrhumée', E],
+      ['roi-des-neiges', 'Le Roi des Neiges', E],
+      ['grand-traineau', 'Le Grand Traîneau', E],
+    ],
+    grade: 'Frileux', epithete: 'du Grand Froid',
+    banniere: { fond: GLACE, trait: BLANC, motif: 'pois' },
+    cadre: { forme: 'pointes', dents: 8, couleur: BLANC, fond: GLACE },
+    etendard: { nom: 'Étendard du Grand Froid', fond: MARINE, trait: BLANC, motif: 'etoiles' },
+    champion: 'Maître des neiges',
   },
 ];
 

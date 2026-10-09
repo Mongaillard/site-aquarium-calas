@@ -333,6 +333,9 @@
 #progression .col-case.aPrendre .btn.primary { background: var(--b-blanc); }
 #progression .col-recompense { display: grid; justify-items: center; gap: 2px; }
 #progression .col-recompense small { font-size: 12px; font-weight: 800; line-height: 1.15; }
+/* (Une pièce qu'on a déjà : la route dit d'avance les Éclats qu'elle rendra.) */
+#progression .col-recompense .col-deja { color: var(--b-gris); }
+#progression .col-deja-passe { margin-top: 6px; font-weight: 800; }
 #progression .col-recompense .piece-embleme { width: 54px; }
 #progression .col-recompense .piece-vignette:not(.piece-mot):not(.piece-fanion) { width: 48px; height: 48px; }
 #progression .col-recompense .piece-mot { max-width: 100%; height: 36px; overflow: hidden; font-size: 12px; }

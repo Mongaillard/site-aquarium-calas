@@ -809,7 +809,7 @@ Basse-cour, La Grande Marée, Les Sables, Le Chantier, Les Gaffes de guerre, Les
 Monstres, Le Banquet, La Cour, et une par saison. Chacune a neuf
 **autocollants** dessinés (cinq communs, trois rares, un épique ; dix-huit pour
 une saison), et à ses couleurs un **grade**, une **épithète**, une **bannière**
-et un **cadre**. 165 pièces en tout. Ce qu'on porte fait le **blason** : le
+et un **cadre**. 189 pièces en tout. Ce qu'on porte fait le **blason** : le
 cadre, l'autocollant posé dessus, la bannière en fond, et un titre en deux mots
 qui se mélangent d'une collection à l'autre (« Dompteur du Banquet »). Le
 blason se voit à l'accueil et à la fin d'une partie classée ; il ne change rien
@@ -819,13 +819,14 @@ au combat (aucune pièce n'entre dans `js/game.js`).
 |---|---|
 | Les coffres | Chaque coffre contient un autocollant (deux pour un légendaire), tiré dans les sept collections « coffres » : bois 90 % commun / 10 % rare ; argent 75 / 22 / 3 ; or 50 / 40 / 10 ; légendaire 60 % rare / 40 % épique. Affiché avec les chances du coffre. |
 | Une collection qui avance | 3 autocollants : son grade ; 6 : sa bannière ; 9 : son cadre et son épithète |
-| Les Éclats | Un autocollant choisi qui manque : 30, 100 ou 300 selon sa rareté ; les trois « autocollants du jour » de la boutique sont à moitié prix |
+| Les Éclats | Un autocollant choisi qui manque : 30, 100 ou 300 selon sa rareté ; les « autocollants du jour » de la boutique sont à moitié prix — trois par jour, pas un de plus : un autocollant acheté n'est pas remplacé avant le lendemain |
 | Les ligues | Chaque promotion donne une pièce de la collection « Les Ligues » : titres Recrue, Capitaine, Stratège, Empereur, Légende ; bannières de Bronze et de Fer ; cadres d'Or, d'Orichalque et des Légendes |
 | La boutique | La Cour, vendue entière : ses treize pièces pour 300 Couronnes, contenu affiché avant l'achat |
 | La saison | Sa route, ci-dessous |
 
 **Une saison par mois de calendrier** (`saisons`, `js/progression-config.js` ;
-la saison 1 est octobre 2026). Une partie classée comptée rapporte 20 points,
+la saison 1 est octobre 2026 : La Nuit des Citrouilles, puis Le Grand Tournoi
+en novembre et Le Grand Froid en décembre). Une partie classée comptée rapporte 20 points,
 une victoire 20 de plus, la première victoire du jour encore 40 ; tous les 100
 points, un palier s'ouvre, trente en tout, sur deux voies. La **voie gratuite**
 donne 8 coffres, 150 Couronnes, 6 autocollants de la saison et des Éclats. La
@@ -844,7 +845,10 @@ la saison en ligue 9, son grade de champion en ligue 10), puis ce qui dépasse
 750 points de classement est réduit de moitié. À deux parties par jour et une
 victoire sur deux, un joueur monte ainsi jusqu'aux ligues 6 ou 7 et y oscille.
 Les thèmes se suivent dans l'ordre de `saisons.themes` puis recommencent ; une
-pièce déjà gagnée devient alors des Éclats.
+pièce déjà gagnée devient alors des Éclats, et la route le dit d'avance, palier
+par palier et sur la fiche du Passe. Un profil qui n'a encore rien joué
+rejoint la saison du jour sans rien clore : qui arrive en décembre n'a pas
+« fini » octobre.
 
 Tout est fonction pure du profil dans `js/progression.js` (`ouvrirCoffre`,
 `avancementDe`, `equiper`, `titreDe`, `prixDePiece`, `acheterPiece`,

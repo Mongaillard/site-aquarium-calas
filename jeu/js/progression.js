@@ -155,6 +155,8 @@ function semaineDe(jour) {
  *                     manquer (null), `cadre`, `banniere` et `grade` jamais
  *   route           : la route de la saison en cours — ses `points`, le Passe
  *                     (`passe`), les paliers déjà pris sur chaque voie (`pris`)
+ *   selection       : les autocollants du jour déjà achetés à prix réduit — le
+ *                     `jour` où on les a pris, et combien (`achats`)
  *   boutique        : ses offres en cours — `offreLigue` (une troupe à prix
  *                     réduit jusqu'à une heure, en secondes), `bienvenueJusqua`
  *                     (fin de l'offre de bienvenue ; 0 tant qu'elle n'est pas
@@ -192,6 +194,7 @@ export function profilNeuf() {
     pieces: [...PIECES_DE_DEPART],
     blason: { ...BLASON_DE_DEPART },
     route: routeNeuve(),
+    selection: { jour: '', achats: 0 },
     saison: 1,
     saisons: [],
     jour: { date: '', parties: 0, abandonsPrecoces: 0, victoires: 0 },
@@ -278,6 +281,9 @@ function lireProfil(o) {
         if (pris.includes(palier)) p.route.pris[voie].push(palier);
       }
     }
+  }
+  if (estObjet(o.selection) && rangDuJour(o.selection.jour) !== null) {
+    p.selection = { jour: o.selection.jour, achats: entier(o.selection.achats, 0, R.collections.eclats.selection.nombre, 0) };
   }
   p.saison = entier(o.saison, 1, GRAND, 1);
   if (Array.isArray(o.saisons)) {
@@ -405,6 +411,7 @@ function debloquerGratuites(p, evenements) {
     const origine = p.plusHauteLigue >= ligue ? 'ligue' : p.parties - p.abandonsPrecoces >= parties ? 'parties' : null;
     if (!origine) continue;
     p.debloquees[type] = origine;
+    if (p.boutique.offreLigue && p.boutique.offreLigue.troupe === type) p.boutique.offreLigue = null;
     evenements.push({ type: 'troupeDebloquee', troupe: type, origine });
   }
 }
@@ -652,7 +659,7 @@ function clore(p, evenements, suivante = p.saison + 1) {
   p.saison = suivante;
   p.route = routeNeuve();
   evenements.push({ type: 'saison', numero: p.saison });
-  noter(p, { op: 'saison', numero: finie.numero, ligue: finie.ligue, elo: p.elo, variation: p.elo - finie.elo });
+  noter(p, { op: 'saison', saison: finie.numero, ligue: finie.ligue, elo: p.elo, variation: p.elo - finie.elo });
 }
 
 /**
@@ -892,7 +899,7 @@ export function probabilitesDe(typeDeCoffre) {
     const pourMille = regle.table[categorie];
     pieces.total += pourMille;
     pieces.lignes.push({
-      categorie, nom: R.nomsDesCategories[categorie], pourMille, pourCent: pourMille / 10,
+      categorie, nom: R.collections.raretes[categorie], pourMille, pourCent: pourMille / 10,
       autocollants: RESERVE[categorie].length, doublon: R.collections.eclats.doublon[categorie],
     });
   }
@@ -1169,7 +1176,8 @@ function lotDeTroupes(p) {
  *   essai     : le porte-monnaie d'essai, ou null ;
  *   eclats    : sa monnaie gratuite ;
  *   selection : les autocollants du jour (`jour`, « AAAA-MM-JJ »), en Éclats —
- *               chacun son `prix` et son `prixPlein` ;
+ *               chacun son `prix` et son `prixPlein` ; `selectionPrise` : ceux
+ *               déjà achetés à prix réduit ce jour-là ;
  *   collections : celles qui se vendent entières, en Couronnes — leur `prix`,
  *               leurs `pieces`, celles qui lui manquent (`manquantes`) ;
  *   passe     : celui de la saison en cours — son `prix`, et s'il est `pris`.
@@ -1199,6 +1207,7 @@ export function catalogueBoutique(profil, maintenant, jour) {
     essai: R.boutique.essai ? { couronnes: R.boutique.essai.couronnes } : null,
     eclats: p.eclats,
     selection: selectionDuJour(p, jour).map((id) => ({ piece: id, prix: prixDePiece(p, id, jour), prixPlein: R.collections.eclats.prix[PIECES[id].rarete] })),
+    selectionPrise: p.selection.jour === jour ? p.selection.achats : 0,
     collections: COLLECTIONS.map((c) => lotDeCollection(p, c.id)).filter(Boolean),
     passe: { saison: p.saison, prix: R.saisons.passe.prix, pris: p.route.passe },
   };
@@ -1311,7 +1320,7 @@ function donnerEclats(p, eclats, origine, evenements) {
 
 /**
  * Donne une pièce de collection. Déjà possédée, elle devient des Éclats (selon
- * sa rareté) : renvoie alors false. Le premier autocollant reçu se porte
+ * sa rareté) : renvoie alors false. Le tout premier autocollant reçu se porte
  * d'office. Une pièce de plus peut en amener d'autres : celles que sa
  * collection donne à qui avance (voir completer).
  */
@@ -1324,8 +1333,10 @@ function donnerPiece(p, id, origine, evenements) {
     evenements.push({ type: 'piece', piece: id, origine, doublon: true, eclats });
     return false;
   }
+  // (Le tout premier autocollant se porte d'office ; ensuite, « aucun » est un choix qu'on respecte.)
+  const premier = piece.genre === 'embleme' && !p.blason.embleme && !p.pieces.some((x) => PIECES[x].genre === 'embleme');
   p.pieces.push(id);
-  if (piece.genre === 'embleme' && !p.blason.embleme) p.blason.embleme = id;
+  if (premier) p.blason.embleme = id;
   evenements.push({ type: 'piece', piece: id, origine, doublon: false, eclats: 0 });
   completer(p, piece.collection, evenements);
   return true;
@@ -1400,23 +1411,32 @@ export function equiper(profil, genre, id) {
     if (!p.pieces.includes(id)) return { erreur: 'pasPossedee' };
   }
   p.blason[genre] = id;
+  // (Une opération comme les autres : c'est ce compteur qui dit au second rangement qu'il y a du neuf.)
+  noter(p, { op: 'blason', genre, piece: id });
   return { profil: p, evenements: [{ type: 'blason', genre, piece: id }] };
 }
 
 /** Le rang que le jour donne à une pièce dans la sélection : un nombre de [0, 1) qui ne dépend que du jour et d'elle. */
 const rangDuJourPour = (jour, id) => aleaDeGraine(`selection|${jour}|${id}`)();
 
+/** Ce que ce profil peut encore acheter à prix réduit ce jour-là : `selection.nombre`, moins ce qu'il y a déjà pris. */
+function resteDeLaSelection(p, jour) {
+  return R.collections.eclats.selection.nombre - (p.selection.jour === jour ? p.selection.achats : 0);
+}
+
 /**
  * La sélection du jour : parmi les autocollants des coffres qui manquent à ce
  * profil, ceux que ce jour met en avant, à prix réduit. La même pour tous ceux
- * à qui il manque les mêmes ; vide sans jour lisible, ou quand il ne manque rien.
+ * à qui il manque les mêmes ; vide sans jour lisible, ou quand il ne manque
+ * rien. Un autocollant acheté n'est pas remplacé : `selection.nombre` par jour,
+ * pas un de plus — sans quoi tout s'achèterait à prix réduit le même jour.
  */
 function selectionDuJour(p, jour) {
   if (rangDuJour(jour) === null) return [];
   return DANS_LES_COFFRES.filter((id) => !p.pieces.includes(id))
     .map((id) => [rangDuJourPour(jour, id), id])
     .sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : 1))
-    .slice(0, R.collections.eclats.selection.nombre)
+    .slice(0, Math.max(0, resteDeLaSelection(p, jour)))
     .map(([, id]) => id);
 }
 
@@ -1443,6 +1463,8 @@ export function acheterPiece(profil, id, jour) {
   const prix = prixDePiece(p, id, jour);
   if (prix === null) return { erreur: 'pasEnVente' };
   if (p.eclats < prix) return { erreur: 'fonds', manque: prix - p.eclats };
+  // (Pris dans la sélection du jour : un de moins à prix réduit aujourd'hui.)
+  if (selectionDuJour(p, jour).includes(id)) p.selection = { jour, achats: (p.selection.jour === jour ? p.selection.achats : 0) + 1 };
   p.eclats -= prix;
   const evenements = [{ type: 'eclats', variation: -prix, origine: 'piece', total: p.eclats }];
   donnerPiece(p, id, 'achat', evenements);
@@ -1588,11 +1610,17 @@ function compterLaSaison(p, issue, evenements) {
  * précédente : la saison qu'il jouait est close (voir clore), une seule fois
  * quel que soit le nombre de mois passés, et la route repart de zéro. Sans
  * effet quand le profil est à jour, que le jour est illisible ou que
- * l'horloge a reculé.
+ * l'horloge a reculé. Renvoie true quand une saison a été close.
  */
 function changerDeSaison(p, jour, evenements) {
   const numero = saisonDuJour(jour);
   if (numero === null || numero <= p.saison) return false;
+  // Qui n'a encore rien joué n'a pas de saison à finir : il rejoint celle du
+  // jour, sans annonce. (Un joueur arrivé en décembre n'a pas « fini » octobre.)
+  if (p.parties === 0 && p.route.points === 0 && !p.route.passe) {
+    p.saison = numero;
+    return false;
+  }
   clore(p, evenements, numero);
   return true;
 }
@@ -1600,7 +1628,9 @@ function changerDeSaison(p, jour, evenements) {
 /**
  * À appeler à l'ouverture du jeu et de l'écran de la saison : met le profil à
  * la saison de ce jour. Renvoie `{ profil, evenements }` — sans événement
- * quand rien n'a changé ; sinon ceux de la fin de la saison passée
+ * quand rien n'a changé, ni quand un profil qui n'a jamais joué rejoint la
+ * saison du jour (son `saison` change alors : à ranger quand même) ; sinon
+ * ceux de la fin de la saison passée
  * (palierPris, recompenseSaison, coffre, piece, remiseDeSaison,
  * retrogradation, saison).
  */
@@ -1615,8 +1645,10 @@ export function ouvrirLaSaison(profil, jour) {
  * Ce que l'écran de la saison montre : son `numero`, sa collection (`theme`),
  * les `points`, le `palier` atteint et les points `versLeSuivant`, le Passe
  * (`passe`, `prixDuPasse`), les `joursRestants`, le nombre de paliers
- * `aPrendre`, et la `route` — par palier, chaque voie avec sa `recompense` et
- * son `etat` : 'pris', 'aPrendre', 'aVenir', ou 'ferme' (voie du Passe sans le Passe).
+ * `aPrendre`, et la `route` — par palier, chaque voie avec sa `recompense`,
+ * son `etat` ('pris', 'aPrendre', 'aVenir', ou 'ferme' : voie du Passe sans
+ * le Passe), et `dejaLa` quand sa pièce est déjà possédée : elle rendra alors
+ * `eclats` Éclats.
  */
 export function etatDeLaSaison(profil, jour) {
   const p = migrerProfil(profil);
@@ -1627,7 +1659,10 @@ export function etatDeLaSaison(profil, jour) {
     for (const voie of VOIES) {
       const pris = p.route.pris[voie].includes(palier);
       const etat = pris ? 'pris' : voie === 'passe' && !p.route.passe ? 'ferme' : palier <= atteint ? 'aPrendre' : 'aVenir';
-      voies[voie] = { recompense: recompenseDePalier(p.saison, voie, palier), etat };
+      const recompense = recompenseDePalier(p.saison, voie, palier);
+      // (Une saison dont le thème revient : la pièce qu'on a déjà rendra des Éclats, et la route le dit d'avance.)
+      const dejaLa = !pris && !!recompense && recompense.genre === 'piece' && p.pieces.includes(recompense.piece);
+      voies[voie] = { recompense, etat, dejaLa, eclats: dejaLa ? R.collections.eclats.doublon[PIECES[recompense.piece].rarete] : 0 };
     }
     return { palier, atteint: palier <= atteint, ...voies };
   });

@@ -158,6 +158,19 @@ console.log('\n--- L’offre de bienvenue ---');
     && prendreOffreDeBienvenue(profilNeuf(), { valide: true, offre: 'bienvenue' }, T0).erreur === 'fermee');
 }
 
+// --- Une offre sur une troupe gagnée entre-temps ----------------------------------------
+console.log('\n--- L’offre et la troupe gagnée ---');
+{
+  // 79 parties jouées, l'offre de ligue porte sur l'Hydre (gratuite en ligue 5, ou à la 80e partie).
+  const base = profilNeuf();
+  const presque = { ...base, parties: 79, defaites: 79, ligue: 4, plusHauteLigue: 4, elo: 460, promotions: [2, 3, 4],
+    debloquees: { ...base.debloquees, triton: 'ligue', horseArcher: 'ligue', catapult: 'ligue' },
+    boutique: { offreLigue: { troupe: 'hydra', jusqua: T0 + 48 * HEURE }, bienvenueJusqua: 0, bienvenuePrise: true } };
+  const r = appliquerResultat(presque, partie('defaite', T0));
+  check('la 80e partie débloque l’Hydre : l’offre de ligue qui portait sur elle s’efface, et le profil reste stable à la relecture',
+    r.profil.debloquees.hydra === 'parties' && r.profil.boutique.offreLigue === null && egal(migrerProfil(r.profil), r.profil));
+}
+
 // --- Les lots, en argent réel -----------------------------------------------------------
 console.log('\n--- Les lots de Couronnes ---');
 {
