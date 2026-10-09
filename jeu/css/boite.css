@@ -1,0 +1,920 @@
+/* ---------------------------------------------------------------------------
+   Les menus, direction « Boîte de jeu » (choisie le 08/10/2026) : le couvercle
+   d'une boîte de jeu de société — aplats francs, contour d'encre épais, ombre
+   pleine sous tout ce qui se touche, titres en gros caractères ronds.
+
+   Cette feuille habille tout ce qui n'est pas la carte : l'écran d'accueil
+   (#start-screen), les écrans de la progression (#progression : ligues,
+   coffres, troupes, boutique), et la partie — sa barre du haut, sa barre du
+   bas (#hud), ses menus (#build-menu, #worker-menu) et ses fenêtres (#modal :
+   pause, aide, consignes, fin de partie). css/jeu.css et css/progression.css
+   portent la mise en place — tailles, positions, cibles de toucher — et les
+   couleurs de la boîte (:root) ; celle-ci pose la matière, écran par écran :
+   contours d'encre, ombres pleines, aplats. Chaque règle d'ici passe par l'un
+   de ces écrans.
+
+   Les caractères : « Lilita One » (titres) et « Nunito » (texte), livrés avec
+   le jeu (assets/polices, licence SIL OFL à côté) : rien ne vient du réseau,
+   l'accueil est le même hors ligne. S'ils manquent, les caractères ronds du
+   téléphone prennent le relais. Un seul dessin de Lilita One existe :
+   `font-synthesis: none` l'empêche d'être engraissé à la machine, et laisse aux
+   caractères de repli leur vrai gras.
+   --------------------------------------------------------------------------- */
+
+/* Les caractères latins seulement (le français y est en entier, « œ » compris).
+   La seconde adresse ne sert que si la page qui embarque le jeu refuse ses
+   propres fichiers de caractères : c'est le même fichier, chez son éditeur. */
+@font-face {
+  font-family: "Lilita One";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/polices/lilita-one.woff2") format("woff2"),
+       url("https://fonts.gstatic.com/s/lilitaone/v17/i7dPIFZ9Zz-WBtRtedDbYEF8RXi4EwQ.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* (Nunito est un caractère à graisse variable : un seul fichier pour le gras, le très gras et le noir.) */
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+  src: url("../assets/polices/nunito.woff2") format("woff2"),
+       url("https://fonts.gstatic.com/s/nunito/v32/XRXV3I6Li01BKofINeaBTMnFcQ.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+#start-screen {
+  /* Le couvercle prend les couleurs du peuple choisi (voir plus bas). */
+  --b-ciel: #3aa0e8;
+  --b-bande: #ffc93c;
+  --b-socle: #173a7a;
+  --b-etiquette: #f0562d;
+  /* Le contour d'encre d'un titre clair : huit ombres nettes autour, une portée dessous. */
+  --b-contour: -3px -3px 0 var(--b-encre), 3px -3px 0 var(--b-encre), -3px 3px 0 var(--b-encre), 3px 3px 0 var(--b-encre),
+    0 -3px 0 var(--b-encre), 0 3px 0 var(--b-encre), -3px 0 0 var(--b-encre), 3px 0 0 var(--b-encre),
+    3px 8px 0 var(--b-encre), -3px 8px 0 var(--b-encre), 0 8px 0 var(--b-encre);
+  --b-contour-fin: -2px -2px 0 var(--b-encre), 2px -2px 0 var(--b-encre), -2px 2px 0 var(--b-encre), 2px 2px 0 var(--b-encre),
+    0 -2px 0 var(--b-encre), 0 2px 0 var(--b-encre), -2px 0 0 var(--b-encre), 2px 0 0 var(--b-encre);
+  padding: 0;
+  background: var(--b-papier);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+}
+body[data-civ="solarien"] #start-screen {
+  --b-ciel: #e2472b;
+  --b-bande: #ffc93c;
+  --b-socle: #7c2413;
+  --b-etiquette: #3aa0e8;
+}
+/* Tant que le jeu n'a pas dit quel peuple on joue (une fraction de seconde au lancement), le
+   couvercle est neutre : du sable, pas les couleurs d'un peuple à la place d'un autre. */
+body:not([data-civ]) #start-screen {
+  --b-ciel: #ffe9b8;
+  --b-socle: #4a3f33;
+}
+
+/* La carte : sur un téléphone, tout l'écran — le couvercle touche les bords.
+   Douze colonnes : tout y prend la largeur, sauf les quatre tuiles du bas. La
+   première rangée, celle du couvercle, prend la place qui reste en hauteur. */
+#start-screen .start-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: minmax(clamp(230px, 34vh, 372px), 1fr);
+  grid-auto-rows: auto;
+  column-gap: 8px;
+  align-content: start;
+  width: min(430px, 100%);
+  min-height: calc(100% - 12px - var(--safe-bottom));
+  margin: 0;
+  padding: 0 16px 14px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--b-papier);
+  color: var(--b-encre);
+}
+#start-screen .start-card > * { grid-column: 1 / -1; }
+/* Sur un écran large, la carte redevient une boîte posée sur la couleur du peuple. */
+@media (min-width: 460px) {
+  #start-screen { padding: calc(16px + var(--safe-top)) 12px 0; background: var(--b-socle); }
+  #start-screen .start-card {
+    min-height: 0;
+    margin: auto 0;
+    border: 5px solid var(--b-encre);
+    border-radius: 26px;
+    box-shadow: 0 10px 0 rgba(0, 0, 0, .35);
+    overflow: clip;
+  }
+}
+#start-screen :focus-visible { outline: 3px solid var(--b-rouge); outline-offset: 2px; }
+
+/* --- Le couvercle ----------------------------------------------------------- */
+
+#start-screen .start-head {
+  position: relative;
+  margin: 0 -16px;
+  overflow: hidden;
+  border-bottom: 5px solid var(--b-encre);
+  /* (Le soleil : un disque clair cerclé d'encre, à droite, sous la pastille de la ligue et derrière la capitale.) */
+  background:
+    radial-gradient(circle at calc(100% - 62px) calc(120px + var(--safe-top)), var(--b-papier) 0 38px, var(--b-encre) 38.5px 43px, transparent 43.5px),
+    var(--b-ciel);
+  text-align: left;
+}
+/* La bande en travers, puis le socle : deux aplats penchés, séparés d'un trait d'encre. */
+#start-screen .start-head::before,
+#start-screen .start-head::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: -20%;
+  right: -20%;
+  transform: rotate(-8deg);
+}
+#start-screen .start-head::before { top: 42%; height: 36%; background: var(--b-bande); border-top: 5px solid var(--b-encre); }
+#start-screen .start-head::after { top: 74%; height: 70%; background: var(--b-socle); border-top: 5px solid var(--b-encre); }
+
+/* La capitale du peuple choisi : les deux sont dans la page, la feuille montre la bonne. */
+#start-screen .couvercle-capitale {
+  display: none;
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  /* (Son sommet passe un peu sous la pastille de la ligue ; son pied, sous le titre.) */
+  top: calc(36px + var(--safe-top));
+  height: calc(82% - 36px - var(--safe-top));
+  width: auto;
+  max-width: 78%;
+  object-fit: contain;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 6px 0 rgba(23, 18, 14, .3));
+  pointer-events: none;
+}
+body[data-civ="atlante"] #start-screen .couvercle-capitale[data-civ="atlante"],
+body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"] { display: block; }
+
+#start-screen .start-head h1 {
+  position: absolute;
+  z-index: 2;
+  left: 16px;
+  right: 16px;
+  bottom: 42px;
+  margin: 0;
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: clamp(34px, 12vw, 47px);
+  line-height: .95;
+  letter-spacing: 0;
+  color: var(--b-papier);
+  text-shadow: var(--b-contour);
+  transform: rotate(-4deg);
+  transform-origin: 0 100%;
+}
+/* « Mobile » : une étiquette collée de travers sous le titre. */
+#start-screen .start-head h1 em {
+  position: absolute;
+  right: 2px;
+  top: calc(100% + 4px);
+  padding: 1px 12px 2px;
+  border: 4px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-etiquette);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-papier);
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 1px;
+  text-shadow: none;
+}
+/* La phrase d'accroche reste pour qui écoute la page ; le couvercle parle seul. */
+#start-screen .tagline,
+#start-screen .start-card > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- La ligue : une pastille posée sur le couvercle -------------------------- */
+
+#start-screen .prog-bandeau,
+#start-screen .prog-bandeau-actions { display: contents; }
+#start-screen .prog-bandeau-ligue {
+  position: absolute;
+  z-index: 3;
+  left: 14px;
+  top: calc(14px + var(--safe-top));
+  flex: none;
+  gap: 8px;
+  max-width: calc(100% - 28px);
+  min-height: 46px;
+  padding: 2px 12px 2px 5px;
+  border: 4px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-papier);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#start-screen .prog-bandeau-ligue:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#start-screen .prog-ecu { width: 34px; height: 34px; }
+#start-screen .prog-ecu svg { width: 34px; height: 34px; filter: none; stroke: var(--b-encre); stroke-width: 34px; paint-order: stroke; }
+#start-screen .prog-ecu b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 16px; color: var(--b-encre); }
+#start-screen .prog-bandeau-texte { gap: 1px; }
+#start-screen .prog-bandeau-texte b { font-family: var(--b-texte); font-weight: 900; font-size: 15px; line-height: 1.1; letter-spacing: 0; }
+#start-screen .prog-bandeau-texte small { font-size: 12.5px; font-weight: 800; line-height: 1.15; color: var(--b-gris); }
+#start-screen .prog-barre { display: none; }
+
+/* --- Ce qui se touche : un bouton est un carton à bord d'encre, sur son ombre --- */
+
+#start-screen .btn {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-papier);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 900;
+}
+#start-screen .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#start-screen .btn.primary { background: var(--b-jaune); border-color: var(--b-encre); color: var(--b-encre); }
+#start-screen .btn.ghost { border-color: transparent; background: none; box-shadow: none; color: var(--b-gris); text-decoration: underline; }
+#start-screen .btn.danger { border-color: var(--b-encre); background: var(--b-rouge); color: var(--b-papier); }
+
+/* Une partie dort : sa carte passe avant le reste. */
+#start-screen .resume-box {
+  margin: 16px 0 0;
+  padding: 12px 12px 14px;
+  border: 3px solid var(--b-encre);
+  border-radius: 16px;
+  background: var(--b-sable);
+}
+#start-screen .resume-info { color: var(--b-gris); font-size: 13.5px; font-weight: 800; }
+
+/* --- Les deux peuples --------------------------------------------------------- */
+
+#start-screen .options.peuples { gap: 12px; margin-top: 18px; }
+#start-screen .option.peuple {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  align-items: center;
+  column-gap: 4px;
+  row-gap: 1px;
+  min-height: 92px;
+  padding: 6px;
+  border: 4px solid var(--b-encre);
+  border-radius: 18px;
+  background: var(--b-papier);
+  box-shadow: none;
+  color: var(--b-encre);
+  opacity: 1;
+  text-align: left;
+}
+#start-screen .option.peuple[data-civ="atlante"] { --b-tuile: #3aa0e8; }
+#start-screen .option.peuple[data-civ="solarien"] { --b-tuile: #f58f2a; }
+/* (Sur 375 points, une tuile fait 165 points : l'image et le nom se resserrent pour que « Solariens » tienne.) */
+#start-screen .option.peuple img { grid-row: 1 / span 2; width: clamp(46px, 14vw, 66px); height: clamp(46px, 14vw, 66px); filter: none; }
+#start-screen .option.peuple .option-name {
+  align-self: end;
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: clamp(16px, 4.8vw, 20px);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+#start-screen .option.peuple .option-desc { align-self: start; font-size: 13px; font-weight: 800; line-height: 1.15; color: var(--b-gris); }
+#start-screen .option.peuple.active { background: var(--b-tuile); border-color: var(--b-encre); box-shadow: 0 5px 0 var(--b-encre); }
+#start-screen .option.peuple.active .option-name { color: var(--b-papier); text-shadow: var(--b-contour-fin); }
+#start-screen .option.peuple.active .option-desc { color: var(--b-encre); }
+/* La coche du peuple choisi : une pastille jaune au coin, son trait d'encre dedans. */
+#start-screen .option.peuple.active::before {
+  content: "";
+  position: absolute;
+  right: -8px;
+  top: -10px;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 4px solid var(--b-encre);
+  border-radius: 50%;
+  background: var(--b-jaune);
+}
+#start-screen .option.peuple.active::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: -4px;
+  width: 6px;
+  height: 11px;
+  border-right: 3px solid var(--b-encre);
+  border-bottom: 3px solid var(--b-encre);
+  transform: rotate(40deg);
+}
+
+/* --- Les réglages -------------------------------------------------------------- */
+
+#start-screen .reglages {
+  margin-top: 14px;
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-sable);
+}
+#start-screen .reglages summary { min-height: 48px; padding: 6px 40px 7px 12px; }
+#start-screen .reglages summary::after { width: 9px; height: 9px; border-color: var(--b-encre); border-width: 3px; }
+#start-screen .reglages-titre { font-weight: 900; font-size: 15px; }
+#start-screen .reglages-resume { font-size: 13px; font-weight: 800; color: var(--b-gris); }
+#start-screen .reglages > h2 {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  font-family: var(--b-texte);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  color: var(--b-gris);
+}
+#start-screen .reglages .option {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-papier);
+  color: var(--b-encre);
+}
+#start-screen .reglages .option.active { border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+#start-screen .reglages .option-name { font-weight: 900; }
+#start-screen .reglages .option-desc { font-weight: 700; color: var(--b-gris); }
+#start-screen .reglages .option svg { fill: var(--b-encre); }
+#start-screen .reglage-note { font-weight: 700; color: var(--b-gris); }
+
+/* --- Jouer ----------------------------------------------------------------------- */
+
+#start-screen .start-actions {
+  display: block;
+  margin: 14px -16px 0;
+  padding: 0 16px calc(18px + var(--safe-bottom));
+  background: linear-gradient(180deg, transparent 0, var(--b-papier) 12px);
+}
+#start-screen #btn-play {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 12px;
+  border: 4px solid var(--b-encre);
+  border-radius: 18px;
+  background: var(--b-papier);
+  box-shadow: 0 6px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+#start-screen #btn-play.primary {
+  min-height: 84px;
+  border-width: 5px;
+  border-radius: 22px;
+  background: var(--b-jaune);
+  box-shadow: 0 8px 0 var(--b-encre);
+  font-size: 44px;
+  letter-spacing: 2px;
+}
+#start-screen #btn-play.arme { background: var(--b-rouge); color: var(--b-papier); font-size: 19px; letter-spacing: .5px; }
+#start-screen #btn-play:active { transform: translateY(5px); box-shadow: 0 3px 0 var(--b-encre); }
+#start-screen .palmares { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: var(--b-gris); }
+
+/* --- Les quatre tuiles du bas : Coffres, Troupes, Boutique, Aide -------------------- */
+
+#start-screen .prog-bandeau-actions .btn,
+#start-screen #btn-howto {
+  order: 1;
+  grid-column: span 3;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: auto;
+  min-height: 66px;
+  padding: 6px 4px;
+  border: 4px solid var(--b-encre);
+  border-radius: 16px;
+  background: var(--b-papier);
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: normal;
+}
+#start-screen .prog-bandeau-actions .btn:active,
+#start-screen #btn-howto:active { transform: translateY(2px); }
+#start-screen .prog-bandeau-actions .btn svg,
+#start-screen #btn-howto svg { width: 28px; height: 28px; margin: 0; fill: var(--b-encre); }
+#start-screen .prog-pastille {
+  position: absolute;
+  right: -7px;
+  top: -10px;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 5px;
+  border: 3px solid var(--b-encre);
+  border-radius: 13px;
+  background: var(--b-rouge);
+  color: var(--b-papier);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+#start-screen .howto { order: 2; margin-top: 14px; }
+#start-screen .howto ul { color: var(--b-gris); font-weight: 700; }
+#start-screen .howto b { color: var(--b-encre); font-weight: 900; }
+#start-screen #btn-confidentialite { order: 4; justify-self: center; min-height: 36px; margin: 2px 0 6px; font-size: 13px; }
+#progression .prog-selection { user-select: all; -webkit-user-select: all; font-weight: 900; }
+#start-screen .credits { order: 3; margin-top: 12px; font-size: 12.5px; font-weight: 700; color: var(--b-gris); opacity: 1; }
+
+/* ---------------------------------------------------------------------------
+   Les écrans de la progression : ligues, coffres, troupes, fiche, boutique.
+   Chaque pièce y reçoit son contour d'encre et son ombre pleine.
+   --------------------------------------------------------------------------- */
+
+#progression {
+  padding: 12px;
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 700;
+}
+#progression :focus-visible { outline: 3px solid var(--b-rouge); outline-offset: 2px; }
+#progression .modal-card {
+  max-height: 90vh;
+  padding: 16px 14px 20px;
+  border: 4px solid var(--b-encre);
+  border-radius: 22px;
+  background: var(--b-papier);
+  box-shadow: 0 8px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#progression .modal-card h2 { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 27px; line-height: 1.05; letter-spacing: 0; }
+#progression .prog-carte h3 { margin-top: 18px; font-size: 12.5px; font-weight: 900; letter-spacing: .08em; color: var(--b-gris); }
+#progression .modal-card .subtitle,
+#progression .modal-card .hint { font-size: 13.5px; font-weight: 700; line-height: 1.4; color: var(--b-gris); }
+#progression .prog-vide,
+#progression .prog-annonce { font-weight: 800; }
+
+/* Ce qui se touche. */
+#progression .btn {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 900;
+}
+#progression .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#progression .btn.primary,
+#progression .btn.prog-attend { background: var(--b-jaune); border-color: var(--b-encre); color: var(--b-encre); }
+#progression .btn.danger { border-color: var(--b-encre); background: var(--b-rouge); color: var(--b-papier); }
+#progression .btn.small { min-height: 40px; padding: 6px 12px; font-size: 14px; font-weight: 900; }
+#progression .btn[disabled] { opacity: 1; background: var(--b-sable); box-shadow: none; color: var(--b-gris); }
+#progression .btn svg { fill: currentColor; }
+#progression .icon-btn {
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--b-encre);
+  border-radius: 12px;
+  background: var(--b-blanc);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#progression .icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+#progression .prog-coffre .icon-btn { width: 40px; height: 40px; min-width: 40px; }
+
+/* Les petites pièces : jauge, vignette, écu, catégorie. */
+#progression .prog-barre { height: 10px; border: 2px solid var(--b-encre); border-radius: 6px; background: var(--b-blanc); }
+#progression .prog-barre > span { border-radius: 0; background: var(--b-jaune); }
+#progression .prog-vignette { border: 3px solid var(--b-encre); border-radius: 12px; background: var(--b-sable); }
+#progression .prog-vignette[data-categorie="rare"] { border-color: var(--b-encre); background: #cfe6fb; }
+#progression .prog-vignette[data-categorie="epique"] { border-color: var(--b-encre); background: #e6d5fb; }
+#progression .prog-vignette svg { fill: var(--b-encre); opacity: 1; }
+#progression .prog-vignette.grande { border-radius: 16px; }
+#progression .prog-vignette.petite { border-width: 2px; }
+#progression .prog-ecu svg { filter: none; stroke: var(--b-encre); stroke-width: 30px; paint-order: stroke; }
+#progression .prog-ecu b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; color: var(--b-encre); }
+#progression .prog-categorie { font-size: 11.5px; font-weight: 900; }
+
+/* Les rangées : une ligue, un coffre, un tirage, un article. */
+#progression .prog-ligue,
+#progression .prog-coffre,
+#progression .prog-tirage {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+}
+/* (Une ligue pas encore atteinte : en pointillé, sans fond. Atteinte : pleine. La sienne : jaune, sur son ombre.) */
+#progression .prog-ligue { opacity: 1; border-style: dashed; background: none; }
+#progression .prog-ligue.atteinte { opacity: 1; border-style: solid; background: var(--b-blanc); }
+#progression .prog-ligue.actuelle { border-style: solid; border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+#progression .prog-ligue-texte b { font-family: var(--b-texte); font-weight: 900; font-size: 16px; }
+#progression .prog-ligue-texte small { font-size: 12.5px; }
+#progression .prog-ici { padding: 2px 7px; border: 2px solid var(--b-encre); border-radius: 8px; background: var(--b-papier); color: var(--b-encre); font-weight: 900; }
+#progression .prog-coffre-texte b,
+#progression .prog-tirage-texte b { font-weight: 900; }
+#progression .prog-coffre-nom { font-weight: 900; }
+#progression .prog-gain,
+#progression .prog-niveau,
+#progression .prog-monte { color: var(--b-encre); font-weight: 900; }
+#progression .scores th,
+#progression .scores td,
+#progression .prog-prochains li { border-bottom-color: rgba(23, 18, 14, .22); }
+#progression .scores tr.total td { border-top: 2px solid var(--b-encre); color: var(--b-encre); font-weight: 900; }
+#progression .prog-regles { font-weight: 700; }
+
+/* La collection : une troupe par carte. */
+#progression .prog-troupe { border: 3px solid var(--b-encre); border-radius: 14px; background: var(--b-blanc); color: var(--b-encre); font-family: var(--b-texte); }
+#progression .prog-troupe:active { transform: translateY(2px); }
+#progression .prog-troupe b { font-weight: 900; }
+#progression .prog-troupe.prete { border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+#progression .prog-troupe.verrouillee { border-style: dashed; background: none; }
+#progression .prog-fiche-texte dt { font-weight: 900; }
+#progression .prog-fiche-texte dd { font-weight: 700; }
+#progression .prog-fiche-tete p b { font-weight: 900; }
+
+/* --- La boutique ------------------------------------------------------------ */
+
+/* Un montant en Couronnes : le pictogramme d'or cerclé d'encre, puis le nombre. */
+#progression .prog-couronnes { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#progression .prog-couronnes svg { flex: none; fill: var(--b-jaune); stroke: var(--b-encre); stroke-width: 40px; paint-order: stroke; }
+#progression .btn.primary .prog-couronnes svg { fill: var(--b-blanc); }
+#progression .prog-bourse {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 6px;
+  padding: 8px 12px;
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-sable);
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: 28px;
+  line-height: 1;
+}
+#progression .prog-bourse > span:last-child { font-family: var(--b-texte); font-size: 15px; font-weight: 900; color: var(--b-gris); }
+#progression .prog-articles { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+#progression .prog-article,
+#progression .prog-offre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 6px 8px;
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+}
+/* Une offre : la même rangée, en jaune et sur son ombre. Le lot de troupes : sur le sable. */
+#progression .prog-offre { background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+#progression .prog-offre .btn.primary { background: var(--b-blanc); }
+#progression .prog-lot-troupes { background: var(--b-sable); }
+#progression .prog-article.acquis { border-style: dashed; background: none; }
+#progression .prog-offre-texte { display: grid; flex: 1; gap: 2px; min-width: 0; }
+#progression .prog-offre-texte b { font-size: 15px; font-weight: 900; line-height: 1.2; }
+#progression .prog-offre-texte small { font-size: 12.5px; font-weight: 700; line-height: 1.3; color: var(--b-gris); }
+#progression .prog-offre-texte s { color: var(--b-gris); }
+#progression .prog-article .btn.small,
+#progression .prog-offre .btn.small { flex: none; min-width: 78px; justify-content: center; }
+#progression .btn.small.prog-cher { background: var(--b-sable); box-shadow: none; color: var(--b-gris); }
+#progression .prog-acquis { flex: none; font-size: 13px; font-weight: 900; color: var(--good); }
+/* (Le portrait d'un article est un bouton : il ouvre la fiche de la troupe.) */
+#progression .prog-article-fiche { display: grid; flex: none; padding: 0; border: 0; border-radius: 12px; background: none; cursor: pointer; }
+
+/* ---------------------------------------------------------------------------
+   La partie. Chaque pièce y reçoit son contour d'encre et son ombre pleine,
+   plus petits que ceux des menus (deux points de bord, trois d'ombre) : la
+   carte doit rester le sujet.
+   --------------------------------------------------------------------------- */
+
+#hud, #build-menu, #worker-menu, #modal {
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 700;
+}
+#hud :focus-visible, #build-menu :focus-visible, #worker-menu :focus-visible, #modal :focus-visible { outline: 3px solid var(--b-rouge); outline-offset: 2px; }
+/* (Un bouton ne prend pas de lui-même les caractères de ce qui l'entoure.) */
+#hud button, #build-menu button, #worker-menu button, #modal button { font-family: var(--b-texte); }
+
+/* --- La barre du haut : des pastilles posées sur la carte, sans bandeau ------- */
+
+#hud #topbar { background: none; }
+/* (Quatre pastilles et deux boutons sur 375 points : elles sont serrées, pour que « 1000 » y tienne.) */
+#hud .res-group { gap: 4px; }
+#hud .res {
+  gap: 2px;
+  padding: 2px 5px;
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-blanc);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-size: 12px;
+  font-weight: 900;
+}
+#hud .res-icon { color: var(--b-encre); }
+#hud .res-icon svg.ic { width: 15px; height: 15px; }
+#hud #res-pop.warn { color: var(--error); }
+#hud #age-box {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-papier);
+  box-shadow: 0 3px 0 var(--b-encre);
+  font-size: 12px;
+  font-weight: 800;
+}
+#hud #age-label { color: var(--b-encre); font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 13.5px; letter-spacing: 0; }
+#hud #age-box .sep,
+#hud #game-timer { color: var(--b-gris); }
+#hud #game-timer.urgent { color: var(--error); font-weight: 900; }
+#hud .age-progress { height: 6px; border: 1px solid var(--b-encre); border-radius: 4px; background: var(--b-blanc); }
+#hud .age-progress span { background: var(--b-jaune); }
+#hud .score-icone { color: var(--b-encre); }
+#hud #score-box b { font-weight: 900; }
+#hud #positions-box i { border: 2px solid var(--b-encre); width: 11px; height: 11px; }
+#hud .icon-btn,
+#build-menu .icon-btn,
+#worker-menu .icon-btn,
+#modal .icon-btn {
+  border: 2px solid var(--b-encre);
+  border-radius: 12px;
+  background: var(--b-blanc);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#hud .icon-btn:active,
+#build-menu .icon-btn:active,
+#worker-menu .icon-btn:active,
+#modal .icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+
+/* Par équipes, le bouton de l'allié n'a pas sa place en haut à côté des deux autres : sur un
+   téléphone il recouvrait la quatrième pastille. Il se range sous la mini-carte, à sa largeur. */
+#hud #btn-allie {
+  position: absolute;
+  top: calc(174px + var(--safe-top));
+  right: calc(8px + var(--safe-right));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 114px;
+  height: 38px;
+  font-size: 13px;
+  font-weight: 900;
+}
+#hud #btn-allie::after { content: "Allié"; }
+@media (min-width: 720px) { #hud #btn-allie { top: calc(220px + var(--safe-top)); width: 160px; } }
+@media (orientation: landscape) and (max-height: 480px) { #hud #btn-allie { top: calc(154px + var(--safe-top)); width: 94px; height: 34px; } }
+
+/* La mini-carte : une vignette encadrée d'encre. */
+#hud #minimap-wrap {
+  top: calc(52px + var(--safe-top));
+  padding: 2px;
+  border: 3px solid var(--b-encre);
+  border-radius: 12px;
+  background: var(--b-papier);
+  box-shadow: 0 4px 0 var(--b-encre);
+}
+#hud #minimap { border-radius: 7px; }
+
+/* Les annonces : un carton, sa tranche à la couleur de ce qu'il dit. */
+#hud .toast {
+  padding: 7px 11px;
+  border: 2px solid var(--b-encre);
+  border-left: 7px solid var(--b-gris);
+  border-radius: 10px;
+  background: var(--b-papier);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-weight: 800;
+}
+#hud .toast.good { border-left-color: #2fae4f; }
+#hud .toast.warn { border-left-color: var(--b-jaune); }
+#hud .toast.error { border-left-color: var(--b-rouge); }
+#hud .toast.touchable:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+#hud #build-hint {
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-jaune);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-weight: 900;
+}
+
+/* --- La barre des ouvriers ---------------------------------------------------- */
+
+/* (Sa marge du bas loge l'ombre des pastilles : la barre défile, et rognerait ce qui dépasse.) */
+#hud #worker-bar { padding-bottom: 6px; }
+#hud .worker-chip,
+#hud .worker-open {
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-blanc);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-weight: 900;
+}
+#hud .worker-chip:active,
+#hud .worker-open:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+#hud .worker-open { border-color: var(--b-encre); background: var(--b-sable); color: var(--b-encre); }
+#hud .worker-chip.idle.has-idle { border-color: var(--b-encre); background: var(--b-jaune); color: var(--b-encre); }
+
+/* --- La barre du bas : le bord de la boîte --------------------------------------- */
+
+#hud #bottombar {
+  border-top: 4px solid var(--b-encre);
+  background: var(--b-papier);
+  box-shadow: none;
+}
+#hud #selection-panel .hint { color: var(--b-gris); font-weight: 700; }
+#hud #selection-panel .name { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 18px; letter-spacing: 0; }
+#hud #selection-panel .name .enemy { font-family: var(--b-texte); font-weight: 900; color: var(--error); }
+#hud #selection-panel .hp { height: 9px; margin: 4px 0; border: 2px solid var(--b-encre); border-radius: 5px; background: var(--b-blanc); }
+#hud #selection-panel .hp span { background: #2fae4f; }
+#hud #selection-panel .stats { color: var(--b-gris); font-size: 12px; font-weight: 800; }
+/* Le portrait : son cadre à la couleur du camp, cerclé d'encre. */
+#hud .portrait {
+  border: 3px solid var(--team, var(--b-encre));
+  border-radius: 12px;
+  background: var(--fond-portrait, var(--b-sable));
+  box-shadow: 0 0 0 2px var(--b-encre);
+}
+#hud .multi-title { color: var(--b-gris); font-weight: 800; }
+#hud .chip,
+#hud .queue-item {
+  border: 2px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-blanc);
+  box-shadow: none;
+  color: var(--b-encre);
+  font-weight: 900;
+}
+#hud .qbar { height: 5px; border: 1px solid var(--b-encre); background: var(--b-blanc); }
+#hud .qbar span { background: var(--b-jaune); }
+#hud img.visage { border-radius: 6px; box-shadow: 0 0 0 2px var(--b-encre); }
+/* (La marge du bas loge l'ombre des boutons : le panneau défile, et rognerait ce qui dépasse.) */
+#hud #command-panel { padding-bottom: 6px; }
+#hud .cmd {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#hud .cmd:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#hud .cmd.disabled { opacity: .5; box-shadow: none; }
+#hud .cmd.toggled,
+#hud .cmd.highlight { border-color: var(--b-encre); background: var(--b-jaune); }
+#hud .cmd.danger { border-color: var(--b-encre); background: var(--b-rouge); color: var(--b-papier); }
+#hud .cmd-label { font-weight: 900; }
+#hud .cmd-cost { color: var(--b-gris); font-weight: 800; }
+#hud .cmd.danger .cmd-cost { color: var(--b-papier); }
+#hud .cmd-verrou svg { fill: var(--b-encre); }
+
+/* --- Les menus qui montent du bas : Construire, Ouvriers ---------------------------- */
+
+#build-menu .sheet,
+#worker-menu .sheet {
+  border: 0;
+  border-top: 4px solid var(--b-encre);
+  border-radius: 22px 22px 0 0;
+  background: var(--b-papier);
+  color: var(--b-encre);
+}
+#build-menu .sheet-head h2,
+#worker-menu .sheet-head h2 { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 24px; letter-spacing: 0; }
+#build-menu .build-card,
+#worker-menu .worker-row {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  box-shadow: none;
+  color: var(--b-encre);
+}
+#build-menu .build-list { padding-bottom: 6px; }
+#build-menu .build-card { box-shadow: 0 4px 0 var(--b-encre); }
+#build-menu .build-card:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#build-menu .build-card.disabled { opacity: .5; box-shadow: none; }
+#build-menu .bc-icon { color: var(--b-encre); }
+#build-menu .bc-icon.vignette img { filter: none; }
+#build-menu .bc-name { font-family: var(--b-texte); font-weight: 900; font-size: 16px; letter-spacing: 0; }
+#build-menu .bc-desc { color: var(--b-gris); font-weight: 700; }
+#build-menu .bc-cost { font-weight: 900; }
+#worker-menu .worker-row .wr-label { color: var(--b-encre); }
+#worker-menu .worker-row .wr-icon { color: var(--b-encre); }
+#worker-menu .worker-row .wr-name { font-weight: 900; }
+#worker-menu .worker-row .wr-hint { color: var(--b-gris); font-weight: 700; }
+#worker-menu .worker-row .wr-count { font-weight: 900; }
+#worker-menu .wr-btn { border: 2px solid var(--b-encre); border-radius: 10px; background: var(--b-papier); box-shadow: 0 3px 0 var(--b-encre); color: var(--b-encre); font-weight: 900; }
+#worker-menu .wr-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+#worker-menu .wr-btn[disabled] { opacity: .4; box-shadow: none; }
+#worker-menu .switch-row { border: 3px solid var(--b-encre); border-radius: 14px; background: var(--b-sable); }
+#worker-menu .switch-row input { accent-color: var(--b-rouge); }
+#worker-menu .switch-row b { font-weight: 900; }
+#worker-menu .switch-row small { color: var(--b-gris); font-weight: 700; }
+@media (min-width: 720px) {
+  #build-menu .sheet,
+  #worker-menu .sheet { border: 4px solid var(--b-encre); border-radius: 22px; box-shadow: 0 8px 0 var(--b-encre); }
+}
+
+/* --- Les fenêtres : pause, aide, crédits, consignes, fin de partie ------------------- */
+
+#modal { padding: 12px; }
+#modal .modal-card {
+  max-height: 90vh;
+  padding: 16px 14px 20px;
+  border: 4px solid var(--b-encre);
+  border-radius: 22px;
+  background: var(--b-papier);
+  box-shadow: 0 8px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+#modal .modal-card.fin { padding-bottom: 0; }
+#modal .modal-card h2 { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 27px; line-height: 1.05; letter-spacing: 0; }
+#modal .modal-sub { margin-top: 18px; font-size: 12.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--b-gris); }
+#modal .modal-card .subtitle,
+#modal .modal-card .hint,
+#modal .fin-note,
+#modal .fin-palmares { font-weight: 700; color: var(--b-gris); }
+#modal .modal-card .hint { font-size: 13.5px; }
+#modal .fin-palmares .record { color: var(--gold); font-weight: 900; }
+#modal ul.help { color: var(--b-gris); font-weight: 700; }
+#modal ul.help b { color: var(--b-encre); font-weight: 900; }
+#modal ul.help a { color: var(--b-encre); }
+#modal .credits-auteurs { color: var(--b-gris); }
+#modal .btn {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-weight: 900;
+}
+#modal .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#modal .btn.primary,
+#modal .btn.prog-attend { background: var(--b-jaune); border-color: var(--b-encre); color: var(--b-encre); }
+#modal .btn.danger { border-color: var(--b-encre); background: var(--b-rouge); color: var(--b-papier); }
+#modal .btn.ghost { border-color: transparent; background: none; box-shadow: none; color: var(--b-gris); text-decoration: underline; }
+#modal .btn.small { min-height: 40px; font-weight: 900; }
+#modal .btn[disabled] { opacity: 1; background: var(--b-sable); box-shadow: none; color: var(--b-gris); }
+#modal .btn svg { fill: currentColor; }
+#modal .option {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  color: var(--b-encre);
+}
+#modal .option.active { border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+/* (Deux par rangée dans une fenêtre : à trois, « Tous les pixels de l'écran » se repliait sur quatre lignes.) */
+#modal .options.row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#modal .option-name { font-weight: 900; }
+#modal .option-desc { font-weight: 700; color: var(--b-gris); }
+#modal .option svg { fill: var(--b-encre); }
+#modal .scores th,
+#modal .scores td { border-bottom-color: rgba(23, 18, 14, .22); }
+#modal .scores th { font-weight: 900; }
+#modal .scores td { font-weight: 800; }
+#modal .scores tr.total td { border-top: 2px solid var(--b-encre); color: var(--b-encre); font-weight: 900; }
+/* Ce qu'une partie classée a changé : un carton de sable dans la fenêtre de fin. */
+#modal .prog-fin {
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-sable);
+  font-weight: 800;
+}
+#modal .prog-fin-elo b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 30px; line-height: 1; }
+#modal .prog-fin-elo span,
+#modal .prog-fin-coffre small { color: var(--b-gris); }
+#modal .prog-coffre-nom { font-weight: 900; }
+#modal .prog-couronnes svg { fill: var(--b-jaune); stroke: var(--b-encre); stroke-width: 40px; paint-order: stroke; }
+#modal .prog-vignette { border: 2px solid var(--b-encre); background: var(--b-blanc); }
+#modal .prog-ecu svg { filter: none; stroke: var(--b-encre); stroke-width: 30px; paint-order: stroke; }
+#modal .prog-ecu b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; color: var(--b-encre); }

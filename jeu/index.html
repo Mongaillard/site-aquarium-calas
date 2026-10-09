@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Au doigt et à l’œil — un jeu de stratégie temps réel jouable au doigt, directement dans le navigateur.">
+  <meta name="theme-color" content="#fff4dc">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Au doigt et à l’œil</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><clipPath id='c'><rect width='512' height='512' rx='96'/></clipPath><g clip-path='url(%23c)'><path d='M0 0 512 0 512 512 0 512z' fill='%233aa0e8'/><circle cx='396' cy='118' r='58' fill='%23fff4dc' stroke='%2317120e' stroke-width='12' stroke-linejoin='round'/><path d='M-20 318 532 232 532 352 -20 438z' fill='%23ffc93c' stroke='%2317120e' stroke-width='12' stroke-linejoin='round'/><path d='M-20 430 532 344 532 540 -20 540z' fill='%23173a7a' stroke='%2317120e' stroke-width='12' stroke-linejoin='round'/><path d='M150 236 362 236 362 404 150 404z' fill='%23fff4dc' stroke='%2317120e' stroke-width='12' stroke-linejoin='round'/><path d='M84 172 84 140 106 140 106 158 120 158 120 140 142 140 142 158 156 158 156 140 178 140 178 404 84 404z' fill='%23ffc93c' stroke='%2317120e' stroke-width='12' stroke-linejoin='round'/><path d='M334 172 334 140 356 140 356 158 370 158 370 140 392 140 392 158 406 158 406 140 428 140 428 404 334 404z' fill='%23ffc93c' stroke='%2317120e' stroke-width='12' stroke-linejoin='round'/><path d='M208 112 208 82 230 82 230 100 245 100 245 82 267 82 267 100 282 100 282 82 304 82 304 250 208 250z' fill='%23f0562d' stroke='%2317120e' stroke-width='12' stroke-linejoin='round'/><path d='M226 404 226 318 240 300 272 300 286 318 286 404z' fill='%2317120e'/><path d='M190 264 214 264 214 290 190 290z' fill='%2317120e'/><path d='M298 264 322 264 322 290 298 290z' fill='%2317120e'/></g></svg>">
+  <link rel="stylesheet" href="css/jeu.css">
+  <link rel="stylesheet" href="css/progression.css">
+  <!-- Les menus, direction « Boîte de jeu » (accueil, ligues, coffres, troupes, boutique) : après les deux autres. -->
+  <link rel="stylesheet" href="css/boite.css">
+  <!-- Les collections : autocollants, blason, album, route de la saison. -->
+  <link rel="stylesheet" href="css/collections.css">
+</head>
+<body>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- Écran d'accueil                                                     -->
+<!-- ------------------------------------------------------------------ -->
+<div id="start-screen" class="screen">
+  <div class="start-card">
+    <!-- Le couvercle : la capitale du peuple choisi (la feuille de style montre la bonne), le titre en travers. -->
+    <div class="start-head">
+      <img class="couvercle-capitale" data-civ="atlante" src="assets/centre-ville.webp" alt="" decoding="async">
+      <img class="couvercle-capitale" data-civ="solarien" src="assets/solariens/centre-ville.webp" alt="" decoding="async">
+      <h1>Au doigt et à l’œil</h1>
+      <p class="tagline" data-txt>Récoltez, bâtissez, traversez les âges et écrasez l'adversaire — au doigt.</p>
+    </div>
+
+    <!-- Classement : la ligue, le score, les coffres et les troupes (js/progression-ecrans.js). -->
+    <div id="ligue-box" class="prog-bandeau"></div>
+
+    <div id="resume-box" class="resume-box hidden"></div>
+
+    <h2 data-txt>Votre civilisation</h2>
+    <div id="civ-options" class="options duo peuples"></div>
+
+    <!-- Tout ce qui se règle une fois pour toutes : replié, résumé en une ligne. -->
+    <details id="reglages" class="reglages">
+      <summary>
+        <span class="reglages-titre" data-txt>Réglages de la partie</span>
+        <span id="reglages-resume" class="reglages-resume"></span>
+      </summary>
+
+      <h2 data-txt>Type de partie</h2>
+      <div id="type-options" class="options duo"></div>
+      <p id="equipes-note" class="reglage-note hidden" data-txt>Le 2 contre 2 ne compte ni pour le classement ni pour les coffres : ton allié est l'ordinateur.</p>
+
+      <h2 data-txt>Civilisation adverse</h2>
+      <div id="civ-adverse-options" class="options duo"></div>
+
+      <h2 data-txt>Format de partie</h2>
+      <div id="mode-options" class="options"></div>
+
+      <h2 data-txt>Difficulté</h2>
+      <p id="difficulte-classee" class="reglage-note hidden" data-txt>En partie classée, l'adversaire a la force de ta ligue.</p>
+      <div id="difficulty-options" class="options"></div>
+
+      <h2 data-txt>Taille de la carte</h2>
+      <div id="map-options" class="options row"></div>
+
+      <h2 data-txt>Vitesse de jeu</h2>
+      <div id="speed-options" class="options row"></div>
+    </details>
+
+    <div class="start-actions">
+      <button id="btn-play" class="btn primary large" data-txt>Jouer</button>
+    </div>
+    <p id="palmares" class="palmares hidden"></p>
+    <!-- La troisième tuile du bas, à côté de « Coffres » et « Troupes » (posées par la progression dans #ligue-box). -->
+    <button id="btn-howto" class="btn" aria-expanded="false" aria-controls="howto" data-txt>Aide</button>
+
+    <div id="howto" class="howto hidden">
+      <ul>
+        <li data-txt><b>Glisser</b> : déplacer la vue · <b>pincer</b> : zoomer</li>
+        <li data-txt><b>Toucher</b> une unité pour la sélectionner, <b>double tap</b> pour toutes celles du même type</li>
+        <li data-txt><b>Appui long puis glisser</b> : sélection rectangulaire</li>
+        <li data-txt>Avec une sélection, toucher le sol / un arbre / un ennemi donne l'ordre correspondant</li>
+        <li data-txt>Vos ouvriers n'abandonnent jamais leur poste tout seuls : la barre des ouvriers, en bas à gauche, montre qui fait quoi et permet de les réaffecter</li>
+        <li data-txt>La partie se sauvegarde toute seule : vous pourrez la reprendre ici même</li>
+        <li data-txt>Objectif : ne laisser à l'adversaire ni bâtiment principal ni bâtiment militaire (en mode Express, son bâtiment principal suffit — sinon, au bout du temps, le meilleur score l'emporte)</li>
+      </ul>
+    </div>
+    <p class="credits" id="note-autonome" data-txt>Jeu web autonome : il fonctionne hors ligne une fois chargé. Ta progression est gardée sur cet appareil, et avec ton compte là où la page le permet.</p>
+    <!-- La politique de confidentialité se lit dans le jeu, l'effacement des données aussi : les magasins le demandent. -->
+    <button id="btn-confidentialite" class="btn ghost" data-ecran="confidentialite" data-txt>Confidentialité et données</button>
+    <!-- La langue du jeu (js/langue.js) : son nom s'écrit dans chaque langue, pour qui ne lit pas celle-ci. -->
+    <button id="btn-langue" class="btn ghost" data-ecran="langue">Langue · Language</button>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- Jeu                                                                 -->
+<!-- ------------------------------------------------------------------ -->
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden">
+  <header id="topbar">
+    <div class="top-left">
+      <div class="res-group">
+        <div class="res"><span class="res-icon" data-icone="food"></span><span id="res-food">0</span></div>
+        <div class="res"><span class="res-icon" data-icone="wood"></span><span id="res-wood">0</span></div>
+        <div class="res"><span class="res-icon" data-icone="gold"></span><span id="res-gold">0</span></div>
+        <div class="res"><span class="res-icon" data-icone="population"></span><span id="res-pop">0/0</span></div>
+      </div>
+      <div id="age-box">
+        <span id="age-label">Âge Sombre</span>
+        <span class="sep">·</span>
+        <span id="game-timer">0:00</span>
+        <span id="score-box" class="hidden" aria-label="Score : le vôtre, puis celui de l'adversaire" data-txt-attr="aria-label">
+          <span class="sep">·</span>
+          <span class="score-icone" data-icone="score"></span>
+          <b id="score-moi">0</b>
+          <span class="sep">–</span>
+          <b id="score-adverse">0</b>
+        </span>
+        <span id="positions-box" class="hidden" aria-label="Les positions : à qui elles sont" data-txt-attr="aria-label"></span>
+        <div class="age-progress hidden"><span id="age-bar"></span></div>
+      </div>
+    </div>
+    <div class="top-right">
+      <button id="btn-allie" class="icon-btn hidden" aria-label="Donner une consigne à votre allié" data-txt-attr="aria-label" data-icone="ouvriers"></button>
+      <button id="btn-sound" class="icon-btn" aria-label="Son" data-txt-attr="aria-label" data-icone="son"></button>
+      <button id="btn-menu" class="icon-btn" aria-label="Menu" data-txt-attr="aria-label" data-icone="menu"></button>
+    </div>
+  </header>
+
+  <div id="minimap-wrap">
+    <canvas id="minimap" width="160" height="160"></canvas>
+  </div>
+
+  <div id="alerts"></div>
+  <div id="build-hint" class="hidden"></div>
+
+  <div id="worker-bar">
+    <button id="btn-workers" class="worker-open" aria-label="Affecter les ouvriers" data-txt-attr="aria-label" data-icone="ouvriers"></button>
+    <button class="worker-chip" data-task="food"><span data-icone="food"></span><b id="wk-food">0</b></button>
+    <button class="worker-chip" data-task="wood"><span data-icone="wood"></span><b id="wk-wood">0</b></button>
+    <button class="worker-chip" data-task="gold"><span data-icone="gold"></span><b id="wk-gold">0</b></button>
+    <button class="worker-chip" data-task="build"><span data-icone="chantier"></span><b id="wk-build">0</b></button>
+    <button class="worker-chip idle" data-task="idle"><span data-icone="idle"></span><b id="wk-idle">0</b></button>
+    <button id="btn-armee" class="worker-chip armee" aria-label="Sélectionner toute l'armée" data-txt-attr="aria-label"><span data-icone="forging"></span><b id="wk-armee">0</b></button>
+  </div>
+
+  <footer id="bottombar">
+    <button id="btn-lacher" class="icon-btn hidden" aria-label="Lâcher la sélection" data-txt-attr="aria-label" data-icone="fermer"></button>
+    <div id="selection-panel"></div>
+    <div id="command-panel"></div>
+  </footer>
+</div>
+
+<div id="build-menu" class="overlay hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 data-txt>Construire</h2>
+      <button id="btn-close-build" class="icon-btn" data-icone="fermer"></button>
+    </div>
+    <div id="build-list" class="build-list"></div>
+  </div>
+</div>
+
+<div id="worker-menu" class="overlay hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 data-txt>Affectation des ouvriers</h2>
+      <button id="btn-close-workers" class="icon-btn" data-icone="fermer"></button>
+    </div>
+    <div id="worker-list" class="worker-list"></div>
+    <label class="switch-row">
+      <input type="checkbox" id="auto-workers">
+      <span>
+        <b data-txt>Réaffectation automatique</b>
+        <small data-txt>Quand un gisement s'épuise, l'ouvrier repart seul sur le suivant. Désactivé, il rapporte son chargement puis attend vos ordres.</small>
+      </span>
+    </label>
+  </div>
+</div>
+
+<div id="modal" class="overlay hidden"></div>
+<!-- Au-dessus de tout, écran de fin compris : ligues, coffres, troupes. -->
+<div id="progression" class="overlay hidden"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

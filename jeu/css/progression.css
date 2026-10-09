@@ -1,0 +1,234 @@
+/* ---------------------------------------------------------------------------
+   Classement, ligues, coffres, troupes : le bandeau de l'accueil, les écrans
+   et le bloc de l'écran de fin (js/progression-ecrans.js). Mêmes couleurs que
+   le reste de l'interface : tout vient des variables de css/jeu.css.
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* Les trois catégories de troupes et les quatre rangs de coffres : des tons qui se lisent sur le papier. */
+  --commune: #56626e;
+  --rare: #1c6bb5;
+  --epique: #7437c2;
+  --coffre-bois: #8a5a2b;
+  --coffre-argent: #5b6875;
+  --coffre-or: #9c6200;
+  --coffre-legendaire: #7437c2;
+}
+
+/* Au-dessus de l'écran de fin, d'où l'on ouvre ses coffres. */
+#progression { z-index: 45; align-items: center; justify-content: center; padding: 16px; }
+
+/* --- Morceaux communs ------------------------------------------------------- */
+
+.prog-barre {
+  display: block; height: 6px; border-radius: 3px; overflow: hidden;
+}
+.prog-barre > span { display: block; height: 100%; border-radius: 3px; }
+
+.prog-ecu { position: relative; display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; color: var(--coffre-bois); }
+.prog-ecu svg { grid-area: 1 / 1; fill: currentColor; }
+/* (Positionné : l'ombre portée met l'écu au-dessus d'un texte qui ne le serait pas.) */
+.prog-ecu b { position: relative; grid-area: 1 / 1; margin-top: -4px; font-family: var(--titre); font-size: 17px; }
+.prog-ecu.petit { width: 22px; height: 22px; vertical-align: -5px; }
+.prog-ecu.petit svg { width: 22px; height: 22px; }
+.prog-ecu.petit b { font-size: 11px; margin-top: -2px; }
+.prog-ecu[data-ligue="2"] { color: #9aa3ad; }
+.prog-ecu[data-ligue="3"] { color: #c8823f; }
+.prog-ecu[data-ligue="4"] { color: #8f9aa8; }
+.prog-ecu[data-ligue="5"] { color: #d5dde6; }
+.prog-ecu[data-ligue="6"] { color: #e8b64c; }
+.prog-ecu[data-ligue="7"] { color: #8fe0f0; }
+.prog-ecu[data-ligue="8"] { color: #3fd0b4; }
+.prog-ecu[data-ligue="9"] { color: #ffcf5a; }
+.prog-ecu[data-ligue="10"] { color: #c58bf2; }
+
+.prog-categorie { font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--commune); }
+.prog-categorie[data-categorie="rare"] { color: var(--rare); }
+.prog-categorie[data-categorie="epique"] { color: var(--epique); }
+
+.prog-vignette {
+  display: inline-grid; place-items: center; flex: none; width: 46px; height: 46px; overflow: hidden;
+  border-radius: 10px; border: 2px solid var(--commune);
+}
+.prog-vignette[data-categorie="rare"] { border-color: var(--rare); }
+.prog-vignette[data-categorie="epique"] { border-color: var(--epique); }
+.prog-vignette img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
+.prog-vignette svg { fill: var(--text); opacity: .85; }
+.prog-vignette.grande { width: 76px; height: 76px; border-radius: 14px; }
+.prog-vignette.petite { width: 26px; height: 26px; border-radius: 6px; border-width: 1px; vertical-align: -8px; }
+
+.prog-pastille {
+  display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 2px; border-radius: 9px;
+ font-size: 12px; line-height: 18px; text-align: center;
+}
+.btn.prog-attend { border-color: var(--gold); }
+/* Un montant en Couronnes (écran de fin) : le pictogramme, puis le nombre. */
+.prog-couronnes { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prog-couronnes svg { fill: var(--gold); }
+
+/* --- Bandeau de l'accueil ---------------------------------------------------- */
+
+.prog-bandeau { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+.prog-bandeau:empty { display: none; }
+.prog-bandeau-ligue {
+  display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; min-height: 52px; padding: 6px 10px;
+  text-align: left; color: var(--text); font: inherit; cursor: pointer;
+ border: 1px solid var(--border); border-radius: var(--radius);
+}
+.prog-bandeau-ligue:active { transform: scale(.99); }
+.prog-bandeau-texte { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.prog-bandeau-texte b { font-family: var(--titre); font-size: 16px; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prog-bandeau-texte small { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prog-bandeau-actions { display: grid; gap: 6px; flex: none; }
+.prog-bandeau-actions .btn { min-height: 0; height: 30px; padding: 0 10px; justify-content: flex-start; white-space: nowrap; }
+.prog-bandeau-actions svg { fill: currentColor; }
+
+.reglage-note { margin: -2px 0 8px; font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+.options.inactives { opacity: .4; pointer-events: none; }
+
+/* --- Écrans ------------------------------------------------------------------- */
+
+.prog-carte h3 { margin: 16px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.prog-tete { display: flex; align-items: center; gap: 8px; margin: -4px 0 8px; }
+.prog-tete h2 { flex: 1; margin: 0; min-width: 0; }
+.prog-tete .icon-btn svg { fill: currentColor; }
+.prog-vide, .prog-annonce { margin: 10px 0; font-size: 14px; line-height: 1.45; }
+.prog-annonce svg { fill: currentColor; }
+.prog-annonce .btn { display: inline-flex; min-height: 32px; margin: 2px 0; }
+
+.prog-ligues, .prog-coffres, .prog-prochains, .prog-tirages { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.prog-ligue {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; opacity: .62;
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+.prog-ligue.atteinte { opacity: .85; }
+.prog-ligue.actuelle { opacity: 1; border-color: var(--gold); }
+.prog-ligue-texte { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.prog-ligue-texte b { font-family: var(--titre); font-size: 16px; }
+.prog-ligue-texte small { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.prog-ligue-texte .prog-lot { color: var(--text); }
+.prog-ici { flex: none; font-size: 11px; font-weight: 650; color: var(--gold); text-transform: uppercase; letter-spacing: .05em; }
+
+.prog-coffre { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 6px; border: 1px solid var(--border); border-radius: var(--radius); }
+.prog-coffre-image { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 10px; color: var(--coffre-bois); }
+.prog-coffre-image svg { fill: currentColor; }
+/* La fiche écrite d'une troupe : quatre rubriques courtes, le titre en marge. */
+.prog-fiche-texte { display: grid; gap: 7px; margin: 2px 0 10px; }
+.prog-fiche-texte > div { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: baseline; }
+.prog-fiche-texte dt { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.prog-fiche-texte dd { margin: 0; font-size: 14px; line-height: 1.35; min-width: 0; }
+.prog-fiche-texte [data-rubrique="bat"] dt { color: var(--good); }
+.prog-fiche-texte [data-rubrique="craint"] dt { color: var(--error); }
+.prog-fiche-texte [data-rubrique="conseil"] dt { color: var(--gold); }
+/* Les coffres illustrés (assets/coffres, 300 × 330) : fermé dans les listes, les trois états à l'ouverture. */
+.prog-coffre-img { display: block; height: auto; max-width: none; }
+.prog-coffre-image { overflow: visible; background: none; width: 56px; height: 56px; }
+.prog-coffre-tete { display: flex; justify-content: center; gap: 18px; margin: 0 0 4px; }
+/* L'ouverture : trois images qui se succèdent sans fondu — il se ferme sur un frémissement, s'entrouvre, s'ouvre. */
+.prog-ouverture { position: relative; width: 190px; height: 209px; margin: 0 auto 8px; }
+.prog-ouverture img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; animation-duration: 1s; animation-fill-mode: both; animation-timing-function: linear; }
+.prog-ouverture .e1 { animation-name: coffre-ferme; transform-origin: 50% 90%; }
+.prog-ouverture .e2 { animation-name: coffre-entrouvert; }
+.prog-ouverture .e3 { animation-name: coffre-ouvert; transform-origin: 50% 90%; }
+@keyframes coffre-ferme {
+  0% { opacity: 1; transform: rotate(0); } 12% { opacity: 1; transform: rotate(-3deg); } 24% { opacity: 1; transform: rotate(3deg); }
+  36% { opacity: 1; transform: rotate(-2deg); } 45% { opacity: 1; transform: rotate(0); } 45.01%, 100% { opacity: 0; }
+}
+@keyframes coffre-entrouvert { 0%, 45% { opacity: 0; } 45.01%, 72% { opacity: 1; } 72.01%, 100% { opacity: 0; } }
+@keyframes coffre-ouvert { 0%, 72% { opacity: 0; transform: scale(.93); } 72.01% { opacity: 1; transform: scale(.93); } 86% { opacity: 1; transform: scale(1.04); } 100% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .prog-ouverture img { animation-duration: 1ms; } }
+.prog-coffre[data-type="argent"] .prog-coffre-image, .prog-coffre-nom[data-type="argent"] { color: var(--coffre-argent); }
+.prog-coffre[data-type="or"] .prog-coffre-image, .prog-coffre-nom[data-type="or"] { color: var(--coffre-or); }
+.prog-coffre[data-type="legendaire"] .prog-coffre-image, .prog-coffre-nom[data-type="legendaire"] { color: var(--coffre-legendaire); }
+.prog-coffre-nom { font-weight: 650; color: var(--coffre-bois); }
+.prog-coffre-texte { display: grid; flex: 1; min-width: 0; }
+.prog-coffre-texte b { font-size: 15px; line-height: 1.15; }
+.prog-coffre .btn.small { flex: none; padding: 6px 14px; }
+.prog-coffre-texte small { font-size: 12px; color: var(--muted); }
+.prog-coffre .icon-btn { width: 36px; height: 36px; min-width: 36px; }
+.prog-coffre .icon-btn svg { fill: currentColor; }
+
+.prog-choix-coffres { margin-top: 0; gap: 6px; }
+.prog-choix-coffres .btn { flex: 1; min-width: 0; display: grid; justify-items: center; gap: 0; padding: 4px 2px 6px; font-size: 11px; text-transform: capitalize; }
+.prog-rangs { table-layout: fixed; }
+.prog-rangs th:first-child { width: 24%; }
+.prog-rangs th { padding-bottom: 2px; }
+.prog-rangs th img { margin-left: auto; }
+.prog-rangs td { font-variant-numeric: tabular-nums; }
+.prog-prochains li { display: grid; gap: 4px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.prog-prochains li:last-child { border-bottom: 0; }
+.prog-prochains small { font-size: 12px; color: var(--muted); line-height: 1.35; }
+
+.prog-probas td:first-child { color: var(--text); }
+.prog-regles { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+.prog-tirage {
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  opacity: 0; animation: prog-apparait .32s ease-out forwards;
+}
+@keyframes prog-apparait { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .prog-tirage { animation-duration: 1ms; animation-delay: 0ms !important; } }
+.prog-tirage-texte { display: grid; flex: 1; min-width: 0; }
+.prog-tirage-texte small { font-size: 12px; color: var(--muted); }
+.prog-gain { flex: none; font-weight: 650; color: var(--gold); font-variant-numeric: tabular-nums; }
+
+.prog-grille { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.prog-troupe {
+  display: grid; justify-items: center; gap: 4px; padding: 10px 6px 8px; min-width: 0;
+  color: var(--text); font: inherit; text-align: center; cursor: pointer;
+ border: 1px solid var(--border); border-radius: var(--radius);
+}
+.prog-troupe:active { transform: scale(.98); }
+.prog-troupe b { font-size: 13px; line-height: 1.2; max-width: 100%; overflow-wrap: anywhere; }
+.prog-troupe small { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.prog-troupe .prog-barre { width: 100%; }
+.prog-niveau { font-size: 12px; font-weight: 650; color: var(--gold); }
+.prog-troupe.prete { border-color: var(--gold); }
+.prog-troupe.verrouillee .prog-vignette { filter: grayscale(1) brightness(.6); }
+.prog-verrou svg { fill: currentColor; vertical-align: -1px; }
+
+.prog-fiche-tete { display: flex; align-items: center; gap: 12px; margin: 4px 0 10px; }
+.prog-fiche-tete p { display: grid; gap: 2px; margin: 0; font-size: 15px; }
+.prog-stats td:first-child { color: var(--muted); }
+.prog-monte { color: var(--gold); font-weight: 650; }
+.prog-cout { display: grid; gap: 4px; margin-top: 12px; }
+.prog-cout small { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.btn[disabled] { opacity: .45; pointer-events: none; }
+
+/* --- Écran de fin --------------------------------------------------------------- */
+
+.prog-fin {
+  display: grid; gap: 6px; margin: 0 0 12px; padding: 10px 12px;
+  border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: var(--radius);
+ font-size: 14px; line-height: 1.4;
+}
+.prog-fin p { margin: 0; }
+.prog-fin-elo { display: flex; align-items: baseline; gap: 10px; }
+.prog-fin-elo b { font-family: var(--titre); font-size: 26px; font-variant-numeric: tabular-nums; }
+.prog-fin-elo.monte b { color: var(--good); }
+.prog-fin-elo.descend b { color: var(--error); }
+.prog-fin-elo span { color: var(--muted); }
+.prog-fin-coffres { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.prog-fin-coffre { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 8px; }
+.prog-fin-coffre img { grid-row: span 2; }
+.prog-fin-coffre .prog-coffre-nom { align-self: end; }
+.prog-fin-coffre small { align-self: start; color: var(--muted); font-size: 12px; }
+.prog-fin .btn { justify-self: start; margin-top: 2px; }
+.prog-fin .btn svg { fill: currentColor; }
+
+/* --- En partie : une troupe à débloquer ------------------------------------------ */
+
+.cmd.verrou { position: relative; }
+.cmd.verrou .cmd-icon, .cmd.verrou .cmd-label, .cmd.verrou .cmd-cost { opacity: .5; }
+.cmd-verrou { position: absolute; top: 3px; right: 3px; }
+.cmd-verrou svg { fill: var(--gold); }
+
+/* Téléphone étroit : la ligue garde toute la largeur, coffres et troupes passent dessous, côte à côte. */
+@media (max-width: 400px) {
+  .prog-bandeau { flex-wrap: wrap; gap: 6px; }
+  .prog-bandeau-ligue { flex-basis: 100%; }
+  .prog-bandeau-actions { display: flex; flex: 1; }
+  .prog-bandeau-actions .btn { flex: 1; justify-content: center; }
+  .prog-grille { gap: 6px; }
+}

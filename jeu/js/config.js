@@ -1,0 +1,712 @@
+// ---------------------------------------------------------------------------
+// Données de jeu : unités, bâtiments, technologies, âges, équilibrage.
+// Tout est exprimé en unités « logiques » :
+//   - distances et portées en cases (TILE pixels monde par case)
+//   - vitesses en cases/seconde
+//   - temps en secondes
+// ---------------------------------------------------------------------------
+
+import { LANGUE, txt } from './langue.js';
+
+export const TILE = 32;
+export const TICKS_PER_SECOND = 20;
+export const TICK_MS = 1000 / TICKS_PER_SECOND;
+export const POP_MAX = 60;
+
+export const RESOURCES = ['food', 'wood', 'gold'];
+
+/**
+ * Attitudes de combat, reprises d'Age of Empires : elles décident si une unité
+ * engage d'elle-même, jusqu'où elle poursuit et si elle revient à son poste.
+ *   chase : distance maximale de poursuite (en cases) depuis le point de garde
+ */
+export const STANCES = {
+  aggressive: {
+    id: 'aggressive', name: 'Agressif', short: 'Agressif', icon: 'aggressive', chase: 9,
+    desc: 'Engage tout ennemi en vue et le poursuit loin.',
+  },
+  defensive: {
+    id: 'defensive', name: 'Défensif', short: 'Défensif', icon: 'defensive', chase: 4,
+    desc: 'Engage ce qui approche, puis revient à son poste.',
+  },
+  standGround: {
+    id: 'standGround', name: 'Position tenue', short: 'Tenir', icon: 'standGround', chase: 0,
+    desc: 'Ne bouge pas : ne frappe que ce qui entre à portée.',
+  },
+  passive: {
+    id: 'passive', name: 'Sans attaque', short: 'Passif', icon: 'passive', chase: 0,
+    desc: 'N’attaque jamais de sa propre initiative.',
+  },
+};
+
+export const DEFAULT_STANCE = { villager: 'passive', military: 'aggressive' };
+
+/** Rendement décroissant des bâtisseurs : n ouvriers valent n^0,75 ouvriers. */
+export const BUILDER_EXPONENT = 0.75;
+
+export const RESOURCE_LABELS = {
+  food: 'Nourriture',
+  wood: 'Bois',
+  gold: 'Or',
+};
+
+/**
+ * Illustrations de personnage, quand il en existe une : elles remplacent
+ * l'icône dans le panneau de sélection. Tout type absent retombe sur son
+ * icône — le jeu ne dépend d'aucune image pour fonctionner.
+ */
+export const PORTRAITS = {
+  villager: 'assets/portrait-villageois.webp',
+  archer: 'assets/portrait-archer.webp',
+  militia: 'assets/portrait-milicien.webp',
+  hydra: 'assets/portrait-hydre.webp',
+  priest: 'assets/portrait-pretresse.webp',
+  knight: 'assets/portrait-cavalier.webp',
+  spearman: 'assets/portrait-lancier.webp',
+  champion: 'assets/portrait-champion.webp',
+  scout: 'assets/portrait-eclaireur.webp',
+  catapult: 'assets/portrait-catapulte.webp',
+  crossbowman: 'assets/portrait-arbaletrier.webp',
+  horseArcher: 'assets/portrait-archer-monte.webp',
+  ram: 'assets/portrait-belier.webp',
+  pavoisier: 'assets/portrait-pavoisier.webp',
+  frondeur: 'assets/portrait-frondeur.webp',
+  sapeur: 'assets/portrait-sapeur.webp',
+  triton: 'assets/portrait-triton.webp',
+};
+
+export const RESOURCE_ICONS = { food: 'food', wood: 'wood', gold: 'gold' };
+
+// --- Âges -------------------------------------------------------------------
+
+// Un âge se mérite : son prix, et `requis` — des bâtiments TERMINÉS de l'âge en
+// cours : tous ceux de `types`, ou `nombre` d'entre eux, au choix, quand il est
+// donné (voir World.conditionAge). Sans cela il n'y avait qu'une ouverture :
+// tout le monde à la nourriture, et le stock de départ de l'Express payait
+// l'Âge des Châteaux à la première seconde.
+export const AGES = [
+  { id: 0, name: 'Âge Sombre', short: 'I' },
+  { id: 1, name: 'Âge Féodal', short: 'II', cost: { food: 400 }, time: 40,
+    requis: { types: ['barracks', 'mill'] } },
+  { id: 2, name: 'Âge des Châteaux', short: 'III', cost: { food: 600, gold: 200 }, time: 55,
+    requis: { types: ['archery', 'stable', 'blacksmith', 'temple'], nombre: 2 } },
+];
+
+// --- Unités -----------------------------------------------------------------
+//  class    : catégorie utilisée pour les bonus de dégâts
+//  attackType: 'melee' ou 'pierce' (confronté à l'armure correspondante)
+//  bonus    : dégâts supplémentaires contre une catégorie
+//  bonusType: dégâts supplémentaires contre un TYPE précis, en plus de `bonus`
+//             (voir computeDamage) — quand la catégorie ne dit pas la cible
+
+export const UNIT_TYPES = {
+  villager: {
+    id: 'villager', name: 'Villageois', icon: 'villager', class: 'villager',
+    cost: { food: 50 }, trainTime: 20, hp: 45, speed: 1.15,
+    attack: 3, attackType: 'melee', range: 0.7, attackSpeed: 2.0,
+    meleeArmor: 0, pierceArmor: 0, los: 5, radius: 9,
+    carry: 10, gather: { wood: 0.55, gold: 0.50, food: 0.50 },
+    from: 'towncenter', age: 0,
+    desc: 'Récolte, construit et répare. La base de toute économie.',
+  },
+  militia: {
+    id: 'militia', name: 'Milicien', icon: 'militia', class: 'infantry',
+    cost: { food: 60, gold: 20 }, trainTime: 16, hp: 45, speed: 1.0,
+    attack: 5, attackType: 'melee', range: 0.8, attackSpeed: 1.8,
+    meleeArmor: 1, pierceArmor: 1, los: 5, radius: 9,
+    from: 'barracks', age: 0,
+    desc: 'Fantassin polyvalent et bon marché.',
+  },
+  spearman: {
+    id: 'spearman', name: 'Lancier', icon: 'spearman', class: 'infantry',
+    cost: { food: 35, wood: 25 }, trainTime: 14, hp: 45, speed: 1.0,
+    attack: 4, attackType: 'melee', range: 1.0, attackSpeed: 2.0,
+    bonus: { cavalry: 10, siege: 6 },
+    meleeArmor: 0, pierceArmor: 0, los: 5, radius: 9,
+    from: 'barracks', age: 1,
+    desc: 'Redoutable contre la cavalerie et les engins de siège.',
+  },
+  // L'unité de l'Atelier 3D : un homme-poisson venu de l'Atlantide. Pas de
+  // planche dessinée, seulement son modèle animé (js/modele3d.js).
+  triton: {
+    id: 'triton', name: 'Atlante', icon: 'triton', class: 'infantry',
+    cost: { food: 55, gold: 35 }, trainTime: 18, hp: 60, speed: 1.05,
+    attack: 6, attackType: 'melee', range: 1.1, attackSpeed: 2.0,
+    bonus: { cavalry: 6 },
+    meleeArmor: 1, pierceArmor: 1, los: 5, radius: 10,
+    from: 'barracks', age: 1,
+    desc: 'Homme-poisson au trident, venu de l’Atlantide : robuste, et sa longue arme tient la cavalerie à distance.',
+  },
+  archer: {
+    id: 'archer', name: 'Archer', icon: 'archer', class: 'archer',
+    cost: { wood: 25, gold: 45 }, trainTime: 18, hp: 30, speed: 1.0,
+    attack: 4, attackType: 'pierce', range: 5, attackSpeed: 2.0,
+    bonus: { infantry: 1 },
+    meleeArmor: 0, pierceArmor: 0, los: 6, radius: 8,
+    projectile: true,
+    from: 'archery', age: 1,
+    desc: 'Tire à distance. Fragile au corps à corps.',
+  },
+  // L'Arbalétrier : un carreau lourd, lent à recharger, qui perce les armures —
+  // la réponse de l'Archerie à l'infanterie lourde.
+  crossbowman: {
+    id: 'crossbowman', name: 'Arbalétrier', icon: 'crossbowman', class: 'archer',
+    cost: { wood: 40, gold: 60 }, trainTime: 22, hp: 40, speed: 0.95,
+    attack: 9, attackType: 'pierce', range: 6, attackSpeed: 3.2,
+    bonus: { infantry: 8 },
+    meleeArmor: 0, pierceArmor: 1, los: 7, radius: 9,
+    projectile: true,
+    from: 'archery', age: 2,
+    desc: 'Un carreau lourd, de plus loin que l’archer : il perce l’armure de l’infanterie. Lent à recharger.',
+  },
+  // L'Archer monté : la portée d'un archer, les jambes d'un cheval. Il harcèle
+  // et s'esquive ; les lanciers le fauchent comme toute cavalerie.
+  horseArcher: {
+    id: 'horseArcher', name: 'Archer monté', pluriel: 'Archers montés', icon: 'horseArcher', class: 'cavalry',
+    cost: { wood: 50, gold: 70 }, trainTime: 26, hp: 60, speed: 1.45,
+    attack: 5, attackType: 'pierce', range: 5, attackSpeed: 2.0,
+    meleeArmor: 0, pierceArmor: 1, los: 7, radius: 11,
+    projectile: true,
+    from: 'archery', age: 2,
+    desc: 'Archer à cheval : rapide, il tire puis s’esquive — idéal pour harceler. Craint les lanciers.',
+  },
+  scout: {
+    id: 'scout', name: 'Éclaireur', icon: 'scout', class: 'cavalry',
+    cost: { food: 80 }, trainTime: 20, hp: 45, speed: 1.75,
+    attack: 3, attackType: 'melee', range: 0.9, attackSpeed: 2.2,
+    meleeArmor: 0, pierceArmor: 2, los: 9, radius: 10,
+    from: 'stable', age: 1,
+    desc: 'Très rapide et large champ de vision : idéal pour explorer.',
+  },
+  knight: {
+    id: 'knight', name: 'Cavalier', icon: 'knight', class: 'cavalry',
+    cost: { food: 60, gold: 75 }, trainTime: 22, hp: 100, speed: 1.5,
+    attack: 10, attackType: 'melee', range: 0.9, attackSpeed: 1.8,
+    bonus: { archer: 4, villager: 2, siege: 5 },
+    meleeArmor: 2, pierceArmor: 2, los: 6, radius: 11,
+    from: 'stable', age: 2,
+    desc: 'Cavalerie lourde. Fonce sur les archers et les villageois.',
+  },
+  champion: {
+    id: 'champion', name: 'Champion', icon: 'champion', class: 'infantry',
+    cost: { food: 70, gold: 50 }, trainTime: 22, hp: 85, speed: 0.95,
+    attack: 9, attackType: 'melee', range: 0.8, attackSpeed: 1.8,
+    meleeArmor: 2, pierceArmor: 2, los: 5, radius: 10,
+    from: 'barracks', age: 2,
+    desc: 'Infanterie lourde en armure complète : tient la ligne là où le milicien plie.',
+  },
+  ram: {
+    id: 'ram', name: 'Bélier', icon: 'ram', class: 'siege',
+    cost: { wood: 160, gold: 75 }, trainTime: 26, hp: 200, speed: 0.6,
+    attack: 4, attackType: 'melee', range: 1.2, attackSpeed: 4.0,
+    bonus: { building: 35 },
+    meleeArmor: 2, pierceArmor: 7, los: 4, radius: 13,
+    from: 'siege', age: 2,
+    desc: 'Démolit les bâtiments. Lent et vulnérable aux lanciers.',
+  },
+  // La créature de l'Atelier 3D : sept têtes sur trois cous, invoquée au
+  // Temple. Lente à venir et chère, elle vaut une escouade — et en occupe la
+  // place : trois de population (`pop`, 1 pour toute autre unité). Ses trois
+  // cous mordent chacun leur ennemi : `morsures` troupes par coup, sa cible et
+  // ses voisines devant elle (voir World.morsuresVoisines). Chaque morsure est
+  // plus faible que son ancienne morsure unique (14), le bonus contre les
+  // bâtiments compense : un mur, lui, n'est mordu qu'une fois.
+  hydra: {
+    id: 'hydra', name: 'Hydre', icon: 'hydra', class: 'monster',
+    cost: { food: 200, gold: 200 }, trainTime: 45, hp: 280, speed: 0.9,
+    attack: 11, attackType: 'melee', range: 1.3, attackSpeed: 2.0, morsures: 3,
+    bonus: { building: 9 },
+    meleeArmor: 2, pierceArmor: 2, los: 6, radius: 16, pop: 3,
+    from: 'temple', age: 2,
+    desc: 'Monstre à sept têtes invoqué au Temple : encaisse comme une escouade et mord jusqu’à trois ennemis à la fois. Occupe 3 places de population.',
+  },
+  // La Prêtresse ne se bat pas : elle soigne. Son « coup » est un soin — même
+  // portée, même cadence que l'attaque d'une autre unité, mais sa cible est un
+  // allié blessé, à qui chaque geste rend `heal` points de vie.
+  priest: {
+    id: 'priest', name: 'Prêtresse', icon: 'priest', class: 'support',
+    cost: { food: 40, gold: 80 }, trainTime: 28, hp: 30, speed: 0.95,
+    attack: 0, attackType: 'melee', range: 4, attackSpeed: 2.0, heal: 8,
+    meleeArmor: 0, pierceArmor: 0, los: 6, radius: 8,
+    from: 'temple', age: 1,
+    desc: 'Soigne les unités blessées à portée : 8 points de vie toutes les 2 s. Sans défense — gardez-la derrière vos lignes.',
+  },
+  // La Catapulte : un boulet lancé sur un POINT (là où se tenait la cible),
+  // qui blesse tout ce qui s'y trouve à l'arrivée dans un rayon de `splash`
+  // cases — ses propres troupes comprises (voir World.impactDeZone). Une
+  // troupe qui bouge l'esquive ; un bâtiment, jamais.
+  catapult: {
+    id: 'catapult', name: 'Catapulte', icon: 'catapult', class: 'siege',
+    cost: { wood: 180, gold: 110 }, trainTime: 30, hp: 70, speed: 0.55,
+    attack: 26, attackType: 'melee', range: 7, attackSpeed: 5.0,
+    bonus: { building: 34 },
+    meleeArmor: 0, pierceArmor: 6, los: 8, radius: 13,
+    projectile: true, splash: 0.8,
+    from: 'siege', age: 2,
+    desc: 'Lance des boulets de loin : dégâts de zone, redoutable contre les bâtiments et les troupes à l’arrêt. Un soldat ou un rang en marche l’esquive (pas une colonne profonde), et le boulet blesse aussi vos hommes. Lente, sans défense au corps à corps.',
+  },
+  // Les trois troupes des ligues 6 à 8 (voir js/progression-config.js). Leurs
+  // valeurs sont des hypothèses de départ, à régler. L'ordinateur ne les forme
+  // pas de lui-même : seulement quand la partie les lui donne (World, option
+  // `troupesEnPlus`) — sans elle, une partie est celle d'avant.
+  //
+  // Le Pavoisier : un mur. Son grand bouclier arrête les flèches des archers et
+  // des tours (armure perforante 6) ; il avance lentement et frappe peu.
+  pavoisier: {
+    id: 'pavoisier', name: 'Pavoisier', icon: 'pavoisier', class: 'infantry',
+    cost: { food: 60, gold: 40 }, trainTime: 20, hp: 70, speed: 0.85,
+    attack: 4, attackType: 'melee', range: 0.8, attackSpeed: 2.0,
+    meleeArmor: 1, pierceArmor: 6, los: 5, radius: 10,
+    from: 'barracks', age: 1,
+    desc: 'Fantassin au grand bouclier : un mur contre les flèches des archers et des tours. Lent, il frappe peu — cavaliers, champions et catapultes l’enfoncent.',
+  },
+  // Le Frondeur : le tireur du pauvre, sans or. Ses pierres valent peu, sauf
+  // contre les tireurs d'en face — les archers par leur classe, l'Archer monté
+  // par son type : il est de la cavalerie, d'où `bonusType`.
+  frondeur: {
+    id: 'frondeur', name: 'Frondeur', icon: 'frondeur', class: 'archer',
+    cost: { food: 30, wood: 30 }, trainTime: 16, hp: 30, speed: 1.05,
+    attack: 3, attackType: 'pierce', range: 4, attackSpeed: 2.0,
+    bonus: { archer: 6 }, bonusType: { horseArcher: 6 },
+    meleeArmor: 0, pierceArmor: 1, los: 6, radius: 8,
+    projectile: true,
+    from: 'archery', age: 1,
+    desc: 'Tireur bon marché : ses pierres abattent les archers et les archers montés. Portée courte, et rien pour se défendre au corps à corps.',
+  },
+  // Le Sapeur : il court aux murs et aux engins, et ne tient pas sous les
+  // coups — 35 points de vie, aucune armure.
+  sapeur: {
+    id: 'sapeur', name: 'Sapeur', icon: 'sapeur', class: 'infantry',
+    cost: { food: 50, gold: 40 }, trainTime: 18, hp: 35, speed: 1.3,
+    attack: 3, attackType: 'melee', range: 0.8, attackSpeed: 2.0,
+    // +10 contre les bâtiments : à prix égal, une fois et demie plus vite que
+    // le bélier sur un bâtiment sans défense — et bien plus vite rendu sur
+    // place —, mais une tour lui prend ses hommes là où le bélier ne craint
+    // rien. À +25 (première valeur essayée), cinq sapeurs rasaient une caserne
+    // trois fois plus vite que deux béliers, et huit le bâtiment principal
+    // d'une partie Express en dix secondes.
+    bonus: { building: 10, siege: 8 },
+    meleeArmor: 0, pierceArmor: 0, los: 5, radius: 9,
+    from: 'barracks', age: 2,
+    desc: 'Rapide, il sape les bâtiments et brise les engins de siège. Très fragile : tout soldat l’abat en quelques coups.',
+  },
+  // Les animaux vivent sur la carte : ni produits, ni comptés dans la
+  // population, sans camp (voir Animal, entities.js). `food` est ce que rend
+  // leur carcasse ; un animal `sauvage` fuit quand on le frappe, un
+  // `capturable` devient le bien du premier joueur qui l'approche.
+  deer: {
+    id: 'deer', name: 'Cerf', icon: 'food', class: 'animal',
+    cost: {}, trainTime: 0, hp: 15, speed: 1.35,
+    attack: 0, attackType: 'melee', range: 0, attackSpeed: 1,
+    meleeArmor: 0, pierceArmor: 0, los: 1, radius: 8,
+    food: 140, sauvage: true, patureCases: 2.5,
+    desc: 'Gibier : sa carcasse vaut 140 de nourriture. Envoyez des villageois le chasser — il détale quand on le frappe, puis s’arrête.',
+  },
+  pig: {
+    id: 'pig', name: 'Cochon', icon: 'food', class: 'animal',
+    cost: {}, trainTime: 0, hp: 9, speed: 0.6,
+    attack: 0, attackType: 'melee', range: 0, attackSpeed: 1,
+    meleeArmor: 0, pierceArmor: 0, los: 2, radius: 8,
+    food: 100, capturable: true, patureCases: 1.5,
+    desc: 'Approchez un villageois pour le capturer, menez-le au village, puis faites-le abattre par un villageois : 100 de nourriture.',
+  },
+};
+
+// --- Bâtiments --------------------------------------------------------------
+
+export const BUILDING_TYPES = {
+  towncenter: {
+    id: 'towncenter', name: 'Centre-Ville', icon: 'towncenter',
+    cost: { wood: 275 }, buildTime: 80, hp: 1400, size: 3,
+    meleeArmor: 3, pierceArmor: 7, los: 8, popBonus: 8,
+    dropoff: ['food', 'wood', 'gold'], trains: ['villager'], age: 0, limit: 2,
+    garrison: { capacity: 15, classes: ['villager', 'infantry', 'archer'], heal: 12, arrows: true },
+    // Le Centre-Ville ne tire que s'il abrite du monde (une flèche par occupant).
+    attack: 5, attackType: 'pierce', range: 6, attackSpeed: 2.2, projectile: true, garrisonOnly: true,
+    desc: 'Forme les villageois, stocke les ressources et permet de passer à l’âge suivant.',
+  },
+  house: {
+    id: 'house', name: 'Maison', icon: 'house', fem: true,
+    cost: { wood: 25 }, buildTime: 18, hp: 320, size: 2,
+    meleeArmor: 1, pierceArmor: 6, los: 4, popBonus: 5, age: 0,
+    desc: 'Augmente la population maximale de 5.',
+  },
+  mill: {
+    id: 'mill', name: 'Moulin', icon: 'mill',
+    cost: { wood: 100 }, buildTime: 30, hp: 400, size: 2,
+    meleeArmor: 1, pierceArmor: 6, los: 5, dropoff: ['food'], age: 0,
+    desc: 'Dépôt de nourriture. Débloque la construction de fermes.',
+  },
+  lumbercamp: {
+    id: 'lumbercamp', name: 'Camp de bûcherons', icon: 'lumbercamp',
+    cost: { wood: 100 }, buildTime: 28, hp: 380, size: 2,
+    meleeArmor: 1, pierceArmor: 6, los: 5, dropoff: ['wood'], age: 0,
+    desc: 'Dépôt de bois. À construire près des forêts.',
+  },
+  miningcamp: {
+    id: 'miningcamp', name: 'Camp minier', icon: 'miningcamp',
+    cost: { wood: 100 }, buildTime: 28, hp: 380, size: 2,
+    meleeArmor: 1, pierceArmor: 6, los: 5, dropoff: ['gold'], age: 0,
+    desc: 'Dépôt d’or. À construire près des filons.',
+  },
+  farm: {
+    id: 'farm', name: 'Ferme', icon: 'farm', fem: true,
+    cost: { wood: 60 }, buildTime: 16, hp: 180, size: 2,
+    meleeArmor: 0, pierceArmor: 3, los: 2, age: 0,
+    requires: 'mill', walkable: true, farmFood: 260,
+    desc: 'Source de nourriture inépuisable tant qu’on la reconstruit.',
+  },
+  barracks: {
+    id: 'barracks', name: 'Caserne', icon: 'barracks', fem: true,
+    cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['militia', 'spearman', 'triton', 'champion', 'pavoisier', 'sapeur'], age: 0,
+    desc: 'Forme l’infanterie.',
+  },
+  archery: {
+    id: 'archery', name: 'Archerie', icon: 'archery', fem: true,
+    cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['archer', 'crossbowman', 'horseArcher', 'frondeur'], age: 1,
+    desc: 'Forme les tireurs : archers, puis arbalétriers et archers montés à l’Âge des Châteaux.',
+  },
+  stable: {
+    id: 'stable', name: 'Écurie', icon: 'stable', fem: true,
+    cost: { wood: 175 }, buildTime: 45, hp: 800, size: 3,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['scout', 'knight'], age: 1,
+    desc: 'Forme la cavalerie.',
+  },
+  siege: {
+    id: 'siege', name: 'Atelier de siège', icon: 'siege',
+    cost: { wood: 200 }, buildTime: 50, hp: 800, size: 3,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['ram', 'catapult'], age: 2,
+    desc: 'Construit les engins de siège.',
+  },
+  blacksmith: {
+    id: 'blacksmith', name: 'Forge', icon: 'blacksmith', fem: true,
+    cost: { wood: 150 }, buildTime: 40, hp: 800, size: 3,
+    meleeArmor: 2, pierceArmor: 7, los: 6, age: 1,
+    techs: ['forging', 'scaleArmor', 'fletching'],
+    desc: 'Améliore l’armement et l’armure de toutes vos troupes.',
+  },
+  temple: {
+    id: 'temple', name: 'Temple de l’Hydre', icon: 'temple',
+    cost: { wood: 200, gold: 100 }, buildTime: 55, hp: 900, size: 3,
+    meleeArmor: 2, pierceArmor: 7, los: 6, trains: ['priest', 'hydra'], age: 1,
+    desc: 'Forme les Prêtresses, qui soignent vos troupes ; à l’Âge des Châteaux, invoque l’Hydre.',
+  },
+  tower: {
+    id: 'tower', name: 'Tour de guet', icon: 'tower', fem: true,
+    cost: { wood: 100, gold: 25 }, buildTime: 35, hp: 700, size: 2,
+    meleeArmor: 3, pierceArmor: 8, los: 8, age: 1,
+    attack: 6, attackType: 'pierce', range: 7, attackSpeed: 1.6, projectile: true,
+    bonus: { siege: 4 },
+    garrison: { capacity: 5, classes: ['villager', 'infantry', 'archer'], heal: 8, arrows: true },
+    desc: 'Défense fixe qui tire sur les ennemis à portée.',
+  },
+};
+
+// --- Technologies -----------------------------------------------------------
+
+export const TECHS = {
+  wheelbarrow: {
+    id: 'wheelbarrow', name: 'Brouette', icon: 'wheelbarrow',
+    cost: { food: 175, wood: 50 }, time: 35, age: 1, from: 'towncenter',
+    desc: 'Villageois : +15 % de vitesse et +3 de capacité de charge.',
+  },
+  forging: {
+    id: 'forging', name: 'Armes forgées', icon: 'forging',
+    cost: { food: 150, gold: 40 }, time: 35, age: 1, from: 'blacksmith',
+    desc: '+1 attaque pour les unités de mêlée.',
+  },
+  fletching: {
+    id: 'fletching', name: 'Flèches barbelées', icon: 'fletching',
+    cost: { food: 100, gold: 50 }, time: 30, age: 1, from: 'blacksmith',
+    desc: '+1 attaque et +1 portée pour les unités à distance et les tours.',
+  },
+  scaleArmor: {
+    id: 'scaleArmor', name: 'Armure d’écailles', icon: 'scaleArmor',
+    cost: { food: 120, gold: 40 }, time: 35, age: 1, from: 'blacksmith',
+    desc: '+1 armure de mêlée et +1 armure perforante.',
+  },
+};
+
+// --- Paramètres de partie ---------------------------------------------------
+
+export const START_RESOURCES = { food: 200, wood: 200, gold: 100 };
+
+/**
+ * Vitesse de jeu, comme dans AoE : un simple multiplicateur sur la boucle de
+ * simulation. Le pas de temps reste fixe, on en exécute juste plus (ou moins)
+ * par seconde réelle — la simulation reste déterministe.
+ */
+// (`short` : la vitesse telle que le joueur la lit, en pour cent du rythme de référence — jamais de chiffre à virgule.)
+export const GAME_SPEEDS = [
+  { id: 'calme', name: 'Tranquille', short: '75 %', mult: 0.75, desc: 'Pour prendre le temps' },
+  { id: 'normal', name: 'Normal', short: '100 %', mult: 1, desc: 'Le rythme de référence' },
+  { id: 'rapide', name: 'Rapide', short: '150 %', mult: 1.5, desc: 'Une partie plus nerveuse' },
+  { id: 'blitz', name: 'Blitz', short: '200 %', mult: 2, desc: 'Tout va deux fois plus vite' },
+];
+
+export const DEFAULT_SPEED = 'normal';
+
+/**
+ * Formats de partie. `victory` vaut 'conquest' (raser tout ce qui forme des
+ * troupes chez l'adversaire : Centres-Villes et bâtiments militaires, voir
+ * World.checkVictory) ou 'towncenter' (le dernier Centre-Ville tombé donne la
+ * victoire — une partie courte et tranchée). `aiRush` accélère d'autant
+ * l'horloge d'attaque de l'IA : sans ça, en Express, elle attaquerait après la
+ * fin de la partie.
+ */
+export const GAME_MODES = {
+  // Le format le plus court : pas d'installation, on se bat tout de suite.
+  // Réserves pleines, caserne déjà bâtie, toute la population offerte (pas une
+  // maison à poser), sur une carte deux fois plus petite que celle d'Express.
+  escarmouche: {
+    id: 'escarmouche', name: 'Escarmouche', icon: 'barracks',
+    desc: '5 min chrono · toute petite carte · réserves pleines, caserne déjà bâtie · raser le bâtiment principal adverse, sinon le meilleur score',
+    mapSize: 'tiny', startAge: 1, popMax: 30, villagers: 5, popStart: 22,
+    resources: { food: 1000, wood: 1000, gold: 500 },
+    batimentsDeDepart: ['barracks'],
+    // L'ordinateur n'a pas le temps de bâtir une économie : peu d'ouvriers, le reste en soldats.
+    // Une archerie pour seul chantier ; miliciens, lanciers et archers à tour de rôle.
+    victory: 'towncenter', aiRush: 0.25, aiVillagers: 8,
+    aiBatiments: ['archery'], aiTroupes: ['militia', 'spearman', 'archer'],
+    townCenterHp: 0.5, timeLimit: 300,
+  },
+  express: {
+    id: 'express', name: 'Express', icon: 'modeExpress',
+    desc: '10 min chrono · départ Féodal · raser le bâtiment principal adverse, sinon le meilleur score',
+    mapSize: 'small', startAge: 1, popMax: 40, villagers: 7,
+    // Sept villageois et un éclaireur saturent déjà le Centre-Ville : sans cette
+    // marge, la partie démarre bloquée, à devoir bâtir une maison avant tout.
+    popStart: 6,
+    resources: { food: 500, wood: 500, gold: 250 },
+    victory: 'towncenter', aiRush: 0.4,
+    // Un Centre-Ville de 1400 points de vie tient tête à toute une armée : en
+    // Express il est deux fois plus fragile, sinon l'objectif est hors d'atteinte
+    // dans le temps imparti. Et la limite de temps garantit une partie courte :
+    // à son terme, c'est le score qui tranche.
+    townCenterHp: 0.5, timeLimit: 600,
+  },
+  // Trois positions sur la ligne du milieu, à égale distance des deux camps : on
+  // les prend en y tenant des soldats, elles rapportent des points tant qu'on
+  // les garde. Le départ et la carte sont ceux d'Express ; le bâtiment
+  // principal y garde tous ses points de vie, pour que la partie se joue sur
+  // les positions — le raser gagne quand même.
+  //   positions.nombre : combien ;        rayon : le cercle de prise, en cases ;
+  //   prise : secondes à tenir seul dans le cercle pour la prendre ;
+  //   pas   : un point par position tenue toutes les `pas` secondes ;
+  //   but   : le premier camp à ce total gagne.
+  positions: {
+    id: 'positions', name: 'Prise de positions', icon: 'ralliement',
+    desc: '10 à 12 min · trois positions à prendre et à tenir · 1 point toutes les 5 s par position, le premier à 200 gagne · raser le bâtiment principal adverse gagne aussi',
+    mapSize: 'small', startAge: 1, popMax: 40, villagers: 7, popStart: 6,
+    resources: { food: 500, wood: 500, gold: 250 },
+    victory: 'towncenter', aiRush: 0.4, townCenterHp: 1, timeLimit: 900,
+    positions: { nombre: 3, rayon: 3, prise: 10, pas: 5, but: 200 },
+  },
+  // Deux équipes de deux. `equipes` donne l'équipe de chaque place, dans
+  // l'ordre : les places 0 et 1 sont alliées, 2 et 3 leur font face. Qui tient
+  // chaque place — le joueur, un ordinateur, plus tard un joueur à distance —
+  // ne fait pas partie du format : c'est la partie qui le dit (World, option
+  // `places`). Une équipe est battue quand les bâtiments principaux de ses deux
+  // membres sont tombés ; à vingt minutes, la meilleure somme des scores gagne.
+  deux: {
+    id: 'deux', name: '2 contre 2', icon: 'ouvriers',
+    desc: '15 à 20 min · vous et un allié contre deux adversaires · une équipe est battue quand ses deux bâtiments principaux sont tombés',
+    mapSize: 'medium', startAge: 1, popMax: 30, villagers: 6, popStart: 6,
+    resources: { food: 500, wood: 500, gold: 250 },
+    victory: 'towncenter', aiRush: 0.5, townCenterHp: 1, timeLimit: 1200,
+    equipes: [0, 0, 1, 1],
+  },
+  classique: {
+    id: 'classique', name: 'Classique', icon: 'modeClassique',
+    desc: '20 à 30 min · trois âges, victoire par conquête',
+    mapSize: 'medium', startAge: 0, popMax: POP_MAX, villagers: 4, popStart: 0,
+    resources: START_RESOURCES,
+    victory: 'conquest', aiRush: 1, townCenterHp: 1, timeLimit: 0,
+  },
+};
+
+export const DEFAULT_MODE = 'classique';
+
+/**
+ * Niveaux de l'adversaire. `armyTrigger` : la taille d'armée (éclaireur de
+ * départ compris) qui déclenche la première vague, `armyStep` : ce que chaque
+ * vague demande de plus que la précédente. Deux réglages propres au Facile,
+ * pour laisser le temps d'apprendre :
+ *   treve         : aucune vague avant cette heure de jeu (en secondes, par
+ *                   format) ; le joueur est prévenu une minute avant ;
+ *   petitesVagues : une vague n'emmène que le nombre de soldats qui la
+ *                   déclenche (3, puis 5, 7…), le reste de l'armée garde la base.
+ * Les `desc`, affichées à l'accueil, disent ce qui a été mesuré en partie
+ * (joueur passif, de six à trente-cinq graines par niveau et par format) : à
+ * revoir avec les chiffres ci-dessus. En Classique, Difficile lance sa
+ * première vague 44 secondes avant Normal en moyenne (33 graines sur 35) ; en
+ * Express, à la même heure.
+ */
+export const DIFFICULTIES = {
+  easy: {
+    id: 'easy', name: 'Facile',
+    gatherBonus: 0.8, maxVillagers: 14, armyTrigger: 3, armyStep: 2,
+    attackDelay: 260,
+    treve: { classique: 900, express: 270, deux: 270, positions: 180, escarmouche: 90 }, petitesVagues: true,
+    desc: 'L’adversaire vous laisse 15 minutes pour vous installer (4 min 30 en Express, 3 min en Prise de positions, 1 min 30 en Escarmouche), vous prévient, puis attaque par petits groupes.',
+  },
+  normal: {
+    id: 'normal', name: 'Normal',
+    gatherBonus: 1.0, maxVillagers: 20, armyTrigger: 6, armyStep: 4,
+    attackDelay: 150,
+    desc: 'L’adversaire attaque sans prévenir au bout d’une dizaine de minutes (deux en Express, dès la première en Escarmouche), par vagues de plus en plus grosses.',
+  },
+  hard: {
+    id: 'hard', name: 'Difficile',
+    gatherBonus: 1.25, maxVillagers: 26, armyTrigger: 6, armyStep: 5,
+    attackDelay: 100,
+    desc: 'L’adversaire récolte plus vite et ses vagues grossissent plus vite ; en Classique, il attaque aussi un peu plus tôt qu’en Normal.',
+  },
+};
+
+export const MAP_SIZES = {
+  tiny: { id: 'tiny', name: 'Minuscule', tiles: 48 },
+  small: { id: 'small', name: 'Petite', tiles: 72 },
+  medium: { id: 'medium', name: 'Moyenne', tiles: 96 },
+  large: { id: 'large', name: 'Grande', tiles: 120 },
+};
+
+// `main` est la couleur de l'anneau de camp sous chaque troupe (et du point de
+// la mini-carte, du cadre des portraits) : un bleu et un rouge FRANCS, qui se
+// lisent sur l'herbe à vingt-trois points de haut — le rouge de l'adversaire
+// ne doit pas tirer sur le rose.
+export const PLAYER_COLORS = [
+  { main: '#2f6fe8', light: '#93c5fd', dark: '#1d4ed8', name: 'Bleu' },
+  { main: '#e3261c', light: '#fca5a5', dark: '#b91c1c', name: 'Rouge' },
+];
+// Format par équipes : une couleur par place. Les deux alliés dans des tons
+// froids (le joueur garde son bleu, son allié est turquoise), leurs adversaires
+// dans des tons chauds (rouge et orangé) : le bord se lit à la température de
+// la couleur, le camp à sa teinte.
+export const COULEURS_EQUIPES = [
+  PLAYER_COLORS[0],
+  { main: '#12b5a6', light: '#8ff0e4', dark: '#0b7d73', name: 'Turquoise' },
+  PLAYER_COLORS[1],
+  { main: '#f08a1c', light: '#fdd09a', dark: '#b85f08', name: 'Orangé' },
+];
+
+// --- Civilisations ------------------------------------------------------------
+
+export const DEFAULT_CIV = 'atlante';
+/**
+ * Les civilisations. Mêmes règles pour toutes à ce stade (coûts, points de
+ * vie, IA) : une civilisation change ce que l'on VOIT — bâtiments et troupes
+ * (voir IMAGES_CIV dans sprites.js) — et ce que l'interface affiche. `noms`
+ * surcharge le nom, le genre (`fem`) et la description d'un type ;
+ * `portraits` surcharge PORTRAITS. Tout type absent garde le nom et le
+ * portrait atlantes.
+ */
+export const CIVILISATIONS = {
+  atlante: { id: 'atlante', name: 'Atlantes', desc: 'Peuple de la mer', noms: {}, portraits: {} },
+  solarien: {
+    id: 'solarien', name: 'Solariens', desc: 'Peuple du désert',
+    noms: {
+      villager: { name: 'Fellah' },
+      militia: { name: 'Garde' },
+      scout: { name: 'Chacal dressé', pluriel: 'Chacals dressés' },
+      knight: { name: 'Méhariste' },
+      champion: { name: 'Garde masqué', pluriel: 'Gardes masqués' },
+      priest: { name: 'Prêtre du Soleil', pluriel: 'Prêtres du Soleil' },
+      triton: { name: 'Mercenaire atlante', pluriel: 'Mercenaires atlantes' },
+      hydra: { name: 'Sphinx', desc: 'Lion à tête de pharaon invoqué au Temple : encaisse comme une escouade et frappe jusqu’à trois ennemis à la fois. Occupe 3 places de population.' },
+      towncenter: { name: 'Palais du Soleil', desc: 'Forme les fellahs, stocke les ressources et permet de passer à l’âge suivant.' },
+      mill: { name: 'Grenier' },
+      barracks: { name: 'Cour des Gardes' },               // féminin, comme Caserne
+      archery: { name: 'Champ de tir', fem: false },       // Archerie était féminin
+      stable: { name: 'Enclos des montures', fem: false }, // Écurie était féminin
+      siege: { name: 'Atelier des engins' },
+      blacksmith: { name: 'Fonderie' },                    // féminin, comme Forge
+      temple: { name: 'Temple du Soleil', desc: 'Forme les Prêtres du Soleil, qui soignent vos troupes ; à l’Âge des Châteaux, invoque le Sphinx.' },
+    },
+    // type → portrait, seulement une fois le fichier livré (et listé dans sw.js).
+    portraits: {
+      villager: 'assets/portrait-sol-fellah.webp',
+      militia: 'assets/portrait-sol-garde.webp',
+      spearman: 'assets/portrait-sol-lancier.webp',
+      archer: 'assets/portrait-sol-archer.webp',
+      scout: 'assets/portrait-sol-chacal.webp',
+      knight: 'assets/portrait-sol-mehariste.webp',
+      champion: 'assets/portrait-sol-elite.webp',
+      priest: 'assets/portrait-sol-pretre.webp',
+      ram: 'assets/portrait-sol-belier.webp',
+      catapult: 'assets/portrait-sol-catapulte.webp',
+      pavoisier: 'assets/portrait-sol-pavoisier.webp',
+      frondeur: 'assets/portrait-sol-frondeur.webp',
+      sapeur: 'assets/portrait-sol-sapeur.webp',
+      crossbowman: 'assets/portrait-sol-arbaletrier.webp',
+      horseArcher: 'assets/portrait-sol-archer-monte.webp',
+      hydra: 'assets/portrait-sol-sphinx.webp',
+    },
+  },
+};
+
+/** L'identifiant d'une civilisation connue, sinon celle par défaut (réglage ou sauvegarde abîmés). */
+export function civDe(id) {
+  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(CIVILISATIONS, id) ? id : DEFAULT_CIV;
+}
+/** Ce que l'interface affiche d'un type. Ne remplace JAMAIS entity.def : les règles s'y lisent. */
+export function ficheDe(type, civ) {
+  const def = entityDef(type);
+  const propre = CIVILISATIONS[civDe(civ)].noms[type];
+  // (Un nom surchargé n'hérite pas du pluriel du nom atlante.)
+  return propre ? { ...def, pluriel: undefined, ...propre } : def;
+}
+/** Nom accordé au nombre : « Fellah », « 3 Fellahs », « 3 Villageois ». */
+export function nomDe(type, civ, n = 1) {
+  const { name, pluriel } = ficheDe(type, civ);
+  if (n <= 1) return name;
+  return pluriel || (/[sxz]$/.test(name) ? name : `${name}s`);   // nom composé : son pluriel est écrit (`pluriel`)
+}
+/** Le portrait d'un type dans cette civilisation, à défaut celui des Atlantes, ou null. */
+export function portraitDe(type, civ) {
+  return CIVILISATIONS[civDe(civ)].portraits[type] || PORTRAITS[type] || null;
+}
+
+// Quantité de ressource contenue par case de terrain.
+export const RESOURCE_TILE_AMOUNT = {
+  wood: 120,
+  gold: 550,
+  food: 160, // buissons de baies
+};
+
+export function unitDef(type) { return UNIT_TYPES[type]; }
+export function buildingDef(type) { return BUILDING_TYPES[type]; }
+export function entityDef(type) { return UNIT_TYPES[type] || BUILDING_TYPES[type]; }
+
+// --- La langue -----------------------------------------------------------------
+//
+// Les noms et les descriptions des tables ci-dessus sont la source française.
+// Dans une autre langue, ils sont remplacés ici, une fois, par leur traduction
+// (js/langue.js) ; en français, rien ne bouge.
+
+/** Les champs qui portent du texte pour le joueur. */
+const CHAMPS_DE_TEXTE = ['name', 'desc', 'short', 'pluriel'];
+/** Les tables qui portent du texte pour le joueur. */
+const TABLES_DE_TEXTE = [STANCES, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, GAME_SPEEDS, GAME_MODES, DIFFICULTIES, MAP_SIZES, COULEURS_EQUIPES, CIVILISATIONS];
+
+/**
+ * Passe sur chaque texte des tables : `visite(objet, champ)`. Sert à traduire
+ * (ci-dessous) et à recenser ce qui est à traduire (outils/langues.mjs). Un
+ * chiffre romain ou un pourcentage n'est pas un texte.
+ */
+export function textesDesTables(visite) {
+  const marcher = (objet, profondeur) => {
+    if (!objet || typeof objet !== 'object' || profondeur > 6) return;
+    for (const [champ, valeur] of Object.entries(objet)) {
+      if (typeof valeur === 'string') {
+        if (CHAMPS_DE_TEXTE.includes(champ) && /[A-Za-zÀ-ÿ]{2,}/.test(valeur) && !/^[IVX]+$/.test(valeur)) visite(objet, champ);
+      } else marcher(valeur, profondeur + 1);
+    }
+  };
+  for (const table of TABLES_DE_TEXTE) marcher(table, 0);
+  for (const ressource of Object.keys(RESOURCE_LABELS)) visite(RESOURCE_LABELS, ressource);
+}
+
+if (LANGUE !== 'fr') textesDesTables((objet, champ) => { objet[champ] = txt(objet[champ]); });

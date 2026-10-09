@@ -1,0 +1,823 @@
+/* ---------------------------------------------------------------------------
+   Au doigt et à l’œil — interface
+   Pensée « pouce d'abord » : cibles ≥ 44 px, barres compactes, zones sûres
+   des encoches respectées, aucun défilement parasite.
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* La direction « Boîte de jeu » : papier, encre, deux accents. Toute l'interface s'y tient ;
+     css/boite.css pose, écran par écran, les contours d'encre et les ombres pleines. */
+  --b-papier: #fff4dc;
+  --b-blanc: #fffaf0;
+  --b-sable: #ffe9b8;
+  --b-encre: #17120e;
+  --b-gris: #4a3f33;
+  --b-jaune: #ffc93c;
+  --b-rouge: #f0562d;
+  --b-eclat: #37c2e0;
+  /* Les caractères, livrés avec le jeu (assets/polices, déclarés dans css/boite.css) ; sinon ceux, ronds, du téléphone. */
+  --b-titres: "Lilita One", ui-rounded, "Arial Rounded MT Bold", "Arial Black", system-ui, sans-serif;
+  --b-texte: "Nunito", ui-rounded, "Arial Rounded MT Bold", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Les noms que lisent les règles de mise en place, ci-dessous et dans css/progression.css. */
+  --bg: #fff4dc;
+  --panel: #fff4dc;
+  --panel-solid: #fff4dc;
+  --border: #17120e;
+  --text: #17120e;
+  --muted: #4a3f33;
+  --lisere: #17120e;
+  --fond-bouton: #fffaf0;
+  /* L'accent des textes : un rouge de brique, qui se lit sur le papier (un or ne s'y lirait pas). */
+  --gold: #a8420c;
+  --gold-dark: #8a3408;
+  --good: #1c7a3c;
+  --warn: #9c6200;
+  --error: #b3261e;
+  --radius: 14px;
+  --angle: 10px;
+  --titre: var(--b-titres);
+  /* Le fond d'un portrait : un aplat à la couleur du peuple de ce qu'il montre (voir plus bas). */
+  --fond-portrait: #9fd4f6;
+  --fond-vignette: #b9d48a;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* --- Ce qui change d'un peuple à l'autre ---------------------------------------
+   Le corps de la page porte le peuple choisi à l'accueil, puis celui que l'on
+   joue (data-civ, posé par js/main.js). L'interface est la même pour tous ; le
+   peuple se lit au couvercle de l'accueil (css/boite.css) et au fond des
+   portraits : la mer derrière une troupe atlante, le grès derrière une
+   solarienne, l'herbe ou le sable sous un bâtiment. Un portrait garde le fond
+   du peuple de ce qu'il montre — un adversaire garde le sien. */
+body[data-civ="atlante"], .portrait[data-civ="atlante"] {
+  --fond-portrait: #9fd4f6;
+  --fond-vignette: #b9d48a;
+}
+body[data-civ="solarien"], .portrait[data-civ="solarien"] {
+  --fond-portrait: #f7c783;
+  --fond-vignette: #efd592;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* --- Icônes ----------------------------------------------------------------
+   Des tracés vectoriels, pas des emoji : même dessin sur tous les téléphones,
+   net à tout zoom, et teinté par la couleur du texte qui les porte. */
+svg.ic { fill: currentColor; display: block; flex: 0 0 auto; }
+svg.ic.inline { display: inline-block; vertical-align: -2px; margin-right: 1px; }
+.res-icon svg.ic, .worker-chip svg.ic { opacity: .95; }
+.cmd-icon svg.ic, .bc-icon svg.ic, .wr-icon svg.ic, .qicon svg.ic { margin: 0 auto; }
+.portrait svg.ic { width: 30px; height: 30px; }
+.chip svg.ic { display: inline-block; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--b-papier);
+  color: var(--text);
+  font-family: var(--b-texte);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hidden { display: none !important; }
+
+/* --- Canvas --------------------------------------------------------------- */
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  display: block;
+}
+
+/* --- Écran d'accueil ------------------------------------------------------ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Centrer la carte par l'alignement du conteneur rognait son haut dès
+     qu'elle dépassait l'écran : le titre devenait inatteignable, même en
+     faisant défiler. Des marges automatiques centrent quand ça tient, et
+     laissent défiler sinon. */
+  padding: calc(12px + var(--safe-top)) 12px 0;
+  background: var(--b-papier);
+  overflow-y: auto;
+}
+/* La marge du bas est un élément, pas un retrait du conteneur : la barre
+   « Jouer », collante, descend ainsi jusqu'au vrai bord de l'écran. */
+.screen::after { content: ""; flex: 0 0 calc(12px + var(--safe-bottom)); }
+
+.start-card {
+  flex: 0 0 auto;
+  width: min(560px, 100%);
+  margin: auto 0;
+  /* Fond plein : la barre « Jouer », collée en bas, s'y fond (voir .start-actions). */
+  background: var(--panel-solid);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 16px 16px;
+}
+
+.start-card h1 {
+  margin: 0 0 6px;
+  font-family: var(--titre);
+  font-size: clamp(22px, 7vw, 36px);
+  line-height: 1.12;
+  letter-spacing: 0.01em;
+
+}
+
+.start-head { text-align: center; }
+.tagline { margin: 0 0 4px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+
+/* Portrait d'une troupe dans le panneau de sélection : son rendu, sur la couleur de son peuple. */
+.portrait.illustre { padding: 0; overflow: hidden; background: var(--fond-portrait); }
+.portrait.illustre img, .portrait.illustre canvas { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.portrait.illustre img.adverse { filter: hue-rotate(155deg) saturate(1.35); }
+/* Portrait d'un bâtiment : son illustration entière, celle de la carte, sur le sol de son peuple. */
+.portrait.batiment { padding: 0; overflow: hidden; background: var(--fond-vignette); }
+.portrait.batiment img, .portrait.batiment canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* Écran de fin : la capitale du joueur — debout et dorée, ou éteinte. Plus
+   petite sur un écran court, où le tableau des scores a besoin de la place. */
+.fin-illustration { display: block; height: 132px; width: auto; margin: -2px auto 8px; }
+@media (max-height: 700px) { .fin-illustration { height: 72px; } }
+.fin-illustration.debout { filter: drop-shadow(0 6px 0 rgba(23, 18, 14, .3)); }
+.fin-illustration.tombe { filter: grayscale(.9) brightness(.7) drop-shadow(0 6px 0 rgba(23, 18, 14, .3)); }
+
+.start-card h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 14px 0 8px;
+}
+
+.options { display: grid; gap: 8px; }
+.options.row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.options.row:has(> :nth-child(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.options.duo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Quatre choix sur un écran de 360 px : « Tranquille » imposait sa largeur,
+   et « Blitz ×2 » sortait de l'écran. Deux par ligne. */
+@media (max-width: 380px) {
+  .options.row:has(> :nth-child(4)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Partie interrompue : la reprise passe avant tout le reste de l'écran. */
+.resume-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding: 12px;
+  border-radius: var(--radius);
+
+}
+.resume-info { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+#ligne-temoin { margin-top: 8px; }
+.btn.ghost { background: none; border-color: transparent; color: var(--muted); }
+.btn.small { min-height: 36px; padding: 6px 10px; font-size: 13px; font-weight: 500; }
+.modal-sub { margin: 16px 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+.scores tr.total td { border-top: 1px solid var(--border); padding-top: 8px; color: var(--gold); }
+#game-timer.urgent { color: var(--error); font-weight: 700; }
+
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 12px 14px;
+  min-height: 52px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .08s;
+}
+.option.compact { align-items: center; text-align: center; padding: 10px 8px; }
+.option:active { transform: scale(0.98); }
+.option-name { font-weight: 650; font-size: 15px; }
+.option-desc { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+
+/* Le choix du peuple : sa capitale, sur ses couleurs. Les deux images tiennent
+   dans le même carré, posées sur sa base : même largeur, comme sur la carte.
+   La tuile choisie est cerclée d'or, l'autre s'efface un peu. */
+.options.peuples { gap: 10px; }
+.option.peuple {
+  gap: 2px;
+  padding: 8px 8px 10px;
+
+}
+.option.peuple img {
+  width: clamp(72px, 15vh, 140px);
+  height: clamp(72px, 15vh, 140px);
+  max-width: 100%;
+  object-fit: contain;
+  object-position: 50% 100%;
+  pointer-events: none;
+}
+.option.peuple .option-name { font-family: var(--titre); font-size: 18px; font-weight: 700; letter-spacing: .01em; }
+
+/* Les réglages qu'on ne touche pas à chaque partie : repliés, résumés en une ligne. */
+.reglages {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.reglages summary {
+  position: relative;
+  display: block;
+  min-height: 52px;
+  padding: 8px 40px 9px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+.reglages summary::-webkit-details-marker { display: none; }
+/* Le chevron : deux traits, qui se retournent quand le bloc est ouvert. */
+.reglages summary::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 8px; height: 8px;
+  margin-top: -7px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+}
+.reglages[open] summary::after { margin-top: -2px; transform: rotate(225deg); }
+.reglages-titre { display: block; font-weight: 650; font-size: 15px; }
+/* (Si le résumé se replie, c'est en lignes de même longueur : pas un « ×1 » seul sur la seconde.) */
+.reglages-resume { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.35; color: var(--muted); text-wrap: balance; }
+.reglages > h2, .reglages > .options, .reglages > .reglage-note { margin-left: 12px; margin-right: 12px; }
+/* (Sous des options, la note s'en détache d'un cran ; sous un titre, elle le suit de près.) */
+.reglages > .options + .reglage-note { margin-top: 6px; }
+.reglages > h2:first-of-type { margin-top: 6px; }
+.reglages > .options:last-child { margin-bottom: 12px; }
+
+/* « Jouer » reste sous le pouce : la barre colle au bas de l'écran tant que la
+   carte dépasse (réglages dépliés, petit téléphone, partie à reprendre), et
+   retrouve sa place dès qu'on y arrive. Son fond est celui de la carte, plein
+   jusqu'au bord : ce qui défile dessous ne se voit pas sous les boutons. */
+.start-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  margin: 4px -16px 0;
+  padding: 12px 16px calc(10px + var(--safe-bottom));
+  background: linear-gradient(180deg, transparent 0, var(--panel-solid) 10px);
+}
+/* « Nouvelle partie » et « Comment jouer » côte à côte sur 375 points : moins de marge, pas de retour à la ligne. */
+.start-actions .btn { padding-left: 8px; padding-right: 8px; }
+/* « Nouvelle partie » touché alors qu'une partie dort : il demande confirmation,
+   en rouge comme « Détruire » armé, et en plus petit pour que sa question tienne
+   sans faire bouger la barre sous le pouce. */
+/* Le palmarès du format et de la difficulté choisis : une ligne discrète sous « Jouer ». */
+.palmares { margin: 10px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+
+.btn {
+  flex: 1;
+  min-height: 48px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:active { transform: scale(0.98); }
+.btn.large { font-size: 17px; min-height: 54px; }
+
+.howto { margin-top: 12px; }
+.howto ul, ul.help { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.howto b, ul.help b { color: var(--text); }
+.credits-auteurs { display: block; margin-top: 3px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+ul.help a { color: var(--gold); }
+.credits { margin: 10px 0 0; font-size: 12px; color: var(--muted); opacity: .7; text-align: center; }
+
+/* --- HUD ------------------------------------------------------------------ */
+
+#hud {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+#hud > * { pointer-events: auto; }
+
+#topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(6px + var(--safe-top)) calc(8px + var(--safe-right)) 6px calc(8px + var(--safe-left));
+}
+
+.top-left { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.res-group { display: flex; gap: 5px; flex-wrap: nowrap; }
+.res {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-radius: var(--angle);
+  background: var(--panel-solid);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.res-icon { font-size: 12px; display: flex; align-items: center; color: var(--gold); }
+#res-pop.warn { color: var(--error); }
+
+.top-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+#age-box {
+  display: flex; align-items: center; gap: 5px;
+  padding: 2px 8px 2px 4px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+#age-label { color: var(--gold); font-family: var(--titre); font-size: 12.5px; font-weight: 700; letter-spacing: .01em; }
+/* (Le nom de l'âge est rogné s'il manque de place : sa marge du haut garde l'accent de « Âge ».) */
+#age-label { padding-top: 3px; margin-top: -3px; }
+#age-box .sep { color: var(--muted); }
+#game-timer { color: var(--muted); font-variant-numeric: tabular-nums; }
+.age-progress { width: 54px; height: 3px; border-radius: 2px; overflow: hidden; }
+.age-progress span { display: block; height: 100%; background: var(--gold); width: 0; transition: width .2s linear; }
+/* Format chronométré : le score des deux camps à côté du temps qui reste — le
+   vôtre puis celui de l'adversaire, chacun à la couleur de son camp. Si la
+   ligne manque de place, c'est le nom de l'âge qui s'abrège, pas les chiffres. */
+#score-box { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+#score-box b { font-weight: 700; }
+.score-icone { display: flex; color: var(--gold); }
+.score-icone svg.ic { width: 11px; height: 11px; }
+/* Prise de positions : un losange par position, à la couleur de qui la tient ;
+   il bat quand quelqu'un est en train de la prendre. */
+#positions-box { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; margin-left: 2px; }
+#positions-box i { display: block; width: 9px; height: 9px; transform: rotate(45deg); background: #b9b3a6; }
+#positions-box i.prise { animation: position-prise .7s steps(2, jump-none) infinite; }
+@keyframes position-prise { from { opacity: 1; } to { opacity: .35; } }
+#age-box { min-width: 0; }
+#age-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#game-timer, .age-progress { flex: 0 0 auto; }
+
+.icon-btn {
+  width: 38px; height: 38px;
+  color: var(--text);
+  border-radius: var(--angle);
+  border: 1px solid var(--border);
+  background: var(--panel-solid);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+#minimap-wrap {
+  position: absolute;
+  top: calc(50px + var(--safe-top));
+  right: calc(8px + var(--safe-right));
+  /* Un cadre franc au liseré du peuple : la mini-carte ne se perd plus dans le noir du brouillard. */
+  padding: 2px;
+  border-radius: var(--angle);
+  background: var(--panel-solid);
+  border: 2px solid var(--lisere);
+  line-height: 0;
+}
+#minimap { width: 104px; height: 104px; border-radius: 4px; touch-action: none; }
+
+#alerts {
+  position: absolute;
+  top: calc(74px + var(--safe-top));
+  left: calc(10px + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Place laissée à la minimap, à droite : sur 360 px, les notifications
+     mordaient sur elle. */
+  max-width: min(60vw, 320px, calc(100vw - 150px - var(--safe-left) - var(--safe-right)));
+  pointer-events: none;
+}
+.toast {
+  padding: 8px 12px;
+  border-radius: var(--angle);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  animation: toast-in .18s ease-out;
+}
+.toast.good { border-left-color: var(--good); }
+.toast.warn { border-left-color: var(--warn); }
+.toast.error { border-left-color: var(--error); }
+.toast.leaving { opacity: 0; transform: translateX(-8px); transition: .35s; }
+.toast-count { opacity: .7; font-variant-numeric: tabular-nums; }
+/* L'alerte d'attaque se touche pour aller voir : elle seule arrête le doigt. */
+.toast.touchable { pointer-events: auto; cursor: pointer; }
+.toast.touchable:active { transform: scale(.98); }
+@keyframes toast-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+
+#build-hint {
+  position: absolute;
+  left: 50%;
+  /* Au-dessus de la barre des ouvriers : en haut, la bulle recouvrait les
+     notifications (« Emplacement impossible ici ») et la minimap. */
+  bottom: calc(var(--bottom-height, 126px) + 44px + var(--safe-bottom));
+  transform: translateX(-50%);
+  width: max-content;   /* sinon `left: 50%` la bride à une demi-largeur d'écran */
+  pointer-events: none;   /* simple consigne : le doigt doit atteindre la carte dessous */
+  padding: 8px 14px;
+  border-radius: var(--angle);
+
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  max-width: 82vw;
+}
+
+/* --- Barre des ouvriers ---------------------------------------------------- */
+
+#worker-bar {
+  position: absolute;
+  left: calc(8px + var(--safe-left));
+  /* Aussi large que ses pastilles, pas plus : étendue de bord à bord, sa
+     partie vide, transparente, avalait les appuis destinés à la carte. */
+  max-width: calc(100% - 16px - var(--safe-left) - var(--safe-right));
+  bottom: calc(var(--bottom-height, 126px) + var(--safe-bottom));
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+#worker-bar::-webkit-scrollbar { display: none; }
+
+.worker-chip, .worker-open {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 5px 10px;
+  border-radius: var(--angle);
+  border: 1px solid var(--border);
+  background: var(--panel-solid);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.worker-chip b { font-weight: 700; }
+.worker-chip:active, .worker-open:active { transform: scale(.96); }
+.worker-open { font-size: 15px; }
+.worker-chip.idle.has-idle {
+
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: .72; } }
+
+/* La pastille « Armée », au bout de la barre : grisée sans soldat. Avec elle
+   la barre porte sept boutons : marges et écarts resserrés, pour qu'elle
+   tienne dans la largeur d'un téléphone. */
+#worker-bar { gap: 4px; }
+#worker-bar > * { padding-left: 7px; padding-right: 7px; }
+.worker-chip.armee.vide { opacity: .45; }
+/* 44 px sous le doigt, pour elle comme pour l'alerte d'attaque — ses voisines
+   s'étirent à sa hauteur, et la consigne de pose remonte d'autant. Sauf
+   téléphone couché, où tout reste bas pour laisser la carte visible. */
+@media (orientation: portrait), (min-height: 481px) {
+  #btn-armee { min-height: 44px; }
+  #build-hint { bottom: calc(var(--bottom-height, 126px) + 54px + var(--safe-bottom)); }
+  .toast.touchable { padding-top: 13px; padding-bottom: 13px; }
+}
+
+/* --- Panneau d'affectation ------------------------------------------------- */
+
+.worker-list { display: grid; gap: 8px; margin-bottom: 4px; }
+.worker-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--angle);
+  border: 1px solid var(--border);
+  background: var(--fond-bouton);
+}
+.worker-row .wr-label {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; color: var(--text); font: inherit;
+  text-align: left; cursor: pointer; padding: 4px 0; min-width: 0;
+}
+.worker-row .wr-icon { font-size: 20px; display: flex; color: var(--gold); }
+.worker-row .wr-name { font-weight: 600; font-size: 14px; }
+.worker-row .wr-hint { font-size: 11px; color: var(--muted); }
+.worker-row .wr-controls { display: flex; align-items: center; gap: 6px; }
+.worker-row .wr-count { min-width: 26px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wr-btn {
+  width: 40px; height: 40px;
+  border-radius: var(--angle);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+.wr-btn:active { transform: scale(.94); }
+.wr-btn[disabled] { opacity: .35; }
+
+.switch-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px;
+  border-radius: var(--angle);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.switch-row input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--gold); }
+.switch-row b { display: block; font-size: 13.5px; }
+.switch-row small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.4; margin-top: 2px; }
+
+/* --- Barre du bas --------------------------------------------------------- */
+
+#bottombar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  /* Un panneau plein à bord franc, au liseré du peuple : plus de dégradé qui se dissout dans la carte. */
+  border-top: 2px solid var(--lisere);
+}
+
+#selection-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+}
+#selection-panel .hint { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+
+/* La croix « lâcher » : toujours au même endroit, en haut à droite du panneau
+   du bas, qui lui laisse sa place. */
+#btn-lacher {
+  position: absolute;
+  top: 8px;
+  right: calc(8px + var(--safe-right));
+  width: 44px; height: 44px;
+}
+#btn-lacher:not(.hidden) + #selection-panel { padding-right: 50px; flex-wrap: wrap; row-gap: 6px; }
+/* La place de la croix manquerait au nom d'un bâtiment : sa file de production
+   passe à la ligne dès qu'elle ne tient plus à côté de lui. */
+#btn-lacher:not(.hidden) + #selection-panel .info { min-width: 120px; }
+
+.portrait {
+  width: 46px; height: 46px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  border-radius: var(--angle);
+  /* Le cadre porte la couleur du camp, doublé d'un filet au liseré du peuple. */
+  border: 2px solid var(--team, var(--border));
+  flex-shrink: 0;
+}
+#selection-panel .info { min-width: 0; flex: 1; max-width: 340px; }
+#selection-panel .name { font-family: var(--titre); font-size: 16.5px; font-weight: 700; letter-spacing: .01em; line-height: 1.15; }
+#selection-panel .name .enemy { color: var(--error); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 500; font-size: 12px; }
+#selection-panel .hp { height: 4px; border-radius: 2px; margin: 4px 0 3px; overflow: hidden; }
+#selection-panel .hp span { display: block; height: 100%; background: var(--good); }
+#selection-panel .stats { font-size: 11.5px; color: var(--muted); }
+
+.multi { flex: 1; }
+.multi-title { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  display: flex; align-items: center; gap: 4px;
+  padding: 5px 9px;
+  border-radius: var(--angle);
+  background: var(--fond-bouton);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.queue { display: flex; gap: 4px; margin-left: auto; }
+.queue-item {
+  width: 38px; height: 38px;
+  border-radius: var(--angle);
+  border: 1px solid var(--border);
+  background: var(--fond-bouton);
+  color: var(--text);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  padding: 2px;
+}
+.qicon { font-size: 15px; line-height: 1; display: flex; }
+.qbar { width: 26px; height: 3px; border-radius: 2px; overflow: hidden; }
+.qbar span { display: block; height: 100%; background: var(--gold); }
+
+#command-panel {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+#command-panel::-webkit-scrollbar { display: none; }
+
+.cmd {
+  flex: 0 0 auto;
+  min-width: 72px;
+  min-height: 62px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: var(--angle);
+  border: 1px solid var(--border);
+  /* Un bouton taillé dans la matière du peuple, avec son arête claire en haut. */
+  background: var(--fond-bouton);
+  color: var(--text);
+  cursor: pointer;
+}
+.cmd:active { transform: scale(0.97); }
+.cmd.disabled { opacity: .42; }
+/* Les états s'ajoutent en voile sur le fond du peuple. */
+/* « Détruire » armé : un second appui rase le bâtiment. */
+.cmd.compact { min-width: 54px; padding: 6px 4px; }
+.cmd.compact .cmd-label { font-size: 9.5px; }
+.cmd-icon { font-size: 19px; line-height: 1; display: flex; align-items: center; min-height: 28px; }
+/* Une troupe se reconnaît à son visage : son portrait remplace le pictogramme
+   sur le bouton qui la forme, dans la file et sur la pastille de sélection.
+   (Pictogramme ou portrait, la case de l'icône a la même hauteur : les noms
+   restent alignés d'un bouton à l'autre.) */
+img.visage {
+  width: 28px; height: 28px;
+  border-radius: 5px;
+  object-fit: cover;
+  object-position: top center;
+  background: var(--fond-portrait);
+  box-shadow: 0 0 0 1px var(--lisere);
+}
+.qicon img.visage { width: 23px; height: 23px; border-radius: 4px; }
+/* Sur une pastille, le portrait mord sur les marges : elle garde la hauteur
+   d'une pastille à pictogramme, et une armée de dix troupes ne coûte pas une
+   rangée de carte en plus. */
+.chip img.visage { width: 23px; height: 23px; margin: -3px 0 -3px -4px; border-radius: 4px; }
+.cmd-label { font-size: 11px; font-weight: 600; text-align: center; line-height: 1.15; }
+.cmd-cost { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+/* --- Panneaux superposés -------------------------------------------------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  background: rgba(23, 18, 14, .62);
+  backdrop-filter: blur(3px);
+}
+
+#build-menu, #worker-menu { align-items: flex-end; }
+.sheet {
+  width: 100%;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border-top: 2px solid var(--lisere);
+  border-radius: 14px 14px 0 0;
+  padding: 10px 12px calc(12px + var(--safe-bottom));
+  /* Le panneau des ouvriers n'a pas de liste défilante : en paysage, ses
+     dernières lignes et la bascule sortaient de l'écran, inatteignables. */
+  overflow-y: auto;
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sheet-head h2 { margin: 0; font-family: var(--titre); font-size: 19px; letter-spacing: .01em; }
+
+.build-list { overflow-y: auto; display: grid; gap: 8px; grid-template-columns: 1fr; }
+.build-card {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
+  /* Pas de hauteur minimale ici : la liste est une grille qui défile, et ses
+     rangées se tasseraient à cette hauteur dès qu'elle dépasse — le texte
+     sortait des cartes. La case de l'icône donne la hauteur (voir .bc-icon). */
+  border-radius: var(--angle);
+  border: 1px solid var(--border);
+  background: var(--fond-bouton);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.build-card.disabled { opacity: .45; }
+.bc-icon { font-size: 26px; display: flex; align-items: center; justify-content: center; min-height: 46px; color: var(--gold); }
+/* La vignette d'une carte : l'illustration du bâtiment, celle que l'on posera sur la carte. */
+.bc-icon.vignette { width: 52px; height: 46px; }
+.bc-icon.vignette img { width: 100%; height: 100%; object-fit: contain; }
+.bc-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bc-name { font-family: var(--titre); font-weight: 700; font-size: 16px; letter-spacing: .01em; }
+.bc-desc { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+.bc-cost { font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+#modal { align-items: center; justify-content: center; padding: 16px; }
+.modal-card {
+  width: min(420px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--panel-solid);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--lisere);
+  border-radius: 14px;
+  padding: 20px;
+}
+.modal-card.wide { width: min(520px, 100%); }
+.modal-card h2 { margin: 0 0 6px; font-family: var(--titre); font-size: 23px; letter-spacing: .01em; }
+.modal-card .subtitle { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+/* Les précisions du menu de pause : sous leurs réglages, en retrait. */
+.modal-card .hint { margin: 8px 0 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.modal-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+/* Écran de fin : « Nouvelle partie » et « Menu principal » restent à l'écran
+   quand le tableau dépasse (petit téléphone, téléphone couché) — ils collent au
+   bas de la carte, sur son fond. La marge du bas passe de la carte aux boutons,
+   comme à l'accueil : collés, ils descendent jusqu'à son bord. */
+.modal-card.fin { padding-bottom: 0; }
+.modal-card.fin .modal-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 8px -20px 0;
+  padding: 10px 20px 20px;
+  background: linear-gradient(180deg, transparent 0, var(--panel-solid) 10px);
+}
+
+.scores { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.scores th, .scores td { padding: 7px 6px; text-align: right; border-bottom: 1px solid var(--border); }
+.scores th:first-child, .scores td:first-child { text-align: left; color: var(--muted); }
+.scores th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+/* Écran de fin : d'où vient le score, et ce que la partie change au palmarès. */
+.fin-note { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.fin-palmares { margin: -6px 0 12px; font-size: 13px; line-height: 1.4; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fin-palmares p { margin: 2px 0; }
+.fin-palmares .record { color: var(--gold); }
+
+/* --- Adaptations ---------------------------------------------------------- */
+
+@media (min-width: 720px) {
+  .build-list { grid-template-columns: 1fr 1fr; }
+  .sheet { border-radius: 14px; max-width: 720px; margin: 0 auto 16px; border: 1px solid var(--border); border-top: 2px solid var(--lisere); }
+  #build-menu, #worker-menu { align-items: center; justify-content: center; }
+  #minimap { width: 150px; height: 150px; }
+  .cmd { min-width: 84px; min-height: 70px; }
+}
+
+/* Téléphone en paysage : on comprime la barre basse pour garder la carte visible. */
+@media (max-width: 360px) {
+  .res { padding: 3px 6px; font-size: 11.5px; }
+  #alerts { max-width: min(70vw, calc(100vw - 150px - var(--safe-left) - var(--safe-right))); }
+}
+
+@media (orientation: landscape) and (max-height: 480px) {
+  /* Trois notifications au plus : la quatrième passait sous la barre des ouvriers. */
+  #alerts .toast:nth-last-child(n+4) { display: none; }
+  .worker-chip, .worker-open { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+  #selection-panel { min-height: 38px; }
+  .portrait { width: 38px; height: 38px; font-size: 20px; }
+  .cmd { min-height: 54px; min-width: 66px; }
+  .cmd.compact { min-width: 48px; }
+  .cmd-icon { font-size: 17px; min-height: 22px; }
+  .cmd-icon img.visage { width: 22px; height: 22px; }
+  #minimap { width: 84px; height: 84px; }
+  .res { padding: 4px 7px; font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
