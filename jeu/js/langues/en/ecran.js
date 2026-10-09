@@ -183,7 +183,7 @@ export default {
   "défaite|défaites": { one: "loss", other: "losses" },
 
   // --- La fin de partie : l'écran ---
-  "Égalité": "Draw",
+  "Égalité": "Tie",
   "Victoire !": "Victory!",
   "Défaite": "Defeat",
   "Vous": "You",

@@ -66,10 +66,12 @@ function finDExpression(source, i) {
  */
 export function clesDuCode(source) {
   const cles = [];
-  const appel = /(?<![\w.$])(txt|accord|pluriel)\s*(`|\()/g;
+  // (`pluriel` se passe aussi d'un module à l'autre : `o.pluriel(n, 'pièce')` compte.)
+  const appel = /(?:(?<![\w.$])(txt|accord)|(?<![\w$])(pluriel))\s*(`|\()/g;
   for (let m = appel.exec(source); m; m = appel.exec(source)) {
-    let i = m.index + m[0].length - 1;
-    if (m[1] === 'txt' && source[i] === '`') {
+    const i = m.index + m[0].length - 1;
+    const genre = m[1] || m[2];
+    if (genre === 'txt' && source[i] === '`') {
       // Un gabarit : ses morceaux fixes, ses trous numérotés.
       const morceaux = [''];
       for (let j = i + 1; j < source.length; j++) {
@@ -91,7 +93,7 @@ export function clesDuCode(source) {
       const fin = finDeChaine(source, j);
       return { texte: cuire(source.slice(j + 1, fin - 1), source[j]), fin };
     };
-    if (m[1] === 'txt') {
+    if (genre === 'txt') {
       const a = litteral(i + 1);
       if (a && /^\s*\)/.test(source.slice(a.fin))) cles.push(a.texte);
     } else {
@@ -141,6 +143,8 @@ export async function recenser() {
   const { textesDesTables, accordsDesTables } = await import('../js/config.js');
   textesDesTables((objet, champ) => noter(objet[champ], 'js/config.js (tables)'));
   for (const cle of accordsDesTables()) noter(cle, 'js/config.js (noms qui se comptent)');
+  (await import('../js/progression-config.js')).textesATraduire((objet, champ) => noter(objet[champ], 'js/progression-config.js (tables)'));
+  (await import('../js/fiches-troupes.js')).textesATraduire((objet, champ) => noter(objet[champ], 'js/fiches-troupes.js (tables)'));
   return cles;
 }
 

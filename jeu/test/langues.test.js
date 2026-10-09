@@ -121,13 +121,13 @@ console.log('\n--- Le recensement ---');
   const code = [
     'const a = txt`Bonjour ${nom}, il reste ${n > 1 ? `${n} tours` : \'un tour\'}.`;',
     'const b = txt(\'L\\u2019été\'); const c = txt("Deux mots"); const d = txt(variable); const e = montxt(\'non\'); x.txt(\'non plus\');',
-    'const f = accord(n, \'Couronne\'); const g = accord(liste.length + f(1, 2), \'cheval\', \'chevaux\'); const p = pluriel(n, \'point\');',
+    'const f = accord(n, \'Couronne\'); const g = accord(liste.length + f(1, 2), \'cheval\', \'chevaux\'); const p = pluriel(n, \'point\'); const q = o.pluriel(n, \'pièce\'); const r = o.accord(n, \'non\');',
     '// txt(\'en commentaire\') : recensé aussi, sans gravité',
     'const h = txt`${a}${b}`; const i = txt`Fin\\u00a0: ${x}`;',
   ].join('\n');
   const cles = clesDuCode(code);
   check('le code : gabarits (trous imbriqués compris), chaînes, accords ; pas les appels dont le texte n’est pas écrit',
-    egal(cles, ['Bonjour {0}, il reste {1}.', 'L’été', 'Deux mots', 'Couronne|Couronnes', 'cheval|chevaux', 'point|points', 'en commentaire', '{0}{1}', 'Fin : {0}']), JSON.stringify(cles));
+    egal(cles, ['Bonjour {0}, il reste {1}.', 'L’été', 'Deux mots', 'Couronne|Couronnes', 'cheval|chevaux', 'point|points', 'pièce|pièces', 'en commentaire', '{0}{1}', 'Fin : {0}']), JSON.stringify(cles));
   check('la page : contenus marqués (espaces ramassés) et attributs nommés',
     egal(clesDeLaPage('<h2 data-txt>Votre\n  civilisation</h2><p class="x" data-txt><b>Glisser</b> : zoomer</p><button aria-label="Son" data-txt-attr="aria-label"></button><p>ailleurs</p>'),
       ['Votre civilisation', '<b>Glisser</b> : zoomer', 'Son']));
