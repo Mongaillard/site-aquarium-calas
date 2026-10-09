@@ -33,7 +33,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NOM_DU_JEU, EDITEUR, IDENTIFIANT, nomComplet, manquesAvantMagasin } from '../js/edition.js';
+import { NOM_DU_JEU, EDITEUR, IDENTIFIANT, nomComplet, nomDuJeuEn, manquesAvantMagasin } from '../js/edition.js';
 
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -42,7 +42,7 @@ const rangSortie = args.indexOf('--sortie');
 const SORTIE = path.resolve(rangSortie >= 0 && args[rangSortie + 1] ? args[rangSortie + 1] : path.join(RACINE, 'magasin', 'www'));
 
 /** La politique de confidentialité, en une page autonome (français, puis anglais). */
-export function pageDeConfidentialite(nom = nomComplet(), editeur = EDITEUR, date = new Date().toISOString().slice(0, 10)) {
+export function pageDeConfidentialite(nom = nomDuJeuEn('fr'), editeur = EDITEUR, date = new Date().toISOString().slice(0, 10), nomAnglais = nomDuJeuEn('en')) {
   const qui = editeur.nom || '[éditeur à renseigner]';
   const ou = editeur.courriel || '[adresse à renseigner]';
   const echapper = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -87,9 +87,9 @@ export function pageDeConfidentialite(nom = nomComplet(), editeur = EDITEUR, dat
 <h2>Contact</h2>
 <p>Éditeur : ${echapper(qui)}. Pour toute question : ${echapper(ou)}.${editeur.mentions ? `<br><small>${echapper(editeur.mentions)}</small>` : ''}</p>
 
-<h1 id="english">${echapper(nom)} — Privacy Policy</h1>
+<h1 id="english">${echapper(nomAnglais)} — Privacy Policy</h1>
 <p><small>Last updated: ${echapper(date)}</small></p>
-<p>${echapper(nom)} does not collect any personal data. The game works offline, with no account, no advertising and no tracking.</p>
+<p>${echapper(nomAnglais)} does not collect any personal data. The game works offline, with no account, no advertising and no tracking.</p>
 <p>Your progress, your current game and your settings are stored on your device only. They are never sent to the publisher or to any third party. The game uses no advertising identifier and no analytics tool.</p>
 <p>To erase your data: in the game, open “Confidentialité et données” on the home screen, then “Effacer toutes mes données”. Uninstalling the app also removes everything it stored.</p>
 <p>In-app purchases, if any, are processed by the app store (Apple or Google) under its own privacy policy; the publisher receives no payment data.</p>
@@ -111,7 +111,7 @@ export const PAQUETS = Object.freeze({
  * L'extension d'achats ne clôt rien d'elle-même : c'est le jeu qui clôt, après
  * avoir livré (js/achats.js) — dit ici pour que l'iPhone le sache dès le lancement.
  */
-export function configDeLApplication(nom = nomComplet(), identifiant = IDENTIFIANT, manques = manquesAvantMagasin()) {
+export function configDeLApplication(nom = nomDuJeuEn('fr'), identifiant = IDENTIFIANT, manques = manquesAvantMagasin()) {
   const essai = manques.length > 0;
   return {
     appId: essai ? 'fr.mongaillard.essai' : identifiant,

@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { EDITION, EN_MAGASIN, NOM_DU_JEU, EDITEUR, nomComplet, manquesAvantMagasin } from '../js/edition.js';
+import { EDITION, EN_MAGASIN, NOM_DU_JEU, EDITEUR, nomComplet, nomDuJeuEn, manquesAvantMagasin } from '../js/edition.js';
 import { PROGRESSION as R } from '../js/progression-config.js';
 import { profilNeuf, migrerProfil, appliquerResultat } from '../js/progression.js';
 import { plusAvance } from '../js/rangement-durable.js';
@@ -34,7 +34,10 @@ console.log('--- L’édition, le nom, l’éditeur ---');
   check('sans enveloppe native ni marque, le jeu est en édition « web »', EDITION === 'web' && EN_MAGASIN === false && R.boutique.essai && R.boutique.essai.couronnes === 500);
   check('le nom du jeu est le même partout : js/edition.js, le titre de la page, le manifeste',
     lire('index.html').includes(`<title>${nomComplet()}</title>`) && JSON.parse(lire('manifest.webmanifest')).name === nomComplet()
-    && lire('index.html').includes(`<h1>${NOM_DU_JEU.titre} <em>${NOM_DU_JEU.suite}</em></h1>`));
+    && lire('index.html').includes(NOM_DU_JEU.suite ? `<h1>${NOM_DU_JEU.titre} <em>${NOM_DU_JEU.suite}</em></h1>` : `<h1>${NOM_DU_JEU.titre}</h1>`));
+  check('le jeu s’appelle « Au doigt et à l’œil » en français et « Rule of Thumb » ailleurs ; aucun des deux ne reprend la marque d’un autre',
+    nomComplet() === 'Au doigt et à l’œil' && nomDuJeuEn('fr') === 'Au doigt et à l’œil' && ['en', 'es', 'de', 'xx'].every((l) => nomDuJeuEn(l) === 'Rule of Thumb')
+    && [nomDuJeuEn('fr'), nomDuJeuEn('en')].every((titre) => manquesAvantMagasin({ titre, suite: '' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }, 'fr.exemple.jeu').length === 0 && titre.length <= 30));
   check('un nom qui reprend « Age of Empires » est signalé, avec ou sans accent',
     ['Âge des Empires', 'Age des Empires', 'Age of Empires', 'L’Âge des empires'].every((titre) => manquesAvantMagasin({ titre, suite: 'Mobile' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }, 'fr.exemple.jeu').length === 1)
     && manquesAvantMagasin({ titre: 'Sable et Marée', suite: '' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }, 'fr.exemple.jeu').length === 0

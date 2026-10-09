@@ -40,7 +40,7 @@ page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()
 page.on('pageerror', (err) => errors.push('pageerror: ' + err.message));
 
 await page.goto(BASE, { waitUntil: 'networkidle' });
-check('page chargée', await page.title() === 'Âge des Empires Mobile', await page.title());
+check('page chargée', await page.title() === 'Au doigt et à l’œil', await page.title());
 await page.screenshot({ path: `${SHOTS}/jeu-accueil.png` });
 
 // L'icône de l'onglet ne doit rien laisser traîner : un reste de balisage

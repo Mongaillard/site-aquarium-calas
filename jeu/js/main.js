@@ -1909,7 +1909,7 @@ document.addEventListener('visibilitychange', () => {
 {
   const titre = document.querySelector('#start-screen h1');
   if (titre) {
-    titre.textContent = `${NOM_DU_JEU.titre} `;
+    titre.textContent = NOM_DU_JEU.suite ? `${NOM_DU_JEU.titre} ` : NOM_DU_JEU.titre;
     if (NOM_DU_JEU.suite) { const suite = document.createElement('em'); suite.textContent = NOM_DU_JEU.suite; titre.append(suite); }
   }
   document.title = nomComplet();

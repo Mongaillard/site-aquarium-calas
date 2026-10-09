@@ -17,12 +17,19 @@
 // `window.Capacitor`) ou à la marque que pose `npm run magasin` dans la page
 // (`window.__EDITION`). Pour la voir dans un navigateur : `?edition=magasin`.
 //
-// AVANT DE SOUMETTRE : remplir EDITEUR, et changer NOM_DU_JEU — « Âge des
-// Empires » est une marque de Microsoft, et un jeu officiel « Age of Empires
-// Mobile » existe sur les deux magasins (Apple 4.1(c) et 5.2.1 ; Google,
-// « Impersonation »). `npm run magasin` refuse de préparer l'application tant
-// que ce n'est pas fait.
+// LE NOM. Le jeu s'appelle « Au doigt et à l'œil » en français et « Rule of
+// Thumb » partout ailleurs (choisi le 9 octobre 2026) : les deux magasins
+// acceptent un nom par langue, et c'est la même idée dans les deux — on y
+// commande du bout du doigt, on y règne avec le pouce. Son premier nom de
+// travail reprenait une marque de Microsoft (« Age of Empires », dont un jeu
+// officiel existe sur les deux magasins : Apple 4.1(c) et 5.2.1 ; Google,
+// « Impersonation ») : `manquesAvantMagasin` refuse toujours un tel nom.
+//
+// AVANT DE SOUMETTRE : remplir IDENTIFIANT. `npm run magasin` refuse de
+// préparer l'application tant que ce n'est pas fait.
 // ---------------------------------------------------------------------------
+
+import { LANGUE } from './langue.js';
 
 function lireEdition() {
   try {
@@ -38,8 +45,12 @@ export const EDITION = lireEdition();
 /** Vrai dans l'application des magasins. */
 export const EN_MAGASIN = EDITION === 'magasin';
 
-/** Le nom du jeu : son titre, et le mot posé dessous sur le couvercle. À changer ici, dans index.html et dans manifest.webmanifest. */
-export const NOM_DU_JEU = Object.freeze({ titre: 'Âge des Empires', suite: 'Mobile' });
+/** Le nom du jeu, par langue : en français, et partout ailleurs. À changer ici, dans index.html et dans manifest.webmanifest. */
+export const NOMS_DU_JEU = Object.freeze({ fr: 'Au doigt et à l’œil', ailleurs: 'Rule of Thumb' });
+/** Le nom du jeu dans une langue donnée (« fr », « en »…). */
+export const nomDuJeuEn = (langue) => (langue === 'fr' ? NOMS_DU_JEU.fr : NOMS_DU_JEU.ailleurs);
+/** Le nom du jeu dans la langue en cours : son titre, et le mot posé dessous sur le couvercle (aucun aujourd'hui). */
+export const NOM_DU_JEU = Object.freeze({ titre: nomDuJeuEn(LANGUE), suite: '' });
 /** Le nom en une ligne. */
 export const nomComplet = () => `${NOM_DU_JEU.titre}${NOM_DU_JEU.suite ? ` ${NOM_DU_JEU.suite}` : ''}`;
 

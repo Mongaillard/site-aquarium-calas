@@ -1,4 +1,4 @@
-# 🏰 Âge des Empires Mobile
+# 🏰 Au doigt et à l’œil (« Rule of Thumb » hors de France)
 
 Un jeu de stratégie en temps réel inspiré d'Age of Empires, **jouable au doigt**
 dans n'importe quel navigateur moderne. Pas de moteur de jeu, pas de bibliothèque
