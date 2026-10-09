@@ -14,6 +14,7 @@ import { DIFFICULTIES, TICKS_PER_SECOND, TILE, UNIT_TYPES, BUILDING_TYPES, nomDe
 import { UI } from '../js/ui.js';
 import { ICONES } from '../js/icones.js';
 import { formatTime } from '../js/utils.js';
+import { txt } from '../js/langue.js';
 import { readFileSync } from 'node:fs';
 
 const DT = 1 / TICKS_PER_SECOND;
@@ -717,7 +718,8 @@ function methodesDe(fichier, noms) {
     if (!m) throw new Error(`${fichier} : méthode ${nom} introuvable`);
     return m[0];
   };
-  return new Function('nomDe', 'ficheDe', `return class {${noms.map(methode).join('')}};`)(nomDe, ficheDe);
+  // (`txt` : par où passent les messages du jeu, js/langue.js.)
+  return new Function('nomDe', 'ficheDe', 'txt', `return class {${noms.map(methode).join('')}};`)(nomDe, ficheDe, txt);
 }
 function fauxJeu(w, selection = []) {
   const Jeu = methodesDe('../js/main.js', ['cancelConstruction', 'demolitionEnAttente', 'demolish', 'deleteSelected']);

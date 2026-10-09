@@ -18,6 +18,7 @@ import { UI, toucherArmee } from '../js/ui.js';
 import {
   BUDGET_TROUPES_MO, STYLES, prevoirTroupe, setStyleUnites, styleUnites, troupesADecharger, troupesSelonStyle,
 } from '../js/sprites.js';
+import { txt } from '../js/langue.js';
 import { readFileSync } from 'node:fs';
 
 const DT = 1 / TICKS_PER_SECOND;
@@ -69,9 +70,11 @@ function troupe(w, joueur, type, rang = 0, chez = joueur) {
 /**
  * Le jeu (Game, js/main.js) ne se charge pas sous Node : écrans, toile, son.
  * Ses méthodes sont lues dans sa source et jouées telles quelles sur un faux
- * jeu. `portee` : ce qu'elles prennent au module (fonctions importées, page).
+ * jeu. `portee` : ce qu'elles prennent au module (fonctions importées, page) ;
+ * `txt`, par où passent leurs messages (js/langue.js), en fait toujours partie.
  */
 function methodesDe(fichier, noms, portee = {}) {
+  portee = { txt, ...portee };
   const source = readFileSync(new URL(fichier, import.meta.url), 'utf8');
   const methode = (nom) => {
     const m = source.match(new RegExp(`\\n  ${nom}\\([^)]*\\) \\{\\n[\\s\\S]*?\\n  \\}\\n`));

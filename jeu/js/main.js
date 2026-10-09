@@ -18,7 +18,7 @@ import { appliquerResultat, reglagesDePartie, issueDePartie } from './progressio
 import { matiereDe } from './collections-config.js';
 import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
 import { guichetParDefaut } from './achats.js';
-import { txt, traduireLaPage } from './langue.js';
+import { txt, accord, traduireLaPage } from './langue.js';
 import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal } from './progression-ecrans.js';
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
@@ -218,8 +218,8 @@ class Game {
     window.addEventListener('pagehide', this.onLeave);
     // Le conseil de départ, pour une partie neuve seulement : à la reprise,
     // les villageois travaillent déjà.
-    if (!repris) this.ui.toast(`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
-    if (!repris && this.world.essai) this.ui.toast(`Partie d’essai : ${ESSAI_NOMBRE} ${nomDe(this.world.essai, this.civ, ESSAI_NOMBRE)} t’attendent près de ton centre.`, 'good');
+    if (!repris) this.ui.toast(txt`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
+    if (!repris && this.world.essai) this.ui.toast(txt`Partie d’essai : ${ESSAI_NOMBRE} ${nomDe(this.world.essai, this.civ, ESSAI_NOMBRE)} t’attendent près de ton centre.`, 'good');
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
   }
@@ -267,7 +267,7 @@ class Game {
     try { localStorage.setItem(FINESSE_KEY, this.finesse); } catch { /* stockage indisponible */ }
     this.renderer.reglerFinesse(this.finesse === 'legere' ? 2 : 3);
     this.recalerZoom();
-    this.ui.toast(this.finesse === 'legere' ? 'Image légère : deux pixels par point' : 'Image fine : tous les pixels de l’écran');
+    this.ui.toast(this.finesse === 'legere' ? txt('Image légère : deux pixels par point') : txt('Image fine : tous les pixels de l’écran'));
   }
 
   // --- Mesures, mémoire et témoin de coupure ---------------------------------
@@ -433,7 +433,7 @@ class Game {
           if (event.building.playerIndex === this.world.humanIndex) {
             this.audio.play('built');
             const f = ficheDe(event.building.type, event.building.player.civ);
-            this.ui.toast(`${f.name} terminé${f.fem ? 'e' : ''}`);
+            this.ui.toast(txt`${f.name} terminé${f.fem ? 'e' : ''}`);
           }
           break;
         case 'trained': if (mine) this.audio.play('trained'); break;
@@ -449,19 +449,19 @@ class Game {
             this.idleNoticeCooldown = 15;
             const count = this.idleVillagers().length;
             this.ui.toast(count > 1
-              ? `${count} ${this.ouvrier(count)} attendent vos ordres`
-              : `Un ${this.ouvrier()} attend vos ordres`, 'warn');
+              ? txt`${count} ${this.ouvrier(count)} attendent vos ordres`
+              : txt`Un ${this.ouvrier()} attend vos ordres`, 'warn');
           }
           break;
         case 'tech':
-          if (mine) this.ui.toast('Technologie terminée', 'good');
+          if (mine) this.ui.toast(txt('Technologie terminée'), 'good');
           break;
         case 'age':
           if (mine) {
             this.audio.play('age');
-            this.ui.toast(`Bienvenue dans l'${AGES[event.age].name} !`, 'good');
+            this.ui.toast(txt`Bienvenue dans l'${AGES[event.age].name} !`, 'good');
           } else {
-            this.ui.toast(`L'adversaire atteint l'${AGES[event.age].name}`, 'warn');
+            this.ui.toast(txt`L'adversaire atteint l'${AGES[event.age].name}`, 'warn');
           }
           break;
         case 'underAttack':
@@ -470,7 +470,7 @@ class Game {
           // pulse sur la mini-carte. Une par foyer, pour ne pas inonder.
           if (this.foyers.signaler(event.x, event.y)) {
             this.audio.play('alert');
-            this.ui.toast('Vous êtes attaqué ! Touchez pour voir où', 'error', () => this.voirAttaque());
+            this.ui.toast(txt('Vous êtes attaqué ! Touchez pour voir où'), 'error', () => this.voirAttaque());
             this.lastAttackPoint = { x: event.x, y: event.y };
             this.vibrate([18, 60, 18]);
           }
@@ -480,23 +480,23 @@ class Game {
           const moi = this.world.humanIndex;
           if (event.player === moi) {
             this.audio.play('alert');
-            this.ui.toast('Votre bâtiment principal est tombé : vos troupes se battent encore, votre allié tient', 'error');
+            this.ui.toast(txt('Votre bâtiment principal est tombé : vos troupes se battent encore, votre allié tient'), 'error');
           } else if (this.world.allies(event.player, moi)) {
             this.audio.play('alert');
-            this.ui.toast('Votre allié a perdu son bâtiment principal', 'warn');
-          } else this.ui.toast('Un adversaire est hors de combat', 'good');
+            this.ui.toast(txt('Votre allié a perdu son bâtiment principal'), 'warn');
+          } else this.ui.toast(txt('Un adversaire est hors de combat'), 'good');
           break;
         }
         case 'position': {
           // Prise de positions : une position change de mains. On dit laquelle des trois issues, et où.
           const moi = this.world.humanIndex;
-          if (event.camp === moi) { this.audio.play('built'); this.ui.toast('Position prise !', 'good'); }
+          if (event.camp === moi) { this.audio.play('built'); this.ui.toast(txt('Position prise !'), 'good'); }
           else if (event.ancien === moi) {
             this.audio.play('alert');
             this.lastAttackPoint = { x: event.x, y: event.y };
-            this.ui.toast('Position perdue ! Touchez pour voir où', 'error', () => this.voirAttaque());
+            this.ui.toast(txt('Position perdue ! Touchez pour voir où'), 'error', () => this.voirAttaque());
             this.vibrate([18, 60, 18]);
-          } else this.ui.toast('L’adversaire prend une position', 'warn');
+          } else this.ui.toast(txt('L’adversaire prend une position'), 'warn');
           break;
         }
         case 'gameOver':
@@ -510,7 +510,7 @@ class Game {
           // difficulté est celle de la ligue, elle fausserait les records.
           if (this.classee) this.ui.showGameOver(event.result, null, this.compterPartieClassee(event.result));
           // Une partie d'essai (trois soldats offerts au départ) ne compte pas non plus au palmarès.
-          else if (this.essai) this.ui.showGameOver(event.result, null, '<p class="fin-note">Partie d’essai : elle ne compte ni au classement ni au palmarès.</p>');
+          else if (this.essai) this.ui.showGameOver(event.result, null, `<p class="fin-note">${txt('Partie d’essai : elle ne compte ni au classement ni au palmarès.')}</p>`);
           else {
             this.ui.showGameOver(event.result, inscrireAuPalmares({
               mode: this.world.modeId, difficulty: this.world.difficultyId,
@@ -573,7 +573,7 @@ class Game {
       this.rallyArmed = false;
       this.ui.setBuildHint('');   // la consigne restait affichée, par-dessus les notifications
       this.audio.play('order');
-      this.ui.toast('Point de ralliement défini');
+      this.ui.toast(txt('Point de ralliement défini'));
       this.ui.refreshSelection(true);
       return;
     }
@@ -599,12 +599,12 @@ class Game {
       if (shelter && shelter.kind === 'building' && shelter.def.garrison && ownUnits.length) {
         const sent = this.world.garrisonUnits(ownUnits, shelter);
         if (sent > 0) {
-          this.ui.toast(`${sent} unité(s) se mettent à l'abri`);
+          this.ui.toast(txt`${sent} unité(s) se mettent à l'abri`);
           this.audio.play('order');
           this.vibrate(10);
         }
       } else {
-        this.ui.toast(`Touchez un ${nomDe('towncenter', this.civ)} ou une tour`, 'error');
+        this.ui.toast(txt`Touchez un ${nomDe('towncenter', this.civ)} ou une tour`, 'error');
         this.audio.play('error');
       }
       this.ui.refreshSelection(true);
@@ -655,7 +655,7 @@ class Game {
           && ownUnits.every((u) => !u.isVillager && entity.canGarrison(u))) {
         const sent = this.world.garrisonUnits(ownUnits, entity);
         if (sent > 0) {
-          this.ui.toast(`${sent} unité(s) se mettent à l'abri`);
+          this.ui.toast(txt`${sent} unité(s) se mettent à l'abri`);
           this.audio.play('order');
           this.pingOrder(entity.x, entity.y, '#c39bf6');
           this.ui.refreshSelection(true);
@@ -684,8 +684,8 @@ class Game {
         if (!this.gestesDits.has(ordre)) {
           this.gestesDits.add(ordre);
           this.ui.toast(ordre === 'repair'
-            ? 'Double tap sur le bâtiment pour le sélectionner'
-            : 'Soin lancé — double tap sur l’unité pour la sélectionner');
+            ? txt('Double tap sur le bâtiment pour le sélectionner')
+            : txt('Soin lancé — double tap sur l’unité pour la sélectionner'));
         }
         return;
       }
@@ -772,24 +772,25 @@ class Game {
     // Retour explicite : sur un petit écran, on ne voit pas d'un coup d'œil
     // que le groupe s'est étalé sur plusieurs arbres.
     if (result && result.kind === 'gather' && result.workers > 1) {
-      const lieux = { wood: 'arbres', gold: 'filons', food: 'sources de nourriture' };
+      const lieux = { wood: txt('arbres'), gold: txt('filons'), food: txt('sources de nourriture') };
       const type = result.res ? result.res.type : 'food';
       this.ui.toast(result.spread > 1
-        ? `${result.workers} ${this.ouvrier(result.workers)} répartis sur ${result.spread} ${lieux[type]}`
-        : `${result.workers} ${this.ouvrier(result.workers)} envoyé${result.workers > 1 ? 's' : ''} récolter`);
+        ? txt`${result.workers} ${this.ouvrier(result.workers)} répartis sur ${result.spread} ${lieux[type]}`
+        : txt`${result.workers} ${this.ouvrier(result.workers)} envoyé${result.workers > 1 ? 's' : ''} récolter`);
     }
     // Un chantier ne montre pas tout de suite qu'il a reçu du renfort : on le dit.
     if (result && (result.kind === 'build' || result.kind === 'repair') && result.workers > 0) {
-      const verbe = result.kind === 'repair' ? 'à la réparation' : 'sur le chantier';
+      // (Une phrase entière par cas : l'ordre des mots change d'une langue à l'autre.)
+      const reparation = result.kind === 'repair';
       this.ui.toast(result.workers > 1
-        ? `${result.workers} ouvriers envoyés ${verbe}`
-        : `Ouvrier envoyé ${verbe}`);
+        ? (reparation ? txt`${result.workers} ouvriers envoyés à la réparation` : txt`${result.workers} ouvriers envoyés sur le chantier`)
+        : (reparation ? txt('Ouvrier envoyé à la réparation') : txt('Ouvrier envoyé sur le chantier')));
     }
     if (result && result.kind === 'hunt') {
       const bete = result.target;
       this.ui.toast(bete.playerIndex === this.world.humanIndex
-        ? `${bete.def.name} : abattage, ${bete.def.food} de nourriture`
-        : `Chasse au ${bete.def.name.toLowerCase()} : ${bete.def.food} de nourriture`);
+        ? txt`${bete.def.name} : abattage, ${bete.def.food} de nourriture`
+        : txt`Chasse au ${bete.def.name.toLowerCase()} : ${bete.def.food} de nourriture`);
     }
     const colors = {
       attack: '#ff6b6b', hunt: '#ff9b6b', gather: '#ffd166', build: '#8ecae6',
@@ -867,7 +868,7 @@ class Game {
    */
   selectArmy() {
     const geste = toucherArmee(this.world, this.world.humanIndex, this.selection);
-    if (!geste) { this.ui.toast('Aucun soldat pour l’instant'); this.audio.play('error'); return; }
+    if (!geste) { this.ui.toast(txt('Aucun soldat pour l’instant')); this.audio.play('error'); return; }
     if (geste.voir) {
       this.camera.centerOn(geste.voir.x, geste.voir.y);
     } else {
@@ -876,7 +877,7 @@ class Game {
       if (geste.abri) {
         // Toute l'armée est à l'abri : on montre l'abri, son bouton « Libérer » est là.
         this.camera.centerOn(geste.abri.x, geste.abri.y);
-        this.ui.toast('Vos soldats sont à l’abri : « Libérer » les fait sortir');
+        this.ui.toast(txt('Vos soldats sont à l’abri : « Libérer » les fait sortir'));
       }
     }
     this.audio.play('select');
@@ -897,16 +898,17 @@ class Game {
     const result = this.world.ringTownBell(this.world.humanIndex);
     if (result.sheltered > 0) {
       // Abris pleins : on dit combien restent dehors, au lieu de les compter à l'abri.
-      const reste = result.sansPlace > 0 ? ` — ${result.sansPlace} sans place` : '';
-      this.ui.toast(`${result.sheltered} ${this.ouvrier(result.sheltered)} à l'abri${reste}`, 'warn');
+      this.ui.toast(result.sansPlace > 0
+        ? txt`${result.sheltered} ${this.ouvrier(result.sheltered)} à l'abri — ${result.sansPlace} sans place`
+        : txt`${result.sheltered} ${this.ouvrier(result.sheltered)} à l'abri`, 'warn');
       this.audio.play('alert');
       this.vibrate([12, 40, 12]);
     } else if (result.released > 0) {
-      this.ui.toast(`${result.released} ${this.ouvrier(result.released)} ${result.released > 1 ? 'retournent' : 'retourne'} au travail`);
+      this.ui.toast(txt`${result.released} ${this.ouvrier(result.released)} ${accord(result.released, 'retourne', 'retournent')} au travail`);
       this.audio.play('order');
     } else {
-      this.ui.toast(result.sansPlace > 0 ? 'Abris pleins'
-        : result.abris > 0 ? `Aucun ${this.ouvrier()} à abriter` : 'Aucun abri disponible', 'error');
+      this.ui.toast(result.sansPlace > 0 ? txt('Abris pleins')
+        : result.abris > 0 ? txt`Aucun ${this.ouvrier()} à abriter` : txt('Aucun abri disponible'), 'error');
       this.audio.play('error');
     }
     this.ui.refreshSelection(true);
@@ -929,7 +931,7 @@ class Game {
     this.attackMoveArmed = !this.attackMoveArmed;
     this.rallyArmed = false;
     this.garrisonArmed = false;
-    this.ui.setBuildHint(this.attackMoveArmed ? 'Touchez la zone à attaquer' : '');
+    this.ui.setBuildHint(this.attackMoveArmed ? txt('Touchez la zone à attaquer') : '');
     this.ui.refreshSelection(true);
   }
 
@@ -937,7 +939,7 @@ class Game {
     this.rallyArmed = !this.rallyArmed;
     this.attackMoveArmed = false;
     this.garrisonArmed = false;
-    this.ui.setBuildHint(this.rallyArmed ? 'Touchez le point de ralliement' : '');
+    this.ui.setBuildHint(this.rallyArmed ? txt('Touchez le point de ralliement') : '');
     this.ui.refreshSelection(true);
   }
 
@@ -945,7 +947,7 @@ class Game {
     this.garrisonArmed = !this.garrisonArmed;
     this.attackMoveArmed = false;
     this.rallyArmed = false;
-    this.ui.setBuildHint(this.garrisonArmed ? `Touchez le ${nomDe('towncenter', this.civ)} ou la tour où s’abriter` : '');
+    this.ui.setBuildHint(this.garrisonArmed ? txt`Touchez le ${nomDe('towncenter', this.civ)} ou la tour où s’abriter` : '');
     this.ui.refreshSelection(true);
   }
 
@@ -956,7 +958,7 @@ class Game {
   startBuildMode(type) {
     this.buildMode = { type, tx: 0, ty: 0, valid: false };
     this.ui.closeBuildMenu();
-    this.ui.setBuildHint(`${ficheDe(type, this.civ).name} : touchez l'emplacement (2 doigts pour déplacer la vue)`);
+    this.ui.setBuildHint(txt`${ficheDe(type, this.civ).name} : touchez l'emplacement (2 doigts pour déplacer la vue)`);
     const center = this.camera.screenToWorld(this.camera.viewWidth / 2, this.camera.viewHeight / 2);
     this.updateGhostWorld(center.x, center.y);
   }
@@ -983,7 +985,7 @@ class Game {
     if (screenX !== undefined) this.updateGhost(screenX, screenY);
     const { type, tx, ty, valid } = this.buildMode;
     if (!valid) {
-      this.ui.toast('Emplacement impossible ici', 'error');
+      this.ui.toast(txt('Emplacement impossible ici'), 'error');
       this.audio.play('error');
       return;
     }
@@ -997,10 +999,10 @@ class Game {
       this.vibrate(14);
       const fiche = ficheDe(type, this.civ);
       const nom = fiche.name;
-      const ouvriers = `${crew.length} ouvrier${crew.length > 1 ? 's' : ''}`;
+      const ouvriers = accord(crew.length, 'ouvrier', 'ouvriers');
       this.ui.toast(dejaOccupes === crew.length && crew.length > 0
-        ? `${nom} ajouté${fiche.fem ? 'e' : ''} à la file — ${ouvriers}`
-        : `${nom} lancé${fiche.fem ? 'e' : ''} — ${ouvriers}`);
+        ? txt`${nom} ajouté${fiche.fem ? 'e' : ''} à la file — ${crew.length} ${ouvriers}`
+        : txt`${nom} lancé${fiche.fem ? 'e' : ''} — ${crew.length} ${ouvriers}`);
       this.cancelBuild();
     }
   }
@@ -1026,12 +1028,12 @@ class Game {
     // qui forme des troupes) : deux appuis, comme pour « Détruire ».
     if (this.world.destructionFatale(building) && !this.demolitionEnAttente(building)) {
       this.demolitionArmee = { id: building.id, jusqua: performance.now() + 3000 };
-      this.ui.toast('Ce chantier seul vous tient en jeu : l’annuler, c’est perdre la partie. Touchez « Confirmer » pour l’annuler.', 'error');
+      this.ui.toast(txt('Ce chantier seul vous tient en jeu : l’annuler, c’est perdre la partie. Touchez « Confirmer » pour l’annuler.'), 'error');
       this.ui.refreshSelection(true);
       return;
     }
     if (this.world.cancelConstruction(building)) {
-      this.ui.toast('Chantier annulé, ressources rendues');
+      this.ui.toast(txt('Chantier annulé, ressources rendues'));
       this.setSelection([]);
     }
   }
@@ -1054,8 +1056,8 @@ class Game {
       // Express ; en Classique, le dernier Centre-Ville ou bâtiment militaire.
       const dernier = this.world.destructionFatale(building);
       this.ui.toast(dernier
-        ? `Votre dernier ${building.type === 'towncenter' ? nomDe('towncenter', this.civ) : 'bâtiment militaire'} : le détruire, c’est perdre la partie. Touchez « Confirmer » pour le raser.`
-        : `Touchez « Confirmer » pour raser : ${ficheDe(building.type, building.player.civ).name}.`, dernier ? 'error' : 'info');
+        ? txt`Votre dernier ${building.type === 'towncenter' ? nomDe('towncenter', this.civ) : txt('bâtiment militaire')} : le détruire, c’est perdre la partie. Touchez « Confirmer » pour le raser.`
+        : txt`Touchez « Confirmer » pour raser : ${ficheDe(building.type, building.player.civ).name}.`, dernier ? 'error' : 'info');
       this.ui.refreshSelection(true);
       return;
     }
@@ -1064,9 +1066,9 @@ class Game {
     const { sortis, rembourse } = this.world.raserBatiment(building);
     const fiche = ficheDe(building.type, building.player.civ);
     const suites = [];
-    if (sortis > 0) suites.push(`${sortis} unité(s) sortie(s)`);
-    if (rembourse) suites.push('file remboursée');
-    this.ui.toast(`${fiche.name} détruit${fiche.fem ? 'e' : ''}${suites.length ? ' — ' + suites.join(', ') : ''}`);
+    if (sortis > 0) suites.push(txt`${sortis} unité(s) sortie(s)`);
+    if (rembourse) suites.push(txt('file remboursée'));
+    this.ui.toast(txt`${fiche.name} détruit${fiche.fem ? 'e' : ''}${suites.length ? ' — ' + suites.join(', ') : ''}`);
     this.setSelection([]);
   }
 
@@ -1076,7 +1078,7 @@ class Game {
   }
   researchTech(building, techId) { this.world.researchTech(building, techId); }
   advanceAge(building) {
-    if (this.world.advanceAge(building)) this.ui.toast('Passage à l’âge suivant lancé…', 'good');
+    if (this.world.advanceAge(building)) this.ui.toast(txt('Passage à l’âge suivant lancé…'), 'good');
   }
 
   // --- Ouvriers : c'est le joueur qui affecte -------------------------------
@@ -1104,7 +1106,7 @@ class Game {
 
   selectWorkerGroup(task) {
     const group = this.villagersWithTask(task);
-    if (group.length === 0) { this.ui.toast(`Aucun ${this.ouvrier()} à ce poste`); return; }
+    if (group.length === 0) { this.ui.toast(txt`Aucun ${this.ouvrier()} à ce poste`); return; }
     this.setSelection(group);
     this.camera.centerOn(group[0].x, group[0].y);
     this.audio.play('select');
@@ -1125,7 +1127,7 @@ class Game {
         .sort((a, b) => stats[b] - stats[a])[0];
       if (from) pool = this.villagersWithTask(from);
     }
-    if (pool.length === 0) { this.ui.toast(`Aucun ${this.ouvrier()} disponible`); this.audio.play('error'); return null; }
+    if (pool.length === 0) { this.ui.toast(txt`Aucun ${this.ouvrier()} disponible`); this.audio.play('error'); return null; }
     return pool;
   }
 
@@ -1157,8 +1159,8 @@ class Game {
       if (d < bestD) { bestD = d; best = v; }
     }
     if (!best || !this.world.assignVillager(best, type)) {
-      const labels = { food: 'nourriture', wood: 'bois', gold: 'or' };
-      this.ui.toast(`Plus de ${labels[type]} à portée — construisez une ferme ou explorez`, 'warn');
+      const labels = { food: txt('nourriture'), wood: txt('bois'), gold: txt('or') };
+      this.ui.toast(txt`Plus de ${labels[type]} à portée — construisez une ferme ou explorez`, 'warn');
       this.audio.play('error');
       return false;
     }
@@ -1175,7 +1177,7 @@ class Game {
   assignWorkerToSite(pool, site = null) {
     const sites = site ? [site] : this.constructionSites();
     if (sites.length === 0) {
-      this.ui.toast('Aucun chantier en cours — posez un bâtiment d’abord', 'warn');
+      this.ui.toast(txt('Aucun chantier en cours — posez un bâtiment d’abord'), 'warn');
       this.audio.play('error');
       return false;
     }
@@ -1188,7 +1190,7 @@ class Game {
       }
     }
     if (!best || !this.world.assignBuilder(best, sites)) {
-      this.ui.toast(`Aucun ${this.ouvrier()} ne peut rejoindre le chantier`, 'warn');
+      this.ui.toast(txt`Aucun ${this.ouvrier()} ne peut rejoindre le chantier`, 'warn');
       this.audio.play('error');
       return false;
     }
@@ -1203,7 +1205,7 @@ class Game {
     if (!pool) return false;
     if (!this.assignWorkerToSite(pool, site)) return false;
     const n = this.world.buildersOn(site);
-    this.ui.toast(`Ouvrier envoyé — ${n} ouvrier${n > 1 ? 's' : ''} sur ce chantier`, 'good');
+    this.ui.toast(txt`Ouvrier envoyé — ${n} ${accord(n, 'ouvrier', 'ouvriers')} sur ce chantier`, 'good');
     return true;
   }
 
@@ -1230,8 +1232,8 @@ class Game {
     this.world.players[this.world.humanIndex].autoWorkers = !!on;
     saveAutoWorkers(!!on);
     this.ui.toast(on
-      ? 'Réaffectation automatique activée'
-      : `Réaffectation manuelle : vos ${this.ouvrier(2)} attendront vos ordres`);
+      ? txt('Réaffectation automatique activée')
+      : txt`Réaffectation manuelle : vos ${this.ouvrier(2)} attendront vos ordres`);
   }
 
   // --- Confort --------------------------------------------------------------
@@ -1244,7 +1246,7 @@ class Game {
 
   focusIdleVillager() {
     const idle = this.idleVillagers();
-    if (idle.length === 0) { this.ui.toast(`Aucun ${this.ouvrier()} inactif`); return; }
+    if (idle.length === 0) { this.ui.toast(txt`Aucun ${this.ouvrier()} inactif`); return; }
     this.idleIndex = ((this.idleIndex || 0) + 1) % idle.length;
     const villager = idle[this.idleIndex];
     this.setSelection([villager]);
@@ -1314,16 +1316,16 @@ class Game {
   /** Donne une consigne à l'allié : 'attaquer' (le prochain toucher sur la carte dit où), 'defendre', 'libre'. */
   consigner(type) {
     const allie = this.allieOrdinateur();
-    if (!allie) { this.ui.toast('Votre allié est hors de combat'); return; }
+    if (!allie) { this.ui.toast(txt('Votre allié est hors de combat')); return; }
     if (type === 'attaquer') {
       this.consigneArmee = true;
-      this.ui.setBuildHint('Touchez l’endroit que votre allié doit attaquer');
+      this.ui.setBuildHint(txt('Touchez l’endroit que votre allié doit attaquer'));
       return;
     }
     if (this.world.consigner(this.world.humanIndex, allie.index, type)) {
       this.audio.play('order');
       if (type === 'defendre') this.annoncerConsigne(allie, type);
-      else this.ui.toast('Votre allié reprend sa conduite', 'good');
+      else this.ui.toast(txt('Votre allié reprend sa conduite'), 'good');
     } else this.audio.play('error');
   }
 
@@ -1351,7 +1353,7 @@ class Game {
     // croire que la partie sera retrouvée.
     if (!ok && !this.saveWarned) {
       this.saveWarned = true;
-      this.ui.toast('Sauvegarde impossible sur cet appareil : la partie ne pourra pas être reprise', 'warn');
+      this.ui.toast(txt('Sauvegarde impossible sur cet appareil : la partie ne pourra pas être reprise'), 'warn');
     }
     return ok;
   }
@@ -1365,20 +1367,20 @@ class Game {
     const moi = this.civ, adverse = this.world.adversaire(this.world.humanIndex).civ;
     const miennes = troupesSelonStyle(moi), adverses = troupesSelonStyle(adverse);
     // (Le chevalier d'essai n'habille que le milicien, sous le nom que lui donne la civilisation.)
-    const essai = miennes.includes('militia') ? `${nomDe('militia', moi)} : chevalier d’essai` : null;
+    const essai = miennes.includes('militia') ? nomDe('militia', moi) : null;
     const messages = {
-      '3d': 'Personnages : tes modèles 3D animés',
-      anime: 'Personnages : marche dessinée',
-      peint: 'Personnages : illustration peinte',
-      '3d-precalc': essai ? `${essai} rendu à l’avance` : 'Personnages : marche dessinée',
-      '3d-direct': essai ? `${essai} animé en direct` : 'Personnages : marche dessinée',
+      '3d': txt('Personnages : tes modèles 3D animés'),
+      anime: txt('Personnages : marche dessinée'),
+      peint: txt('Personnages : illustration peinte'),
+      '3d-precalc': essai ? txt`${essai} : chevalier d’essai rendu à l’avance` : txt('Personnages : marche dessinée'),
+      '3d-direct': essai ? txt`${essai} : chevalier d’essai animé en direct` : txt('Personnages : marche dessinée'),
     };
     if (miennes.length === 0) {
       this.ui.toast(adverses.length === 0
-        ? 'Style : rien ne change, les troupes de cette partie n’ont que leur modèle 3D'
-        : `Style : seules les troupes des ${CIVILISATIONS[adverse].name} changent, les tiennes n’ont que leur modèle 3D`);
+        ? txt('Style : rien ne change, les troupes de cette partie n’ont que leur modèle 3D')
+        : txt`Style : seules les troupes des ${CIVILISATIONS[adverse].name} changent, les tiennes n’ont que leur modèle 3D`);
     } else if (styleUnites() === '3d-direct' && !webglDisponible()) {
-      this.ui.toast('3D en direct : WebGL indisponible ici — le rendu précalculé le remplace', 'warn');
+      this.ui.toast(txt('3D en direct : WebGL indisponible ici — le rendu précalculé le remplace'), 'warn');
     } else {
       this.ui.toast(messages[styleUnites()]);
     }
@@ -1394,7 +1396,7 @@ class Game {
     this.renderer.vitesseJeu = this.speed;
     this.accumulator = 0;
     storeSpeed(def.id);
-    this.ui.toast(`Vitesse : ${def.name} (${def.short})`);
+    this.ui.toast(txt`Vitesse : ${def.name} (${def.short})`);
     this.ui.refreshSelection(true);
   }
 
@@ -1635,7 +1637,7 @@ function refreshPalmares() {
   // (En partie classée, c'est le bandeau de ligue qui dit où l'on en est.)
   const resume = partieClassee() ? '' : resumePalmares(lignePalmares(lirePalmares(), settings.mode, settings.difficulty));
   node.textContent = resume
-    ? `${GAME_MODES[settings.mode].name}, ${DIFFICULTIES[settings.difficulty].name} : ${resume}`
+    ? txt`${GAME_MODES[settings.mode].name}, ${DIFFICULTIES[settings.difficulty].name} : ${resume}`
     : '';
   node.classList.toggle('hidden', !resume);
 }
@@ -1931,9 +1933,9 @@ window.addEventListener('modeles3d', (ev) => {
   if (ev.detail && ev.detail.retour) return;   // une troupe déchargée revient du cache : rien à annoncer
   if (!currentGame || !currentGame.running || styleUnites() !== '3d') return;
   const e = etatModeles3d();
-  if (e.etat === 'pret' && e.alleges && e.alleges.length) currentGame.ui.toast(`Personnages 3D allégés faute de mémoire (${e.alleges.join(', ')})`, 'warn');
-  else if (e.etat === 'pret') currentGame.ui.toast('Tes personnages 3D sont prêts');
-  else if (e.etat === 'absent') currentGame.ui.toast(`Personnages 3D indisponibles ici (${e.raison}) : dessins à la place`, 'warn');
+  if (e.etat === 'pret' && e.alleges && e.alleges.length) currentGame.ui.toast(txt`Personnages 3D allégés faute de mémoire (${e.alleges.join(', ')})`, 'warn');
+  else if (e.etat === 'pret') currentGame.ui.toast(txt('Tes personnages 3D sont prêts'));
+  else if (e.etat === 'absent') currentGame.ui.toast(txt`Personnages 3D indisponibles ici (${e.raison}) : dessins à la place`, 'warn');
 });
 
 // Mode hors ligne : uniquement là où le jeu est déployé en entier (le

@@ -17,6 +17,7 @@ import { Projectile } from './entities.js';
 import { entityDef } from './config.js';
 import { formatTime } from './utils.js';
 import { migrerProfil, regulariser, profilNeuf } from './progression.js';
+import { txt, accord, LOCALE } from './langue.js';
 
 export const SAVE_KEY = 'aem.partie';
 export const SAVE_VERSION = 1;
@@ -622,16 +623,16 @@ export function marquerIncidentsLus(store = storage()) {
 
 /** « après 12 min — 180 Mo d’images, 64 unités » : où en était la partie, ce que pesait la page. */
 export function resumeIncident(incident) {
-  const duree = incident.min >= 1 ? `après ${Math.round(incident.min)} min` : 'après moins d’une minute';
-  return `${duree} — ${incident.mo} Mo d’images, ${incident.unites} unité${incident.unites > 1 ? 's' : ''}`;
+  const duree = incident.min >= 1 ? txt`après ${Math.round(incident.min)} min` : txt('après moins d’une minute');
+  return txt`${duree} — ${incident.mo} Mo d’images, ${incident.unites} ${accord(incident.unites, 'unité', 'unités')}`;
 }
 
 /** La ligne de l'écran d'accueil. `court` : sans les mesures (poids des images, nombre d'unités), qui ne parlent qu'à qui met le jeu au point. */
 export function phraseIncident(incident, court = false) {
-  if (court) return incident.genre === 'rechargee' ? 'Le jeu s’est relancé en pleine partie : elle t’attend.' : 'La dernière partie s’est interrompue : elle t’attend.';
+  if (court) return incident.genre === 'rechargee' ? txt('Le jeu s’est relancé en pleine partie : elle t’attend.') : txt('La dernière partie s’est interrompue : elle t’attend.');
   return incident.genre === 'rechargee'
-    ? `La page a été rechargée en pleine partie, ${resumeIncident(incident)}`
-    : `La dernière partie s’est interrompue ${resumeIncident(incident)}`;
+    ? txt`La page a été rechargée en pleine partie, ${resumeIncident(incident)}`
+    : txt`La dernière partie s’est interrompue ${resumeIncident(incident)}`;
 }
 
 // --- Rangement dans le navigateur -------------------------------------------
@@ -805,8 +806,8 @@ export function inscrireAuPalmares({ mode, difficulty, humanIndex = 0, result })
 export function resumePalmares(ligne) {
   if (!ligne || (!ligne.victoires && !ligne.score)) return '';
   const morceaux = [];
-  if (ligne.victoires) morceaux.push(`${ligne.victoires} victoire${ligne.victoires > 1 ? 's' : ''}`);
-  if (ligne.temps) morceaux.push(`meilleur temps ${formatTime(ligne.temps)}`);
-  if (ligne.score) morceaux.push(`meilleur score ${ligne.score.toLocaleString('fr-FR')}`);
+  if (ligne.victoires) morceaux.push(`${ligne.victoires} ${accord(ligne.victoires, 'victoire', 'victoires')}`);
+  if (ligne.temps) morceaux.push(txt`meilleur temps ${formatTime(ligne.temps)}`);
+  if (ligne.score) morceaux.push(txt`meilleur score ${ligne.score.toLocaleString(LOCALE)}`);
   return morceaux.join(' · ');
 }

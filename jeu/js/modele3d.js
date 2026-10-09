@@ -20,6 +20,9 @@
 // personnage tourne sur ses pieds et ne glisse jamais.
 // ---------------------------------------------------------------------------
 
+// (Une cuisson qui échoue dit pourquoi au joueur — voir etatModeles3d, js/sprites.js : ses raisons se traduisent.)
+import { txt } from './langue.js';
+
 /**
  * Les unités en 3D. `clips` associe chaque état du jeu à une animation du
  * fichier, `images` le nombre d'images tirées de chacune : seize pour un tour
@@ -497,7 +500,7 @@ async function empreinteRetenue(src) {
 /** Lit le modèle ; retient son empreinte avec ce que le serveur dit de lui. Rend `{ octets, h }`. */
 async function lireModele(m) {
   const reponse = await fetch(m.src);
-  if (!reponse.ok) throw new Error(`${m.src} : ${reponse.status}`);
+  if (!reponse.ok) throw new Error(txt`${m.src} : ${reponse.status}`);
   const octets = await reponse.arrayBuffer();
   const h = empreinte(octets);
   empreintesVues.set(m.src, h);
@@ -736,7 +739,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
   const melangeur = new THREE.AnimationMixer(modele);
   const clipDe = (nom) => {
     const c = gltf.animations.find((a) => a.name === nom);
-    if (!c) throw new Error(`animation « ${nom} » absente de ${m.src}`);
+    if (!c) throw new Error(txt`animation « ${nom} » absente de ${m.src}`);
     return c;
   };
   const jouer = (clip, t) => {
@@ -819,7 +822,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
       c.width = travailL * f; c.height = travailH * f;
       const x = c.getContext('2d');
       moities.push({ c, x });
-      if (!x) throw new Error('mémoire graphique saturée (toile de réduction refusée)');
+      if (!x) throw new Error(txt('mémoire graphique saturée (toile de réduction refusée)'));
     }
     const gl = rendu.getContext();
     rendu.setPixelRatio(1);
@@ -830,7 +833,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
     bande = document.createElement('canvas');
     bande.width = travailL * Math.max(...Object.values(m.images)); bande.height = travailH * DIRECTIONS;
     const bctx = bande.getContext('2d', { willReadFrequently: true });
-    if (!bctx) throw new Error('mémoire graphique saturée (toile de travail refusée)');
+    if (!bctx) throw new Error(txt('mémoire graphique saturée (toile de travail refusée)'));
     bctx.imageSmoothingQuality = 'high';
     for (const [etat, nom] of Object.entries(m.clips)) {
       const clip = clipDe(nom);
@@ -844,7 +847,7 @@ export async function cuireModele(cle, vitessePxS, octets, { sur = 0, mip = fals
           const t = boucle ? (i / n) * clip.duration : (i / Math.max(1, n - 1)) * clip.duration;
           poser(clip, t, etat);
           rendu.render(scene, camera);
-          if (gl.isContextLost()) throw new Error('mémoire graphique saturée (contexte WebGL perdu)');
+          if (gl.isContextLost()) throw new Error(txt('mémoire graphique saturée (contexte WebGL perdu)'));
           let source = toile;
           for (const { c, x } of moities) {
             x.clearRect(0, 0, c.width, c.height);
@@ -937,7 +940,7 @@ function recadrer(bande, n, L, H, ancreX, ancreY, equipe, reglage, f = 1, densit
       }
     }
   }
-  if (!Number.isFinite(haut)) throw new Error('modèle invisible à la caméra');
+  if (!Number.isFinite(haut)) throw new Error(txt('modèle invisible à la caméra'));
   const ax = Math.round(ancreX), ay = Math.round(ancreY);
   // `f` : réduction de cet atlas (2 pour la chute en cuisson de secours). Tout
   // se mesure à pleine finesse, en multiples de f, puis chaque case est
@@ -960,7 +963,7 @@ function recadrer(bande, n, L, H, ancreX, ancreY, equipe, reglage, f = 1, densit
   const atlas = document.createElement('canvas');
   atlas.width = X; atlas.height = cellH * n;
   const actx = atlas.getContext('2d', { willReadFrequently: true });
-  if (!actx) throw new Error('mémoire graphique saturée (atlas refusé)');
+  if (!actx) throw new Error(txt('mémoire graphique saturée (atlas refusé)'));
   for (let k = 0; k < DIRECTIONS; k++) {
     const c = colonnes[k];
     for (let i = 0; i < n; i++) {
@@ -974,7 +977,7 @@ function recadrer(bande, n, L, H, ancreX, ancreY, equipe, reglage, f = 1, densit
   const finale = document.createElement('canvas');
   finale.width = atlas.width; finale.height = atlas.height;
   const fctx = finale.getContext('2d');
-  if (!fctx) { atlas.width = atlas.height = 0; finale.width = finale.height = 0; throw new Error('mémoire graphique saturée (atlas refusé)'); }
+  if (!fctx) { atlas.width = atlas.height = 0; finale.width = finale.height = 0; throw new Error(txt('mémoire graphique saturée (atlas refusé)')); }
   fctx.drawImage(atlas, 0, 0);
   atlas.width = atlas.height = 0;
   // `cellW` : la plus large des colonnes (pour mémoire : le dessin lit `colonnes`).

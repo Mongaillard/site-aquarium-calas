@@ -16,6 +16,7 @@ import { SpatialGrid, RNG, dist, dist2, canAfford, payCost, clamp } from './util
 import { AIPlayer } from './ai.js';
 import { PROGRESSION } from './progression-config.js';
 import { definitionAuNiveau } from './progression.js';
+import { txt } from './langue.js';
 
 const PATHS_PER_TICK = 10;
 const FOG_INTERVAL = 0.25;
@@ -167,8 +168,8 @@ export class World {
     const civs = Array.isArray(options.civs) ? options.civs : [];
     if (!this.parEquipes) {
       this.players = [
-        makePlayer(0, options.playerName || 'Vous', false, civDe(civs[0])),
-        makePlayer(1, 'Adversaire', true, civDe(civs[1])),
+        makePlayer(0, options.playerName || txt('Vous'), false, civDe(civs[0])),
+        makePlayer(1, txt('Adversaire'), true, civDe(civs[1])),
       ];
       this.players[1].mods.gatherRate = this.difficulty.gatherBonus;
     } else {
@@ -178,7 +179,7 @@ export class World {
       let allies = 0, adversaires = 0;
       this.players = this.places.map((place, i) => {
         const dela = place.equipe === moi;
-        const nom = i === this.humanIndex ? (options.playerName || 'Vous') : dela ? `Allié${++allies > 1 ? ' ' + allies : ''}` : `Adversaire ${++adversaires}`;
+        const nom = i === this.humanIndex ? (options.playerName || txt('Vous')) : dela ? txt`Allié${++allies > 1 ? ' ' + allies : ''}` : txt`Adversaire ${++adversaires}`;
         const premier = this.places.findIndex((p) => (p.equipe === moi) === dela);
         const joueur = makePlayer(i, nom, place.controle === 'ordinateur', civDe(civs[i] || civs[premier]));
         joueur.color = COULEURS_EQUIPES[i % COULEURS_EQUIPES.length];
@@ -345,7 +346,7 @@ export class World {
 
   onAnimalCaptured(animal) {
     if (animal.playerIndex === this.humanIndex) {
-      this.pushEvent({ type: 'notice', text: `Cochon capturé : menez-le au village, un ${nomDe('villager', this.players[this.humanIndex].civ).toLowerCase()} l’abattra.` });
+      this.pushEvent({ type: 'notice', text: txt`Cochon capturé : menez-le au village, un ${nomDe('villager', this.players[this.humanIndex].civ).toLowerCase()} l’abattra.` });
     }
   }
 
@@ -1070,7 +1071,7 @@ export class World {
     // Le joueur l'apprend en clair, sans être harcelé : une fois par demi-minute.
     if (amis > 0 && tireur.playerIndex === this.humanIndex && this.time >= (this.avisTirAmi || 0)) {
       this.avisTirAmi = this.time + 30;
-      this.pushEvent({ type: 'notice', text: `Votre ${nomDe(tireur.type, joueur.civ)} a touché vos propres troupes.` });
+      this.pushEvent({ type: 'notice', text: txt`Votre ${nomDe(tireur.type, joueur.civ)} a touché vos propres troupes.` });
     }
     this.effects.push({ kind: 'impact', x: pr.x, y: pr.y, rayon, life: 0.5, max: 0.5 });
     this.pushEvent({ type: 'melee', x: pr.x, y: pr.y, player: tireur.playerIndex, combat: true });
@@ -1175,7 +1176,7 @@ export class World {
       if (silent && entity.type === 'farm' && entity.complete && entity.foodLeft <= 0) {
         if (owner.autoWorkers) this.reseedFarm(entity);
         else if (entity.playerIndex === this.humanIndex) {
-          this.pushEvent({ type: 'notice', text: 'Ferme épuisée — reconstruisez-la pour continuer.' });
+          this.pushEvent({ type: 'notice', text: txt('Ferme épuisée — reconstruisez-la pour continuer.') });
         }
       }
       // En conquête, le dernier Centre-Ville tombé ne perd pas la partie tant
@@ -1186,15 +1187,14 @@ export class World {
         const restants = this.buildings.filter((b) => !b.dead && b.playerIndex === entity.playerIndex);
         if (!restants.some((b) => b.type === 'towncenter') && restants.some((b) => b.def.trains)) {
           const f = ficheDe('towncenter', owner.civ);
-          const perdu = `${f.name} perdu${f.fem ? 'e' : ''} !`;
           // Rebâtir demande un villageois, et la garnison vient de périr avec le
           // bâtiment : sans lui, le conseil serait impossible à suivre.
           const batisseur = this.units.some((u) => !u.dead && u.playerIndex === entity.playerIndex && u.isVillager);
           this.pushEvent({
             type: 'notice',
             text: batisseur
-              ? `${perdu} Rebâtissez ${f.fem ? 'une' : 'un'} ${f.name} : il ne vous reste que vos bâtiments militaires.`
-              : `${perdu} Plus aucun ${nomDe('villager', owner.civ).toLowerCase()} pour rebâtir : il ne vous reste que vos troupes et vos bâtiments militaires.`,
+              ? txt`${f.name} perdu${f.fem ? 'e' : ''} ! Rebâtissez ${f.fem ? 'une' : 'un'} ${f.name} : il ne vous reste que vos bâtiments militaires.`
+              : txt`${f.name} perdu${f.fem ? 'e' : ''} ! Plus aucun ${nomDe('villager', owner.civ).toLowerCase()} pour rebâtir : il ne vous reste que vos troupes et vos bâtiments militaires.`,
           });
         }
       }
@@ -1301,7 +1301,7 @@ export class World {
   notifyPopBlocked(playerIndex) {
     if (playerIndex !== this.humanIndex || this.popWarnCooldown > 0) return;
     this.popWarnCooldown = 12;
-    this.pushEvent({ type: 'notice', text: 'Population maximale atteinte — construisez des maisons.' });
+    this.pushEvent({ type: 'notice', text: txt('Population maximale atteinte — construisez des maisons.') });
   }
 
   // --- Production -----------------------------------------------------------
@@ -1309,11 +1309,11 @@ export class World {
   canTrain(building, unitType) {
     const player = this.players[building.playerIndex];
     const def = UNIT_TYPES[unitType];
-    if (!def || !building.complete) return { ok: false, reason: 'Bâtiment en construction' };
-    if (player.interdites.has(unitType)) return { ok: false, reason: 'Troupe à débloquer' };
-    if ((def.age || 0) > player.age) return { ok: false, reason: 'Âge requis : ' + AGES[def.age].name };
-    if (building.queue.length >= 8) return { ok: false, reason: 'File d’attente pleine' };
-    if (!canAfford(player.resources, def.cost)) return { ok: false, reason: 'Ressources insuffisantes' };
+    if (!def || !building.complete) return { ok: false, reason: txt('Bâtiment en construction') };
+    if (player.interdites.has(unitType)) return { ok: false, reason: txt('Troupe à débloquer') };
+    if ((def.age || 0) > player.age) return { ok: false, reason: txt`Âge requis : ${AGES[def.age].name}` };
+    if (building.queue.length >= 8) return { ok: false, reason: txt('File d’attente pleine') };
+    if (!canAfford(player.resources, def.cost)) return { ok: false, reason: txt('Ressources insuffisantes') };
     return { ok: true };
   }
 
@@ -1332,17 +1332,17 @@ export class World {
   canResearch(building, techId) {
     const tech = TECHS[techId];
     const player = this.players[building.playerIndex];
-    if (!tech || !building.complete) return { ok: false, reason: 'Indisponible' };
-    if (player.techs.has(techId)) return { ok: false, reason: 'Déjà recherché' };
+    if (!tech || !building.complete) return { ok: false, reason: txt('Indisponible') };
+    if (player.techs.has(techId)) return { ok: false, reason: txt('Déjà recherché') };
     // En cours dans N'IMPORTE LEQUEL de ses bâtiments : deux forges (ou deux
     // Centres-Villes) la paieraient et l'appliqueraient deux fois.
     if (this.buildings.some((b) => !b.dead && b.playerIndex === building.playerIndex
         && b.queue.some((q) => q.kind === 'tech' && q.id === techId))) {
-      return { ok: false, reason: 'Déjà en cours' };
+      return { ok: false, reason: txt('Déjà en cours') };
     }
-    if (tech.age > player.age) return { ok: false, reason: 'Âge requis : ' + AGES[tech.age].name };
-    if (building.queue.length >= 8) return { ok: false, reason: 'File d’attente pleine' };
-    if (!canAfford(player.resources, tech.cost)) return { ok: false, reason: 'Ressources insuffisantes' };
+    if (tech.age > player.age) return { ok: false, reason: txt`Âge requis : ${AGES[tech.age].name}` };
+    if (building.queue.length >= 8) return { ok: false, reason: txt('File d’attente pleine') };
+    if (!canAfford(player.resources, tech.cost)) return { ok: false, reason: txt('Ressources insuffisantes') };
     return { ok: true };
   }
 
@@ -1438,25 +1438,27 @@ export class World {
       (b) => !b.dead && b.playerIndex === player.index && b.type === type);
     const chantiers = c.types.filter(enChantier), aPoser = c.types.filter((type) => !enChantier(type));
     const reste = c.manque - chantiers.length;
-    if (reste <= 0) return `Chantier à terminer d’abord : ${chantiers.map(nom).join(', ')}`;
+    if (reste <= 0) return txt`Chantier à terminer d’abord : ${chantiers.map(nom).join(', ')}`;
+    // (Une phrase entière par cas : l'ordre des mots et les articles changent d'une langue à l'autre.)
     if (reste < aPoser.length) {
-      return `Il faut ${reste > 1 ? `${reste} bâtiments` : 'encore un bâtiment'} parmi : ${aPoser.map(nom).join(', ')}`;
+      const parmi = aPoser.map(nom).join(', ');
+      return reste > 1 ? txt`Il faut ${reste} bâtiments parmi : ${parmi}` : txt`Il faut encore un bâtiment parmi : ${parmi}`;
     }
-    const avecArticle = aPoser.map((type) => `${ficheDe(type, player.civ).fem ? 'une' : 'un'} ${nom(type)}`);
+    const avecArticle = aPoser.map((type) => (ficheDe(type, player.civ).fem ? txt`une ${nom(type)}` : txt`un ${nom(type)}`));
     const dernier = avecArticle.pop();
-    return `Il faut ${avecArticle.length ? `${avecArticle.join(', ')} et ` : ''}${dernier}`;
+    return avecArticle.length ? txt`Il faut ${avecArticle.join(', ')} et ${dernier}` : txt`Il faut ${dernier}`;
   }
 
   canAdvanceAge(building) {
     const player = this.players[building.playerIndex];
     const next = AGES[player.age + 1];
-    if (!next) return { ok: false, reason: 'Âge maximal atteint' };
-    if (player.ageProgress) return { ok: false, reason: 'Passage déjà en cours' };
-    if (!building.complete || building.type !== 'towncenter') return { ok: false, reason: 'Centre-Ville requis' };
+    if (!next) return { ok: false, reason: txt('Âge maximal atteint') };
+    if (player.ageProgress) return { ok: false, reason: txt('Passage déjà en cours') };
+    if (!building.complete || building.type !== 'towncenter') return { ok: false, reason: txt('Centre-Ville requis') };
     // Les bâtiments exigés d'abord : le message dit lesquels. Le prix ensuite.
     const raison = this.raisonAge(player);
     if (raison) return { ok: false, reason: raison };
-    if (!canAfford(player.resources, next.cost)) return { ok: false, reason: 'Ressources insuffisantes' };
+    if (!canAfford(player.resources, next.cost)) return { ok: false, reason: txt('Ressources insuffisantes') };
     return { ok: true };
   }
 
@@ -1482,7 +1484,7 @@ export class World {
     if (porteur && porteur.dead) {
       player.ageProgress = null;
       if (player.index === this.humanIndex) {
-        this.pushEvent({ type: 'notice', text: `Passage d’âge interrompu : votre ${nomDe('towncenter', player.civ)} est tombé.` });
+        this.pushEvent({ type: 'notice', text: txt`Passage d’âge interrompu : votre ${nomDe('towncenter', player.civ)} est tombé.` });
       }
       return;
     }
@@ -1583,11 +1585,11 @@ export class World {
     const def = BUILDING_TYPES[type];
     const player = this.players[playerIndex];
     if (!this.canPlace(playerIndex, type, tx, ty, playerIndex !== this.humanIndex)) {
-      if (playerIndex === this.humanIndex) this.pushEvent({ type: 'notice', text: 'Emplacement impossible ici.' });
+      if (playerIndex === this.humanIndex) this.pushEvent({ type: 'notice', text: txt('Emplacement impossible ici.') });
       return null;
     }
     if (!canAfford(player.resources, def.cost)) {
-      if (playerIndex === this.humanIndex) this.pushEvent({ type: 'notice', text: 'Ressources insuffisantes.' });
+      if (playerIndex === this.humanIndex) this.pushEvent({ type: 'notice', text: txt('Ressources insuffisantes.') });
       return null;
     }
     payCost(player.resources, def.cost);
@@ -1907,9 +1909,9 @@ export class World {
       const g = building.def.garrison;
       this.pushEvent({
         type: 'notice',
-        text: !g ? 'Ce bâtiment n’abrite personne.'
-          : building.garrison.length >= g.capacity ? 'Bâtiment plein.'
-            : 'Ces unités ne peuvent pas s’y abriter.',
+        text: !g ? txt('Ce bâtiment n’abrite personne.')
+          : building.garrison.length >= g.capacity ? txt('Bâtiment plein.')
+            : txt('Ces unités ne peuvent pas s’y abriter.'),
       });
     }
     return sent;
@@ -1918,7 +1920,7 @@ export class World {
   releaseGarrison(building) {
     const released = building.releaseGarrison();
     if (released.length && building.playerIndex === this.humanIndex) {
-      this.pushEvent({ type: 'notice', text: `${released.length} unité(s) sortie(s)` });
+      this.pushEvent({ type: 'notice', text: txt`${released.length} unité(s) sortie(s)` });
     }
     // « Libérer » lève l'alerte aussi bien que la cloche : plus aucun villageois
     // à l'abri ni en route sur son appel, ceux qui s'étaient arrêtés devant un
