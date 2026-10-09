@@ -163,7 +163,8 @@ function semaineDe(jour) {
  *   boutique        : ses offres en cours — `offreLigue` (une troupe à prix
  *                     réduit jusqu'à une heure, en secondes), `bienvenueJusqua`
  *                     (fin de l'offre de bienvenue ; 0 tant qu'elle n'est pas
- *                     ouverte), `bienvenuePrise`
+ *                     ouverte), `bienvenuePrise`, et les `transactions` du
+ *                     magasin d'applications déjà livrées (leurs numéros)
  *   saison, saisons : le numéro de la saison en cours, ce que furent les précédentes
  *   jour, semaine   : compteurs remis à zéro quand la date change
  *   rechercheFermeeJusqua : heure (en secondes) jusqu'à laquelle la recherche
@@ -193,7 +194,7 @@ export function profilNeuf() {
     debloquees,
     eclats: 0,
     couronnes: 0,
-    boutique: { offreLigue: null, bienvenueJusqua: 0, bienvenuePrise: false },
+    boutique: { offreLigue: null, bienvenueJusqua: 0, bienvenuePrise: false, transactions: [] },
     pieces: [...PIECES_DE_DEPART],
     blason: { ...BLASON_DE_DEPART },
     route: routeNeuve(),
@@ -261,6 +262,7 @@ function lireProfil(o) {
     }
     p.boutique.bienvenueJusqua = estNombre(o.boutique.bienvenueJusqua) && o.boutique.bienvenueJusqua > 0 ? o.boutique.bienvenueJusqua : 0;
     p.boutique.bienvenuePrise = o.boutique.bienvenuePrise === true;
+    if (Array.isArray(o.boutique.transactions)) p.boutique.transactions = [...new Set(o.boutique.transactions.filter(transactionLisible))].slice(-R.boutique.transactions);
   }
   if (Array.isArray(o.pieces)) {
     for (const id of o.pieces) {
@@ -1111,6 +1113,19 @@ export function debloquerParAchat(profil, type, preuve) {
 
 const HEURE = 3600;
 
+/** Le numéro d'une transaction du magasin d'applications, tel qu'il se retient. */
+function transactionLisible(t) { return typeof t === 'string' && t.length > 0 && t.length <= 128; }
+/**
+ * Une preuve d'achat en argent réel recevable : `valide` vaut exactement true,
+ * et elle porte le numéro de sa `transaction`. Sans numéro, rien : c'est lui
+ * qui empêche de livrer deux fois le même achat quand le magasin le représente.
+ */
+const preuveRecevable = (preuve) => estObjet(preuve) && preuve.valide === true && transactionLisible(preuve.transaction);
+/** Retient qu'une transaction est livrée (les dernières seulement : voir boutique.transactions). */
+function retenirTransaction(p, transaction) {
+  p.boutique.transactions = [...p.boutique.transactions, transaction].slice(-R.boutique.transactions);
+}
+
 /** Ajoute des Couronnes au profil et le dit. */
 function crediter(p, couronnes, origine, evenements) {
   if (!(couronnes > 0)) return;
@@ -1276,28 +1291,42 @@ export function prendreCouronnesDEssai(profil) {
 
 /**
  * Crédite un lot de Couronnes acheté en argent réel. N'accorde rien sans une
- * preuve valide qui nomme ce lot. `{ erreur }` : 'inconnu', 'preuve'.
+ * preuve recevable qui nomme ce lot, et jamais deux fois pour la même
+ * transaction. `{ erreur }` : 'inconnu', 'preuve', 'dejaCredite'.
  */
 export function crediterLot(profil, lotId, preuve) {
   const lot = R.boutique.lots.find((l) => l.id === lotId);
   if (!lot) return { erreur: 'inconnu' };
-  if (!estObjet(preuve) || preuve.valide !== true || preuve.lot !== lotId) return { erreur: 'preuve' };
+  if (!preuveRecevable(preuve) || preuve.lot !== lotId) return { erreur: 'preuve' };
   const p = migrerProfil(profil);
+  if (p.boutique.transactions.includes(preuve.transaction)) return { erreur: 'dejaCredite' };
   const evenements = [];
   crediter(p, lot.couronnes, 'lot', evenements);
+  retenirTransaction(p, preuve.transaction);
   noter(p, { op: 'boutique', article: 'lot', lot: lotId, couronnes: lot.couronnes });
   return { profil: p, evenements };
 }
 
 /**
  * Donne l'offre de bienvenue achetée en argent réel : ses troupes (celles qui
- * restent à débloquer) et ses Couronnes. Une seule fois, avant sa fin, sur
- * preuve valide. `{ erreur }` : 'fermee', 'preuve'.
+ * restent à débloquer) et ses Couronnes. Une seule fois, sur preuve recevable.
+ *
+ * Ce qui est payé est dû : la fin de l'offre ferme sa vitrine (voir
+ * catalogueBoutique), pas sa livraison. Un achat que le magasin ne confirme
+ * qu'après coup (accord parental, paiement différé) est livré quand même.
+ *
+ * Une preuve de `restauration` (l'achat retrouvé après une réinstallation, ou
+ * sur un autre appareil) rend les troupes, pas les Couronnes : elles ont déjà
+ * été données, et dépensées peut-être.
+ *
+ * `{ erreur }` : 'preuve', 'dejaCredite' (cette transaction est déjà livrée),
+ * 'fermee' (l'offre a déjà été prise).
  */
-export function prendreOffreDeBienvenue(profil, preuve, maintenant) {
+export function prendreOffreDeBienvenue(profil, preuve) {
+  if (!preuveRecevable(preuve) || preuve.offre !== 'bienvenue') return { erreur: 'preuve' };
   const p = migrerProfil(profil);
-  if (p.boutique.bienvenuePrise || !estNombre(maintenant) || !(p.boutique.bienvenueJusqua > maintenant)) return { erreur: 'fermee' };
-  if (!estObjet(preuve) || preuve.valide !== true || preuve.offre !== 'bienvenue') return { erreur: 'preuve' };
+  if (p.boutique.transactions.includes(preuve.transaction)) return { erreur: 'dejaCredite' };
+  if (p.boutique.bienvenuePrise) return { erreur: 'fermee' };
   const b = R.boutique.offres.bienvenue;
   const evenements = [];
   p.boutique.bienvenuePrise = true;
@@ -1306,8 +1335,9 @@ export function prendreOffreDeBienvenue(profil, preuve, maintenant) {
     p.debloquees[type] = 'achat';
     evenements.push({ type: 'troupeDebloquee', troupe: type, origine: 'achat' });
   }
-  crediter(p, b.couronnes, 'bienvenue', evenements);
-  noter(p, { op: 'boutique', article: 'bienvenue' });
+  if (preuve.restauration !== true) crediter(p, b.couronnes, 'bienvenue', evenements);
+  retenirTransaction(p, preuve.transaction);
+  noter(p, { op: 'boutique', article: 'bienvenue', ...(preuve.restauration === true ? { restauration: true } : {}) });
   return { profil: p, evenements };
 }
 

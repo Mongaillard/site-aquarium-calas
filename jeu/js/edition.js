@@ -9,9 +9,9 @@
 //   « magasin » — l'application de l'App Store et de Google Play. Une version
 //                 soumise doit être finie : pas de bouton d'essai, pas
 //                 d'article annoncé « bientôt », pas d'option de mise au point
-//                 (Apple, articles 2.1, 2.2 et 2.3.1). Tant que les achats
-//                 intégrés ne sont pas branchés, elle ne montre donc aucun
-//                 prix en argent réel.
+//                 (Apple, articles 2.1, 2.2 et 2.3.1). Tant que les ventes ne
+//                 sont pas ouvertes (boutique.argentReel : voir
+//                 js/achats.js), elle ne montre donc aucun prix en argent réel.
 //
 // L'édition « magasin » se reconnaît à l'enveloppe native (Capacitor pose
 // `window.Capacitor`) ou à la marque que pose `npm run magasin` dans la page
@@ -48,9 +48,10 @@ export const nomComplet = () => `${NOM_DU_JEU.titre}${NOM_DU_JEU.suite ? ` ${NOM
  * et sur la page de la politique de confidentialité : son nom (ou sa raison
  * sociale), une adresse de courriel où lui écrire, et — pour une société —
  * ses mentions légales (forme, siège, numéro d'immatriculation).
- * VIDE : à remplir par l'éditeur avant toute soumission.
+ * Pour l'instant un particulier ; le jour où le jeu passe sur un compte de
+ * société, c'est ici que cela se change (et dans les deux magasins).
  */
-export const EDITEUR = Object.freeze({ nom: '', courriel: '', mentions: '' });
+export const EDITEUR = Object.freeze({ nom: 'Vincent Mongaillard', courriel: 'v.mongaillard@gmail.com', mentions: '' });
 
 /** Ce qui manque encore pour soumettre aux magasins : une liste de phrases, vide quand tout y est. */
 export function manquesAvantMagasin(nom = NOM_DU_JEU, editeur = EDITEUR) {

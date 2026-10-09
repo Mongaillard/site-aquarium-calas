@@ -15,6 +15,10 @@ import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAu
 import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai, ouvrirLaSaison } from './progression.js';
 import { lireProgression, ecrireProgression, effacerLesDonnees } from './save.js';
 import { EN_MAGASIN, EDITEUR, nomComplet } from './edition.js';
+import {
+  ouvrirLesVentes, fermerLesVentes, ventesOuvertes, ventesSimulees, vendable, prixAffiche, achatEnCours, prixManquants, relireLesPrix,
+  acheter as acheterAuGuichet, restaurer as restaurerAuGuichet,
+} from './achats.js';
 import { UNIT_TYPES, DEFAULT_CIV, GAME_MODES, nomDe, portraitDe } from './config.js';
 import { iconeSVG, ICONES_LICENCE } from './icones.js';
 import { ficheDeTroupe } from './fiches-troupes.js';
@@ -32,6 +36,7 @@ const ORIGINES = { victoire: 'Victoire', defaite: 'Défaite', egalite: 'Égalit�
 let civ = DEFAULT_CIV;          // le peuple dont on montre les noms et les portraits
 let surChangement = () => {};   // l'accueil se redessine quand le profil change
 let surEssai = null;            // lance une partie d'essai (main.js) ; absent : pas de bouton
+let titreMontre = '';           // l'écran affiché (son titre) ; vide : aucun
 
 const nombre = (v, decimales = 2) => Number(v).toLocaleString('fr-FR', { maximumFractionDigits: decimales });
 const pluriel = (n, mot, mots = mot + 's') => `${nombre(n)} ${n > 1 ? mots : mot}`;
@@ -122,9 +127,16 @@ export function htmlBandeau(profil) {
 
 const noeud = () => document.getElementById('progression');
 
-function montrer(titre, corps, { retour = null } = {}) {
+/**
+ * Affiche un écran. `surPlace` : le même écran redessiné garde sa hauteur de
+ * défilement — un bouton qui demande un second toucher reste sous le doigt.
+ */
+function montrer(titre, corps, { retour = null, surPlace = false } = {}) {
   const n = noeud();
   if (!n) return;
+  const carte = () => (n.querySelector ? n.querySelector('.prog-carte') : null);
+  const hauteur = surPlace && titreMontre === titre && carte() ? carte().scrollTop : 0;
+  titreMontre = titre;
   n.innerHTML = `
     <div class="modal-card wide prog-carte">
       <div class="prog-tete">
@@ -135,10 +147,12 @@ function montrer(titre, corps, { retour = null } = {}) {
       ${corps}
     </div>`;
   n.classList.remove('hidden');
+  if (hauteur > 0 && carte()) carte().scrollTop = hauteur;
 }
 
 export function fermerProgression() {
   const n = noeud();
+  titreMontre = '';
   if (!n) return;
   n.classList.add('hidden');
   n.innerHTML = '';
@@ -420,16 +434,33 @@ function boutonAcheter(act, arg, prix, solde, confirmer) {
 }
 
 /**
+ * Le bouton d'un article qui se paie en argent réel : son prix, tel que le
+ * magasin le dit (à défaut, celui des réglages). Au guichet simulé, `confirmer`
+ * demande le second toucher ; le vrai magasin a sa propre feuille de paiement.
+ */
+function boutonArgent(act, arg, produit, centimes, confirmer) {
+  const prix = prixAffiche(produit) || euros(centimes);
+  if (achatEnCours()) return `<button class="btn small" disabled>${achatEnCours() === produit ? 'En cours…' : prix}</button>`;
+  return confirmer
+    ? `<button class="btn small danger" data-act="${act}" data-arg="${arg}" data-i="1">Toucher encore</button>`
+    : `<button class="btn small primary" data-act="${act}" data-arg="${arg}">${prix}</button>`;
+}
+
+/**
  * La boutique : le porte-monnaie, les offres qui courent, les troupes à
  * débloquer, les lots de Couronnes. `confirmer` : l'article dont on attend le
- * second toucher (un type de troupe, ou « tout »).
+ * second toucher (un type de troupe, « tout », ou « argent:… » pour ce qui se
+ * paie en argent réel). `surPlace` : l'écran se redessine sans remonter.
  */
-function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
+function ecranBoutique(profil, message = '', { confirmer = '', surPlace = false } = {}) {
   const c = catalogueBoutique(profil, heure(), jourLocal());
   // Dans l'application des magasins, rien ne s'annonce « bientôt » : ce qui se paie en argent réel
-  // ne se montre que le jour où il s'achète (Apple 2.1 ; voir js/edition.js).
-  const montrerLArgentReel = c.lots.some((l) => l.disponible) || !EN_MAGASIN;
-  const offres = c.offres.filter((o) => o.id === 'ligue' || montrerLArgentReel).map((o) => {
+  // ne se montre que le jour où il s'achète (Apple 2.1 ; voir js/edition.js), au prix que dit le magasin.
+  const ventes = ventesOuvertes();
+  const seVend = (produit) => (EN_MAGASIN ? vendable(produit) : true);
+  const montrerLArgentReel = c.lots.some((l) => seVend(l.produit));
+  const bienvenue = R.boutique.offres.bienvenue.produit;
+  const offres = c.offres.filter((o) => o.id === 'ligue' || seVend(bienvenue)).map((o) => {
     if (o.id === 'ligue') {
       return `
         <li class="prog-offre">
@@ -447,9 +478,9 @@ function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
         <span class="prog-vignette">${iconeSVG('couronne', 30)}</span>
         <span class="prog-offre-texte">
           <b>Offre de bienvenue : ${contenu}</b>
-          <small>${euros(o.prixCentimes)}, une seule fois · encore ${resteEnClair(o.reste)}</small>
+          <small>${confirmer === 'argent:bienvenue' ? 'Achat simulé : aucun paiement.' : `${prixAffiche(bienvenue) || euros(o.prixCentimes)}, une seule fois · encore ${resteEnClair(o.reste)}`}</small>
         </span>
-        <button class="btn small" disabled>${o.disponible ? euros(o.prixCentimes) : 'Bientôt'}</button>
+        ${vendable(bienvenue) ? boutonArgent('acheterOffre', 'bienvenue', bienvenue, o.prixCentimes, confirmer === 'argent:bienvenue') : '<button class="btn small" disabled>Bientôt</button>'}
       </li>`;
   }).join('');
   const troupes = c.troupes.map((t) => {
@@ -468,21 +499,27 @@ function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
       </li>`;
   }).join('');
   const lot = c.lotTroupes;
-  const lots = c.lots.map((l) => `
+  const lots = c.lots.filter((l) => seVend(l.produit)).map((l) => `
     <li class="prog-article">
       <span class="prog-vignette">${iconeSVG('couronne', 30)}</span>
       <span class="prog-offre-texte">
         <b>${l.nom} : ${nombre(l.couronnes)} Couronnes</b>
-        <small>${l.bonus ? `${l.bonus} % de plus que le premier lot` : 'Le premier lot'}</small>
+        <small>${confirmer === `argent:${l.id}` ? 'Achat simulé : aucun paiement.' : l.bonus ? `${l.bonus} % de plus que le premier lot` : 'Le premier lot'}</small>
       </span>
-      <button class="btn small" disabled>${euros(l.prixCentimes)}</button>
+      ${vendable(l.produit) ? boutonArgent('acheterLot', l.id, l.produit, l.prixCentimes, confirmer === `argent:${l.id}`) : `<button class="btn small" disabled>${euros(l.prixCentimes)}</button>`}
     </li>`).join('');
   const rayonDesCouronnes = !montrerLArgentReel ? `
     <h3>Couronnes</h3>
     <p class="subtitle">Elles se gagnent en jouant : ${R.boutique.parLigue} à chaque nouvelle ligue, et sur la route de la saison.</p>` : `
     <h3>Couronnes</h3>
-    <p class="subtitle">${c.lots.some((l) => l.disponible) ? 'Les Couronnes servent ici, et seulement ici.' : `L’achat de Couronnes arrivera avec l’application. D’ici là, elles se gagnent : ${R.boutique.parLigue} à chaque nouvelle ligue, et sur la route de la saison.`}</p>
+    <p class="subtitle">${!ventes ? `L’achat de Couronnes arrivera avec l’application. D’ici là, elles se gagnent : ${R.boutique.parLigue} à chaque nouvelle ligue, et sur la route de la saison.`
+    : ventesSimulees() ? 'L’achat de Couronnes arrivera avec l’application. Ici, toucher un lot simule son achat : aucun paiement n’est demandé.'
+    : 'Les Couronnes servent ici, et seulement ici. Le paiement passe par le magasin d’applications.'}</p>
     <ul class="prog-articles">${lots}</ul>
+    ${ventes ? `
+    <div class="modal-actions">
+      <button class="btn ghost" data-act="restaurerAchats"${achatEnCours() ? ' disabled' : ''}>Restaurer mes achats</button>
+    </div>` : ''}
     ${c.essai ? `
     <div class="modal-actions">
       <button class="btn" data-act="essaiCouronnes">Porte-monnaie d’essai : +${nombre(c.essai.couronnes)} Couronnes</button>
@@ -510,7 +547,7 @@ function ecranBoutique(profil, message = '', { confirmer = '' } = {}) {
       </li>` : ''}
     </ul>
     ${rayonDesCouronnes}
-    <p class="hint">Rien d’aléatoire ne se vend ici : ni coffre, ni fragment, ni niveau.</p>`);
+    <p class="hint">Rien d’aléatoire ne se vend ici : ni coffre, ni fragment, ni niveau.</p>`, { surPlace: surPlace || !!confirmer });
 }
 
 // --- Confidentialité, données et mentions ------------------------------------------------
@@ -572,6 +609,10 @@ const ECRANS = {
  */
 export function ouvrirProgression(ecran, arg) {
   if (ECRANS[ecran]) ECRANS[ecran](lireProgression(), arg);
+  // (Le magasin n'avait pas dit ses prix au lancement — hors ligne, sans doute : on les lui redemande.)
+  if (ecran === 'boutique' && prixManquants()) {
+    relireLesPrix().then((lus) => { if (lus && titreMontre === 'Boutique') ecranBoutique(lireProgression(), '', { surPlace: true }); }).catch(() => {});
+  }
 }
 
 /** Range le profil et prévient l'accueil ; renvoie false si l'appareil refuse d'écrire. */
@@ -579,6 +620,30 @@ function retenir(profil) {
   const ok = ecrireProgression(profil);
   surChangement(profil);
   return ok;
+}
+
+/** Où les achats en argent réel lisent et rangent le profil (js/achats.js). */
+const RANGEMENT = { lire: () => lireProgression(), ecrire: (profil) => retenir(profil) };
+
+/** Ce que l'écran dit d'un achat en argent réel, une fois le guichet revenu. Rien pour un achat annulé. */
+function phraseDAchat(r) {
+  if (r.etat === 'achete') {
+    const gagnees = r.evenements.filter((e) => e.type === 'couronnes').reduce((n, e) => n + e.variation, 0);
+    const troupes = r.evenements.filter((e) => e.type === 'troupeDebloquee').map((e) => nomTroupe(e.troupe));
+    return [troupes.length ? `${troupes.join(', ')} : c’est débloqué.` : '', gagnees > 0 ? `${pluriel(gagnees, 'Couronne')} de plus dans ta bourse.` : ''].filter(Boolean).join(' ') || 'C’est livré.';
+  }
+  if (r.etat === 'annule') return '';
+  if (r.etat === 'attente') return 'Achat en attente : il sera livré dès que le magasin l’aura confirmé.';
+  if (r.etat === 'deja') return 'Cet achat t’avait déjà été livré.';
+  if (r.etat === 'occupe') return 'Un achat est déjà en cours.';
+  if (r.etat === 'erreur' && r.raison === 'ecriture') return 'Sauvegarde impossible sur cet appareil : l’achat sera livré au prochain lancement.';
+  return 'L’achat n’a pas abouti. Si un paiement est parti, il sera livré au prochain lancement.';
+}
+
+/** Le guichet est revenu : la boutique, si elle est encore à l'écran, dit ce qu'il en est. */
+function apresAchat(r) {
+  if (titreMontre === 'Boutique') ecranBoutique(lireProgression(), phraseDAchat(r));
+  return r;
 }
 
 function agir(act, arg, i) {
@@ -621,6 +686,28 @@ function agir(act, arg, i) {
     return ecranBoutique(r.profil, ok ? `${acquises.join(', ')} : c’est débloqué. À former dès ta prochaine partie.`
       : 'Sauvegarde impossible sur cet appareil : cet achat ne sera pas retenu.');
   }
+  if (act === 'acheterLot' || act === 'acheterOffre') {
+    const article = act === 'acheterLot' ? R.boutique.lots.find((l) => l.id === arg) : arg === 'bienvenue' ? R.boutique.offres.bienvenue : null;
+    if (!article || !vendable(article.produit)) return ecranBoutique(profil);
+    if (achatEnCours()) return ecranBoutique(profil, 'Un achat est déjà en cours.');
+    // Au guichet simulé : deux touchers, et l'écran dit que rien n'est payé. Le vrai magasin demande lui-même confirmation.
+    if (ventesSimulees() && i !== '1') return ecranBoutique(profil, 'Version d’essai : cet achat est simulé, aucun paiement n’est demandé.', { confirmer: `argent:${arg}` });
+    const suite = acheterAuGuichet(article.produit, RANGEMENT).then(apresAchat);
+    ecranBoutique(profil, 'Achat en cours…', { surPlace: true });
+    return suite;
+  }
+  if (act === 'restaurerAchats') {
+    if (!ventesOuvertes() || achatEnCours()) return ecranBoutique(profil);
+    const suite = restaurerAuGuichet(RANGEMENT).then((r) => {
+      const rendues = r.rendus.flatMap((x) => x.evenements.filter((e) => e.type === 'troupeDebloquee').map((e) => nomTroupe(e.troupe)));
+      const phrase = r.etat !== 'restaure' ? 'Le magasin n’a pas répondu. Réessaie dans un moment.'
+        : rendues.length ? `${rendues.join(', ')} : c’est de nouveau à toi.` : 'Rien à restaurer : tout ce que tu as acheté est déjà là.';
+      if (titreMontre === 'Boutique') ecranBoutique(lireProgression(), phrase);
+      return r;
+    });
+    ecranBoutique(profil, 'Recherche de tes achats…', { surPlace: true });
+    return suite;
+  }
   if (act === 'essaiCouronnes') {
     const r = prendreCouronnesDEssai(profil);
     if (r.erreur) return ecranBoutique(profil);
@@ -652,9 +739,14 @@ export function reglerPeuple(nouveau) { civ = nouveau || DEFAULT_CIV; reglerPeup
  * À appeler une fois : pose les écouteurs. Tout bouton qui porte `data-ecran`
  * (dans l'accueil, l'écran de fin ou les écrans eux-mêmes) ouvre cet écran.
  */
-export function installerProgression({ quandLeProfilChange = () => {}, quandOnEssaie = null } = {}) {
+export function installerProgression({ quandLeProfilChange = () => {}, quandOnEssaie = null, guichet = null } = {}) {
   surChangement = quandLeProfilChange;
   surEssai = quandOnEssaie;
+  // Les ventes en argent réel : par le guichet donné (js/achats.js). Sans guichet, rien ne s'achète ainsi.
+  if (guichet) {
+    ouvrirLesVentes(guichet, RANGEMENT, { quandUnAchatArrive: apresAchat })
+      .then(() => { if (titreMontre === 'Boutique') ecranBoutique(lireProgression()); }).catch(() => {});
+  } else fermerLesVentes();
   document.addEventListener('click', (ev) => {
     const cible = ev.target.closest ? ev.target.closest('[data-ecran], #progression [data-act]') : null;
     if (!cible) {

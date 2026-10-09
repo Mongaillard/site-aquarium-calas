@@ -38,14 +38,14 @@ check('le bonus dit à l’écran est le vrai : ce que le lot donne de plus que 
 check('les troupes : 100, 200, 200, puis 300 — 1 700 en tout, des centaines rondes',
   egal(AVANCEES.map((t) => R.troupes[t].prix), [100, 200, 200, 300, 300, 300, 300]) && AVANCEES.reduce((s, t) => s + R.troupes[t].prix, 0) === 1700);
 check('rien d’aléatoire ni de puissance à vendre : ni coffre, ni fragment, ni niveau dans les réglages de la boutique',
-  !/coffre|fragment|niveau|eclat/i.test(JSON.stringify(B).replace(/"coffret"|Coffret/g, '')));
+  !/coffre|fragment|niveau|eclat/i.test(JSON.stringify(B).replace(/"coffret"|Coffret|couronnes\.coffret/g, '')));
 check('l’argent réel attend l’application ; d’ici là, un porte-monnaie d’essai de 500 Couronnes', B.argentReel === false && B.essai.couronnes === 500 && B.parLigue === 50);
 
 // --- Le porte-monnaie ---------------------------------------------------------------
 console.log('\n--- Le porte-monnaie ---');
 {
   const neuf = profilNeuf();
-  check('un profil neuf : 0 Couronne, aucune offre', neuf.couronnes === 0 && egal(neuf.boutique, { offreLigue: null, bienvenueJusqua: 0, bienvenuePrise: false }));
+  check('un profil neuf : 0 Couronne, aucune offre', neuf.couronnes === 0 && egal(neuf.boutique, { offreLigue: null, bienvenueJusqua: 0, bienvenuePrise: false, transactions: [] }));
   check('un profil d’avant la boutique se lit sans rien perdre, avec un porte-monnaie vide',
     (() => { const ancien = { ...profilNeuf(), elo: 300, ligue: 3, plusHauteLigue: 3 }; delete ancien.couronnes; delete ancien.boutique; const lu = migrerProfil(ancien); return lu.couronnes === 0 && lu.boutique.offreLigue === null && lu.elo === 300; })());
   check('un porte-monnaie abîmé repart de zéro, jamais en négatif',
@@ -147,15 +147,27 @@ console.log('\n--- L’offre de bienvenue ---');
   check('la boutique la montre avec ce qu’il reste, et dit qu’elle n’est pas encore achetable ici',
     !!vue && vue.reste === 48 * HEURE && vue.prixCentimes === 299 && vue.couronnes === 300 && egal(vue.troupes, ['triton', 'horseArcher']) && vue.disponible === false);
   check('… passé les 3 jours, elle a disparu', !catalogueBoutique(premiere.profil, T0 + 72 * HEURE).offres.some((x) => x.id === 'bienvenue'));
-  check('sans preuve valide du serveur, rien n’est donné',
-    [undefined, {}, { valide: 'true', offre: 'bienvenue' }, { valide: true }, { valide: true, offre: 'ligue' }].every((preuve) => prendreOffreDeBienvenue(premiere.profil, preuve, T0 + HEURE).erreur === 'preuve'));
-  const prise = prendreOffreDeBienvenue(premiere.profil, { valide: true, offre: 'bienvenue' }, T0 + HEURE);
-  check('avec la preuve : le Mercenaire, l’Archer monté et 300 Couronnes',
-    prise.profil.debloquees.triton === 'achat' && prise.profil.debloquees.horseArcher === 'achat' && prise.profil.couronnes === 300 && prise.profil.boutique.bienvenuePrise === true);
-  check('… une seule fois, et jamais après sa fin',
-    prendreOffreDeBienvenue(prise.profil, { valide: true, offre: 'bienvenue' }, T0 + 2 * HEURE).erreur === 'fermee'
-    && prendreOffreDeBienvenue(premiere.profil, { valide: true, offre: 'bienvenue' }, T0 + 72 * HEURE).erreur === 'fermee'
-    && prendreOffreDeBienvenue(profilNeuf(), { valide: true, offre: 'bienvenue' }, T0).erreur === 'fermee');
+  const recu = (transaction, plus = {}) => ({ valide: true, offre: 'bienvenue', transaction, ...plus });
+  check('sans preuve valide, rien n’est donné — ni sans le numéro de la transaction',
+    [undefined, {}, { valide: 'true', offre: 'bienvenue', transaction: 'a' }, { valide: true, transaction: 'a' }, { valide: true, offre: 'ligue', transaction: 'a' },
+      { valide: true, offre: 'bienvenue' }, recu(''), recu(12), recu('x'.repeat(129))].every((preuve) => prendreOffreDeBienvenue(premiere.profil, preuve).erreur === 'preuve'));
+  const prise = prendreOffreDeBienvenue(premiere.profil, recu('b-1'));
+  check('avec la preuve : le Mercenaire, l’Archer monté et 300 Couronnes, et la transaction est retenue',
+    prise.profil.debloquees.triton === 'achat' && prise.profil.debloquees.horseArcher === 'achat' && prise.profil.couronnes === 300 && prise.profil.boutique.bienvenuePrise === true
+    && egal(prise.profil.boutique.transactions, ['b-1']));
+  check('… une seule fois : la même transaction représentée ne donne rien, une autre non plus',
+    prendreOffreDeBienvenue(prise.profil, recu('b-1')).erreur === 'dejaCredite' && prendreOffreDeBienvenue(prise.profil, recu('b-2')).erreur === 'fermee');
+  // Ce qui est payé est dû : la fin de l'offre ferme la vitrine, pas la livraison.
+  const tard = prendreOffreDeBienvenue(premiere.profil, recu('b-3'));
+  const jamaisOuverte = prendreOffreDeBienvenue(profilNeuf(), recu('b-4'));
+  check('un achat confirmé après la fin de l’offre est livré quand même : ce qui est payé est dû',
+    !catalogueBoutique(premiere.profil, T0 + 80 * HEURE).offres.some((x) => x.id === 'bienvenue') && tard.profil.couronnes === 300 && tard.profil.debloquees.triton === 'achat'
+    && jamaisOuverte.profil.couronnes === 300 && jamaisOuverte.profil.boutique.bienvenuePrise === true);
+  const rendue = prendreOffreDeBienvenue(profilNeuf(), recu('b-5', { restauration: true }));
+  check('restaurée (réinstallation, autre appareil) : les troupes reviennent, pas les Couronnes',
+    rendue.profil.debloquees.triton === 'achat' && rendue.profil.debloquees.horseArcher === 'achat' && rendue.profil.couronnes === 0 && rendue.profil.boutique.bienvenuePrise === true
+    && !rendue.evenements.some((e) => e.type === 'couronnes') && rendue.profil.journal.at(-1).restauration === true
+    && prendreOffreDeBienvenue(rendue.profil, recu('b-5', { restauration: true })).erreur === 'dejaCredite');
 }
 
 // --- Une offre sur une troupe gagnée entre-temps ----------------------------------------
@@ -174,11 +186,27 @@ console.log('\n--- L’offre et la troupe gagnée ---');
 // --- Les lots, en argent réel -----------------------------------------------------------
 console.log('\n--- Les lots de Couronnes ---');
 {
-  check('sans preuve valide qui nomme le lot, aucun crédit',
-    [undefined, { valide: true }, { valide: true, lot: 'butin' }, { valide: 1, lot: 'bourse' }].every((preuve) => crediterLot(profilNeuf(), 'bourse', preuve).erreur === 'preuve')
-    && crediterLot(profilNeuf(), 'sac', { valide: true, lot: 'sac' }).erreur === 'inconnu');
-  const credit = crediterLot(profilNeuf(), 'bourse', { valide: true, lot: 'bourse' });
+  check('sans preuve valide qui nomme le lot et porte le numéro de la transaction, aucun crédit',
+    [undefined, { valide: true, transaction: 't' }, { valide: true, lot: 'butin', transaction: 't' }, { valide: 1, lot: 'bourse', transaction: 't' },
+      { valide: true, lot: 'bourse' }, { valide: true, lot: 'bourse', transaction: '' }, { valide: true, lot: 'bourse', transaction: 7 }].every((preuve) => crediterLot(profilNeuf(), 'bourse', preuve).erreur === 'preuve')
+    && crediterLot(profilNeuf(), 'sac', { valide: true, lot: 'sac', transaction: 't' }).erreur === 'inconnu');
+  const credit = crediterLot(profilNeuf(), 'bourse', { valide: true, lot: 'bourse', transaction: 't-1' });
   check('avec la preuve : 550 Couronnes, notées au journal', credit.profil.couronnes === 550 && credit.profil.journal.at(-1).lot === 'bourse');
+  const encore = crediterLot(credit.profil, 'bourse', { valide: true, lot: 'bourse', transaction: 't-2' });
+  check('la même transaction représentée par le magasin ne crédite pas deux fois ; une autre, si',
+    crediterLot(credit.profil, 'bourse', { valide: true, lot: 'bourse', transaction: 't-1' }).erreur === 'dejaCredite'
+    && crediterLot(credit.profil, 'poignee', { valide: true, lot: 'poignee', transaction: 't-1' }).erreur === 'dejaCredite'
+    && encore.profil.couronnes === 1100 && egal(encore.profil.boutique.transactions, ['t-1', 't-2']));
+  {
+    let p = profilNeuf();
+    for (let i = 0; i < B.transactions + 30; i++) p = crediterLot(p, 'poignee', { valide: true, lot: 'poignee', transaction: `n-${i}` }).profil;
+    check(`le profil retient les ${B.transactions} dernières transactions, pas plus, et les relit telles quelles`,
+      p.boutique.transactions.length === B.transactions && p.boutique.transactions.at(-1) === `n-${B.transactions + 29}` && p.boutique.transactions[0] === 'n-30'
+      && egal(migrerProfil(JSON.parse(JSON.stringify(p))), p)
+      && egal(migrerProfil({ ...profilNeuf(), boutique: { transactions: ['a', 'a', 3, '', null, 'b'] } }).boutique.transactions, ['a', 'b']));
+  }
+  check('chaque lot et l’offre de bienvenue ont leur identifiant de produit, unique, au format des deux magasins',
+    (() => { const ids = [...B.lots.map((l) => l.produit), B.offres.bienvenue.produit]; return new Set(ids).size === 6 && ids.every((id) => /^[a-z0-9][a-z0-9._]{2,80}$/.test(id)); })());
   check('tant que l’argent réel n’est pas ouvert, aucun lot n’est « disponible » dans la boutique', catalogueBoutique(profilNeuf(), T0).lots.length === 5 && catalogueBoutique(profilNeuf(), T0).lots.every((l) => l.disponible === false));
 }
 

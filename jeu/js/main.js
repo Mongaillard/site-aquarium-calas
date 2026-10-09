@@ -17,6 +17,7 @@ import { brancher as brancherRangementDurable } from './rangement-durable.js';
 import { appliquerResultat, reglagesDePartie, issueDePartie } from './progression.js';
 import { matiereDe } from './collections-config.js';
 import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
+import { guichetParDefaut } from './achats.js';
 import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal } from './progression-ecrans.js';
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
@@ -1878,7 +1879,7 @@ function setupStartScreen() {
   });
 }
 
-installerProgression({ quandLeProfilChange: refreshLigue, quandOnEssaie: essayerTroupe });
+installerProgression({ quandLeProfilChange: refreshLigue, quandOnEssaie: essayerTroupe, guichet: guichetParDefaut() });
 // Là où la page offre un rangement par personne, le profil y est gardé aussi :
 // s'il y est plus avancé qu'ici (autre appareil, stockage effacé), il revient.
 brancherRangementDurable({ hote: window.claude, lire: lireProgression, ecrire: ecrireProgression }).then((rangement) => {

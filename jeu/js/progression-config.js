@@ -364,20 +364,25 @@ export const PROGRESSION = figer({
   //    ligue     : à chaque ligue atteinte pour la première fois, la troupe de
   //                la ligue suivante à `part` pour-cent de son prix.
   boutique: {
+    // L'INTERRUPTEUR DES VENTES : à true, l'application des magasins vend les lots et l'offre de bienvenue
+    // en argent réel (js/achats.js). Les produits doivent alors exister, sous les mêmes identifiants
+    // (`produit`, ci-dessous), dans App Store Connect et dans la Play Console.
     argentReel: false,
+    // (Combien de transactions déjà livrées le profil retient, pour ne jamais en livrer une deux fois.)
+    transactions: 200,
     // (Jamais dans l'application des magasins : une version soumise n'a pas de bouton d'essai. Voir js/edition.js.)
     essai: EN_MAGASIN ? null : { couronnes: 500 },
     parLigue: 50,
     lots: [
-      { id: 'poignee', nom: 'Poignée', prixCentimes: 99, couronnes: 100, bonus: 0 },
-      { id: 'bourse', nom: 'Bourse', prixCentimes: 499, couronnes: 550, bonus: 10 },
-      { id: 'coffret', nom: 'Coffret', prixCentimes: 999, couronnes: 1200, bonus: 20 },
-      { id: 'tresor', nom: 'Trésor', prixCentimes: 1999, couronnes: 2600, bonus: 30 },
-      { id: 'butin', nom: 'Butin royal', prixCentimes: 4999, couronnes: 7000, bonus: 40 },
+      { id: 'poignee', produit: 'couronnes.poignee', nom: 'Poignée', prixCentimes: 99, couronnes: 100, bonus: 0 },
+      { id: 'bourse', produit: 'couronnes.bourse', nom: 'Bourse', prixCentimes: 499, couronnes: 550, bonus: 10 },
+      { id: 'coffret', produit: 'couronnes.coffret', nom: 'Coffret', prixCentimes: 999, couronnes: 1200, bonus: 20 },
+      { id: 'tresor', produit: 'couronnes.tresor', nom: 'Trésor', prixCentimes: 1999, couronnes: 2600, bonus: 30 },
+      { id: 'butin', produit: 'couronnes.butin', nom: 'Butin royal', prixCentimes: 4999, couronnes: 7000, bonus: 40 },
     ],
     toutesLesTroupes: { part: 70, arrondi: 50, minimum: 2 },
     offres: {
-      bienvenue: { prixCentimes: 299, troupes: ['triton', 'horseArcher'], couronnes: 300, heures: 72 },
+      bienvenue: { produit: 'offre.bienvenue', prixCentimes: 299, troupes: ['triton', 'horseArcher'], couronnes: 300, heures: 72 },
       ligue: { part: 50, heures: 48 },
     },
   },
