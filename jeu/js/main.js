@@ -13,7 +13,7 @@ import {
   lirePalmares, lignePalmares, inscrireAuPalmares, resumePalmares,
   lireProgression, ecrireProgression, quandLaProgressionSEcrit,
 } from './save.js';
-import { brancher as brancherRangementDurable } from './rangement-durable.js';
+import { brancher as brancherRangementDurable, hoteDeLApplication } from './rangement-durable.js';
 import { appliquerResultat, reglagesDePartie, issueDePartie } from './progression.js';
 import { matiereDe } from './collections-config.js';
 import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
@@ -1882,7 +1882,7 @@ function setupStartScreen() {
 installerProgression({ quandLeProfilChange: refreshLigue, quandOnEssaie: essayerTroupe, guichet: guichetParDefaut() });
 // Là où la page offre un rangement par personne, le profil y est gardé aussi :
 // s'il y est plus avancé qu'ici (autre appareil, stockage effacé), il revient.
-brancherRangementDurable({ hote: window.claude, lire: lireProgression, ecrire: ecrireProgression }).then((rangement) => {
+brancherRangementDurable({ hote: window.claude || hoteDeLApplication(), lire: lireProgression, ecrire: ecrireProgression }).then((rangement) => {
   if (!rangement) return;
   quandLaProgressionSEcrit(rangement.recopier);
   if (rangement.adopte && !currentGame) refreshLigue();

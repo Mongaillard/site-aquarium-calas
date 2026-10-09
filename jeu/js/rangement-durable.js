@@ -6,9 +6,15 @@
 // joueur d'un appareil à l'autre. Quand la page est servie par un hôte qui
 // prête une base de données par personne (`claude.use('db')`), le profil y
 // est rangé aussi : au lancement, le plus avancé des deux l'emporte ; ensuite
-// chaque écriture locale y est recopiée. Sans cet hôte — page ouverte seule,
-// application — rien ne change : `brancher` rend null et le jeu continue sur
-// le stockage du navigateur.
+// chaque écriture locale y est recopiée. Sans cet hôte — page ouverte seule —
+// rien ne change : `brancher` rend null et le jeu continue sur le stockage du
+// navigateur.
+//
+// Dans l'application des magasins, le second rangement est celui de
+// l'appareil lui-même (les « préférences » natives : voir hoteDeLApplication).
+// La vue web d'une application peut perdre son stockage ; les préférences,
+// elles, restent, et partent dans la sauvegarde de l'appareil (iCloud, Google).
+// Ce que le joueur a acheté ne doit pas tenir à la seule vue web.
 //
 // Ce n'est pas un serveur qui fait foi : il ne vérifie rien, il garde. Deux
 // appareils qui jouent en même temps ne se fusionnent pas : le profil le plus
@@ -28,8 +34,36 @@ export function plusAvance(a, b) {
 }
 
 /**
+ * L'hôte de l'application : les préférences natives de l'appareil (extension
+ * « Preferences » de Capacitor), présentées sous la forme qu'attend `brancher`
+ * — une base à un document, et une « personne » qui est l'appareil. Rend null
+ * hors de l'application, ou si l'extension n'y est pas.
+ */
+export function hoteDeLApplication(capacitor = typeof globalThis !== 'undefined' ? globalThis.Capacitor : null) {
+  const preferences = capacitor && capacitor.Plugins ? capacitor.Plugins.Preferences : null;
+  if (!preferences || typeof preferences.get !== 'function' || typeof preferences.set !== 'function') return null;
+  const base = {
+    doc(chemin) {
+      const cle = `aem.${chemin}`;
+      return {
+        async get() {
+          const r = await preferences.get({ key: cle });
+          let valeur = null;
+          try { valeur = r && typeof r.value === 'string' ? JSON.parse(r.value) : null; } catch { valeur = null; }
+          return { exists: valeur !== null, data: () => valeur };
+        },
+        async set(objet) { await preferences.set({ key: cle, value: JSON.stringify(objet) }); },
+      };
+    },
+  };
+  const appareil = { id: async () => 'appareil' };
+  return { use: async (quoi) => (quoi === 'db' ? base : quoi === 'user' ? appareil : null) };
+}
+
+/**
  * Branche le rangement durable. `lire` et `ecrire` sont ceux du stockage du
- * navigateur ; `hote` est `window.claude` (ou rien). Rend `null` s'il n'y a
+ * navigateur ; `hote` est `window.claude`, celui de l'application
+ * (hoteDeLApplication), ou rien. Rend `null` s'il n'y a
  * pas de rangement durable ici, sinon `{ adopte, recopier }` : `adopte` dit si
  * le profil durable, plus avancé, vient de remplacer le profil local ;
  * `recopier(profil)` est à appeler après chaque écriture locale.

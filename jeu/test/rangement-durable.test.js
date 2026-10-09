@@ -3,7 +3,7 @@
 // deux l'emporte au lancement. Ici l'hôte est simulé : une base en mémoire.
 // Lancement : node test/rangement-durable.test.js
 
-import { brancher, plusAvance } from '../js/rangement-durable.js';
+import { brancher, plusAvance, hoteDeLApplication } from '../js/rangement-durable.js';
 import { profilNeuf, appliquerResultat, migrerProfil } from '../js/progression.js';
 
 let failures = 0;
@@ -130,6 +130,34 @@ console.log('=== Rangement durable du profil ===');
   const r2 = await brancher({ hote: h2.hote, ...l2 }); await tour(); await tour();
   check('une partie finie pendant la lecture de la base n’est pas écrasée par elle',
     r2.adopte === false && egal(l2.boite.profil, profilApres(8)) && egal(h2.contenu[CHEMIN].profil, profilApres(8)));
+}
+
+// --- L'application : les préférences de l'appareil ------------------------------------------
+console.log('\n--- L’application ---');
+{
+  const coffre = new Map();
+  const preferences = { get: async ({ key }) => ({ value: coffre.has(key) ? coffre.get(key) : null }), set: async ({ key, value }) => { coffre.set(key, value); } };
+  const capacitor = { Plugins: { Preferences: preferences } };
+  check('hors de l’application, ou sans l’extension : pas d’hôte', hoteDeLApplication(null) === null && hoteDeLApplication({ Plugins: {} }) === null && hoteDeLApplication({}) === null);
+  // Premier lancement : rien dans l'appareil ; le profil local y est recopié à la première écriture.
+  let local = profilApres(3);
+  const r1 = await brancher({ hote: hoteDeLApplication(capacitor), lire: () => local, ecrire: (p) => { local = p; return true; } });
+  await tour(); await tour();
+  const cle = [...coffre.keys()][0];
+  check('dans l’application : le profil est recopié dans les préférences de l’appareil, sous une clé du jeu',
+    !!r1 && r1.adopte === false && coffre.size === 1 && cle.startsWith('aem.') && egal(JSON.parse(coffre.get(cle)).profil, profilApres(3)));
+  r1.recopier(profilApres(5));
+  await tour(); await tour();
+  check('… chaque écriture suit', JSON.parse(coffre.get(cle)).profil.operations === profilApres(5).operations);
+  // La vue web a perdu son stockage : le profil revient de l'appareil.
+  let perdu = profilNeuf();
+  const r2 = await brancher({ hote: hoteDeLApplication(capacitor), lire: () => perdu, ecrire: (p) => { perdu = p; return true; } });
+  check('la vue web a perdu son stockage : le profil — et ce qui a été acheté — revient de l’appareil', r2.adopte === true && egal(perdu, profilApres(5)));
+  coffre.set(cle, '{ pas du JSON');
+  let sain = profilApres(2);
+  const r3 = await brancher({ hote: hoteDeLApplication(capacitor), lire: () => sain, ecrire: (p) => { sain = p; return true; } });
+  await tour(); await tour();
+  check('des préférences illisibles ne cassent rien : le profil local reste, et les remplace', !!r3 && r3.adopte === false && egal(sain, profilApres(2)) && JSON.parse(coffre.get(cle)).profil.operations === profilApres(2).operations);
 }
 
 console.log(`\n${failures === 0 ? 'Tous les tests passent' : failures + ' test(s) en échec'}`);
