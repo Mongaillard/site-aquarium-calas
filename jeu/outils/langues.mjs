@@ -17,8 +17,8 @@
 //   2. les textes que la page porte en dur — les éléments marqués `data-txt`
 //      et les attributs nommés par `data-txt-attr` dans index.html ;
 //   3. les noms et les descriptions des tables de js/config.js.
-// Les mots accordés (`accord(n, 'Couronne', 'Couronnes')`) sont recensés sous
-// la clé « Couronne|Couronnes ».
+// Les mots accordés (`accord(n, 'Couronne', 'Couronnes')`, ou `pluriel(…)`)
+// sont recensés sous la clé « Couronne|Couronnes ».
 //
 // Aucune dépendance : Node seul.
 // ---------------------------------------------------------------------------
@@ -59,10 +59,14 @@ function finDExpression(source, i) {
   return source.length;
 }
 
-/** Les clés des `txt` et des `accord` d'un fichier source. */
+/**
+ * Les clés des `txt` et des `accord` d'un fichier source. `pluriel(n, 'mot',
+ * 'mots')` (l'aide des écrans de progression, qui passe par `accord`) se
+ * recense comme un accord.
+ */
 export function clesDuCode(source) {
   const cles = [];
-  const appel = /(?<![\w.$])(txt|accord)\s*(`|\()/g;
+  const appel = /(?<![\w.$])(txt|accord|pluriel)\s*(`|\()/g;
   for (let m = appel.exec(source); m; m = appel.exec(source)) {
     let i = m.index + m[0].length - 1;
     if (m[1] === 'txt' && source[i] === '`') {

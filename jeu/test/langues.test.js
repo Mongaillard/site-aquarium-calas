@@ -115,7 +115,7 @@ console.log('\n--- Le recensement ---');
   const code = [
     'const a = txt`Bonjour ${nom}, il reste ${n > 1 ? `${n} tours` : \'un tour\'}.`;',
     'const b = txt(\'L\\u2019été\'); const c = txt("Deux mots"); const d = txt(variable); const e = montxt(\'non\'); x.txt(\'non plus\');',
-    'const f = accord(n, \'Couronne\'); const g = accord(liste.length + f(1, 2), \'cheval\', \'chevaux\');',
+    'const f = accord(n, \'Couronne\'); const g = accord(liste.length + f(1, 2), \'cheval\', \'chevaux\'); const p = pluriel(n, \'point\');',
     '// txt(\'en commentaire\') : recensé aussi, sans gravité',
     'const h = txt`${a}${b}`; const i = txt`Fin\\u00a0: ${x}`;',
   ].join('\n');
@@ -133,9 +133,16 @@ console.log('\n--- Le recensement ---');
   for (const langue of LANGUES.filter((l) => l.id !== 'fr')) {
     const e = await etatDe(langue.id, source);
     const { CAHIERS, default: dictionnaire } = await import(`../js/langues/${langue.id}.js`);
-    const toutes = Object.values(CAHIERS).flatMap((cahier) => Object.keys(cahier));
-    const doubles = toutes.filter((cle, i) => toutes.indexOf(cle) !== i);
-    check(`${langue.nom} : aucune phrase traduite deux fois d’un cahier à l’autre`, doubles.length === 0, doubles.slice(0, 3).join(' | '));
+    // (Chaque cahier couvre ses fichiers en entier : « Fermer » peut donc se trouver dans plusieurs. Mais il n'a qu'une traduction.)
+    const vues = new Map(), desaccords = [];
+    for (const [nom, cahier] of Object.entries(CAHIERS)) {
+      for (const [cle, valeur] of Object.entries(cahier)) {
+        const forme = JSON.stringify(valeur);
+        if (vues.has(cle) && vues.get(cle).forme !== forme) desaccords.push(`${JSON.stringify(cle)} (${vues.get(cle).nom} / ${nom})`);
+        else if (!vues.has(cle)) vues.set(cle, { nom, forme });
+      }
+    }
+    check(`${langue.nom} : une même phrase n’a qu’une traduction, d’un cahier à l’autre`, desaccords.length === 0, desaccords.slice(0, 3).join(' | '));
     check(`${langue.nom} : aucune traduction qui ne sert plus`, e.orphelines.length === 0, e.orphelines.slice(0, 3).join(' | '));
     const trous = (t) => [...String(t).matchAll(/\{(\d+)\}/g)].map((x) => x[1]).sort().join(',');
     const balises = (t) => [...String(t).matchAll(/<\/?[a-z]+/g)].map((x) => x[0]).sort().join(',');
