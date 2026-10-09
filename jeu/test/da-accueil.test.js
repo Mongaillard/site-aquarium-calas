@@ -135,7 +135,7 @@ console.log('\n--- L’accueil ---');
 
   // « Jouer » sous le pouce, quelle que soit la hauteur de la carte.
   check('main.js : une partie dort — « Nouvelle partie », resté sous le pouce, laisse l’or à « Reprendre »',
-    /play\.textContent = arme \? 'Effacer la partie en cours \?' : partieEnAttente \? 'Nouvelle partie' : 'Jouer';/.test(main)
+    /play\.textContent = arme \? txt\('Effacer la partie en cours \?'\) : partieEnAttente \? txt\('Nouvelle partie'\) : txt\('Jouer'\);/.test(main)
     && /play\.classList\.toggle\('primary', !partieEnAttente\);/.test(main) && /play\.classList\.toggle\('arme', arme\);/.test(main));
   // … et il n'efface plus la partie en cours d'un seul toucher.
   const jouer = (main.match(/getElementById\('btn-play'\)\.addEventListener\('click', \(\) => \{([\s\S]*?)\n  \}\);/) || ['', ''])[1];
@@ -259,7 +259,7 @@ console.log('\n--- L’accueil, direction « Boîte de jeu » ---');
     && /grid-column:\s*span 3/.test(regleB('#start-screen .prog-bandeau-actions .btn')) && /grid-template-columns:\s*repeat\(12,/.test(regleB('#start-screen .start-card')));
   const actions = html.slice(html.indexOf('<div class="start-actions">'), html.indexOf('<p id="palmares"'));
   check('« Jouer » est seul dans sa barre ; « Aide » est une tuile, qui dit si la liste est ouverte',
-    actions.includes('id="btn-play"') && !actions.includes('btn-howto') && /<button id="btn-howto" class="btn" aria-expanded="false" aria-controls="howto">Aide<\/button>/.test(html)
+    actions.includes('id="btn-play"') && !actions.includes('btn-howto') && /<button id="btn-howto" class="btn" aria-expanded="false" aria-controls="howto" data-txt>Aide<\/button>/.test(html)
     && html.indexOf('id="btn-howto"') > html.indexOf('id="palmares"') && html.indexOf('id="btn-howto"') < html.indexOf('id="howto"')
     && /iconeSVG\('info', 16, 'inline'\)/.test(main) && /setAttribute\('aria-expanded'/.test(main));
   const hauteur = (x) => Number((regleB(x).match(/min-height:\s*(\d+)px/) || [0, 0])[1]);

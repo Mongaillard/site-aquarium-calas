@@ -30,7 +30,7 @@
       <img class="couvercle-capitale" data-civ="atlante" src="assets/centre-ville.webp" alt="" decoding="async">
       <img class="couvercle-capitale" data-civ="solarien" src="assets/solariens/centre-ville.webp" alt="" decoding="async">
       <h1>Âge des Empires <em>Mobile</em></h1>
-      <p class="tagline">Récoltez, bâtissez, traversez les âges et écrasez l'adversaire — au doigt.</p>
+      <p class="tagline" data-txt>Récoltez, bâtissez, traversez les âges et écrasez l'adversaire — au doigt.</p>
     </div>
 
     <!-- Classement : la ligue, le score, les coffres et les troupes (js/progression-ecrans.js). -->
@@ -38,58 +38,60 @@
 
     <div id="resume-box" class="resume-box hidden"></div>
 
-    <h2>Votre civilisation</h2>
+    <h2 data-txt>Votre civilisation</h2>
     <div id="civ-options" class="options duo peuples"></div>
 
     <!-- Tout ce qui se règle une fois pour toutes : replié, résumé en une ligne. -->
     <details id="reglages" class="reglages">
       <summary>
-        <span class="reglages-titre">Réglages de la partie</span>
+        <span class="reglages-titre" data-txt>Réglages de la partie</span>
         <span id="reglages-resume" class="reglages-resume"></span>
       </summary>
 
-      <h2>Type de partie</h2>
+      <h2 data-txt>Type de partie</h2>
       <div id="type-options" class="options duo"></div>
-      <p id="equipes-note" class="reglage-note hidden">Le 2 contre 2 ne compte ni pour le classement ni pour les coffres : ton allié est l'ordinateur.</p>
+      <p id="equipes-note" class="reglage-note hidden" data-txt>Le 2 contre 2 ne compte ni pour le classement ni pour les coffres : ton allié est l'ordinateur.</p>
 
-      <h2>Civilisation adverse</h2>
+      <h2 data-txt>Civilisation adverse</h2>
       <div id="civ-adverse-options" class="options duo"></div>
 
-      <h2>Format de partie</h2>
+      <h2 data-txt>Format de partie</h2>
       <div id="mode-options" class="options"></div>
 
-      <h2>Difficulté</h2>
-      <p id="difficulte-classee" class="reglage-note hidden">En partie classée, l'adversaire a la force de ta ligue.</p>
+      <h2 data-txt>Difficulté</h2>
+      <p id="difficulte-classee" class="reglage-note hidden" data-txt>En partie classée, l'adversaire a la force de ta ligue.</p>
       <div id="difficulty-options" class="options"></div>
 
-      <h2>Taille de la carte</h2>
+      <h2 data-txt>Taille de la carte</h2>
       <div id="map-options" class="options row"></div>
 
-      <h2>Vitesse de jeu</h2>
+      <h2 data-txt>Vitesse de jeu</h2>
       <div id="speed-options" class="options row"></div>
     </details>
 
     <div class="start-actions">
-      <button id="btn-play" class="btn primary large">Jouer</button>
+      <button id="btn-play" class="btn primary large" data-txt>Jouer</button>
     </div>
     <p id="palmares" class="palmares hidden"></p>
     <!-- La troisième tuile du bas, à côté de « Coffres » et « Troupes » (posées par la progression dans #ligue-box). -->
-    <button id="btn-howto" class="btn" aria-expanded="false" aria-controls="howto">Aide</button>
+    <button id="btn-howto" class="btn" aria-expanded="false" aria-controls="howto" data-txt>Aide</button>
 
     <div id="howto" class="howto hidden">
       <ul>
-        <li><b>Glisser</b> : déplacer la vue · <b>pincer</b> : zoomer</li>
-        <li><b>Toucher</b> une unité pour la sélectionner, <b>double tap</b> pour toutes celles du même type</li>
-        <li><b>Appui long puis glisser</b> : sélection rectangulaire</li>
-        <li>Avec une sélection, toucher le sol / un arbre / un ennemi donne l'ordre correspondant</li>
-        <li>Vos ouvriers n'abandonnent jamais leur poste tout seuls : la barre des ouvriers, en bas à gauche, montre qui fait quoi et permet de les réaffecter</li>
-        <li>La partie se sauvegarde toute seule : vous pourrez la reprendre ici même</li>
-        <li>Objectif : ne laisser à l'adversaire ni bâtiment principal ni bâtiment militaire (en mode Express, son bâtiment principal suffit — sinon, au bout du temps, le meilleur score l'emporte)</li>
+        <li data-txt><b>Glisser</b> : déplacer la vue · <b>pincer</b> : zoomer</li>
+        <li data-txt><b>Toucher</b> une unité pour la sélectionner, <b>double tap</b> pour toutes celles du même type</li>
+        <li data-txt><b>Appui long puis glisser</b> : sélection rectangulaire</li>
+        <li data-txt>Avec une sélection, toucher le sol / un arbre / un ennemi donne l'ordre correspondant</li>
+        <li data-txt>Vos ouvriers n'abandonnent jamais leur poste tout seuls : la barre des ouvriers, en bas à gauche, montre qui fait quoi et permet de les réaffecter</li>
+        <li data-txt>La partie se sauvegarde toute seule : vous pourrez la reprendre ici même</li>
+        <li data-txt>Objectif : ne laisser à l'adversaire ni bâtiment principal ni bâtiment militaire (en mode Express, son bâtiment principal suffit — sinon, au bout du temps, le meilleur score l'emporte)</li>
       </ul>
     </div>
-    <p class="credits" id="note-autonome">Jeu web autonome : il fonctionne hors ligne une fois chargé. Ta progression est gardée sur cet appareil, et avec ton compte là où la page le permet.</p>
+    <p class="credits" id="note-autonome" data-txt>Jeu web autonome : il fonctionne hors ligne une fois chargé. Ta progression est gardée sur cet appareil, et avec ton compte là où la page le permet.</p>
     <!-- La politique de confidentialité se lit dans le jeu, l'effacement des données aussi : les magasins le demandent. -->
-    <button id="btn-confidentialite" class="btn ghost" data-ecran="confidentialite">Confidentialité et données</button>
+    <button id="btn-confidentialite" class="btn ghost" data-ecran="confidentialite" data-txt>Confidentialité et données</button>
+    <!-- La langue du jeu (js/langue.js) : son nom s'écrit dans chaque langue, pour qui ne lit pas celle-ci. -->
+    <button id="btn-langue" class="btn ghost" data-ecran="langue">Langue · Language</button>
   </div>
 </div>
 
@@ -111,21 +113,21 @@
         <span id="age-label">Âge Sombre</span>
         <span class="sep">·</span>
         <span id="game-timer">0:00</span>
-        <span id="score-box" class="hidden" aria-label="Score : le vôtre, puis celui de l'adversaire">
+        <span id="score-box" class="hidden" aria-label="Score : le vôtre, puis celui de l'adversaire" data-txt-attr="aria-label">
           <span class="sep">·</span>
           <span class="score-icone" data-icone="score"></span>
           <b id="score-moi">0</b>
           <span class="sep">–</span>
           <b id="score-adverse">0</b>
         </span>
-        <span id="positions-box" class="hidden" aria-label="Les positions : à qui elles sont"></span>
+        <span id="positions-box" class="hidden" aria-label="Les positions : à qui elles sont" data-txt-attr="aria-label"></span>
         <div class="age-progress hidden"><span id="age-bar"></span></div>
       </div>
     </div>
     <div class="top-right">
-      <button id="btn-allie" class="icon-btn hidden" aria-label="Donner une consigne à votre allié" data-icone="ouvriers"></button>
-      <button id="btn-sound" class="icon-btn" aria-label="Son" data-icone="son"></button>
-      <button id="btn-menu" class="icon-btn" aria-label="Menu" data-icone="menu"></button>
+      <button id="btn-allie" class="icon-btn hidden" aria-label="Donner une consigne à votre allié" data-txt-attr="aria-label" data-icone="ouvriers"></button>
+      <button id="btn-sound" class="icon-btn" aria-label="Son" data-txt-attr="aria-label" data-icone="son"></button>
+      <button id="btn-menu" class="icon-btn" aria-label="Menu" data-txt-attr="aria-label" data-icone="menu"></button>
     </div>
   </header>
 
@@ -137,17 +139,17 @@
   <div id="build-hint" class="hidden"></div>
 
   <div id="worker-bar">
-    <button id="btn-workers" class="worker-open" aria-label="Affecter les ouvriers" data-icone="ouvriers"></button>
+    <button id="btn-workers" class="worker-open" aria-label="Affecter les ouvriers" data-txt-attr="aria-label" data-icone="ouvriers"></button>
     <button class="worker-chip" data-task="food"><span data-icone="food"></span><b id="wk-food">0</b></button>
     <button class="worker-chip" data-task="wood"><span data-icone="wood"></span><b id="wk-wood">0</b></button>
     <button class="worker-chip" data-task="gold"><span data-icone="gold"></span><b id="wk-gold">0</b></button>
     <button class="worker-chip" data-task="build"><span data-icone="chantier"></span><b id="wk-build">0</b></button>
     <button class="worker-chip idle" data-task="idle"><span data-icone="idle"></span><b id="wk-idle">0</b></button>
-    <button id="btn-armee" class="worker-chip armee" aria-label="Sélectionner toute l'armée"><span data-icone="forging"></span><b id="wk-armee">0</b></button>
+    <button id="btn-armee" class="worker-chip armee" aria-label="Sélectionner toute l'armée" data-txt-attr="aria-label"><span data-icone="forging"></span><b id="wk-armee">0</b></button>
   </div>
 
   <footer id="bottombar">
-    <button id="btn-lacher" class="icon-btn hidden" aria-label="Lâcher la sélection" data-icone="fermer"></button>
+    <button id="btn-lacher" class="icon-btn hidden" aria-label="Lâcher la sélection" data-txt-attr="aria-label" data-icone="fermer"></button>
     <div id="selection-panel"></div>
     <div id="command-panel"></div>
   </footer>
@@ -156,7 +158,7 @@
 <div id="build-menu" class="overlay hidden">
   <div class="sheet">
     <div class="sheet-head">
-      <h2>Construire</h2>
+      <h2 data-txt>Construire</h2>
       <button id="btn-close-build" class="icon-btn" data-icone="fermer"></button>
     </div>
     <div id="build-list" class="build-list"></div>
@@ -166,15 +168,15 @@
 <div id="worker-menu" class="overlay hidden">
   <div class="sheet">
     <div class="sheet-head">
-      <h2>Affectation des ouvriers</h2>
+      <h2 data-txt>Affectation des ouvriers</h2>
       <button id="btn-close-workers" class="icon-btn" data-icone="fermer"></button>
     </div>
     <div id="worker-list" class="worker-list"></div>
     <label class="switch-row">
       <input type="checkbox" id="auto-workers">
       <span>
-        <b>Réaffectation automatique</b>
-        <small>Quand un gisement s'épuise, l'ouvrier repart seul sur le suivant. Désactivé, il rapporte son chargement puis attend vos ordres.</small>
+        <b data-txt>Réaffectation automatique</b>
+        <small data-txt>Quand un gisement s'épuise, l'ouvrier repart seul sur le suivant. Désactivé, il rapporte son chargement puis attend vos ordres.</small>
       </span>
     </label>
   </div>

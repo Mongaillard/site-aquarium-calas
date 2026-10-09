@@ -5,6 +5,7 @@
 // accessibilité et zoom navigateur gratuits.
 // ---------------------------------------------------------------------------
 
+import { txt } from './langue.js';
 import {
   AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, RESOURCE_ICONS, STANCES, GAME_SPEEDS,
   ficheDe, nomDe, portraitDe,
@@ -119,11 +120,11 @@ export function resumeReglages(reglages) {
   const vitesse = GAME_SPEEDS.find((v) => v.id === reglages.speed);
   const carte = MAP_SIZES[reglages.mapSize];
   return [
-    `${CIVILISATIONS[civDe(reglages.civAdverse)].name} en face`,
+    txt`${CIVILISATIONS[civDe(reglages.civAdverse)].name} en face`,
     GAME_MODES[reglages.mode]?.name,
     DIFFICULTIES[reglages.difficulty]?.name,
-    carte && `carte ${carte.name.toLowerCase()}`,
-    vitesse && `vitesse ${vitesse.short}`,
+    carte && txt`carte ${carte.name.toLowerCase()}`,
+    vitesse && txt`vitesse ${vitesse.short}`,
   ].filter(Boolean).map((mention) => mention.replace(/ /g, '\u00a0')).join('\u00a0· ');
 }
 

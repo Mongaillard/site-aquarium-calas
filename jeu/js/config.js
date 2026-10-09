@@ -6,6 +6,8 @@
 //   - temps en secondes
 // ---------------------------------------------------------------------------
 
+import { LANGUE, txt } from './langue.js';
+
 export const TILE = 32;
 export const TICKS_PER_SECOND = 20;
 export const TICK_MS = 1000 / TICKS_PER_SECOND;
@@ -677,3 +679,34 @@ export const RESOURCE_TILE_AMOUNT = {
 export function unitDef(type) { return UNIT_TYPES[type]; }
 export function buildingDef(type) { return BUILDING_TYPES[type]; }
 export function entityDef(type) { return UNIT_TYPES[type] || BUILDING_TYPES[type]; }
+
+// --- La langue -----------------------------------------------------------------
+//
+// Les noms et les descriptions des tables ci-dessus sont la source française.
+// Dans une autre langue, ils sont remplacés ici, une fois, par leur traduction
+// (js/langue.js) ; en français, rien ne bouge.
+
+/** Les champs qui portent du texte pour le joueur. */
+const CHAMPS_DE_TEXTE = ['name', 'desc', 'short', 'pluriel'];
+/** Les tables qui portent du texte pour le joueur. */
+const TABLES_DE_TEXTE = [STANCES, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS, GAME_SPEEDS, GAME_MODES, DIFFICULTIES, MAP_SIZES, COULEURS_EQUIPES, CIVILISATIONS];
+
+/**
+ * Passe sur chaque texte des tables : `visite(objet, champ)`. Sert à traduire
+ * (ci-dessous) et à recenser ce qui est à traduire (outils/langues.mjs). Un
+ * chiffre romain ou un pourcentage n'est pas un texte.
+ */
+export function textesDesTables(visite) {
+  const marcher = (objet, profondeur) => {
+    if (!objet || typeof objet !== 'object' || profondeur > 6) return;
+    for (const [champ, valeur] of Object.entries(objet)) {
+      if (typeof valeur === 'string') {
+        if (CHAMPS_DE_TEXTE.includes(champ) && /[A-Za-zÀ-ÿ]{2,}/.test(valeur) && !/^[IVX]+$/.test(valeur)) visite(objet, champ);
+      } else marcher(valeur, profondeur + 1);
+    }
+  };
+  for (const table of TABLES_DE_TEXTE) marcher(table, 0);
+  for (const ressource of Object.keys(RESOURCE_LABELS)) visite(RESOURCE_LABELS, ressource);
+}
+
+if (LANGUE !== 'fr') textesDesTables((objet, champ) => { objet[champ] = txt(objet[champ]); });

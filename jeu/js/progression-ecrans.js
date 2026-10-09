@@ -15,6 +15,7 @@ import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAu
 import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai, ouvrirLaSaison } from './progression.js';
 import { lireProgression, ecrireProgression, effacerLesDonnees } from './save.js';
 import { EN_MAGASIN, EDITEUR, nomComplet } from './edition.js';
+import { LANGUES, LANGUE, txt, choisirLangue } from './langue.js';
 import {
   ouvrirLesVentes, fermerLesVentes, ventesOuvertes, ventesSimulees, vendable, prixAffiche, achatEnCours, prixManquants, relireLesPrix,
   acheter as acheterAuGuichet, restaurer as restaurerAuGuichet,
@@ -590,7 +591,27 @@ function ecranConfidentialite(message = '', { confirmer = false } = {}) {
 
 // --- Ouvrir un écran, agir ----------------------------------------------------------
 
+/**
+ * La langue du jeu : chaque langue sous son propre nom, pour qui ne lit pas
+ * celle de l'écran. En choisir une autre recharge la page (js/langue.js).
+ */
+function ecranLangue(message = '') {
+  const langues = LANGUES.map((l) => `
+    <li class="prog-article ${l.id === LANGUE ? 'acquis' : ''}">
+      <span class="prog-offre-texte">
+        <b lang="${l.id}">${l.nom}</b>
+        ${l.prete ? '' : `<small>${txt('Traduction en cours : certains écrans sont encore en français.')}</small>`}
+      </span>
+      ${l.id === LANGUE ? `<span class="prog-acquis">${txt('Choisie')}</span>` : `<button class="btn small primary" data-act="langue" data-arg="${l.id}" lang="${l.id}">${l.nom}</button>`}
+    </li>`).join('');
+  montrer(txt('Langue'), `
+    ${message ? `<p class="prog-annonce">${message}</p>` : ''}
+    <ul class="prog-articles">${langues}</ul>
+    <p class="hint">${txt('Le jeu redémarre pour changer de langue. Ta partie en cours est gardée.')}</p>`);
+}
+
 const ECRANS = {
+  langue: () => ecranLangue(),
   ligues: (p) => ecranLigues(p),
   coffres: (p) => ecranCoffres(p),
   troupes: (p) => ecranTroupes(p),
@@ -648,6 +669,12 @@ function apresAchat(r) {
 
 function agir(act, arg, i) {
   if (act === 'fermer') return fermerProgression();
+  if (act === 'langue') {
+    if (arg === LANGUE) return fermerProgression();
+    if (!choisirLangue(arg)) return ecranLangue('Changement impossible sur cet appareil : le stockage est fermé.');
+    try { if (typeof location !== 'undefined' && location.reload) location.reload(); } catch { /* sans page : rien à recharger */ }
+    return undefined;
+  }
   if (act === 'effacerDonnees') {
     // Deux touchers, comme tout ce qui ne se rattrape pas ; puis la page repart de zéro.
     if (i !== '1') return ecranConfidentialite('', { confirmer: true });

@@ -18,6 +18,7 @@ import { appliquerResultat, reglagesDePartie, issueDePartie } from './progressio
 import { matiereDe } from './collections-config.js';
 import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
 import { guichetParDefaut } from './achats.js';
+import { txt, traduireLaPage } from './langue.js';
 import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal } from './progression-ecrans.js';
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
@@ -32,6 +33,10 @@ import { setStyleUnites, styleUnites, spriteDe, chargerSprites, chargerCivilisat
 import { memoireTroupes, entretenirMemoire, rendreVariantes, troupesSelonStyle, ficheCiv } from './sprites.js';
 import { webglDisponible } from './rendu3d.js';
 import { DENSITE } from './modele3d.js';
+
+// La langue d'abord : les textes que la page porte en dur sont traduits avant
+// que le code n'y pose quoi que ce soit (js/langue.js). En français, rien ne bouge.
+traduireLaPage();
 
 const DT = 1 / TICKS_PER_SECOND;
 const MAX_CATCHUP = 5;
@@ -1601,8 +1606,8 @@ function refreshReglages() {
   const resume = resumeReglages(settings);
   // En partie classée, la difficulté choisie ne joue pas : elle sort du résumé.
   node.textContent = partieClassee()
-    ? `Classée · ${resume.replace(` · ${DIFFICULTIES[settings.difficulty].name}`, '')}`
-    : `Libre · ${resume}`;
+    ? txt`Classée · ${resume.replace(` · ${DIFFICULTIES[settings.difficulty].name}`, '')}`
+    : txt`Libre · ${resume}`;
 }
 
 function showStartScreen() {
@@ -1649,7 +1654,7 @@ function refreshJouer() {
   const play = document.getElementById('btn-play');
   if (!play) return;
   const arme = partieEnAttente && performance.now() < effacerJusqua;
-  play.textContent = arme ? 'Effacer la partie en cours ?' : partieEnAttente ? 'Nouvelle partie' : 'Jouer';
+  play.textContent = arme ? txt('Effacer la partie en cours ?') : partieEnAttente ? txt('Nouvelle partie') : txt('Jouer');
   play.classList.toggle('primary', !partieEnAttente);
   play.classList.toggle('arme', arme);
 }
@@ -1686,14 +1691,14 @@ function refreshResumeCard() {
   box.classList.remove('hidden');
   // Sur un format chronométré, ce qui compte c'est le temps qu'il reste.
   const chrono = mode.timeLimit
-    ? `reste ${formatClock(Math.max(0, mode.timeLimit - save.time))}`
+    ? txt`reste ${formatClock(Math.max(0, mode.timeLimit - save.time))}`
     : formatClock(save.time);
   box.innerHTML = `
-    <button id="btn-resume" class="btn primary large">Reprendre la partie</button>
-    <p class="resume-info">${civs[moi]} contre ${civs[face]} · ${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
+    <button id="btn-resume" class="btn primary large">${txt('Reprendre la partie')}</button>
+    <p class="resume-info">${txt`${civs[moi]} contre ${civs[face]}`} · ${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
       · ${DIFFICULTIES[save.difficulty] ? DIFFICULTIES[save.difficulty].name : ''}</p>
-    ${save.classee ? '<p class="resume-info">Partie classée : la quitter compte comme une défaite.</p>' : ''}
-    <button id="btn-drop-save" class="btn ghost small">Abandonner cette partie</button>`;
+    ${save.classee ? `<p class="resume-info">${txt('Partie classée : la quitter compte comme une défaite.')}</p>` : ''}
+    <button id="btn-drop-save" class="btn ghost small">${txt('Abandonner cette partie')}</button>`;
   document.getElementById('btn-resume').addEventListener('click', () => {
     audio.resume(); audio.play('click');
     startGame({ restore: save, speed: settings.speed });
@@ -1760,8 +1765,8 @@ function setupStartScreen() {
   // Classée ou libre.
   const typeBox = document.getElementById('type-options');
   typeBox.innerHTML = [
-    { id: 'classe', name: 'Classée', desc: 'Elo, ligues et coffres' },
-    { id: 'libre', name: 'Libre', desc: 'Tu règles l’adversaire' },
+    { id: 'classe', name: txt('Classée'), desc: txt('Elo, ligues et coffres') },
+    { id: 'libre', name: txt('Libre'), desc: txt('Tu règles l’adversaire') },
   ].map((t) => `
     <button class="option compact ${t.id === settings.type ? 'active' : ''}" data-type="${t.id}">
       <span class="option-name">${t.name}</span>
@@ -1910,7 +1915,7 @@ document.addEventListener('visibilitychange', () => {
   document.title = nomComplet();
   // (L'application n'est pas une page web, et n'a pas de compte où ranger la progression.)
   const note = document.getElementById('note-autonome');
-  if (note && EN_MAGASIN) note.textContent = 'Le jeu fonctionne sans connexion. Ta progression est gardée sur cet appareil.';
+  if (note && EN_MAGASIN) note.textContent = txt('Le jeu fonctionne sans connexion. Ta progression est gardée sur cet appareil.');
 }
 // Les illustrations se chargent — et les unités en 3D se cuisent — pendant
 // que le joueur choisit sa partie : elles sont prêtes quand elle commence.
