@@ -53,11 +53,21 @@ export const nomComplet = () => `${NOM_DU_JEU.titre}${NOM_DU_JEU.suite ? ` ${NOM
  */
 export const EDITEUR = Object.freeze({ nom: 'Vincent Mongaillard', courriel: 'v.mongaillard@gmail.com', mentions: '' });
 
+/**
+ * L'identifiant de l'application dans les deux magasins, du type
+ * « fr.exemple.nomdujeu » : des mots en minuscules séparés par des points.
+ * Définitif une fois le jeu publié, et visible dans l'adresse de sa fiche
+ * Google Play. VIDE tant que le nom du jeu n'est pas choisi.
+ */
+export const IDENTIFIANT = '';
+
 /** Ce qui manque encore pour soumettre aux magasins : une liste de phrases, vide quand tout y est. */
-export function manquesAvantMagasin(nom = NOM_DU_JEU, editeur = EDITEUR) {
+export function manquesAvantMagasin(nom = NOM_DU_JEU, editeur = EDITEUR, identifiant = IDENTIFIANT) {
   const manques = [];
   if (/empires?/i.test(`${nom.titre} ${nom.suite}`) && /[âa]ge/i.test(nom.titre)) manques.push('Le nom du jeu reprend une marque de Microsoft (« Age of Empires ») : il faut en changer.');
   if (!editeur.nom.trim()) manques.push('Le nom de l’éditeur est vide.');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(editeur.courriel.trim())) manques.push('L’adresse de courriel de l’éditeur est vide ou illisible.');
+  // (Chaque mot commence par une lettre : c'est la règle d'Android, la plus stricte des deux.)
+  if (!/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*){2,}$/.test(identifiant)) manques.push('L’identifiant de l’application est vide ou mal formé (attendu : « fr.exemple.nomdujeu »).');
   return manques;
 }

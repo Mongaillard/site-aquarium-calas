@@ -16,7 +16,7 @@ import { profilNeuf, migrerProfil, appliquerResultat } from '../js/progression.j
 import { plusAvance } from '../js/rangement-durable.js';
 import { PROGRESSION_KEY, SAVE_KEY, PALMARES_KEY, effacerLesDonnees, lireProgression, phraseIncident } from '../js/save.js';
 import { ouvrirProgression, installerProgression } from '../js/progression-ecrans.js';
-import { preparer, pageDeConfidentialite } from '../outils/magasin.mjs';
+import { preparer, pageDeConfidentialite, configDeLApplication, PAQUETS } from '../outils/magasin.mjs';
 
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 let failures = 0;
@@ -36,12 +36,24 @@ console.log('--- L’édition, le nom, l’éditeur ---');
     lire('index.html').includes(`<title>${nomComplet()}</title>`) && JSON.parse(lire('manifest.webmanifest')).name === nomComplet()
     && lire('index.html').includes(`<h1>${NOM_DU_JEU.titre} <em>${NOM_DU_JEU.suite}</em></h1>`));
   check('un nom qui reprend « Age of Empires » est signalé, avec ou sans accent',
-    ['Âge des Empires', 'Age des Empires', 'Age of Empires', 'L’Âge des empires'].every((titre) => manquesAvantMagasin({ titre, suite: 'Mobile' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }).length === 1)
-    && manquesAvantMagasin({ titre: 'Sable et Marée', suite: '' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }).length === 0
-    && manquesAvantMagasin({ titre: 'Petits Empires', suite: '' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }).length === 0);
+    ['Âge des Empires', 'Age des Empires', 'Age of Empires', 'L’Âge des empires'].every((titre) => manquesAvantMagasin({ titre, suite: 'Mobile' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }, 'fr.exemple.jeu').length === 1)
+    && manquesAvantMagasin({ titre: 'Sable et Marée', suite: '' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }, 'fr.exemple.jeu').length === 0
+    && manquesAvantMagasin({ titre: 'Petits Empires', suite: '' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }, 'fr.exemple.jeu').length === 0);
   check('un éditeur sans nom ou sans adresse lisible est signalé',
-    manquesAvantMagasin({ titre: 'Sable et Marée', suite: '' }, { nom: ' ', courriel: '', mentions: '' }).length === 2
-    && manquesAvantMagasin({ titre: 'Sable et Marée', suite: '' }, { nom: 'Moi', courriel: 'pas une adresse', mentions: '' }).length === 1);
+    manquesAvantMagasin({ titre: 'Sable et Marée', suite: '' }, { nom: ' ', courriel: '', mentions: '' }, 'fr.exemple.jeu').length === 2
+    && manquesAvantMagasin({ titre: 'Sable et Marée', suite: '' }, { nom: 'Moi', courriel: 'pas une adresse', mentions: '' }, 'fr.exemple.jeu').length === 1);
+  {
+    const bon = [{ titre: 'Sable et Marée', suite: '' }, { nom: 'Moi', courriel: 'moi@exemple.fr', mentions: '' }];
+    check('un identifiant d’application vide ou mal formé est signalé ; « fr.exemple.nomdujeu » passe',
+      ['', 'jeu', 'fr.jeu', 'Fr.Exemple.Jeu', 'fr.exemple.1jeu', 'fr.exemple.mon-jeu', 'fr..jeu'].every((id) => manquesAvantMagasin(...bon, id).length === 1)
+      && ['fr.exemple.jeu', 'fr.mongaillard.empires2', 'com.exemple.studio.jeu'].every((id) => manquesAvantMagasin(...bon, id).length === 0));
+    const essai = configDeLApplication('Âge des Empires Mobile', '', ['x']), vrai = configDeLApplication('Sable et Marée', 'fr.exemple.sableetmaree', []);
+    check('les réglages de l’enveloppe : un essai tant qu’il manque quelque chose, le vrai nom et le vrai identifiant ensuite',
+      essai.appId === 'fr.mongaillard.essai' && essai.appName === 'Essai du jeu' && vrai.appId === 'fr.exemple.sableetmaree' && vrai.appName === 'Sable et Marée' && vrai.webDir === 'www');
+    check('… l’extension d’achats y est réglée pour ne rien clore d’elle-même, et ses versions sont fixées',
+      vrai.plugins.NativePurchases.autoFinishTransactions === false && essai.plugins.NativePurchases.autoFinishTransactions === false
+      && Object.values(PAQUETS).every((v) => /^\d+\.\d+\.\d+$/.test(v)) && ['@capacitor/core', '@capacitor/ios', '@capacitor/android', '@capacitor/preferences', '@capgo/native-purchases'].every((p) => PAQUETS[p]));
+  }
   // (Ce contrôle dit l'état du dépôt : il changera de sens le jour où le nom et l'éditeur seront renseignés.)
   const manques = manquesAvantMagasin();
   check(`état du jeu aujourd’hui : ${manques.length ? `${manques.length} point(s) à régler avant de soumettre` : 'prêt à être soumis'}`, Array.isArray(manques), manques.join(' '));

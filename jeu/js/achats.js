@@ -94,15 +94,23 @@ export function guichetSimule({ issue = 'achete', numero = null } = {}) {
 
 /**
  * Le guichet des magasins, par l'extension « NativePurchases »
- * (@capgo/native-purchases : StoreKit 2 sur iPhone, Play Billing sur Android).
- * `plateforme` : « apple » ou « google ».
+ * (@capgo/native-purchases 8.9 : StoreKit 2 sur iPhone, Play Billing sur
+ * Android). `plateforme` : « apple » ou « google ».
  *
- * Sur Android, un lot de Couronnes reste « possédé » tant qu'il n'est pas
- * consommé : c'est ce qui permet de le retrouver au lancement s'il n'a pas été
- * livré. On ne le consomme donc qu'après la livraison (`terminer`).
- * Sur iPhone, StoreKit clôt la transaction à l'achat ; ce que l'on retrouve au
- * lancement, ce sont les achats uniques, et ceux que le magasin confirme après
- * coup arrivent par `ecouter`.
+ * L'extension est réglée pour ne rien clore d'elle-même
+ * (`autoFinishTransactions: false`, `autoAcknowledgePurchases: false`) : c'est
+ * le jeu qui clôt, après avoir livré et rangé. Tant qu'un achat n'est pas clos,
+ * le magasin le représente au lancement (`getUnfinishedTransactions`) :
+ *   iPhone  — clore = `finishTransaction` ;
+ *   Android — clore = consommer un lot de Couronnes (`consumePurchase`, qui
+ *             permet de le racheter), reconnaître un achat unique
+ *             (`acknowledgePurchase`). Google rembourse un achat non reconnu
+ *             au bout de trois jours.
+ * Un achat que le magasin confirme après coup (accord parental) arrive par
+ * `ecouter`, sur iPhone ; sur Android, au lancement suivant.
+ *
+ * Vérifié contre les définitions de l'extension (dist/esm/definitions.d.ts),
+ * pas encore sur un appareil.
  */
 export function guichetNatif(extension, plateforme = 'apple') {
   const GENRE = 'inapp';
@@ -111,13 +119,19 @@ export function guichetNatif(extension, plateforme = 'apple') {
     transaction: String(t.transactionId || t.orderId || t.purchaseToken || ''),
     jeton: t.purchaseToken || null,
   });
-  // (Play : PURCHASED = 1, PENDING = 2 ; l'extension peut aussi le dire en toutes lettres.)
-  const enAttente = (t) => /pending|^2$/i.test(String(t && t.purchaseState !== undefined ? t.purchaseState : ''));
-  const connus = (liste) => (liste || []).filter((t) => t && PAR_PRODUIT.has(t.productIdentifier) && !enAttente(t)).map(achatDe).filter((a) => a.transaction);
+  // Android dit l'état de l'achat : « 1 », payé ; « 0 », paiement en attente (espèces, accord). iPhone ne dit rien : payé.
+  const paye = (t) => t.purchaseState === undefined || t.purchaseState === null || String(t.purchaseState) === '1';
+  // (Un achat remboursé ou retiré par le magasin ne se livre pas.)
+  const livrable = (t) => !!t && PAR_PRODUIT.has(t.productIdentifier) && paye(t) && !t.revocationDate;
+  const connus = (liste) => (liste || []).filter(livrable).map(achatDe).filter((a) => a.transaction);
   return {
     nom: plateforme,
     async ouvrir() {
-      try { const r = await extension.isBillingSupported(); return !!(r && r.isBillingSupported); } catch { return false; }
+      try {
+        if (extension.configure) await extension.configure({ autoFinishTransactions: false });
+        const r = await extension.isBillingSupported();
+        return !!(r && r.isBillingSupported);
+      } catch { return false; }
     },
     async prix(produits) {
       const r = await extension.getProducts({ productIdentifiers: produits, productType: GENRE });
@@ -125,10 +139,10 @@ export function guichetNatif(extension, plateforme = 'apple') {
     },
     async acheter(produit) {
       try {
-        // (isConsumable: false : sur Android, c'est le jeu qui consomme, après avoir livré.)
-        const t = await extension.purchaseProduct({ productIdentifier: produit, productType: GENRE, quantity: 1, isConsumable: false });
-        if (!t || enAttente(t)) return { etat: 'attente', produit };
-        const achat = achatDe({ productIdentifier: produit, ...t });
+        const t = await extension.purchaseProduct({ productIdentifier: produit, productType: GENRE, quantity: 1, isConsumable: false, autoAcknowledgePurchases: false });
+        if (!t || !paye(t)) return { etat: 'attente', produit };
+        if (t.revocationDate) return { etat: 'erreur', raison: 'magasin', produit };
+        const achat = achatDe({ ...t, productIdentifier: produit });
         return achat.transaction ? { etat: 'achete', ...achat } : { etat: 'erreur', raison: 'sansNumero', produit };
       } catch (erreur) {
         const message = String((erreur && (erreur.message || erreur.code)) || erreur || '');
@@ -138,18 +152,22 @@ export function guichetNatif(extension, plateforme = 'apple') {
       }
     },
     async enSouffrance() {
-      const r = await extension.getPurchases({ productType: GENRE });
-      return connus(r && r.purchases);
+      const r = await extension.getUnfinishedTransactions();
+      return connus(r && r.transactions);
     },
     async terminer(achat) {
       const article = PAR_PRODUIT.get(achat.produit);
-      if (plateforme !== 'google' || !achat.jeton) return;
-      if (article && article.consommable) await extension.consumePurchase({ purchaseToken: achat.jeton });
-      else if (extension.acknowledgePurchase) await extension.acknowledgePurchase({ purchaseToken: achat.jeton });
+      if (plateforme === 'google') {
+        if (!achat.jeton) return;
+        if (article && article.consommable) await extension.consumePurchase({ purchaseToken: achat.jeton });
+        else await extension.acknowledgePurchase({ purchaseToken: achat.jeton });
+      } else {
+        await extension.finishTransaction({ transactionId: achat.transaction });
+      }
     },
     async restaurer() {
       await extension.restorePurchases();
-      const r = await extension.getPurchases({ productType: GENRE });
+      const r = await extension.getPurchases({ productType: GENRE, onlyCurrentEntitlements: true });
       return connus(r && r.purchases).filter((a) => !PAR_PRODUIT.get(a.produit).consommable);
     },
     ecouter(fonction) {
@@ -289,10 +307,9 @@ export async function acheter(produit, rangement) {
 
 /**
  * Livre ce que le magasin a encaissé et que le jeu n'a pas clos (au lancement).
- * Renvoie ce qui a été livré. Un achat unique que le compte possède y revient à
- * chaque lancement : le numéro retenu par le profil fait qu'il n'est livré
- * qu'une fois — et en entier, car on ne peut pas le distinguer d'un achat payé
- * dont la livraison a été interrompue.
+ * Renvoie ce qui a été livré. Un achat représenté alors qu'il est déjà livré
+ * (l'application s'est arrêtée juste avant de le clore) n'est pas recompté :
+ * le profil a retenu son numéro. Il est seulement clos.
  */
 export async function rattraper(rangement) {
   if (!ventesOuvertes()) return [];

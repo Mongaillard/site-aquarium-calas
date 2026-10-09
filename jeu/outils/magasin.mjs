@@ -19,7 +19,13 @@
 //      parle à personne, et sa fiche de confidentialité peut le dire ;
 //   5. écrit la politique de confidentialité, en français et en anglais
 //      (confidentialite.html) — la même page est à publier à une adresse
-//      publique pour la fiche des magasins.
+//      publique pour la fiche des magasins ;
+//   6. écrit, à côté, les réglages de l'enveloppe native : capacitor.config.json
+//      (nom, identifiant, extensions) et, s'il manque, package.json (les
+//      paquets de Capacitor, versions fixées).
+//
+// L'enveloppe se fabrique ensuite dans magasin/, avec Node 22 (Capacitor 8) :
+//     npm install ; npx cap add ios ; npx cap add android ; npx cap sync
 //
 // Aucune dépendance : Node seul.
 // ---------------------------------------------------------------------------
@@ -27,7 +33,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NOM_DU_JEU, EDITEUR, nomComplet, manquesAvantMagasin } from '../js/edition.js';
+import { NOM_DU_JEU, EDITEUR, IDENTIFIANT, nomComplet, manquesAvantMagasin } from '../js/edition.js';
 
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -93,6 +99,28 @@ export function pageDeConfidentialite(nom = nomComplet(), editeur = EDITEUR, dat
 `;
 }
 
+/** Les paquets de l'enveloppe native, versions fixées (Capacitor 8 : Node 22, Xcode 26, Android API 36). */
+export const PAQUETS = Object.freeze({
+  '@capacitor/core': '8.5.3', '@capacitor/cli': '8.5.3', '@capacitor/ios': '8.5.3', '@capacitor/android': '8.5.3',
+  '@capacitor/preferences': '8.0.1', '@capgo/native-purchases': '8.9.2',
+});
+
+/**
+ * Les réglages de l'enveloppe native (capacitor.config.json). Tant que le nom
+ * ou l'identifiant manquent, ce sont ceux d'un essai, qui ne se soumet pas.
+ * L'extension d'achats ne clôt rien d'elle-même : c'est le jeu qui clôt, après
+ * avoir livré (js/achats.js) — dit ici pour que l'iPhone le sache dès le lancement.
+ */
+export function configDeLApplication(nom = nomComplet(), identifiant = IDENTIFIANT, manques = manquesAvantMagasin()) {
+  const essai = manques.length > 0;
+  return {
+    appId: essai ? 'fr.mongaillard.essai' : identifiant,
+    appName: essai ? 'Essai du jeu' : nom,
+    webDir: 'www',
+    plugins: { NativePurchases: { autoFinishTransactions: false } },
+  };
+}
+
 function copier(source, cible, garder) {
   const stat = fs.statSync(source);
   if (stat.isDirectory()) {
@@ -114,7 +142,7 @@ function taille(dossier) {
 }
 
 /** Prépare le dossier. Renvoie `{ sortie, fichiers, octets, manques }`, ou lève une erreur quand un manque interdit de continuer. */
-export function preparer({ sortie = SORTIE, force = quandMeme } = {}) {
+export function preparer({ sortie = SORTIE, force = quandMeme, enveloppe = false } = {}) {
   const manques = manquesAvantMagasin();
   if (manques.length && !force) {
     const erreur = new Error(`Le jeu n’est pas prêt pour les magasins :\n${manques.map((m) => `  - ${m}`).join('\n')}\nCorrige js/edition.js (et le nom dans index.html et manifest.webmanifest), ou ajoute --quand-meme pour un essai.`);
@@ -144,17 +172,28 @@ export function preparer({ sortie = SORTIE, force = quandMeme } = {}) {
   }
 
   fs.writeFileSync(path.join(sortie, 'confidentialite.html'), pageDeConfidentialite());
+
+  // Les réglages de l'enveloppe native, à côté du contenu web.
+  if (enveloppe) {
+    const dossier = path.dirname(sortie);
+    fs.writeFileSync(path.join(dossier, 'capacitor.config.json'), `${JSON.stringify({ ...configDeLApplication(), webDir: path.basename(sortie) }, null, 2)}\n`);
+    const paquet = path.join(dossier, 'package.json');
+    if (!fs.existsSync(paquet)) {
+      fs.writeFileSync(paquet, `${JSON.stringify({ name: 'application-du-jeu', version: '1.0.0', private: true,
+        description: 'L’enveloppe native du jeu (Capacitor) : App Store et Google Play.', dependencies: PAQUETS }, null, 2)}\n`);
+    }
+  }
   return { sortie, ...taille(sortie), manques };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const r = preparer();
+    const r = preparer({ enveloppe: true });
     console.log(`Application « ${nomComplet()} » préparée dans ${r.sortie}`);
     console.log(`  ${r.fichiers} fichiers, ${Math.round(r.octets / 1048576)} Mo`);
     if (r.manques.length) console.log(`  ATTENTION, préparée « quand même » : ce dossier ne doit pas être soumis.\n${r.manques.map((m) => `  - ${m}`).join('\n')}`);
     else console.log('  Prête à être embarquée (Capacitor : webDir = "magasin/www").');
-    console.log(`  Nom : ${NOM_DU_JEU.titre}${NOM_DU_JEU.suite ? ` ${NOM_DU_JEU.suite}` : ''} · Éditeur : ${EDITEUR.nom || '(vide)'}`);
+    console.log(`  Nom : ${NOM_DU_JEU.titre}${NOM_DU_JEU.suite ? ` ${NOM_DU_JEU.suite}` : ''} · Éditeur : ${EDITEUR.nom || '(vide)'} · Identifiant : ${IDENTIFIANT || '(vide)'}`);
   } catch (erreur) {
     console.error(erreur.message);
     process.exit(1);
