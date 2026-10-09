@@ -970,6 +970,9 @@ jeu/
 │   ├── progression-config.js  classement, ligues, coffres, niveaux : tous les réglages
 │   ├── progression.js    … et toutes les règles, en fonctions pures
 │   ├── progression-ecrans.js  bandeau de ligue, coffres, probabilités, collection
+│   ├── collections-config.js  le catalogue des pièces de collection : autocollants, cadres, bannières, mots de titre
+│   ├── collections-ecrans.js  l'Album, une collection, le blason, la route de la saison et le Passe
+│   ├── blason.js           le dessin des pièces : un autocollant est une case de sa planche, cadres et bannières sont tracés
 │   ├── rangement-durable.js   second rangement du profil, là où la page en offre un
 │   ├── render.js         Canvas 2D : sol en tronçons, entités, brouillard, minimap
 │   ├── sprites.js        atlas d'illustrations, couleur d'équipe, textures de sol
