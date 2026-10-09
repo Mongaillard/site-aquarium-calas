@@ -19,6 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { EN_MAGASIN } from './edition.js';
+import { LANGUE, txt } from './langue.js';
 
 // Règle générale (H) : +5 % par niveau, soit +20 % au niveau 5 — arrondi à
 // l'entier pour les points de vie et les dégâts (`entiers`) : le joueur ne lit
@@ -39,7 +40,31 @@ function figer(objet) {
   return Object.freeze(objet);
 }
 
-export const PROGRESSION = figer({
+/**
+ * Les textes de la table que le joueur lit : les noms des ligues, des
+ * catégories et des raretés, des coffres et de leurs tirages, des lots de
+ * Couronnes. Appelle `visite(objet, champ)` pour chacun. Les identifiants
+ * (`id`, `produit`, les clés des coffres et des catégories) n'en sont pas :
+ * les règles en dépendent, ils ne se traduisent jamais.
+ */
+export function textesATraduire(visite, table = PROGRESSION) {
+  for (const ligue of table.ligues) visite(ligue, 'nom');
+  for (const categorie of Object.keys(table.nomsDesCategories)) visite(table.nomsDesCategories, categorie);
+  for (const coffre of Object.values(table.coffres)) {
+    visite(coffre, 'nom');
+    for (const groupe of coffre.tirages) visite(groupe, 'nom');
+  }
+  for (const lot of table.boutique.lots) visite(lot, 'nom');
+  for (const rarete of Object.keys(table.collections.raretes)) visite(table.collections.raretes, rarete);
+}
+
+/** La table dans la langue du joueur. En français, telle qu'elle est écrite ; ailleurs, ses textes traduits — AVANT d'être figée. */
+function traduire(table) {
+  if (LANGUE !== 'fr') textesATraduire((objet, champ) => { objet[champ] = txt(objet[champ]); }, table);
+  return table;
+}
+
+export const PROGRESSION = figer(traduire({
   // --- Le profil -------------------------------------------------------------
   //  version  : format du profil, voir migrerProfil
   //  journal  : nombre d'opérations gardées (parties, coffres ouverts, améliorations…) (choix)
@@ -496,4 +521,4 @@ export const PROGRESSION = figer({
       { gratuit: { coffre: 'legendaire' }, passe: { embleme: 17 } },
     ],
   },
-});
+}));
