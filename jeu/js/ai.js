@@ -9,6 +9,7 @@ import { TILE, BUILDING_TYPES, UNIT_TYPES, AGES, nomDe, ficheDe } from './config
 import { dist2, canAfford, RNG } from './utils.js';
 import { STATE, villagerTask, computeDamage } from './entities.js';
 import { BLOCK } from './map.js';
+import { txt } from './langue.js';
 
 const JOB_RATIOS = [
   { food: 0.45, wood: 0.40, gold: 0.15 }, // Âge Sombre
@@ -1062,7 +1063,7 @@ export class AIPlayer {
     const civ = world.players[ennemi].civ;
     world.pushEvent({
       type: 'notice',
-      text: `L’ennemi prépare une attaque : formez des soldats ${ficheDe('barracks', civ).fem ? 'à la' : 'au'} ${nomDe('barracks', civ)}`,
+      text: txt`L’ennemi prépare une attaque : formez des soldats ${ficheDe('barracks', civ).fem ? 'à la' : 'au'} ${nomDe('barracks', civ)}`,
     });
   }
 

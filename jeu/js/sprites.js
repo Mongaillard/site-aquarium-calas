@@ -29,6 +29,7 @@ import { TILE, UNIT_TYPES, nomDe } from './config.js';
 import { MODELES, modeleCuit, ALPHA_EQUIPE } from './modele3d.js';
 import { reglesDeTeinture, acierDeTeinture, teindrePixels } from './teintures.js';
 import { PIECES_DECOR } from './decor-pieces.js';
+import { txt, LANGUE } from './langue.js';
 
 /**
  * Plafond de mémoire des troupes cuites, en mégaoctets (voir « Mémoire des
@@ -873,6 +874,19 @@ function annoncerModeles3d(retour = false) {
 }
 
 /**
+ * Le nom courant de chaque modèle atlante, pour dire au joueur lequel a échoué
+ * ou a été allégé (voir etatModeles3d).
+ */
+const NOMS_DE_MODELES = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte', crossbowman: 'arbalétrier', horseArcher: 'archer monté', pavoisier: 'pavoisier', frondeur: 'frondeur', sapeur: 'sapeur' };
+/**
+ * « fellah solarien » : une troupe dite avec son peuple. En français,
+ * l'identifiant du peuple sert d'adjectif ; ailleurs l'adjectif change de
+ * place, et c'est la phrase entière qui se traduit.
+ */
+const DU_PEUPLE = { solarien: (troupe) => txt`${troupe} solarien` };
+const duPeuple = (troupe, civ) => (DU_PEUPLE[civ] ? DU_PEUPLE[civ](troupe) : `${troupe} ${civ}`);
+
+/**
  * Où en sont les unités du style « 3D » : `attente` (pas encore demandées),
  * `cuisson` (le premier lancement les prépare ; les planches dessinées servent
  * en attendant), `pret`, ou `absent` avec sa raison (pas de WebGL, fichier
@@ -882,17 +896,16 @@ export function etatModeles3d() {
   // (Les modèles des Atlantes dans leur ordre habituel, puis ceux, cuits à la demande, des autres civilisations.)
   const cles = [...Object.values(ALTERNATIVES).map((a) => a['3d']).filter((c) => EN_3D[c]), ...Object.keys(EN_3D).filter((c) => EN_3D[c].civ)]
     .filter((c) => !EN_3D[c].aLaDemande || charges.has(c));
-  const noms = { villager: 'ouvrier', militia: 'chevalier', triton: 'homme-poisson', archer: 'archer', hydra: 'hydre', spearman: 'lancier', priest: 'prêtresse', knight: 'cavalier', scout: 'éclaireur', champion: 'champion', ram: 'bélier', catapult: 'catapulte', crossbowman: 'arbalétrier', horseArcher: 'archer monté', pavoisier: 'pavoisier', frondeur: 'frondeur', sapeur: 'sapeur' };
   // « ouvrier », « fellah solarien » : le modèle d'une autre civilisation porte le nom qu'elle lui donne.
   const nom = (c) => (EN_3D[c].civ
-    ? `${nomDe(EN_3D[c].unite, EN_3D[c].civ).toLowerCase()} ${EN_3D[c].civ}`
-    : noms[EN_3D[c].unite] || EN_3D[c].unite);
+    ? duPeuple(nomDe(EN_3D[c].unite, EN_3D[c].civ).toLowerCase(), EN_3D[c].civ)
+    : NOMS_DE_MODELES[EN_3D[c].unite] || EN_3D[c].unite);
   const entrees = cles.map((c) => charges.get(c));
   if (entrees.some((e) => !e)) return { etat: 'attente' };
   const echecs = cles.filter((c) => charges.get(c).absent);
   if (echecs.length) {
     // Qui a échoué, et pourquoi : « ouvrier : … », pour qu'on puisse le dire.
-    return { etat: 'absent', raison: echecs.map((c) => `${nom(c)} : ${charges.get(c).raison}`).join(' ; ') };
+    return { etat: 'absent', raison: echecs.map((c) => txt`${nom(c)} : ${charges.get(c).raison}`).join(txt(' ; ')) };
   }
   // `alleges` : les troupes cuites faute de mieux à finesse réduite (mémoire
   // graphique insuffisante) — elles paraissent plus floues que les autres.
@@ -1316,3 +1329,24 @@ export function caseDirection(facing, cases = 8) {
   const k = Math.round((Math.PI / 2 - facing) / pas);
   return ((k % cases) + cases) % cases;
 }
+
+// --- La langue -----------------------------------------------------------------
+//
+// Les noms et les descriptions des styles, les noms courants des modèles : le
+// français est la source. Dans une autre langue, ils sont remplacés ici, une
+// fois, par leur traduction (js/langue.js) ; en français, rien ne bouge.
+
+/**
+ * Passe sur chaque texte des tables de ce module : `visite(objet, champ)`.
+ * Sert à traduire (ci-dessous) et à recenser ce qui est à traduire
+ * (outils/langues.mjs). « 3D » n'est pas un texte.
+ */
+export function textesATraduire(visite) {
+  for (const s of STYLES) {
+    if (/[A-Za-zÀ-ÿ]{2,}/.test(s.nom)) visite(s, 'nom');
+    visite(s, 'desc');
+  }
+  for (const type of Object.keys(NOMS_DE_MODELES)) visite(NOMS_DE_MODELES, type);
+}
+
+if (LANGUE !== 'fr') textesATraduire((objet, champ) => { objet[champ] = txt(objet[champ]); });

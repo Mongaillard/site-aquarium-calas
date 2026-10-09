@@ -8,6 +8,7 @@ import { serializeWorld, restoreWorld } from '../js/save.js';
 import { TICKS_PER_SECOND, TILE, nomDe } from '../js/config.js';
 import { dist, clamp } from '../js/utils.js';
 import { STATE } from '../js/entities.js';
+import { txt } from '../js/langue.js';
 import { readFileSync } from 'node:fs';
 
 const DT = 1 / TICKS_PER_SECOND;
@@ -541,8 +542,8 @@ function fauxEcran(w, zoom) {
     return source.slice(debut.index + 1, i);
   };
   const vraies = ['tapAt', 'issueOrder', 'devantSousLeDoigt', 'tapTolerance', 'setSelection', 'pingOrder'];
-  const Ecran = new Function('nomDe', 'clamp', 'spriteDe', 'TILE',
-    `return class { ${vraies.map(methode).join('\n')} }`)(nomDe, clamp, () => null, TILE);
+  const Ecran = new Function('nomDe', 'clamp', 'spriteDe', 'TILE', 'txt',
+    `return class { ${vraies.map(methode).join('\n')} }`)(nomDe, clamp, () => null, TILE, txt);
   const g = new Ecran();
   return Object.assign(g, {
     world: w, civ: w.players[w.humanIndex].civ, selection: [], messages: [],
