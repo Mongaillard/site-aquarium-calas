@@ -16,7 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { PROGRESSION as R } from './progression-config.js';
-import { COLLECTIONS, PIECES, GENRES, BLASON_DE_DEPART, collection as collectionDuJeu, pieceDe } from './collections-config.js';
+import { COLLECTIONS, PIECES, GENRES, BLASON_DE_DEPART, collection as collectionDuJeu, pieceDe, composerTitre } from './collections-config.js';
 
 export const VERSION_PROFIL = R.profil.version;
 
@@ -1428,7 +1428,8 @@ export function avancementDe(profil, collectionId) {
 /** Le titre que porte ce profil : son grade, puis son épithète s'il en a une — « Dompteur du Banquet ». */
 export function titreDe(profil) {
   const b = migrerProfil(profil).blason;
-  return `${PIECES[b.grade].nom}${b.epithete ? ` ${PIECES[b.epithete].nom}` : ''}`;
+  // (L'ordre des deux mots est affaire de langue : voir composerTitre.)
+  return composerTitre(PIECES[b.grade].nom, b.epithete ? PIECES[b.epithete].nom : null);
 }
 
 /**

@@ -143,6 +143,7 @@ export async function recenser() {
   const { textesDesTables, accordsDesTables } = await import('../js/config.js');
   textesDesTables((objet, champ) => noter(objet[champ], 'js/config.js (tables)'));
   for (const cle of accordsDesTables()) noter(cle, 'js/config.js (noms qui se comptent)');
+  (await import('../js/collections-config.js')).textesATraduire((objet, champ) => noter(objet[champ], 'js/collections-config.js (tables)'));
   (await import('../js/progression-config.js')).textesATraduire((objet, champ) => noter(objet[champ], 'js/progression-config.js (tables)'));
   (await import('../js/fiches-troupes.js')).textesATraduire((objet, champ) => noter(objet[champ], 'js/fiches-troupes.js (tables)'));
   return cles;

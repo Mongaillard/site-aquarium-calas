@@ -39,6 +39,7 @@ const ASSETS = [
   './js/langues/en/fiches.js',
   './js/langues/en/ecran.js',
   './js/langues/en/progression.js',
+  './js/langues/en/collections.js',
   './js/fiches-troupes.js',
   './js/musique.js',
   './js/rangement-durable.js',
