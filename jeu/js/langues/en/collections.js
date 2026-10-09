@@ -41,7 +41,7 @@ export default {
   "le {0}": "the {0}",
   "titre «\u00a0{0}\u00a0»": "title “{0}”",
   "titre «\u00a0…\u00a0{0}\u00a0»": "title “{0} …”",
-  "un {0}": "a {0}",
+  "un {0} [gain]": "a {0}",
 
   // --- Le titre ------------------------------------------------------------------
   "{grade} {épithète}": "{épithète} {grade}",

@@ -67,7 +67,7 @@ console.log('\n--- Le cahier ---');
   check('l’anglais du cahier : pas d’espace avant « : », « ? », « ! » ; pas de guillemets français',
     Object.values(cahier).flatMap((v) => (typeof v === 'string' ? [v] : Object.values(v))).every((v) => !/[\u00a0\u202f ][:?!;]/.test(v) && !/[«»]/.test(v)));
   check('ces fichiers ne posent plus de texte sans passer par la langue : chaque écran prend ses phrases à `txt`',
-    clesDuCode(lire('js/collections-ecrans.js')).length > 120 && /import \{ txt, accord \} from '\.\/langue\.js';/.test(lire('js/collections-ecrans.js')) && /import \{ txt \} from '\.\/langue\.js';/.test(lire('js/blason.js')));
+    clesDuCode(lire('js/collections-ecrans.js')).length > 120 && /import \{ txt, txtDe, accord \} from '\.\/langue\.js';/.test(lire('js/collections-ecrans.js')) && /import \{ txt \} from '\.\/langue\.js';/.test(lire('js/blason.js')));
 }
 
 // --- L'anglais, dans un jeu neuf ------------------------------------------------------------

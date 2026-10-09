@@ -8,8 +8,9 @@ import fiches from './en/fiches.js';
 import ecran from './en/ecran.js';
 import progression from './en/progression.js';
 import collections from './en/collections.js';
+import partie from './en/partie.js';
 
 /** Les cahiers, par nom (pour les essais). */
-export const CAHIERS = { reglages, accueil, fiches, ecran, progression, collections };
+export const CAHIERS = { reglages, accueil, fiches, ecran, progression, collections, partie };
 
 export default Object.assign({}, ...Object.values(CAHIERS));

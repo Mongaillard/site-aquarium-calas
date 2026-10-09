@@ -100,10 +100,10 @@ export default {
   "voir la route des ligues": "see the league road",
   "Contenu et chances de chaque coffre": "Contents and odds of each chest",
   // (Le rang d'un coffre, sans le mot « coffre », sous son image.)
-  "bois": "wooden",
-  "argent": "silver",
-  "or": "golden",
-  "légendaire": "legendary",
+  "bois [coffre]": "wooden",
+  "argent [coffre]": "silver",
+  "or [coffre]": "golden",
+  "légendaire [coffre]": "legendary",
 
   // --- Les probabilités d'un coffre ---
   "{0}. Sur 100 coffres, en moyenne : {1},\n      {2}, {3}.": "{0}. Per 100 chests, on average: {1}, {2}, {3}.",

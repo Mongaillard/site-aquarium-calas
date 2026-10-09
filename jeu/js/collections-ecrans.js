@@ -19,7 +19,7 @@ import {
 import { htmlEmbleme, htmlPiece, htmlBlason, htmlMedaillon, svgBanniere, titreDuBlason, htmlSansTeinture } from './blason.js';
 import { iconeSVG } from './icones.js';
 import { EN_MAGASIN } from './edition.js';
-import { txt, accord } from './langue.js';
+import { txt, txtDe, accord } from './langue.js';
 
 /** Les outils prêtés par js/progression-ecrans.js : montrer, retenir, nombre, pluriel, couronnes, euros, jour, heure, coffre. */
 let o = null;
@@ -305,7 +305,7 @@ export function resumeDesGains(evenements) {
   for (const e of evenements) {
     if (e.type === 'eclats' && e.variation > 0) nEclats += e.variation;
     else if (e.type === 'couronnes' && e.variation > 0) nCouronnes += e.variation;
-    else if (e.type === 'coffre') gains.push(txt`un ${R.coffres[e.coffre].nom.toLowerCase()}`);
+    else if (e.type === 'coffre') gains.push(txtDe('gain')`un ${R.coffres[e.coffre].nom.toLowerCase()}`);
     else if (e.type === 'piece' && !e.doublon) gains.push(pieceEnPhrase(e.piece));
     else if (e.type === 'piece') nEclats += e.eclats;
   }

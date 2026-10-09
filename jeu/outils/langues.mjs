@@ -67,10 +67,12 @@ function finDExpression(source, i) {
 export function clesDuCode(source) {
   const cles = [];
   // (`pluriel` se passe aussi d'un module à l'autre : `o.pluriel(n, 'pièce')` compte.)
-  const appel = /(?:(?<![\w.$])(txt|accord)|(?<![\w$])(pluriel))\s*(`|\()/g;
+  // (`txtDe('contexte')` rend une étiquette : la clé porte le contexte entre crochets.)
+  const appel = /(?:(?<![\w.$])(txt|accord)|(?<![\w$])(pluriel)|(?<![\w.$])txtDe\(\s*'([^'\n]+)'\s*\))\s*(`|\()/g;
   for (let m = appel.exec(source); m; m = appel.exec(source)) {
     const i = m.index + m[0].length - 1;
-    const genre = m[1] || m[2];
+    const contexte = m[3] ? ` [${m[3]}]` : '';
+    const genre = m[1] || m[2] || 'txt';
     if (genre === 'txt' && source[i] === '`') {
       // Un gabarit : ses morceaux fixes, ses trous numérotés.
       const morceaux = [''];
@@ -81,7 +83,7 @@ export function clesDuCode(source) {
         else morceaux[morceaux.length - 1] += source[j];
       }
       const cuits = morceaux.map((x) => cuire(x, '`'));
-      cles.push(cuits.reduce((cle, x, k) => (k ? `${cle}{${k - 1}}${x}` : x), ''));
+      cles.push(cuits.reduce((cle, x, k) => (k ? `${cle}{${k - 1}}${x}` : x), '') + contexte);
       continue;
     }
     if (source[i] !== '(') continue;
@@ -95,7 +97,7 @@ export function clesDuCode(source) {
     };
     if (genre === 'txt') {
       const a = litteral(i + 1);
-      if (a && /^\s*\)/.test(source.slice(a.fin))) cles.push(a.texte);
+      if (a && /^\s*\)/.test(source.slice(a.fin))) cles.push(a.texte + contexte);
     } else {
       // (Le premier argument est le nombre : on saute jusqu'à la virgule de même niveau.)
       let j = i + 1, niveau = 0;
@@ -143,6 +145,7 @@ export async function recenser() {
   const { textesDesTables, accordsDesTables } = await import('../js/config.js');
   textesDesTables((objet, champ) => noter(objet[champ], 'js/config.js (tables)'));
   for (const cle of accordsDesTables()) noter(cle, 'js/config.js (noms qui se comptent)');
+  (await import('../js/sprites.js')).textesATraduire((objet, champ) => noter(objet[champ], 'js/sprites.js (tables)'));
   (await import('../js/collections-config.js')).textesATraduire((objet, champ) => noter(objet[champ], 'js/collections-config.js (tables)'));
   (await import('../js/progression-config.js')).textesATraduire((objet, champ) => noter(objet[champ], 'js/progression-config.js (tables)'));
   (await import('../js/fiches-troupes.js')).textesATraduire((objet, champ) => noter(objet[champ], 'js/fiches-troupes.js (tables)'));

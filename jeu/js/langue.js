@@ -20,6 +20,11 @@
 // Les mots qui s'accordent avec un nombre passent par `accord` ; les nombres
 // et les dates s'écrivent selon LOCALE.
 //
+// Un même texte français peut vouloir dire deux choses (« bois », la
+// ressource ; « bois », le coffre) : là où il y a doute, `txtDe('coffre')`
+// rend une étiquette qui cherche « bois [coffre] » dans le dictionnaire. En
+// français, le contexte ne change rien.
+//
 // La langue se lit une fois, au chargement : changer de langue recharge la
 // page (bien des textes sont posés dès le chargement des modules). Ordre : la
 // marque `globalThis.__LANGUE` (les essais, l'enveloppe native), `?langue=en`
@@ -111,6 +116,26 @@ export function txt(morceaux, ...valeurs) {
     return texte;
   }
   return traduite.replace(/\{(\d+)\}/g, (trou, i) => (Number(i) < valeurs.length ? String(valeurs[Number(i)]) : trou));
+}
+
+/**
+ * `txt` dans un contexte : txtDe('coffre')('bois'), txtDe('gain')`un ${nom}`.
+ * La clé du dictionnaire porte le contexte entre crochets — « bois [coffre] »,
+ * « un {0} [gain] » — pour qu'un même texte français ait deux traductions. En
+ * français : le texte tel quel.
+ */
+export function txtDe(contexte) {
+  return (morceaux, ...valeurs) => {
+    const simple = typeof morceaux === 'string';
+    const traduite = dictionnaire ? traduction(`${simple ? morceaux : cleDe(morceaux)} [${contexte}]`) : null;
+    if (traduite === null) {
+      if (simple) return morceaux;
+      let texte = morceaux[0];
+      for (let i = 1; i < morceaux.length; i++) texte += String(valeurs[i - 1]) + morceaux[i];
+      return texte;
+    }
+    return traduite.replace(/\{(\d+)\}/g, (trou, i) => (Number(i) < valeurs.length ? String(valeurs[Number(i)]) : trou));
+  };
 }
 
 const regles = (() => { try { return new Intl.PluralRules(LOCALE); } catch { return null; } })();

@@ -15,7 +15,7 @@ import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAu
 import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai, ouvrirLaSaison } from './progression.js';
 import { lireProgression, ecrireProgression, effacerLesDonnees } from './save.js';
 import { EN_MAGASIN, EDITEUR, nomComplet } from './edition.js';
-import { LANGUES, LANGUE, txt, accord, nombreLocal, choisirLangue } from './langue.js';
+import { LANGUES, LANGUE, txt, txtDe, accord, nombreLocal, choisirLangue } from './langue.js';
 import {
   ouvrirLesVentes, fermerLesVentes, ventesOuvertes, ventesSimulees, vendable, prixAffiche, achatEnCours, prixManquants, relireLesPrix,
   acheter as acheterAuGuichet, restaurer as restaurerAuGuichet,
@@ -205,7 +205,7 @@ function coffre(type, etat, largeur, classe = '') {
 }
 
 // (Le français tire le rang d'un coffre de son nom. Une autre langue ne se découpe pas ainsi : elle a ses quatre mots.)
-const RANGS_DE_COFFRE = LANGUE === 'fr' ? {} : { bois: txt('bois'), argent: txt('argent'), or: txt('or'), legendaire: txt('légendaire') };
+const RANGS_DE_COFFRE = LANGUE === 'fr' ? {} : { bois: txtDe('coffre')('bois'), argent: txtDe('coffre')('argent'), or: txtDe('coffre')('or'), legendaire: txtDe('coffre')('légendaire') };
 /** « bois », « argent », « or », « légendaire » : le rang d'un coffre, sans le mot « coffre ». */
 function nomCourtDuCoffre(type) {
   return RANGS_DE_COFFRE[type] || R.coffres[type].nom.replace('Coffre ', '').replace(/^d[e’] ?/, '');
