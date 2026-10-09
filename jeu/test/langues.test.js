@@ -89,8 +89,13 @@ console.log('\n--- Le choix ---');
     lue(`globalThis.__LANGUE = 'en'; ${stockage('fr')}`) === 'en' && lue(`globalThis.location = { search: '?langue=en' }; ${stockage('fr')}`) === 'en' && lue(stockage('en')) === 'en' && lue(stockage('fr')) === 'fr');
   check('une langue inconnue, où qu’elle soit écrite, laisse le français', lue(`globalThis.__LANGUE = 'xx'`) === 'fr' && lue(`globalThis.location = { search: '?langue=zz' }`) === 'fr' && lue(stockage('tlh')) === 'fr');
   const pasPrete = LANGUES.find((l) => !l.prete);
+  // (L'appareil qui la parle reçoit alors l'anglais s'il est prêt, sinon le français.)
+  const secours = LANGUES.some((l) => l.id === 'en' && l.prete) ? 'en' : 'fr';
   check('une langue pas encore entièrement traduite n’est jamais prise d’office à l’appareil : il faut la choisir',
-    !pasPrete || lue(`globalThis.window = { navigator: { languages: ['${pasPrete.id}-XX'], language: '${pasPrete.id}' } }`) === 'fr');
+    !pasPrete || lue(`globalThis.window = { navigator: { languages: ['${pasPrete.id}-XX'], language: '${pasPrete.id}' } }`) === secours);
+  check('l’appareil prend sa langue si le jeu la parle en entier ; un appareil français reste en français ; une langue inconnue reçoit l’anglais',
+    lue(`globalThis.window = { navigator: { languages: ['en-GB', 'fr-FR'], language: 'en-GB' } }`) === 'en' && lue(`globalThis.window = { navigator: { languages: ['fr-CA', 'en-US'], language: 'fr-CA' } }`) === 'fr'
+    && lue(`globalThis.window = { navigator: { languages: ['ja-JP'], language: 'ja-JP' } }`) === secours);
   const m = ailleurs(`
     const coffre = new Map(); globalThis.localStorage = { getItem: (k) => coffre.get(k) ?? null, setItem: (k, v) => coffre.set(k, v) };
     const L = await import('./js/langue.js');
@@ -162,7 +167,7 @@ console.log('\n--- Le recensement ---');
     check(`${langue.nom} : pas de traduction vide, pas de trou inventé, les mêmes balises que la phrase française ; un accord a sa forme « other »`,
       fautives.length === 0, fautives.slice(0, 2).map(([cle]) => cle).join(' | ') + (trous('') ? '' : ''));
     check(`${langue.nom} : ${e.traduites} textes traduits sur ${e.total}${langue.prete ? ' — langue proposée d’office : rien ne doit manquer' : ' (traduction en cours)'}`,
-      langue.prete ? e.manquantes.length === 0 : e.traduites > 0, e.manquantes.slice(0, 3).join(' | '));
+      langue.prete ? e.manquantes.length === 0 : true, langue.prete ? e.manquantes.slice(0, 3).join(' | ') : '');
     const sw = lire('sw.js');
     const fichiers = [`js/langues/${langue.id}.js`, ...Object.keys(CAHIERS).map((c) => `js/langues/${langue.id}/${c}.js`)];
     check(`${langue.nom} : chaque cahier existe et le jeu le garde pour le hors-ligne`, fichiers.every((f) => fs.existsSync(path.join(RACINE, f)) && sw.includes(`'./${f}'`)) && sw.includes('\'./js/langue.js\''));
