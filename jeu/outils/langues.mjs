@@ -5,6 +5,11 @@
 //
 //     npm run langues              → l'état de chaque langue
 //     npm run langues -- en        → la liste de ce qui manque à l'anglais
+//     node outils/langues.mjs verifier <langue> <cahier> <fichier.js…> [--tables module.js:fonction…]
+//                                  → vérifie un cahier (js/langues/<langue>/<cahier>.js) contre les
+//                                    fichiers qu'il couvre : rien ne manque, rien en trop, pas de trou
+//                                    inventé, les mêmes balises. `--tables` ajoute les textes d'une
+//                                    table : `fonction(visite)` appelle `visite(objet, champ)`.
 //
 // Le français est la source (js/langue.js). Ce qui est à traduire se trouve à
 // trois endroits :
@@ -143,7 +148,49 @@ export async function etatDe(langue, cles = null) {
   return { total: source.size, traduites: source.size - manquantes.length, manquantes, orphelines, source };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+/** Les défauts d'une traduction face à sa clé : vide, trou inventé, balises différentes, accord sans « other ». */
+export function defautsDe(cle, valeur) {
+  const balises = (t) => [...String(t).matchAll(/<\/?[a-z]+/g)].map((x) => x[0]).sort().join(',');
+  if (cle.includes('|') && valeur && typeof valeur === 'object') return typeof valeur.other === 'string' ? [] : ['accord sans forme « other »'];
+  if (typeof valeur !== 'string' || !valeur.trim()) return ['traduction vide'];
+  const defauts = [];
+  if ([...valeur.matchAll(/\{(\d+)\}/g)].some((x) => !cle.includes(`{${x[1]}}`))) defauts.push('trou qui n’existe pas dans la phrase française');
+  if (balises(valeur) !== balises(cle)) defauts.push('balises différentes de la phrase française');
+  return defauts;
+}
+
+/** Vérifie un cahier contre les fichiers qu'il couvre. Rend `{ cles, manquantes, enTrop, fautives }`. */
+export async function verifierCahier(langue, cahier, fichiers, tables = []) {
+  const cles = new Set();
+  for (const f of fichiers) for (const cle of clesDuCode(lire(f))) cles.add(cle);
+  for (const t of tables) {
+    const [module, fonction] = t.split(':');
+    const m = await import(path.join(RACINE, module));
+    m[fonction]((objet, champ) => cles.add(objet[champ]));
+  }
+  const dictionnaire = (await import(path.join(RACINE, 'js', 'langues', langue, `${cahier}.js`))).default;
+  const a = (cle) => Object.prototype.hasOwnProperty.call(dictionnaire, cle);
+  return {
+    cles: cles.size,
+    manquantes: [...cles].filter((cle) => !a(cle)),
+    enTrop: Object.keys(dictionnaire).filter((cle) => !cles.has(cle)),
+    fautives: Object.entries(dictionnaire).map(([cle, v]) => [cle, defautsDe(cle, v)]).filter(([, d]) => d.length),
+  };
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv[2] === 'verifier') {
+  const [langue, cahier, ...reste] = process.argv.slice(3);
+  const tables = reste.filter((x, i) => reste[i - 1] === '--tables' || (reste.indexOf('--tables') >= 0 && i > reste.indexOf('--tables')));
+  const fichiers = reste.slice(0, reste.indexOf('--tables') >= 0 ? reste.indexOf('--tables') : reste.length);
+  const r = await verifierCahier(langue, cahier, fichiers, tables);
+  console.log(`Cahier « ${cahier} » (${langue}) : ${r.cles} textes dans ${fichiers.length} fichier(s)${tables.length ? ` et ${tables.length} table(s)` : ''}.`);
+  for (const cle of r.manquantes) console.log(`  manque   ${JSON.stringify(cle)}`);
+  for (const cle of r.enTrop) console.log(`  en trop  ${JSON.stringify(cle)}`);
+  for (const [cle, d] of r.fautives) console.log(`  fautive  ${JSON.stringify(cle)} : ${d.join(' ; ')}`);
+  const defauts = r.manquantes.length + r.enTrop.length + r.fautives.length;
+  console.log(defauts ? `${defauts} défaut(s).` : 'Rien ne manque, rien en trop, rien de fautif.');
+  process.exit(defauts ? 1 : 0);
+} else if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { LANGUES } = await import('../js/langue.js');
   const cles = await recenser();
   const detail = process.argv[2];
