@@ -56,6 +56,7 @@ export function textesATraduire(visite, table = PROGRESSION) {
   }
   for (const lot of table.boutique.lots) visite(lot, 'nom');
   for (const rarete of Object.keys(table.collections.raretes)) visite(table.collections.raretes, rarete);
+  for (const liste of [table.objectifs.faciles, table.objectifs.moyens, table.objectifs.semaine]) for (const objectif of liste) visite(objectif, 'nom');
 }
 
 /** La table dans la langue du joueur. En français, telle qu'elle est écrite ; ailleurs, ses textes traduits — AVANT d'être figée. */
@@ -88,6 +89,44 @@ export const PROGRESSION = figer(traduire({
   //  recrue : ce que donne la fin de la partie guidée, une seule fois par joueur (un
   //  coffre et des Éclats, pour voir un coffre s'ouvrir avant la première vraie partie).
   debut: { parties: 3, format: 'escarmouche', ensuite: 'express', recrue: { coffre: 'argent', eclats: 20 } },
+
+  // --- Les objectifs -------------------------------------------------------------
+  //  Une raison de revenir demain (état des lieux du 12/10/2026) : deux objectifs par jour — un
+  //  facile, un moins — et un par semaine, tous faisables dans une partie classée ordinaire, même
+  //  en Escarmouche. Ceux du jour sont tirés de la date : les mêmes pour tous, sans serveur.
+  //  Ils se paient en POINTS DE SAISON, jamais en Éclats : il faut `boutique.change` Éclats pour
+  //  une Couronne, chaque Éclat donné en plus rapproche le Passe gratuit. Rien ne se perd : un
+  //  jour manqué ne coûte rien, et aucune série ne se casse.
+  //   points  : ce que rapporte un objectif du jour, et celui de la semaine
+  //   genre   : ce qu'il faut (js/progression.js, objectifAtteint) — `seuil` et `civ` le précisent
+  objectifs: {
+    points: { jour: 40, semaine: 100 },
+    faciles: [
+      { id: 'jouer', genre: 'jouer', nom: 'Jouer une partie classée' },
+      { id: 'former12', genre: 'former', seuil: 12, nom: 'Former 12 unités dans une partie' },
+      { id: 'abattre8', genre: 'abattre', seuil: 8, nom: 'Abattre 8 ennemis dans une partie' },
+      { id: 'batir2', genre: 'batir', seuil: 2, nom: 'Bâtir 2 bâtiments dans une partie' },
+    ],
+    moyens: [
+      { id: 'gagner', genre: 'gagner', nom: 'Gagner une partie classée' },
+      { id: 'gagnerAtlante', genre: 'gagner', civ: 'atlante', nom: 'Gagner avec les Atlantes' },
+      { id: 'abattre15', genre: 'abattre', seuil: 15, nom: 'Abattre 15 ennemis dans une partie' },
+      { id: 'pertes6', genre: 'pertes', seuil: 6, nom: 'Gagner en perdant moins de 6 unités' },
+      { id: 'gagnerSolarien', genre: 'gagner', civ: 'solarien', nom: 'Gagner avec les Solariens' },
+      { id: 'former20', genre: 'former', seuil: 20, nom: 'Former 20 unités dans une partie' },
+      { id: 'batir4', genre: 'batir', seuil: 4, nom: 'Bâtir 4 bâtiments dans une partie' },
+    ],
+    semaine: [
+      { id: 'victoires5', genre: 'victoires', seuil: 5, nom: 'Gagner 5 parties classées' },
+      { id: 'jours4', genre: 'jours', seuil: 4, nom: 'Jouer 4 jours différents' },
+      { id: 'peuples2', genre: 'peuples', seuil: 2, nom: 'Gagner avec les deux peuples' },
+    ],
+  },
+
+  // --- Le bon retour ---------------------------------------------------------------
+  //  Après `apres` jours sans jouer, la première partie classée donne un coffre de plus : on
+  //  revient sans rien avoir perdu, et avec un cadeau. Un seul par retour, jamais récurrent.
+  retour: { apres: 4, coffre: 'argent' },
 
   // --- Recherche d'adversaire --------------------------------------------------
   //  fenetre  : écart d'Elo accepté au départ (H)

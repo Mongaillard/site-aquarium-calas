@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { PROGRESSION as R } from './progression-config.js';
-import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour, prochainPalier } from './progression.js';
+import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour, prochainPalier, etatDesObjectifs } from './progression.js';
 import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai, ouvrirLaSaison } from './progression.js';
 import { lireProgression, ecrireProgression, effacerLesDonnees } from './save.js';
 import { EN_MAGASIN, EDITEUR, nomComplet } from './edition.js';
@@ -33,7 +33,7 @@ import {
 
 /** Les troupes que le jeu sait former, dans l'ordre des réglages. */
 const TROUPES = Object.keys(R.troupes).filter((type) => !R.troupes[type].aVenir && UNIT_TYPES[type]);
-const ORIGINES = { victoire: txt('Victoire'), defaite: txt('Défaite'), egalite: txt('Égalité'), promotion: txt('Promotion'), semaine: txt('Semaine jouée'), saison: txt('Fin de saison'), route: txt('Route de saison'), bataille: txt('Points de bataille'), recrue: txt('Partie guidée') };
+const ORIGINES = { victoire: txt('Victoire'), defaite: txt('Défaite'), egalite: txt('Égalité'), promotion: txt('Promotion'), semaine: txt('Semaine jouée'), saison: txt('Fin de saison'), route: txt('Route de saison'), bataille: txt('Points de bataille'), recrue: txt('Partie guidée'), retour: txt('Bon retour') };
 
 let civ = DEFAULT_CIV;          // le peuple dont on montre les noms et les portraits
 let surChangement = () => {};   // l'accueil se redessine quand le profil change
@@ -186,6 +186,33 @@ export function versLaLigueSuivante(profil) {
   return palier.victoires > 1
     ? txt`Encore ${palier.victoires} victoires pour la ${ligueEnPhrase(palier.ligue)}`
     : txt`Encore une victoire pour la ${ligueEnPhrase(palier.ligue)}`;
+}
+
+/**
+ * La carte « Aujourd'hui » de l'accueil : les deux objectifs du jour, celui de la semaine avec son avance, et le
+ * compteur de jours joués. Une raison de revenir demain — sans rien qui se perde (js/progression.js, etatDesObjectifs).
+ */
+export function htmlAujourdhui(profil, jour) {
+  const etat = etatDesObjectifs(profil, jour);
+  if (!etat.duJour.length) return '';
+  const ligne = (o, avance = '') => `
+      <li class="${o.fait ? 'fait' : ''}"><span class="prog-auj-case" aria-hidden="true"></span><span class="prog-auj-nom">${o.nom}</span>${avance}<b>+${nombre(o.points)}</b></li>`;
+  const jours = etat.joursJoues > 1 ? txt`${nombre(etat.joursJoues)} jours joués` : etat.joursJoues === 1 ? txt('1 jour joué') : '';
+  const s = etat.semaine;
+  return `
+    <div class="prog-aujourdhui">
+      <p class="prog-auj-tete"><b>${txt('Aujourd’hui')}</b>${jours ? `<small>${jours}</small>` : ''}</p>
+      <ul>${etat.duJour.map((o) => ligne(o)).join('')}</ul>
+      ${s ? `<p class="prog-auj-tete"><b>${txt('Cette semaine')}</b></p>
+      <ul>${ligne(s, `<small class="prog-auj-avance">${nombre(s.avance)} / ${nombre(s.seuil)}</small>`)}</ul>` : ''}
+      <p class="prog-auj-note">${iconeSVG('saison', 14, 'inline')} ${txt('Des points de saison, à gagner en partie classée.')}</p>
+    </div>`;
+}
+
+/** Le nom d'un objectif, d'après son identifiant (ceux du jour et ceux de la semaine). */
+function nomDObjectif(id) {
+  const o = [...R.objectifs.faciles, ...R.objectifs.moyens, ...R.objectifs.semaine].find((x) => x.id === id);
+  return o ? o.nom : '';
 }
 
 /** La fin de la partie guidée : ce que le coffre de recrue vient de donner, en une phrase. */
@@ -864,6 +891,14 @@ export function htmlFinDePartie(evenements, profil) {
     const aPrendre = `<button class="btn small prog-attend" data-ecran="saison">${txt`palier ${e.palier} à prendre`}</button>`;
     lignes.push(`<p class="prog-fin-saison">${iconeSVG('saison', 16, 'inline')} ${e.paliersGagnes > 0 ? txt`<b>+${e.variation}</b> points de saison${premiere} : ${aPrendre}` : txt`<b>+${e.variation}</b> points de saison${premiere}`}</p>`);
   }
+  // Les objectifs que cette partie vient d'atteindre : ils paient en points de saison, comme elle.
+  for (const e of de('objectif')) {
+    const aPrendre = e.paliersGagnes > 0 ? ` <button class="btn small prog-attend" data-ecran="saison">${txt`palier ${e.palier} à prendre`}</button>` : '';
+    lignes.push(`<p class="prog-fin-objectif">${e.portee === 'semaine'
+      ? txt`Objectif de la semaine : <b>${nomDObjectif(e.objectif)}</b> · +${nombre(e.points)} points de saison`
+      : txt`Objectif du jour : <b>${nomDObjectif(e.objectif)}</b> · +${nombre(e.points)} points de saison`}${aPrendre}</p>`);
+  }
+  if (de('bonRetour').length) lignes.push(`<p class="prog-fin-retour">${txt('Bon retour ! Un coffre t’attendait.')}</p>`);
   for (const e of de('offreOuverte')) {
     if (e.offre === 'ligue') lignes.push(`<p class="prog-fin-offre"><button class="btn small prog-attend" data-ecran="boutique">${iconeSVG('couronne', 16, 'inline')} ${txt`Offre de ligue : ${nomTroupe(e.troupe)} à moitié prix, ${R.boutique.offres.ligue.heures} h`}</button></p>`);
   }

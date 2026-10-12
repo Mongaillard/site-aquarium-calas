@@ -35,6 +35,8 @@ const C = R.collections, S = R.saisons;
 const DES_COFFRES = COLLECTIONS.filter((c) => c.source === 'coffres');
 const DE_SAISON = COLLECTIONS.filter((c) => c.source === 'saison');
 const parType = (evenements, type) => evenements.filter((e) => e.type === type);
+/** Les points de saison venus des objectifs du jour (test/objectifs.test.js) : ils dépendent de la date, on les met de côté ici. */
+const pointsDesObjectifs = (evenements) => parType(evenements, 'objectif').reduce((somme, e) => somme + e.points, 0);
 /** Un hasard écrit d'avance ; au-delà, 0. */
 function aleaEcrit(...nombres) {
   let rang = 0;
@@ -393,7 +395,7 @@ console.log('\n--- La route ---');
   check('une défaite jouée jusqu’au bout : 20 points', d.profil.route.points === 140);
   check('une défaite d’avant deux minutes : rien', appliquerResultat(v2.profil, partie('defaite', J, { duree: 60 })).profil.route.points === 120);
   const lendemain = appliquerResultat(d.profil, partie('victoire', '2026-10-10'));
-  check('le lendemain, la première victoire rapporte de nouveau son supplément', lendemain.profil.route.points === 220);
+  check('le lendemain, la première victoire rapporte de nouveau son supplément', lendemain.profil.route.points - pointsDesObjectifs(lendemain.evenements) === 220);
   check('une égalité : 20 points, sans entamer la première victoire du jour',
     appliquerResultat(profilNeuf(), partie('egalite', J)).profil.route.points === 20 && appliquerResultat(appliquerResultat(profilNeuf(), partie('egalite', J)).profil, partie('victoire', J)).profil.route.points === 100);
   const plein = appliquerResultat(enRoute(2990), partie('victoire', J));
@@ -457,7 +459,7 @@ console.log('\n--- D’une saison à l’autre ---');
   const nouveau = appliquerResultat(profilNeuf(), partie('victoire', '2026-11-03'));
   check('un joueur arrivé en novembre n’a pas de saison à finir : il rejoint la saison 2 sans annonce ni saison fantôme',
     nouveau.profil.saison === 2 && nouveau.profil.saisons.length === 0 && !nouveau.evenements.some((e) => ['saison', 'remiseDeSaison', 'recompenseSaison'].includes(e.type))
-    && nouveau.profil.route.points === 80);
+    && nouveau.profil.route.points - pointsDesObjectifs(nouveau.evenements) === 80);
   const arrive = ouvrirLaSaison(profilNeuf(), '2026-12-05');
   check('… pareil à l’ouverture du jeu : la saison du jour, aucun événement', arrive.profil.saison === 3 && arrive.evenements.length === 0 && arrive.profil.journal.length === 0);
   check('… mais qui a joué, même une seule partie, a bien une saison à clore', ouvrirLaSaison(nouveau.profil, '2026-12-05').evenements.some((e) => e.type === 'saison'));

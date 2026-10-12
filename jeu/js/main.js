@@ -19,7 +19,7 @@ import { matiereDe } from './collections-config.js';
 import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
 import { guichetParDefaut } from './achats.js';
 import { txt, accord, traduireLaPage } from './langue.js';
-import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal, versLaLigueSuivante, phraseDuCoffreDeRecrue } from './progression-ecrans.js';
+import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, htmlAujourdhui, jourLocal, versLaLigueSuivante, phraseDuCoffreDeRecrue } from './progression-ecrans.js';
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
@@ -544,9 +544,14 @@ class Game {
    * coffres, les troupes (js/progression.js). Rend le bloc de l'écran de fin.
    */
   compterPartieClassee(result) {
+    // (Ce que le joueur a fait dans la partie : les objectifs du jour s'y lisent — js/progression.js, objectifAtteint.)
+    const moi = this.world.players[this.world.humanIndex];
     const r = appliquerResultat(lireProgression(), {
       issue: issueDePartie(result), duree: this.world.time, contreOrdinateur: 'echelle',
       jour: jourLocal(), instant: Date.now() / 1000, id: this.partieId || undefined, format: this.world.modeId,
+      faits: {
+        civ: moi.civ, formees: moi.stats.trained, perdues: moi.stats.lost, baties: moi.stats.built, abattus: moi.stats.killed,
+      },
     });
     ecrireProgression(r.profil);
     return htmlFinDePartie(r.evenements, r.profil);
@@ -1593,6 +1598,7 @@ function quitterLeGuide(jeu, vers) {
 /** À l'accueil : l'invitation à la partie guidée, tant qu'elle n'a été ni jouée ni écartée. */
 function refreshInvitation() {
   document.getElementById('invite-guide').classList.toggle('hidden', guideVu());
+  refreshAujourdhui();
 }
 
 /** La partie que l'accueil s'apprête à lancer est-elle classée ? (Jamais par équipes.) */
@@ -1648,6 +1654,16 @@ function abandonnerPartieClasseeEnCours() {
 function refreshLigue() {
   const box = document.getElementById('ligue-box');
   if (box) box.innerHTML = htmlBandeau(lireProgression());
+  refreshAujourdhui();
+}
+
+/**
+ * La carte « Aujourd'hui » : les objectifs du jour et de la semaine. Une seule carte à la fois sur l'accueil :
+ * tant que l'invitation à la partie guidée est là, celle-ci attend.
+ */
+function refreshAujourdhui() {
+  const box = document.getElementById('aujourdhui-box');
+  if (box) box.innerHTML = guideVu() ? htmlAujourdhui(lireProgression(), jourLocal()) : '';
 }
 
 /** En partie classée, la difficulté ne se choisit pas : l'adversaire suit la ligue. */

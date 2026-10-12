@@ -62,8 +62,8 @@ const tableFrancaise = squelette(R);
     && egal(R.nomsDesCategories, { commune: 'Commune', rare: 'Rare', epique: 'Épique' }) && egal(R.collections.raretes, { commune: 'Commun', rare: 'Rare', epique: 'Épique' }) && fige(R));
   const vus = [];
   textesATraduire((objet, champ) => vus.push([champ, objet[champ]]));
-  check('`textesATraduire` visite les noms des ligues, des catégories, des raretés, des coffres, de leurs tirages et des lots — et rien d’autre',
-    vus.length === 10 + 3 + 3 + 4 + 6 + 5 && vus.every(([champ, texte]) => typeof texte === 'string' && /[A-Za-zÀ-ÿ]{2,}/.test(texte) && (champ === 'nom' || R.categories.includes(champ))),
+  check('`textesATraduire` visite les noms des ligues, des catégories, des raretés, des coffres, de leurs tirages, des lots et des objectifs — et rien d’autre',
+    vus.length === 10 + 3 + 3 + 4 + 6 + 5 + R.objectifs.faciles.length + R.objectifs.moyens.length + R.objectifs.semaine.length && vus.every(([champ, texte]) => typeof texte === 'string' && /[A-Za-zÀ-ÿ]{2,}/.test(texte) && (champ === 'nom' || R.categories.includes(champ))),
     `${vus.length} textes`);
   check('… jamais un identifiant : ni `id`, ni `produit`, ni une clé de coffre ou de catégorie',
     !vus.some(([champ, texte]) => champ === 'id' || champ === 'produit' || R.boutique.lots.some((l) => texte === l.id || texte === l.produit) || Object.keys(R.coffres).includes(texte)));

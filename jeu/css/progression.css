@@ -213,6 +213,26 @@
 .prog-fin-suite { display: grid; gap: 2px; padding: 8px 12px; border: 2px solid currentColor; border-radius: 12px; }
 .prog-fin-suite b { font-size: 16px; }
 .prog-fin-suite small { font-size: 13px; color: var(--muted); }
+/* Les objectifs que la partie vient d'atteindre, et le bon retour. */
+.prog-fin-objectif b, .prog-fin-retour { font-weight: 800; }
+
+/* --- La carte « Aujourd'hui » de l'accueil : les objectifs du jour et de la semaine (htmlAujourdhui) --- */
+.prog-aujourdhui { display: grid; gap: 6px; margin: 12px 0 0; padding: 12px 14px; color: var(--b-encre); background: var(--b-blanc); border: 3px solid var(--b-encre); border-radius: 18px; box-shadow: 0 5px 0 var(--b-encre); }
+.prog-aujourdhui p, .prog-aujourdhui ul { margin: 0; padding: 0; }
+.prog-aujourdhui ul { display: grid; gap: 6px; list-style: none; }
+.prog-auj-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.prog-auj-tete b { font-family: var(--b-titres); font-size: 19px; letter-spacing: .01em; }
+.prog-auj-tete small { font-size: 13px; font-weight: 800; color: var(--b-gris); }
+.prog-aujourdhui li { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; line-height: 1.25; }
+.prog-aujourdhui li > b { font-variant-numeric: tabular-nums; }
+.prog-auj-avance { font-size: 13px; font-weight: 800; color: var(--b-gris); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* La case : vide tant que l'objectif est à faire, cochée (un trait d'encre) une fois atteint. */
+.prog-auj-case { position: relative; width: 22px; height: 22px; border: 3px solid var(--b-encre); border-radius: 7px; background: var(--b-papier); }
+.prog-aujourdhui li.fait .prog-auj-case { background: var(--b-jaune); }
+.prog-aujourdhui li.fait .prog-auj-case::after { content: ''; position: absolute; left: 5px; top: 1px; width: 5px; height: 10px; border: solid var(--b-encre); border-width: 0 3px 3px 0; transform: rotate(45deg); }
+.prog-aujourdhui li.fait .prog-auj-nom { color: var(--b-gris); }
+.prog-auj-note { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--b-gris); }
+.prog-auj-note svg { fill: currentColor; flex: none; }
 .prog-fin-coffres { display: flex; flex-wrap: wrap; gap: 8px 14px; }
 .prog-fin-coffre { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 8px; }
 .prog-fin-coffre img { grid-row: span 2; }

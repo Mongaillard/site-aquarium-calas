@@ -71,11 +71,15 @@ const AVANCEES = EXISTANTES.filter((type) => R.troupes[type].gratuite);
 /** Parmi elles, celles que l'ordinateur ne forme que si la partie les lui donne (voir reglagesDePartie). */
 const EN_PLUS = AVANCEES.filter((type) => R.troupes[type].enPlus);
 const ORIGINES = ['ligue', 'parties', 'achat'];   // d'une troupe avancée ; une troupe de base est « base »
-const ORIGINES_DE_COFFRE = ['victoire', 'defaite', 'egalite', 'promotion', 'semaine', 'saison', 'route', 'bataille', 'recrue', 'autre'];
+const ORIGINES_DE_COFFRE = ['victoire', 'defaite', 'egalite', 'promotion', 'semaine', 'saison', 'route', 'bataille', 'recrue', 'retour', 'autre'];
 const ISSUES = ['victoire', 'defaite', 'egalite', 'abandon', 'abandonAdverse', 'annulee'];
 const COMPTEURS = { victoire: 'victoires', defaite: 'defaites', egalite: 'egalites' };
 
 const existe = (type) => typeof type === 'string' && possede(R.troupes, type) && !R.troupes[type].aVenir;
+/** Les identifiants des objectifs du jour (ceux qu'une fiche peut dire « faits »). */
+const OBJECTIFS_DU_JOUR = [...R.objectifs.faciles, ...R.objectifs.moyens].map((o) => o.id);
+/** Un nom de peuple ou de format, tel que la partie le dit : court, en lettres. */
+const nomCourt = (v) => typeof v === 'string' && /^[A-Za-z]{1,24}$/.test(v);
 const ligueValide = (ligue) => entier(ligue, 1, NB_LIGUES, 1);
 
 // Les collections (js/collections-config.js), relevées une fois.
@@ -168,6 +172,11 @@ function semaineDe(jour) {
  *                     magasin d'applications déjà livrées (leurs numéros)
  *   saison, saisons : le numéro de la saison en cours, ce que furent les précédentes
  *   jour, semaine   : compteurs remis à zéro quand la date change
+ *   objectifs       : ceux du `jour` déjà atteints (`faits`, leurs identifiants), et celui de la
+ *                     `semaine` — son `avance`, ce qu'il a déjà `vus` (peuples), `fait`
+ *   joursJoues      : le nombre de jours où l'on a joué une partie classée : il ne retombe jamais ;
+ *                     `premierJour` et `dernierJour` en sont les bornes (le bon retour s'y lit)
+ *   victoiresPar    : les victoires classées comptées par peuple (`civ`) et par `format`
  *   rechercheFermeeJusqua : heure (en secondes) jusqu'à laquelle la recherche
  *                     d'adversaire est fermée ; 0 si elle est ouverte
  *   operations, journal : nombre d'opérations faites, et les dernières
@@ -205,6 +214,9 @@ export function profilNeuf() {
     saisons: [],
     jour: { date: '', parties: 0, abandonsPrecoces: 0, victoires: 0 },
     semaine: { numero: 0, jours: 0, coffre: false },
+    objectifs: { jour: '', faits: [], semaine: { numero: 0, avance: 0, vus: [], fait: false } },
+    joursJoues: 0, premierJour: '', dernierJour: '',
+    victoiresPar: { civ: {}, format: {} },
     rechercheFermeeJusqua: 0,
     operations: 0,
     journal: [],
@@ -310,6 +322,33 @@ function lireProfil(o) {
     p.semaine.numero = entier(o.semaine.numero, -GRAND, GRAND, 0);
     p.semaine.jours = entier(o.semaine.jours, 0, R.sources.or.joursParSemaine, 0);
     p.semaine.coffre = o.semaine.coffre === true;
+  }
+  if (estObjet(o.objectifs)) {
+    if (rangDuJour(o.objectifs.jour) !== null) {
+      p.objectifs.jour = o.objectifs.jour;
+      if (Array.isArray(o.objectifs.faits)) p.objectifs.faits = [...new Set(o.objectifs.faits.filter((id) => OBJECTIFS_DU_JOUR.includes(id)))];
+    }
+    const s = o.objectifs.semaine;
+    if (estObjet(s)) {
+      p.objectifs.semaine.numero = entier(s.numero, -GRAND, GRAND, 0);
+      p.objectifs.semaine.avance = entier(s.avance, 0, GRAND, 0);
+      if (Array.isArray(s.vus)) p.objectifs.semaine.vus = [...new Set(s.vus.filter(nomCourt))].slice(0, 8);
+      p.objectifs.semaine.fait = s.fait === true;
+    }
+  }
+  p.joursJoues = entier(o.joursJoues, 0, GRAND, 0);
+  p.premierJour = rangDuJour(o.premierJour) === null ? '' : o.premierJour;
+  // (Une fiche d'avant ces compteurs : son dernier jour de jeu est celui de ses compteurs du jour.)
+  p.dernierJour = rangDuJour(o.dernierJour) === null ? p.jour.date : o.dernierJour;
+  if (estObjet(o.victoiresPar)) {
+    for (const genre of ['civ', 'format']) {
+      const lues = o.victoiresPar[genre];
+      if (!estObjet(lues)) continue;
+      for (const cle of Object.keys(lues).filter(nomCourt).slice(0, 16)) {
+        const n = entier(lues[cle], 0, GRAND, 0);
+        if (n > 0) p.victoiresPar[genre][cle] = n;
+      }
+    }
   }
   p.rechercheFermeeJusqua = estNombre(o.rechercheFermeeJusqua) && o.rechercheFermeeJusqua > 0 ? o.rechercheFermeeJusqua : 0;
   p.operations = entier(o.operations, 0, GRAND, 0);
@@ -545,6 +584,16 @@ function changerDeJour(p, jour) {
 function compterLeJour(p, evenements) {
   p.jour.parties++;
   if (p.jour.parties !== 1 || !p.jour.date) return;
+  // Un jour joué de plus : ce compteur-là ne retombe jamais. Et le bon retour, après une absence —
+  // un coffre de plus, une seule fois par retour (R.retour).
+  const dernier = rangDuJour(p.dernierJour), aujourdhui = rangDuJour(p.jour.date);
+  if (dernier !== null && aujourdhui - dernier > R.retour.apres) {
+    donnerCoffre(p, R.retour.coffre, 'retour', evenements);
+    evenements.push({ type: 'bonRetour', jours: aujourdhui - dernier - 1 });
+  }
+  if (dernier === null || aujourdhui > dernier) p.joursJoues++;
+  if (!p.premierJour) p.premierJour = p.jour.date;
+  p.dernierJour = p.jour.date;
   const numero = semaineDe(p.jour.date);
   if (numero !== p.semaine.numero) p.semaine = { numero, jours: 0, coffre: false };
   p.semaine.jours++;
@@ -651,6 +700,13 @@ export function appliquerResultat(profil, partie) {
     donnerCoffre(p, tirerRang(tableDesCoffres(partie.format)[issue], aleaDeLaPartie(partie, p, id)), issue, evenements);
     compterLeJour(p, evenements);
     compterLaSaison(p, issue, evenements);
+    compterLesObjectifs(p, issue, partie, evenements);
+    // (Pour plus tard — la maîtrise d'un peuple, les trophées : les victoires par peuple et par format.)
+    if (issue === 'victoire') {
+      const civ = estObjet(partie.faits) ? partie.faits.civ : null;
+      if (nomCourt(civ)) p.victoiresPar.civ[civ] = (p.victoiresPar.civ[civ] || 0) + 1;
+      if (nomCourt(partie.format)) p.victoiresPar.format[partie.format] = (p.victoiresPar.format[partie.format] || 0) + 1;
+    }
   }
 
   // Trop de défaites précoces dans la journée : la recherche se ferme.
@@ -1717,12 +1773,94 @@ function compterLaSaison(p, issue, evenements) {
     if (premiere) points += s.premiereVictoireDuJour;
     p.jour.victoires++;
   }
+  const r = avancerSurLaRoute(p, points);
+  evenements.push({ type: 'pointsDeSaison', variation: r.gagnes, total: p.route.points, palier: r.palier, paliersGagnes: r.paliersGagnes, premiereVictoireDuJour: premiere });
+}
+
+/** Ajoute des points à la route de la saison, sans dépasser son bout : ce qui a été ajouté, le palier atteint, les paliers franchis. */
+function avancerSurLaRoute(p, points) {
   const avant = palierAtteint(p.route.points);
   const plein = R.saisons.paliers * R.saisons.pointsParPalier;
-  const gagnes = Math.min(points, plein - p.route.points);
+  const gagnes = Math.max(0, Math.min(points, plein - p.route.points));
   p.route.points += gagnes;
   const palier = palierAtteint(p.route.points);
-  evenements.push({ type: 'pointsDeSaison', variation: gagnes, total: p.route.points, palier, paliersGagnes: palier - avant, premiereVictoireDuJour: premiere });
+  return { gagnes, palier, paliersGagnes: palier - avant };
+}
+
+// --- Les objectifs ------------------------------------------------------------------
+
+/** Les deux objectifs d'un jour — un facile, un moins — tirés de sa date : les mêmes pour tous, sans serveur. */
+export function objectifsDuJour(jour) {
+  const rang = rangDuJour(jour);
+  if (rang === null) return [];
+  const { faciles, moyens } = R.objectifs;
+  return [faciles[rang % faciles.length], moyens[rang % moyens.length]];
+}
+
+/** L'objectif de la semaine où tombe ce jour (elle court du lundi au dimanche, comme le coffre d'or). */
+export function objectifDeLaSemaine(jour) {
+  if (rangDuJour(jour) === null) return null;
+  const liste = R.objectifs.semaine, numero = semaineDe(jour);
+  return liste[((numero % liste.length) + liste.length) % liste.length];
+}
+
+/** Cette partie atteint-elle l'objectif ? `faits` : ce que le joueur y a fait (voir appliquerResultat). */
+function objectifAtteint(objectif, issue, faits) {
+  const n = (cle) => (estNombre(faits[cle]) && faits[cle] > 0 ? faits[cle] : 0);
+  const gagnee = issue === 'victoire';
+  switch (objectif.genre) {
+    case 'jouer': return true;
+    case 'gagner': return gagnee && (!objectif.civ || faits.civ === objectif.civ);
+    case 'former': return n('formees') >= objectif.seuil;
+    case 'abattre': return n('abattus') >= objectif.seuil;
+    case 'batir': return n('baties') >= objectif.seuil;
+    case 'pertes': return gagnee && estNombre(faits.perdues) && faits.perdues < objectif.seuil;
+    default: return false;
+  }
+}
+
+/**
+ * Ce que cette partie change aux objectifs : ceux du jour qu'elle atteint, l'avance de celui de la semaine.
+ * Chacun paie en points de saison, une fois, et le dit par un événement « objectif ».
+ */
+function compterLesObjectifs(p, issue, partie, evenements) {
+  const jour = p.jour.date;
+  if (!jour) return;
+  const faits = estObjet(partie.faits) ? partie.faits : {};
+  const payer = (portee, objectif, points) => {
+    const r = avancerSurLaRoute(p, points);
+    evenements.push({ type: 'objectif', portee, objectif: objectif.id, points: r.gagnes, total: p.route.points, palier: r.palier, paliersGagnes: r.paliersGagnes });
+  };
+  if (p.objectifs.jour !== jour) { p.objectifs.jour = jour; p.objectifs.faits = []; }
+  for (const objectif of objectifsDuJour(jour)) {
+    if (p.objectifs.faits.includes(objectif.id) || !objectifAtteint(objectif, issue, faits)) continue;
+    p.objectifs.faits.push(objectif.id);
+    payer('jour', objectif, R.objectifs.points.jour);
+  }
+  const numero = semaineDe(jour);
+  if (p.objectifs.semaine.numero !== numero) p.objectifs.semaine = { numero, avance: 0, vus: [], fait: false };
+  const hebdo = objectifDeLaSemaine(jour), s = p.objectifs.semaine;
+  if (!hebdo || s.fait) return;
+  if (hebdo.genre === 'victoires' && issue === 'victoire') s.avance++;
+  else if (hebdo.genre === 'jours') s.avance = p.semaine.numero === numero ? p.semaine.jours : 0;
+  else if (hebdo.genre === 'peuples' && issue === 'victoire' && nomCourt(faits.civ) && !s.vus.includes(faits.civ)) { s.vus.push(faits.civ); s.avance = s.vus.length; }
+  if (s.avance >= hebdo.seuil) { s.fait = true; payer('semaine', hebdo, R.objectifs.points.semaine); }
+}
+
+/**
+ * Où en sont les objectifs à cette date : ceux du jour (`fait` ou non, et ce qu'ils rapportent), celui de la
+ * semaine avec son `avance`, et le compteur de jours joués.
+ */
+export function etatDesObjectifs(profil, jour) {
+  const p = migrerProfil(profil);
+  const duJour = objectifsDuJour(jour).map((o) => ({ ...o, points: R.objectifs.points.jour, fait: p.objectifs.jour === jour && p.objectifs.faits.includes(o.id) }));
+  const hebdo = objectifDeLaSemaine(jour);
+  const cetteSemaine = !!hebdo && p.objectifs.semaine.numero === semaineDe(jour);
+  const semaine = hebdo ? {
+    ...hebdo, points: R.objectifs.points.semaine, fait: cetteSemaine && p.objectifs.semaine.fait,
+    avance: cetteSemaine ? Math.min(hebdo.seuil, p.objectifs.semaine.avance) : 0,
+  } : null;
+  return { duJour, semaine, joursJoues: p.joursJoues };
 }
 
 /**
