@@ -57,4 +57,9 @@ export default {
   "Le jeu redémarre pour changer de langue. Ta partie en cours est gardée.": "The game restarts to change language. Your game in progress is kept.",
   "Traduction en cours : certains écrans sont encore en français.": "Translation in progress: some screens are still in French.",
   "Choisie": "Selected",
+  // La partie guidée (js/guide.js, js/guide-ecran.js) et son entrée à l'accueil.
+  "Première fois ? Apprends à jouer en 3 minutes.": "First time? Learn to play in 3 minutes.",
+  "Me guider": "Guide me",
+  "Plus tard": "Later",
+  "Lancer la partie guidée": "Start the guided game",
 };

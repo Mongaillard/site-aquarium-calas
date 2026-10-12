@@ -23,6 +23,8 @@ import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourL
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
+import { Guide, partieGuidee } from './guide.js';
+import { EcranDuGuide } from './guide-ecran.js';
 import { UI, FoyersAttaque, toucherArmee, resumeReglages, toucherNouvellePartie, texteDeConsigne } from './ui.js';
 import { AudioEngine } from './audio.js';
 import { Musique } from './musique.js';
@@ -56,6 +58,8 @@ const SETUP_KEY = 'aem.reglages';
 // même chez qui avait retenu un autre style — dont les essais de 3D.
 const STYLE_KEY = 'aem.styleUnites.v2';
 const FINESSE_KEY = 'aem.finesse.v1';
+// La partie guidée a été jouée, passée ou remise à plus tard : l'accueil ne la propose plus d'office.
+const GUIDE_KEY = 'aem.guide';
 /** Intervalle de sauvegarde automatique, en secondes réelles. */
 const AUTOSAVE_INTERVAL = 30;
 /** Intervalle du témoin de coupure (js/save.js), en secondes réelles. */
@@ -94,6 +98,14 @@ function storeSetup(setup) {
  * point) ou « legere » (deux au plus, si le jeu rame ou chauffe). Le choix du
  * joueur est conservé ; le garde-fou automatique, lui, ne retient rien.
  */
+function guideVu() {
+  try { return localStorage.getItem(GUIDE_KEY) === 'vu'; } catch { return true; }
+}
+
+function noterGuideVu() {
+  try { localStorage.setItem(GUIDE_KEY, 'vu'); } catch { /* stockage indisponible */ }
+}
+
 function loadFinesse() {
   try { return localStorage.getItem(FINESSE_KEY) === 'legere' ? 'legere' : 'fine'; } catch { return 'fine'; }
 }
@@ -139,6 +151,8 @@ class Game {
     this.partieId = options.partieId || (options.restore && options.restore.partieId) || null;
     // Partie d'essai d'une troupe à débloquer : elle ne compte nulle part.
     this.essai = this.world.essai;
+    // Partie guidée (js/guide.js) : elle ne compte nulle part non plus, et ne s'enregistre pas.
+    this.tutoriel = !!this.world.tutoriel;
     // Les images propres à chaque camp (partie neuve ou reprise) ; sans effet pour les Atlantes.
     for (const p of this.world.players) chargerCivilisation(p.civ);
     this.canvas = document.getElementById('game');
@@ -218,8 +232,9 @@ class Game {
     window.addEventListener('pagehide', this.onLeave);
     // Le conseil de départ, pour une partie neuve seulement : à la reprise,
     // les villageois travaillent déjà.
-    if (!repris) this.ui.toast(txt`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
+    if (!repris && !this.tutoriel) this.ui.toast(txt`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
     if (!repris && this.world.essai) this.ui.toast(txt`Partie d’essai : ${ESSAI_NOMBRE} ${nomDe(this.world.essai, this.civ, ESSAI_NOMBRE)} t’attendent près de ton centre.`, 'good');
+    if (this.tutoriel) this.installerLeGuide();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
   }
@@ -420,6 +435,7 @@ class Game {
       if (image) this.world.delisser();
     }
     this.ui.update(realDt);
+    if (this.guide) { this.guide.suivre(); this.ecranDuGuide.dessiner(); }
     this.foyers.vieillir(realDt);
     this.musique.suivre();
     requestAnimationFrame(this.loop);
@@ -502,7 +518,7 @@ class Game {
         case 'gameOver':
           this.musique.mettre('silence');   // la place au jingle de fin
           this.audio.play(event.result.victory ? 'victory' : 'defeat');
-          clearSave();
+          if (!this.tutoriel) clearSave();
           this.fermerMarque('fin');
           // La partie entre au palmarès (victoires, défaites, records) : l'écran
           // de fin dit ce qu'elle y change.
@@ -510,6 +526,7 @@ class Game {
           // difficulté est celle de la ligue, elle fausserait les records.
           if (this.classee) this.ui.showGameOver(event.result, null, this.compterPartieClassee(event.result));
           // Une partie d'essai (trois soldats offerts au départ) ne compte pas non plus au palmarès.
+          else if (this.tutoriel) this.ui.showGameOver(event.result, null, `<p class="fin-note">${txt('Partie guidée : elle ne compte ni au classement ni au palmarès.')}</p>`);
           else if (this.essai) this.ui.showGameOver(event.result, null, `<p class="fin-note">${txt('Partie d’essai : elle ne compte ni au classement ni au palmarès.')}</p>`);
           else {
             this.ui.showGameOver(event.result, inscrireAuPalmares({
@@ -540,6 +557,31 @@ class Game {
       this.selection = this.selection.filter((e) => !e.dead);
       this.ui.refreshSelection(true);
     }
+  }
+
+  // --- Partie guidée ---------------------------------------------------------
+
+  /** Le guide de la partie (js/guide.js) et son écran : la consigne, le doigt, la voix. */
+  installerLeGuide() {
+    this.guide = new Guide(this);
+    this.ecranDuGuide = new EcranDuGuide(this, this.guide, {
+      passer: () => quitterLeGuide(this, 'accueil'),
+      jouer: () => quitterLeGuide(this, 'partie'),
+      accueil: () => quitterLeGuide(this, 'accueil'),
+    });
+    this.guide.surEtape = (etape) => this.ecranDuGuide.etape(etape);
+    this.guide.demarrer();
+  }
+
+  /** Un panneau de la partie est-il ouvert ? ('ouvriers' ou 'construire') */
+  menuOuvert(nom) {
+    const noeud = document.getElementById(nom === 'ouvriers' ? 'worker-menu' : 'build-menu');
+    return !!noeud && !noeud.classList.contains('hidden');
+  }
+
+  /** Amène la vue sur un point de la carte — au milieu de ce que le guide laisse voir, s'il est là. */
+  montrer(x, y) {
+    if (this.ecranDuGuide) this.ecranDuGuide.amener({ x, y }); else this.camera.centerOn(x, y);
   }
 
   // --- Sélection ------------------------------------------------------------
@@ -768,6 +810,7 @@ class Game {
     const units = this.selection.filter(
       (e) => e.kind === 'unit' && e.playerIndex === this.world.humanIndex);
     if (units.length === 0) return;
+    if (this.guide) this.guide.noter('ordre');
     const result = this.world.commandUnits(units, worldX, worldY, { tolerance: this.tapTolerance(), cible });
     // Retour explicite : sur un petit écran, on ne voit pas d'un coup d'œil
     // que le groupe s'est étalé sur plusieurs arbres.
@@ -821,7 +864,7 @@ class Game {
       picked = this.world.buildings.filter((b) => !b.dead && b.playerIndex === mine && inBox(b)).slice(0, 1);
     }
     this.setSelection(picked);
-    if (picked.length > 0) { this.audio.play('select'); this.vibrate(10); }
+    if (picked.length > 0) { this.audio.play('select'); this.vibrate(10); if (this.guide) this.guide.noter('rectangle'); }
   }
 
   selectSameTypeOnScreen(entity) {
@@ -830,6 +873,7 @@ class Game {
       && u.playerIndex === entity.playerIndex && u.type === entity.type
       && u.x >= view.left && u.x <= view.right && u.y >= view.top && u.y <= view.bottom);
     this.setSelection(same.length ? same : [entity]);
+    if (this.guide) this.guide.noter('double');
     this.ui.toast(`${same.length} ${nomDe(entity.type, entity.player.civ, same.length)}`);
   }
 
@@ -1074,6 +1118,7 @@ class Game {
 
   trainUnit(building, unitType) {
     this.world.trainUnit(building, unitType);
+    if (this.guide) this.guide.noter('formation');
     prevoirTroupe(unitType, building.player.civ);   // son modèle se cuit pendant la formation
   }
   researchTech(building, techId) { this.world.researchTech(building, techId); }
@@ -1347,6 +1392,8 @@ class Game {
 
   /** Écrit l'instantané de la partie en cours. */
   saveNow() {
+    // La partie guidée ne s'enregistre pas : celle qui dort à l'accueil reste intacte.
+    if (this.tutoriel) return false;
     if (this.world.gameOver) { clearSave(); return false; }
     const ok = saveGame(this.world, { speed: this.speedId, ...(this.classee ? { classee: true, partieId: this.partieId } : {}) });
     // Navigation privée, quota plein : mieux vaut le dire une fois que laisser
@@ -1408,11 +1455,13 @@ class Game {
     this.paused = false;
     this.ui.hideModal();
     this.world.resign();
-    clearSave();
+    if (!this.tutoriel) clearSave();
   }
 
   restart() {
     this.destroy();
+    // (Rejouer la partie guidée : la même, depuis le début.)
+    if (this.tutoriel) { startGame(partieDuGuide()); return; }
     clearSave();
     // Après une reprise, `options` ne porte que la sauvegarde : on relit le
     // format, la carte et les civilisations sur la partie qui s'achève.
@@ -1445,6 +1494,7 @@ class Game {
     this.ui.closeBuildMenu();
     this.ui.closeWorkerMenu();
     this.ui.setBuildHint('');   // une consigne en cours (ordre armé, pose) ne suit pas dans la partie suivante
+    if (this.ecranDuGuide) { this.ecranDuGuide.retirer(); this.ecranDuGuide = null; this.guide = null; }
     document.getElementById('hud').classList.add('hidden');
   }
 }
@@ -1491,6 +1541,38 @@ function avecProgression(options, classee) {
     ...options, ...reglagesDePartie(lireProgression(), classee ? 'classe' : 'libre'), classee: !!classee,
     partieId: classee ? `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}` : null,
   };
+}
+
+/** Les réglages de la partie guidée (js/guide.js), avec les peuples choisis à l'accueil. */
+function partieDuGuide() {
+  return avecProgression(partieGuidee([settings.civ, settings.civAdverse]), false);
+}
+
+/** Lance la partie guidée. Une partie qui dort n'est pas effacée : le guide ne s'enregistre pas. */
+function lancerLeGuide() {
+  if (currentGame && currentGame.running) currentGame.destroy();
+  startGame(partieDuGuide());
+}
+
+/**
+ * Le joueur quitte la partie guidée — finie ou passée : l'accueil ne la
+ * proposera plus d'office. Puis l'accueil, ou une première vraie partie (sauf
+ * si une partie dort : on ne l'écrase pas sans qu'il l'ait demandé).
+ */
+function quitterLeGuide(jeu, vers) {
+  noterGuideVu();
+  jeu.destroy();
+  if (vers !== 'partie' || loadSave()) { showStartScreen(); return; }
+  startGame(avecProgression({
+    mode: settings.mode, difficulty: settings.difficulty, mapSize: settings.mapSize,
+    civs: [settings.civ, settings.civAdverse],
+    speed: settings.speed, seed: Math.floor(Math.random() * 1e9),
+  }, partieClassee()));
+}
+
+/** À l'accueil : l'invitation à la partie guidée, tant qu'elle n'a été ni jouée ni écartée. */
+function refreshInvitation() {
+  document.getElementById('invite-guide').classList.toggle('hidden', guideVu());
 }
 
 /** La partie que l'accueil s'apprête à lancer est-elle classée ? (Jamais par équipes.) */
@@ -1625,6 +1707,7 @@ function showStartScreen() {
   reglerPeuple(settings.civ);
   refreshLigue();
   refreshType();
+  refreshInvitation();
 }
 
 /**
@@ -1883,6 +1966,15 @@ function setupStartScreen() {
     boutonAide.setAttribute('aria-expanded', String(!aide.classList.contains('hidden')));
     // La liste s'ouvre sous les boutons, souvent hors de l'écran : on l'y amène.
     if (!aide.classList.contains('hidden')) aide.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  // La partie guidée : rangée dans l'aide, et proposée d'office à la première visite (voir refreshInvitation).
+  for (const id of ['btn-guide', 'btn-invite-guide']) {
+    document.getElementById(id).addEventListener('click', () => { audio.resume(); audio.play('click'); lancerLeGuide(); });
+  }
+  document.getElementById('btn-invite-plus-tard').addEventListener('click', () => {
+    audio.resume(); audio.play('click');
+    noterGuideVu();
+    refreshInvitation();
   });
 }
 

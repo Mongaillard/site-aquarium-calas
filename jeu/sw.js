@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v74';
+const CACHE = 'age-empires-mobile-v75';
 // La musique (js/musique.js) : trois morceaux lourds. Ils ne sont pas pris à
 // l'installation mais à la première écoute, et gardés à part, comme les unités
 // en 3D : une mise à jour du jeu ne les fait pas retélécharger.
@@ -33,6 +33,21 @@ const ASSETS = [
   './js/edition.js',
   './js/achats.js',
   './js/langue.js',
+  // La partie guidée : sa logique, son écran, son doigt, et sa voix (en français pour l'instant).
+  './js/guide.js',
+  './js/guide-ecran.js',
+  './assets/guide/doigt.webp',
+  './assets/voix/fr/bienvenue.mp4',
+  './assets/voix/fr/carte.mp4',
+  './assets/voix/fr/choisir.mp4',
+  './assets/voix/fr/rectangle.mp4',
+  './assets/voix/fr/ordres.mp4',
+  './assets/voix/fr/barre.mp4',
+  './assets/voix/fr/batir.mp4',
+  './assets/voix/fr/but.mp4',
+  './assets/voix/fr/express.mp4',
+  './assets/voix/fr/sauvegarde.mp4',
+  './assets/voix/fr/fin.mp4',
   './js/langues/en.js',
   './js/langues/en/reglages.js',
   './js/langues/en/accueil.js',
@@ -79,6 +94,7 @@ const ASSETS = [
   './css/progression.css',
   './css/boite.css',
   './css/collections.css',
+  './css/guide.css',
   './assets/polices/lilita-one.woff2',
   './assets/polices/nunito.woff2',
   './js/render.js',

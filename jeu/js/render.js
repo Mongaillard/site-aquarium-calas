@@ -234,8 +234,10 @@ export class Camera {
     const margin = TILE * 4;
     const minX = Math.min(halfW - margin, map.pixelWidth / 2);
     const maxX = Math.max(map.pixelWidth - halfW + margin, map.pixelWidth / 2);
-    const minY = Math.min(halfH - margin, map.pixelHeight / 2);
-    const maxY = Math.max(map.pixelHeight - halfH + margin, map.pixelHeight / 2);
+    // (`hautOccupe`, `basOccupe` : les pixels d'écran pris par une bulle ou un panneau — la partie guidée
+    // les donne, pour que le bord de la carte puisse en sortir. Zéro partout ailleurs : rien ne change.)
+    const minY = Math.min(halfH - margin, map.pixelHeight / 2) - (this.hautOccupe || 0) / this.zoom;
+    const maxY = Math.max(map.pixelHeight - halfH + margin, map.pixelHeight / 2) + (this.basOccupe || 0) / this.zoom;
     this.x = clamp(this.x, minX, maxX);
     this.y = clamp(this.y, minY, maxY);
   }

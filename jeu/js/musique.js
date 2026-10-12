@@ -186,7 +186,8 @@ export class Musique {
     source.loop = true;
     const volume = ctx.createGain();
     volume.gain.value = 0;
-    source.connect(volume).connect(this.audio.sortie);
+    // (Par le « fond » du moteur : il la baisse pendant qu'une voix parle. Un moteur sans fond : droit à la sortie.)
+    source.connect(volume).connect(this.audio.fond || this.audio.sortie);
     source.start();
     const voie = { source, volume, de: 0, cible: 0, t0: 0, duree: 0 };
     this.voies.set(nom, voie);

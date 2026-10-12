@@ -110,6 +110,9 @@ export class World {
     // doit pouvoir recréer exactement le même monde (voir save.js).
     this.modeId = GAME_MODES[options.mode] ? options.mode : DEFAULT_MODE;
     this.mode = GAME_MODES[this.modeId];
+    // La partie guidée (js/guide.js) se joue sans chronomètre : le format reste le sien, moins sa limite de temps.
+    this.tutoriel = !!options.tutoriel;
+    if (this.tutoriel) this.mode = { ...this.mode, timeLimit: 0 };
     this.mapSizeId = MAP_SIZES[options.mapSize] ? options.mapSize : this.mode.mapSize;
     this.difficultyId = DIFFICULTIES[options.difficulty] ? options.difficulty : 'normal';
     const mapSize = MAP_SIZES[this.mapSizeId];

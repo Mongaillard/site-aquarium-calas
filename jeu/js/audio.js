@@ -47,6 +47,7 @@ export function fichiersDeLaBanque() {
 
 const VOLUME_SYNTHESE = 0.35;   // les ondes de synthèse sont pleines : elles passent par un volume à part
 const VOIX_MAX = 14;            // au-delà, un son de plus n'ajoute que de la bouillie
+const FOND_SOUS_LA_VOIX = 0.3;  // le volume de la musique pendant qu'une phrase est dite
 
 export class AudioEngine {
   constructor() {
@@ -57,6 +58,9 @@ export class AudioEngine {
     this.voix = 0;              // échantillons en train de jouer
     this.demandes = false;      // le chargement des échantillons a été lancé
     this.apresReprise = null;   // rappelé à chaque reprise du contexte
+    this.phrases = new Map();   // chemin d'une phrase dite → la promesse de son AudioBuffer
+    this.parole = null;         // la phrase en train d'être dite
+    this.tourDeParole = 0;      // change à chaque phrase demandée : une phrase en retard ne coupe pas la suivante
   }
 
   /** À appeler depuis un geste utilisateur (politique autoplay des navigateurs). */
@@ -68,6 +72,8 @@ export class AudioEngine {
       this.sortie = this.ctx.createGain();          // l'interrupteur du son
       this.sortie.gain.value = this.enabled ? 1 : 0;
       this.sortie.connect(this.ctx.destination);
+      this.fond = this.ctx.createGain();            // la musique passe par ici : elle s'efface sous une voix (voir dire)
+      this.fond.connect(this.sortie);
       this.master = this.ctx.createGain();          // la synthèse
       this.master.gain.value = VOLUME_SYNTHESE;
       this.master.connect(this.sortie);
@@ -170,6 +176,49 @@ export class AudioEngine {
     env.gain.value = gain;
     src.connect(bp).connect(env).connect(this.master);
     src.start(t0);
+  }
+
+  /**
+   * Une phrase dite — la voix du guide (js/guide.js). Chargée à la demande, une
+   * seule à la fois, la musique baissée dessous. Un fichier absent (la voix
+   * n'existe pas dans cette langue) ne dit rien, sans erreur.
+   */
+  dire(chemin, gain = 1) {
+    this.taire();
+    if (!this.ctx || typeof fetch !== 'function') return;
+    const tour = this.tourDeParole;
+    const prete = this.phrases.get(chemin) || fetch(chemin)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((octets) => new Promise((oui, non) => { this.ctx.decodeAudioData(octets, oui, non); }));
+    this.phrases.set(chemin, prete);
+    prete.then((tampon) => {
+      if (tour !== this.tourDeParole || !this.ctx) return;   // une autre phrase a pris la parole entre-temps
+      const source = this.ctx.createBufferSource();
+      source.buffer = tampon;
+      const volume = this.ctx.createGain();
+      volume.gain.value = gain;
+      source.connect(volume).connect(this.sortie);
+      this.reglerLeFond(FOND_SOUS_LA_VOIX);
+      source.onended = () => { if (this.parole === source) { this.parole = null; this.reglerLeFond(1); } };
+      this.parole = source;
+      source.start();
+    }).catch(() => { this.phrases.delete(chemin); });
+  }
+
+  /** Coupe la phrase en cours, et rend son volume à la musique. */
+  taire() {
+    this.tourDeParole++;
+    if (this.parole) { try { this.parole.stop(); } catch { /* déjà finie */ } this.parole = null; }
+    this.reglerLeFond(1);
+  }
+
+  /** Amène la musique à ce volume, en un quart de seconde. */
+  reglerLeFond(niveau) {
+    if (!this.fond) return;
+    const t = this.ctx.currentTime, g = this.fond.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(niveau, t + 0.25);
   }
 
   play(name) {
