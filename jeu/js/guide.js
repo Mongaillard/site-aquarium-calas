@@ -273,7 +273,7 @@ export function voixDuGuide() {
 }
 
 /** Les langues où le guide parle : ailleurs, il se lit sans rien dire (voir assets/voix/SOURCES.md). */
-export const LANGUES_DITES = ['fr'];
+export const LANGUES_DITES = ['fr', 'en', 'es'];
 
 /** Le chemin d'une phrase dite, dans une langue. */
 export const cheminDeLaVoix = (langue, nom) => `assets/voix/${langue}/${nom}.mp4`;

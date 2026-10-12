@@ -225,7 +225,7 @@ export default {
   "Jouer ma première partie": "Jugar mi primera partida",
   "Retour à l’accueil": "Volver al inicio",
   "Commencer": "Empezar",
-  "Bienvenue, chef. Ici, tout le monde t’obéit au doigt et à l’œil.": "Bienvenido, jefe. Aquí todos te obedecen al dedillo.",
+  "Bienvenue, chef. Ici, tout le monde t’obéit au doigt et à l’œil.": "Bienvenido, jefe. Aquí manda tu pulgar.",
   "Glisse un doigt pour parcourir la carte. Pince pour zoomer.": "Desliza un dedo para recorrer el mapa. Pellizca para hacer zoom.",
   "Touche une unité pour la choisir. Touche-la deux fois, et toutes ses semblables suivent.": "Toca una unidad para elegirla. Tócala dos veces y todas las de su tipo la siguen.",
   "Maintenant, touche-la deux fois de suite : toutes ses semblables à l’écran sont choisies.": "Ahora tócala dos veces seguidas: se eligen todas las de su tipo que hay en pantalla.",

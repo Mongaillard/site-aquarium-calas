@@ -132,11 +132,12 @@ check('chaque étape a été annoncée une fois, dans l’ordre', vues.join() ==
 console.log('--- Les voix ---');
 const voix = voixDuGuide();
 check('onze phrases dites, une par étape parlée', voix.length === 11 && new Set(voix).size === 11);
+check('le guide parle français, anglais et espagnol', LANGUES_DITES.join() === 'fr,en,es');
 const absentes = voix.filter((v) => !fs.existsSync(path.join(RACINE, cheminDeLaVoix('fr', v))));
 check('chaque phrase a son fichier en français', absentes.length === 0, absentes.join(', '));
 check('le guide ne parle que dans les langues qui ont leurs fichiers', LANGUES_DITES.every((l) => voix.every((v) => fs.existsSync(path.join(RACINE, cheminDeLaVoix(l, v))))));
 const sw = fs.readFileSync(path.join(RACINE, 'sw.js'), 'utf8');
-check('le jeu hors ligne garde le guide : modules, style, doigt et voix', ['js/guide.js', 'js/guide-ecran.js', 'css/guide.css', 'assets/guide/doigt.webp', ...voix.map((v) => cheminDeLaVoix('fr', v))].every((f) => sw.includes(`'./${f}'`)));
+check('le jeu hors ligne garde le guide : modules, style, doigt et voix', ['js/guide.js', 'js/guide-ecran.js', 'css/guide.css', 'assets/guide/doigt.webp', ...LANGUES_DITES.flatMap((l) => voix.map((v) => cheminDeLaVoix(l, v)))].every((f) => sw.includes(`'./${f}'`)));
 check('le doigt est là', fs.existsSync(path.join(RACINE, 'assets/guide/doigt.webp')));
 
 console.log(failures ? `\n${failures} essai(s) en échec` : '\nTout est bon.');

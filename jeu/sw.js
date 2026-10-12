@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v75';
+const CACHE = 'age-empires-mobile-v76';
 // La musique (js/musique.js) : trois morceaux lourds. Ils ne sont pas pris à
 // l'installation mais à la première écoute, et gardés à part, comme les unités
 // en 3D : une mise à jour du jeu ne les fait pas retélécharger.
@@ -33,7 +33,7 @@ const ASSETS = [
   './js/edition.js',
   './js/achats.js',
   './js/langue.js',
-  // La partie guidée : sa logique, son écran, son doigt, et sa voix (en français pour l'instant).
+  // La partie guidée : sa logique, son écran, son doigt, et sa voix (français, anglais, espagnol).
   './js/guide.js',
   './js/guide-ecran.js',
   './assets/guide/doigt.webp',
@@ -48,6 +48,28 @@ const ASSETS = [
   './assets/voix/fr/express.mp4',
   './assets/voix/fr/sauvegarde.mp4',
   './assets/voix/fr/fin.mp4',
+  './assets/voix/en/bienvenue.mp4',
+  './assets/voix/en/carte.mp4',
+  './assets/voix/en/choisir.mp4',
+  './assets/voix/en/rectangle.mp4',
+  './assets/voix/en/ordres.mp4',
+  './assets/voix/en/barre.mp4',
+  './assets/voix/en/batir.mp4',
+  './assets/voix/en/but.mp4',
+  './assets/voix/en/express.mp4',
+  './assets/voix/en/sauvegarde.mp4',
+  './assets/voix/en/fin.mp4',
+  './assets/voix/es/bienvenue.mp4',
+  './assets/voix/es/carte.mp4',
+  './assets/voix/es/choisir.mp4',
+  './assets/voix/es/rectangle.mp4',
+  './assets/voix/es/ordres.mp4',
+  './assets/voix/es/barre.mp4',
+  './assets/voix/es/batir.mp4',
+  './assets/voix/es/but.mp4',
+  './assets/voix/es/express.mp4',
+  './assets/voix/es/sauvegarde.mp4',
+  './assets/voix/es/fin.mp4',
   './js/langues/en.js',
   './js/langues/en/reglages.js',
   './js/langues/en/accueil.js',
