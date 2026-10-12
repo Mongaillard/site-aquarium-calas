@@ -14,5 +14,10 @@
   langue suffisent). Les textes sont prêts : `teaser/voix/textes/Tutoriel-en.txt`, `Tutoriel-es.txt`.
 - Mise au format : `teaser/voix/vers_le_jeu.py fr <préfixe des prises>` (silences de bout retirés,
   même niveau pour toutes, AAC mono 24 kHz).
+- Contrôle sans écoute : le moteur ajoute parfois quelque chose après la phrase (un souffle, un son tenu,
+  des mots inventés). `teaser/voix/controler_prises.py` compare les syllabes entendues à celles du texte, et
+  `vers_le_jeu.py` coupe ce qui suit la phrase. Le 12/10/2026 : fins parasites retirées de trois phrases
+  anglaises (carte, but, sauvegarde) et d'une française (rectangle) ; la phrase française « express »,
+  tronquée, a été refaite. L'oreille de l'auteur reste le seul juge.
 
 Une langue sans dossier ici n'a pas de voix : le guide s'y lit, sans rien dire.
