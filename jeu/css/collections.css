@@ -1,0 +1,392 @@
+/* ---------------------------------------------------------------------------
+   Les collections : autocollants, cadres, bannières et mots de titre ; le
+   blason qu'ils composent ; l'Album, la page d'une collection, la route de la
+   saison. Direction « Boîte de jeu » : papier crème, encre épaisse, aplats —
+   les couleurs sont celles de css/jeu.css (--b-*).
+
+   Les pièces se dessinent partout de la même façon (accueil, écrans de la
+   progression, fin de partie) : leurs règles ne passent par aucun écran.
+   --------------------------------------------------------------------------- */
+
+/* --- Les pièces ------------------------------------------------------------- */
+
+/* Un autocollant : une case de sa planche de neuf (3 × 3), montrée par le fond. */
+.piece-embleme {
+  display: inline-block;
+  flex: none;
+  width: 56px;
+  aspect-ratio: 1;
+  background-repeat: no-repeat;
+  background-size: 300% 300%;
+}
+/* Celui qu'on n'a pas : sa silhouette, à l'encre pâle. */
+.piece-embleme.manque { filter: brightness(0) opacity(.2); }
+.piece-cadre,
+.piece-banniere { display: block; width: 100%; height: 100%; }
+.piece-vignette { display: inline-grid; place-items: center; flex: none; width: 56px; height: 56px; }
+.piece-vignette.manque { filter: grayscale(1) opacity(.4); }
+.piece-vignette.piece-fanion {
+  width: 76px;
+  height: 42px;
+  overflow: hidden;
+  border: 3px solid var(--b-encre);
+  border-radius: 10px;
+}
+.piece-vignette.piece-mot {
+  width: auto;
+  min-width: 56px;
+  height: 42px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 3px solid var(--b-encre);
+  border-radius: 10px;
+  background: var(--b-blanc);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-size: 13.5px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+/* Une teinture : le soldat du peuple du joueur dans cette matière, sur un rond à sa couleur. */
+.piece-vignette.piece-teinture {
+  position: relative;
+  box-sizing: border-box;
+  border: 3px solid var(--b-encre);
+  border-radius: 50%;
+  background: var(--pastille, var(--b-sable));
+  overflow: hidden;
+}
+.piece-vignette.piece-teinture img { width: 92%; height: 92%; object-fit: contain; image-rendering: auto; }
+
+/* Un montant en Éclats : le pictogramme bleu cerclé d'encre, puis le nombre. */
+.prog-eclats { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prog-eclats svg,
+#progression .btn .prog-eclats svg,
+#progression .prog-annonce .prog-eclats svg { flex: none; fill: var(--b-eclat); stroke: var(--b-encre); stroke-width: 40px; paint-order: stroke; }
+
+/* --- Le blason -------------------------------------------------------------- */
+
+/* Le médaillon : le cadre, et l'autocollant posé dessus. */
+.blason-medaillon { position: relative; display: inline-grid; place-items: center; flex: none; width: 64px; aspect-ratio: 1; }
+.blason-medaillon > .piece-cadre { position: absolute; inset: 0; }
+.blason-medaillon > .piece-embleme { position: relative; width: 74%; }
+.blason-medaillon > .blason-vide { position: relative; font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 26px; line-height: 1; color: var(--b-gris); opacity: .55; }
+
+/* La carte de joueur : la bannière en fond, le médaillon, le titre sur son étiquette. */
+.blason {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 84px;
+  box-sizing: border-box;
+  padding: 8px 12px 8px 8px;
+  overflow: hidden;
+  border: 4px solid var(--b-encre);
+  border-radius: 16px;
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+}
+.blason > .piece-banniere { position: absolute; inset: 0; }
+.blason > .blason-medaillon { width: 68px; }
+.blason-texte {
+  position: relative;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 5px 10px 6px;
+  border: 3px solid var(--b-encre);
+  border-radius: 12px;
+  background: var(--b-papier);
+}
+.blason-texte b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 19px; line-height: 1.1; letter-spacing: 0; }
+.blason-texte small { font-family: var(--b-texte); font-size: 12.5px; font-weight: 800; color: var(--b-gris); }
+.blason.grand { min-height: 104px; }
+.blason.grand > .blason-medaillon { width: 86px; }
+.blason.grand .blason-texte b { font-size: 22px; }
+
+/* --- L'accueil : le joueur, ses bourses, six tuiles --------------------------- */
+
+/* Le médaillon du joueur, à cheval sur la pastille de sa ligue. */
+#start-screen .prog-carte-joueur {
+  position: absolute;
+  z-index: 3;
+  left: 10px;
+  top: calc(12px + var(--safe-top));
+  display: flex;
+  align-items: center;
+  max-width: calc(100% - 104px);
+}
+#start-screen .prog-joueur {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 62px;
+  height: 62px;
+  margin: 0 -16px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  filter: drop-shadow(0 3px 0 var(--b-encre));
+}
+#start-screen .prog-joueur:active { transform: translateY(2px); filter: drop-shadow(0 1px 0 var(--b-encre)); }
+#start-screen .prog-joueur .blason-medaillon { width: 100%; }
+#start-screen .prog-carte-joueur .prog-bandeau-ligue {
+  position: static;
+  min-width: 0;
+  max-width: none;
+  padding-left: 22px;
+}
+#start-screen .prog-carte-joueur .prog-bandeau-texte b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#start-screen .prog-vers { display: none; }
+/* Les deux bourses, en haut à droite du couvercle : elles ouvrent la boutique. */
+#start-screen .prog-bourses {
+  position: absolute;
+  z-index: 3;
+  right: 10px;
+  top: calc(14px + var(--safe-top));
+  display: grid;
+  justify-items: start;
+  gap: 1px;
+  min-width: 66px;
+  padding: 4px 9px 4px 7px;
+  border: 3px solid var(--b-encre);
+  border-radius: 12px;
+  background: var(--b-papier);
+  box-shadow: 0 3px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.25;
+  cursor: pointer;
+}
+#start-screen .prog-bourses:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--b-encre); }
+#start-screen .prog-bourses .prog-couronnes { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#start-screen .prog-bourses .prog-couronnes svg { flex: none; fill: var(--b-jaune); stroke: var(--b-encre); stroke-width: 40px; paint-order: stroke; }
+/* Six tuiles, trois par rangée : Coffres, Troupes, Album ; Saison, Boutique, Aide. */
+#start-screen .prog-bandeau-actions .btn,
+#start-screen #btn-howto { grid-column: span 4; min-height: 62px; }
+
+/* --- L'Album ----------------------------------------------------------------- */
+
+#progression .col-carte-joueur {
+  display: block;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+#progression button.col-carte-joueur { cursor: pointer; }
+#progression button.col-carte-joueur:active .blason { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#progression .col-bourses {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 12px 0 2px;
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: 20px;
+  line-height: 1;
+}
+#progression .col-bourses > span:not(.prog-eclats):not(.prog-couronnes) { font-family: var(--b-texte); font-size: 14px; font-weight: 900; color: var(--b-gris); }
+#progression .col-liste { display: grid; gap: 12px; margin: 10px 0 0; padding: 0; list-style: none; }
+#progression .col-collection {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 9px 10px 10px;
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  box-shadow: 0 4px 0 var(--b-encre);
+  color: var(--b-encre);
+  font-family: var(--b-texte);
+  text-align: left;
+  cursor: pointer;
+}
+#progression .col-collection:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
+#progression .col-collection.complete { background: var(--b-jaune); }
+#progression .col-collection-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+#progression .col-collection-tete b { font-size: 16px; font-weight: 900; line-height: 1.2; }
+#progression .col-collection-tete small { flex: none; font-size: 12.5px; font-weight: 800; color: var(--b-gris); }
+#progression .col-bande { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; padding: 0; border: 0; background: none; }
+#progression .col-bande .piece-embleme { width: 100%; }
+/* (Une collection sans autocollant — les ligues : ses pièces à la suite.) */
+#progression .col-bande.mots { display: flex; flex-wrap: wrap; gap: 5px; }
+#progression .col-bande.mots .piece-vignette { height: 30px; }
+#progression .col-bande.mots .piece-vignette:not(.piece-mot):not(.piece-fanion) { width: 30px; }
+#progression .col-bande.mots .piece-teinture { border-width: 2px; }
+#progression .prog-vignette.col-vignette .piece-teinture { transform: none; width: 100%; height: 100%; border: 0; border-radius: 0; }
+#progression .col-bande.mots .piece-fanion { width: 52px; }
+#progression .col-bande.mots .piece-mot { min-width: 0; padding: 0 6px; border-width: 2px; border-radius: 8px; font-size: 11.5px; }
+
+/* --- Une collection ------------------------------------------------------------ */
+
+#progression .col-grille,
+#progression .col-autres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+#progression .col-piece,
+#progression .col-autres .col-lot {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 3px;
+  padding: 8px 4px 9px;
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  text-align: center;
+}
+#progression .col-piece.manque,
+#progression .col-autres .col-lot.manque { border-style: dashed; background: none; }
+#progression .col-piece .piece-embleme { width: 86%; }
+#progression .col-piece b { display: grid; place-items: center; min-height: 2.3em; font-size: 12.5px; font-weight: 900; line-height: 1.15; }
+#progression .col-piece .btn.small,
+#progression .col-lot .btn.small,
+#progression .col-case .btn.small { min-height: 30px; margin-top: 2px; padding: 2px 9px; font-size: 13px; }
+#progression .col-porte,
+#progression .col-pris { font-size: 12.5px; font-weight: 900; color: var(--good); }
+#progression .col-verrou svg { fill: var(--b-gris); }
+#progression .col-vide { margin: 0; }
+#progression .col-paliers { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+#progression .col-paliers li { display: flex; align-items: center; gap: 10px; padding: 8px; border: 3px dashed var(--b-encre); border-radius: 14px; }
+#progression .col-paliers li.atteint { border-style: solid; background: var(--b-blanc); }
+#progression .col-seuil,
+#progression .col-numero {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  box-sizing: border-box;
+  border: 3px solid var(--b-encre);
+  border-radius: 50%;
+  background: var(--b-blanc);
+  font-family: var(--b-titres);
+  font-weight: 900;
+  font-synthesis: none;
+  font-size: 18px;
+  line-height: 1;
+}
+#progression .col-paliers li.atteint .col-seuil,
+#progression .col-palier.atteint .col-numero { background: var(--b-jaune); }
+#progression .col-palier-pieces { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+#progression .col-lot { display: grid; justify-items: center; align-content: start; gap: 3px; text-align: center; }
+#progression .col-lot small { max-width: 116px; font-size: 12px; font-weight: 800; line-height: 1.2; }
+
+/* --- Le blason à composer -------------------------------------------------------- */
+
+#progression .col-choix-liste { display: flex; flex-wrap: wrap; gap: 6px; }
+#progression .col-choix {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border: 3px solid transparent;
+  border-radius: 14px;
+  background: none;
+  cursor: pointer;
+}
+#progression .col-choix.porte { border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 3px 0 var(--b-encre); }
+#progression .col-choix .piece-embleme { width: 58px; }
+
+/* --- La saison ------------------------------------------------------------------- */
+
+#progression .col-saison-tete {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 86px;
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  overflow: hidden;
+  border: 4px solid var(--b-encre);
+  border-radius: 16px;
+  box-shadow: 0 4px 0 var(--b-encre);
+}
+#progression .col-saison-tete > .piece-banniere { position: absolute; inset: 0; }
+#progression .col-saison-texte { position: relative; display: grid; gap: 1px; padding: 6px 12px 7px; border: 3px solid var(--b-encre); border-radius: 12px; background: var(--b-papier); }
+#progression .col-saison-texte b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 22px; line-height: 1.08; }
+#progression .col-saison-texte small { font-size: 13px; font-weight: 800; color: var(--b-gris); }
+#progression .col-passe { margin: 12px 0; padding: 10px 12px; border: 3px solid var(--b-encre); border-radius: 14px; background: var(--b-sable); font-size: 14px; font-weight: 700; line-height: 1.4; }
+#progression .col-passe p { margin: 0; }
+#progression .col-passe .modal-actions { margin: 8px 0 6px; }
+#progression .col-passe.pris { background: var(--b-jaune); }
+#progression .col-voies,
+#progression .col-palier { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); gap: 6px; }
+#progression .col-voies { margin: 14px 0 6px; text-align: center; font-size: 13px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; color: var(--b-gris); }
+#progression .col-voies svg { fill: var(--b-jaune); stroke: var(--b-encre); stroke-width: 40px; paint-order: stroke; }
+#progression .col-route { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+#progression .col-numero { align-self: center; justify-self: center; }
+#progression .col-case {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  min-height: 96px;
+  padding: 6px 4px;
+  border: 3px solid var(--b-encre);
+  border-radius: 14px;
+  background: var(--b-blanc);
+  text-align: center;
+}
+#progression .col-case.aVenir,
+#progression .col-case.ferme { border-style: dashed; background: none; }
+#progression .col-case.pris { background: var(--b-sable); }
+#progression .col-case.pris .col-recompense { opacity: .5; }
+#progression .col-case.aPrendre { background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
+#progression .col-case.aPrendre .btn.primary { background: var(--b-blanc); }
+#progression .col-recompense { display: grid; justify-items: center; gap: 2px; }
+#progression .col-recompense small { font-size: 12px; font-weight: 800; line-height: 1.15; }
+/* (Une pièce qu'on a déjà : la route dit d'avance les Éclats qu'elle rendra.) */
+#progression .col-recompense .col-deja { color: var(--b-gris); }
+#progression .col-deja-passe { margin-top: 6px; font-weight: 800; }
+#progression .col-recompense .piece-embleme { width: 54px; }
+#progression .col-recompense .piece-vignette:not(.piece-mot):not(.piece-fanion) { width: 48px; height: 48px; }
+#progression .col-recompense .piece-mot { max-width: 100%; height: 36px; overflow: hidden; font-size: 12px; }
+#progression .col-monnaie,
+#modal .col-monnaie {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  border: 3px solid var(--b-encre);
+  border-radius: 50%;
+  background: var(--b-jaune);
+}
+#progression .col-monnaie svg { fill: var(--b-blanc); stroke: var(--b-encre); stroke-width: 40px; paint-order: stroke; opacity: 1; }
+#progression .col-monnaie.eclat { background: #c9eef8; }
+#progression .col-monnaie.eclat svg { fill: var(--b-eclat); }
+
+/* --- Dans un coffre, à la boutique, à la fin d'une partie -------------------------- */
+
+#progression .prog-vignette.col-vignette { overflow: visible; background: var(--b-blanc); }
+#progression .prog-vignette.col-vignette .piece-embleme { width: 42px; }
+#progression .prog-vignette.col-vignette .piece-vignette { transform: scale(.72); }
+#progression .prog-vignette.col-monnaie { border-radius: 12px; }
+#progression .col-guillemets { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 20px; line-height: 1; color: var(--b-rouge); }
+#progression .prog-vignette.col-vignette .piece-fanion { transform: scale(.55); }
+#progression .col-nouveau { padding: 1px 7px; border: 2px solid var(--b-encre); border-radius: 8px; background: var(--b-jaune); font-size: 12.5px; font-weight: 900; }
+#progression .prog-bourse { flex-wrap: wrap; }
+#progression .prog-bourse-eclats { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+#progression .prog-bourse .prog-bourse-eclats > span:last-child { font-family: var(--b-texte); font-size: 15px; font-weight: 900; color: var(--b-gris); }
+#progression .prog-monnaies { margin: 0 0 4px; }
+#progression .col-article-lot { flex-wrap: wrap; }
+#progression .col-article-lot .col-bande { flex: 1 0 100%; cursor: pointer; }
+#modal .prog-fin-joueur { display: flex; align-items: center; gap: 8px; font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 18px; line-height: 1.1; }
+#modal .prog-fin-joueur .blason-medaillon { width: 46px; }
+#modal .prog-fin-piece { display: flex; align-items: center; gap: 8px; }
+#modal .prog-fin-piece .piece-embleme,
+#modal .prog-fin-piece .piece-vignette:not(.piece-mot):not(.piece-fanion) { width: 40px; height: 40px; }
+#modal .prog-fin-saison svg { fill: var(--b-rouge); vertical-align: -2px; }
+/* (Le palier à prendre : sur sa ligne, sous la phrase.) */
+#modal .prog-fin-saison .btn { display: flex; margin-top: 4px; }
