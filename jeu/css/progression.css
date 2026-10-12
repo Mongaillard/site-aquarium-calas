@@ -232,3 +232,8 @@
   .prog-bandeau-actions .btn { flex: 1; justify-content: center; }
   .prog-grille { gap: 6px; }
 }
+
+/* Deux monnaies, deux prix : le bouton de l'article dans sa monnaie, et dessous le même achat dans l'autre. */
+.prog-deux-prix { display: inline-flex; flex: 0 0 auto; flex-direction: column; align-items: stretch; gap: 5px; }
+.prog-deux-prix .btn { width: 100%; }
+.modal-actions .prog-autre { align-self: center; }

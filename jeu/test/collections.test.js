@@ -587,7 +587,7 @@ console.log('\n--- Les écrans ---');
   ouvrirProgression('boutique');
   page = noeud.innerHTML; t = texte(page);
   check('la boutique : le Passe de la saison, trois autocollants du jour en Éclats, la collection à vendre en Couronnes',
-    /<b>Passe de saison<\/b>/.test(page) && (page.match(/data-act="acheterPiece" data-arg="(?!teintures)/g) || []).length === 3 && /data-ecran="collection" data-arg="cour">/.test(page) && /environ 3 €/.test(t.replace(/\u00a0/g, ' ')) && propre(page.replace(/\d,99/g, '')));
+    /<b>Passe de saison<\/b>/.test(page) && (page.match(/data-act="acheterPiece" data-arg="(?!teintures)[\w.-]+"(?! data-m)/g) || []).length === 3 && /data-ecran="collection" data-arg="cour">/.test(page) && /environ 3 €/.test(t.replace(/\u00a0/g, ' ')) && propre(page.replace(/\d,99/g, '')));
   check('… les deux monnaies sont expliquées en une phrase', /Les Couronnes s’achètent\. Les Éclats se gagnent en jouant/.test(t));
   const duJour = page.match(/data-act="acheterPiece" data-arg="([\w.-]+)" data-i="s"/)[1];
   toucher({ act: 'acheterPiece', arg: duJour, i: 's' });
@@ -639,7 +639,7 @@ console.log('\n--- Les écrans ---');
     const id = noeud.innerHTML.match(/data-act="acheterPiece" data-arg="([\w.-]+)" data-i="s"/)[1];
     toucher({ act: 'acheterPiece', arg: id, i: 's' });
     toucher({ act: 'acheterPiece', arg: id, i: 's1' });
-    if (k === 0) check('… un acheté : il en reste deux, et le texte le dit', (noeud.innerHTML.match(/data-act="acheterPiece" data-arg="(?!teintures)/g) || []).length === 2 && /Deux autocollants qui te manquent/.test(texte(noeud.innerHTML)));
+    if (k === 0) check('… un acheté : il en reste deux, et le texte le dit', (noeud.innerHTML.match(/data-act="acheterPiece" data-arg="(?!teintures)[\w.-]+"(?! data-m)/g) || []).length === 2 && /Deux autocollants qui te manquent/.test(texte(noeud.innerHTML)));
   }
   check('… les trois achetés : plus de bouton, « d’autres demain »', !/data-act="acheterPiece" data-arg="(?!teintures)/.test(noeud.innerHTML) && /Tu as pris tes autocollants du jour\. D’autres demain/.test(texte(noeud.innerHTML)) && lu().pieces.length === 6);
 

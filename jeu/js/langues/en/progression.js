@@ -193,6 +193,7 @@ export default {
   "Les Couronnes s’achètent.": "Crowns can be bought.",
   "Les Couronnes se gagnent aux ligues et sur la route de la saison.": "Crowns are earned through leagues and on the season road.",
   "Les Éclats se gagnent en jouant : dans chaque coffre, et pour chaque autocollant en double.": "Shards are earned by playing: in every chest, and for every duplicate sticker.",
+  "Tout s’achète avec les unes ou avec les autres : il faut {0} Éclats pour 1 Couronne.": "Everything can be bought with either: it takes {0} Shards to make 1 Crown.",
   "Rien d’aléatoire ne se vend ici : ni coffre, ni fragment, ni niveau.": "Nothing random is sold here: no chests, no fragments, no levels.",
 
   // --- Ce que la boutique dit d'un achat ---

@@ -365,6 +365,7 @@ export const PROGRESSION = figer(traduire({
   // La monnaie payante : les Couronnes. On les achète en argent réel (les
   // lots), on les dépense à la boutique. Repère : 100 Couronnes pour 1 €.
   // (La monnaie gratuite, les Éclats, est avec les collections, plus bas.)
+  // Tout ce qui se vend ici a deux prix, un dans chaque monnaie : voir `change`.
   //
   // Ce qui s'y vend a toujours un contenu connu d'avance : une troupe avancée
   // tout de suite (sinon gratuite par la ligue — c'est du temps gagné) et, plus
@@ -393,6 +394,12 @@ export const PROGRESSION = figer(traduire({
     // en argent réel (js/achats.js). Les produits doivent alors exister, sous les mêmes identifiants
     // (`produit`, ci-dessous), dans App Store Connect et dans la Play Console.
     argentReel: false,
+    // LE CHANGE : tout ce qui se vend à la boutique a deux prix — le sien, dans sa monnaie, et l'autre au
+    // change. Il faut `change` Éclats pour faire 1 Couronne ; un prix en Éclats ramené en Couronnes
+    // s'arrondit à la Couronne du dessus. Les Couronnes s'achètent, les Éclats se gagnent en jouant :
+    // payer en Éclats demande donc plus de pièces. (Les lots de Couronnes et l'offre de bienvenue, eux,
+    // ne se paient qu'en argent réel.)
+    change: 10,
     // (Combien de transactions déjà livrées le profil retient, pour ne jamais en livrer une deux fois.)
     transactions: 200,
     // (Jamais dans l'application des magasins : une version soumise n'a pas de bouton d'essai. Voir js/edition.js.)
@@ -415,8 +422,9 @@ export const PROGRESSION = figer(traduire({
   // --- Collections -------------------------------------------------------------
   // Le jeu a deux monnaies. Les COURONNES s'achètent (boutique, ci-dessus) ;
   // les ÉCLATS se gagnent en jouant, et seulement en jouant : chaque coffre en
-  // donne, un autocollant en double en devient. Les Éclats n'achètent que de
-  // l'apparence — les autocollants qui manquent à une collection.
+  // donne, un autocollant en double en devient. Leurs prix d'origine sont ceux
+  // de l'apparence (autocollants, teintures) ; au change (boutique.change), ils
+  // paient aussi tout ce qui se dit en Couronnes — il en faut simplement plus.
   //
   // Les pièces elles-mêmes (noms, dessins, couleurs) sont dans
   // js/collections-config.js. Leurs raretés sont les `categories` des troupes.

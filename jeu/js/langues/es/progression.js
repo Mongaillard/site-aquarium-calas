@@ -194,6 +194,7 @@ export default {
   "Les Couronnes s’achètent.": "Las Coronas se compran.",
   "Les Couronnes se gagnent aux ligues et sur la route de la saison.": "Las Coronas se ganan con las ligas y en la ruta de la temporada.",
   "Les Éclats se gagnent en jouant : dans chaque coffre, et pour chaque autocollant en double.": "Las Esquirlas se ganan jugando: en cada cofre y por cada pegatina repetida.",
+  "Tout s’achète avec les unes ou avec les autres : il faut {0} Éclats pour 1 Couronne.": "Todo se compra con unas u otras: hacen falta {0} Esquirlas para 1 Corona.",
   "Rien d’aléatoire ne se vend ici : ni coffre, ni fragment, ni niveau.": "Aquí no se vende nada aleatorio: ni cofres, ni fragmentos, ni niveles.",
 
   // --- Ce que la boutique dit d'un achat ---

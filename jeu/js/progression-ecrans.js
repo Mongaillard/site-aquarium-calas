@@ -28,6 +28,7 @@ import { htmlPiece, htmlMedaillon, titreDuBlason, reglerPeupleDesTeintures } fro
 import {
   brancherCollections, ECRANS_DES_COLLECTIONS, agirSurLesCollections, eclats, htmlJoueur, htmlBourses,
   aPrendreDansLaSaison, htmlPiecesDuCoffre, htmlRayonDesCollections, pieceEnEtiquette, resumeDesGains, enEuros,
+  boutonAutreMonnaie, deuxPrix,
 } from './collections-ecrans.js';
 
 /** Les troupes que le jeu sait former, dans l'ordre des réglages. */
@@ -478,7 +479,7 @@ function ecranBoutique(profil, message = '', { confirmer = '', surPlace = false 
             <b>${txt`Offre de ligue : ${nomTroupe(o.troupe)} à moitié prix`}</b>
             <small>${txt`${couronnes(o.prix)} au lieu de <s>${nombre(o.prixPlein)}</s> · encore ${resteEnClair(o.reste)}`}</small>
           </span>
-          ${boutonAcheter('acheter', o.troupe, o.prix, c.couronnes, confirmer === o.troupe)}
+          ${deuxPrix(boutonAcheter('acheter', o.troupe, o.prix, c.couronnes, confirmer === o.troupe), boutonAutreMonnaie('acheter', o.troupe, o.prix * c.change, c.eclats, confirmer === `${o.troupe}~`, eclats))}
         </li>`;
     }
     const contenu = [...o.troupes.map(nomTroupe), txt`${nombre(o.couronnes)} Couronnes`].join(' + ');
@@ -496,7 +497,7 @@ function ecranBoutique(profil, message = '', { confirmer = '', surPlace = false 
     const g = R.troupes[t.type].gratuite;
     const droite = t.debloquee
       ? `<span class="prog-acquis">${txt('Débloquée')}</span>`
-      : boutonAcheter('acheter', t.type, t.prix, c.couronnes, confirmer === t.type);
+      : deuxPrix(boutonAcheter('acheter', t.type, t.prix, c.couronnes, confirmer === t.type), boutonAutreMonnaie('acheter', t.type, t.prixEclats, c.eclats, confirmer === `${t.type}~`, eclats));
     return `
       <li class="prog-article ${t.debloquee ? 'acquis' : ''}">
         <button class="prog-article-fiche" data-ecran="fiche" data-arg="${t.type}" aria-label="${txt`Voir la fiche : ${nomTroupe(t.type)}`}">${vignette(t.type)}</button>
@@ -537,7 +538,7 @@ function ecranBoutique(profil, message = '', { confirmer = '', surPlace = false 
   montrer(txt('Boutique'), `
     <p class="prog-bourse">${couronnes(c.couronnes, 22)} <span>${accord(c.couronnes, 'Couronne')}</span>
       <span class="prog-bourse-eclats">${eclats(c.eclats, 22)} <span>${accord(c.eclats, 'Éclat')}</span></span></p>
-    <p class="hint prog-monnaies">${montrerLArgentReel ? txt('Les Couronnes s’achètent.') : txt('Les Couronnes se gagnent aux ligues et sur la route de la saison.')} ${txt('Les Éclats se gagnent en jouant : dans chaque coffre, et pour chaque autocollant en double.')}</p>
+    <p class="hint prog-monnaies">${montrerLArgentReel ? txt('Les Couronnes s’achètent.') : txt('Les Couronnes se gagnent aux ligues et sur la route de la saison.')} ${txt('Les Éclats se gagnent en jouant : dans chaque coffre, et pour chaque autocollant en double.')} ${txt`Tout s’achète avec les unes ou avec les autres : il faut ${c.change} Éclats pour 1 Couronne.`}</p>
     ${message ? `<p class="prog-annonce">${message}</p>` : ''}
     ${offres ? `<h3>${txt('Offres du moment')}</h3><ul class="prog-articles">${offres}</ul>` : ''}
     ${htmlRayonDesCollections(profil, c, confirmer)}
@@ -552,7 +553,7 @@ function ecranBoutique(profil, message = '', { confirmer = '', surPlace = false 
           <b>${txt`Toutes les troupes (${lot.troupes.length})`}</b>
           <small>${txt`au lieu de <s>${nombre(lot.prixPlein)}</s>`}${enEuros(lot.prix, ' · ')}</small>
         </span>
-        ${boutonAcheter('acheterTout', 'tout', lot.prix, c.couronnes, confirmer === 'tout')}
+        ${deuxPrix(boutonAcheter('acheterTout', 'tout', lot.prix, c.couronnes, confirmer === 'tout'), boutonAutreMonnaie('acheterTout', 'tout', lot.prixEclats, c.eclats, confirmer === 'tout~', eclats))}
       </li>` : ''}
     </ul>
     ${rayonDesCouronnes}
@@ -675,7 +676,7 @@ function apresAchat(r) {
   return r;
 }
 
-function agir(act, arg, i) {
+function agir(act, arg, i, m) {
   if (act === 'fermer') return fermerProgression();
   if (act === 'langue') {
     if (arg === LANGUE) return fermerProgression();
@@ -693,7 +694,7 @@ function agir(act, arg, i) {
     return undefined;
   }
   const profil = lireProgression();
-  if (agirSurLesCollections(act, arg, i, profil, (p, message, confirmer) => ecranBoutique(p, message, { confirmer }))) return undefined;
+  if (agirSurLesCollections(act, arg, i, profil, (p, message, confirmer) => ecranBoutique(p, message, { confirmer }), m)) return undefined;
   if (act === 'ouvrir') {
     const r = ouvrirCoffre(profil, Number(i) || 0, Math.random);
     if (r.erreur) return ecranCoffres(profil);
@@ -709,11 +710,15 @@ function agir(act, arg, i) {
   if (act === 'acheter' || act === 'acheterTout') {
     // Premier toucher : le bouton demande confirmation — ou dit ce qu'il manque. Second : l'achat.
     const c = catalogueBoutique(profil, heure(), jourLocal());
-    const prix = act === 'acheter' ? (c.troupes.find((t) => t.type === arg && !t.debloquee) || {}).prix : c.lotTroupes && c.lotTroupes.prix;
+    // (`m` : le bouton en Éclats — le même achat, au change.)
+    const enEclats = m === '1';
+    const article = act === 'acheter' ? c.troupes.find((t) => t.type === arg && !t.debloquee) : c.lotTroupes;
+    const prix = article && (enEclats ? article.prixEclats : article.prix);
     if (!(prix > 0)) return ecranBoutique(profil);
-    if (c.couronnes < prix) return ecranBoutique(profil, txt`Il te manque ${couronnes(prix - c.couronnes)} pour cet achat.`);
-    if (i !== '1') return ecranBoutique(profil, '', { confirmer: arg });
-    const r = act === 'acheter' ? acheterTroupe(profil, arg, heure()) : acheterToutesLesTroupes(profil);
+    const solde = enEclats ? c.eclats : c.couronnes, dire = enEclats ? eclats : couronnes;
+    if (solde < prix) return ecranBoutique(profil, txt`Il te manque ${dire(prix - solde)} pour cet achat.`);
+    if (i !== '1') return ecranBoutique(profil, '', { confirmer: enEclats ? `${arg}~` : arg });
+    const r = act === 'acheter' ? acheterTroupe(profil, arg, heure(), enEclats ? 'eclats' : undefined) : acheterToutesLesTroupes(profil, enEclats ? 'eclats' : undefined);
     if (r.erreur) return ecranBoutique(profil);
     const ok = retenir(r.profil);
     const acquises = r.evenements.filter((e) => e.type === 'troupeDebloquee').map((e) => nomTroupe(e.troupe));
@@ -789,7 +794,7 @@ export function installerProgression({ quandLeProfilChange = () => {}, quandOnEs
       return;
     }
     if (cible.dataset.ecran) ouvrirProgression(cible.dataset.ecran, cible.dataset.arg);
-    else agir(cible.dataset.act, cible.dataset.arg, cible.dataset.i);
+    else agir(cible.dataset.act, cible.dataset.arg, cible.dataset.i, cible.dataset.m);
   });
 }
 

@@ -1159,6 +1159,37 @@ function offreDeLigue(p, maintenant) {
 /** Les troupes avancées qui restent à débloquer et que la boutique vend. */
 const aVendre = (p) => AVANCEES.filter((type) => !p.debloquees[type] && R.troupes[type].prix > 0);
 
+// Le change : deux monnaies, deux prix (voir boutique.change). Les Couronnes s'achètent, les Éclats se
+// gagnent en jouant ; tout article se paie dans l'une ou dans l'autre.
+
+/** Un prix en Couronnes, dit en Éclats. */
+export function enEclats(couronnes) { return couronnes * R.boutique.change; }
+
+/** Un prix en Éclats, dit en Couronnes : arrondi à la Couronne du dessus, jamais moins d'une. */
+export function enCouronnes(eclats) { return Math.max(1, Math.ceil(eclats / R.boutique.change)); }
+
+/** Les deux prix d'un article, à partir du sien (`prix`, dans sa monnaie `origine`). */
+function deuxPrix(prix, origine) {
+  return origine === 'couronnes' ? { couronnes: prix, eclats: enEclats(prix) } : { couronnes: enCouronnes(prix), eclats: prix };
+}
+
+/**
+ * Fait payer un article. `prix` est le sien, dans sa monnaie `origine` ; `monnaie` est celle que le joueur
+ * choisit ('couronnes' ou 'eclats' — à défaut, celle de l'article). Rien n'est retiré s'il manque de quoi :
+ * `{ erreur: 'fonds', manque }` (et `monnaie`, si ce n'est pas celle de l'article). Sinon la somme part, et l'on reçoit `{ monnaie, paye, evenement }`.
+ */
+function payer(p, prix, origine, monnaie, motif) {
+  const choisie = monnaie === 'couronnes' || monnaie === 'eclats' ? monnaie : origine;
+  const du = deuxPrix(prix, origine)[choisie];
+  // (Dans la monnaie de l'article, le refus se dit comme avant ; dans l'autre, il la nomme.)
+  if (p[choisie] < du) return { erreur: 'fonds', manque: du - p[choisie], ...(choisie !== origine ? { monnaie: choisie } : {}) };
+  p[choisie] -= du;
+  return { monnaie: choisie, paye: du, autre: choisie !== origine, evenement: { type: choisie, variation: -du, origine: motif, total: p[choisie] } };
+}
+
+/** Ce que le journal retient d'un paiement fait dans l'autre monnaie que celle de l'article (rien sinon). */
+const payeAutrement = (paiement) => (paiement.autre ? { payeEn: paiement.monnaie, paye: paiement.paye } : {});
+
 /**
  * Le prix d'une troupe en Couronnes, à cette heure : son prix, ou le prix de
  * l'offre de ligue si elle porte sur elle. null si elle ne se vend pas.
@@ -1220,17 +1251,18 @@ export function catalogueBoutique(profil, maintenant, jour) {
     couronnes: p.couronnes,
     troupes: AVANCEES.filter((type) => R.troupes[type].prix > 0).map((type) => (p.debloquees[type]
       ? { type, debloquee: p.debloquees[type] }
-      : { type, debloquee: null, prix: prixDeTroupe(p, type, t), prixPlein: R.troupes[type].prix, offre: !!offre && offre.troupe === type })),
-    lotTroupes: lotDeTroupes(p),
+      : { type, debloquee: null, prix: prixDeTroupe(p, type, t), prixEclats: enEclats(prixDeTroupe(p, type, t)), prixPlein: R.troupes[type].prix, offre: !!offre && offre.troupe === type })),
+    lotTroupes: ((lot) => (lot ? { ...lot, prixEclats: enEclats(lot.prix) } : null))(lotDeTroupes(p)),
     offres,
     lots: R.boutique.lots.map((lot) => ({ ...lot, disponible: reel })),
     essai: R.boutique.essai ? { couronnes: R.boutique.essai.couronnes } : null,
     eclats: p.eclats,
-    selection: selectionDuJour(p, jour).map((id) => ({ piece: id, prix: prixDePiece(p, id, jour), prixPlein: R.collections.eclats.prix[PIECES[id].rarete] })),
+    selection: selectionDuJour(p, jour).map((id) => ({ piece: id, prix: prixDePiece(p, id, jour), prixCouronnes: enCouronnes(prixDePiece(p, id, jour)), prixPlein: R.collections.eclats.prix[PIECES[id].rarete] })),
     selectionPrise: p.selection.jour === jour ? p.selection.achats : 0,
-    atelier: DE_L_ATELIER.filter((id) => possede(R.collections.atelier, id)).map((id) => ({ piece: id, prix: R.collections.atelier[id], possedee: p.pieces.includes(id) })),
+    atelier: DE_L_ATELIER.filter((id) => possede(R.collections.atelier, id)).map((id) => ({ piece: id, prix: R.collections.atelier[id], prixCouronnes: enCouronnes(R.collections.atelier[id]), possedee: p.pieces.includes(id) })),
     collections: COLLECTIONS.map((c) => lotDeCollection(p, c.id)).filter(Boolean),
-    passe: { saison: p.saison, prix: R.saisons.passe.prix, pris: p.route.passe },
+    passe: { saison: p.saison, prix: R.saisons.passe.prix, prixEclats: enEclats(R.saisons.passe.prix), pris: p.route.passe },
+    change: R.boutique.change,
   };
 }
 
@@ -1239,19 +1271,19 @@ export function catalogueBoutique(profil, maintenant, jour) {
  * Renvoie `{ profil, evenements }` (couronnes, troupeDebloquee), ou `{ erreur }` :
  * 'inconnue', 'pasEnVente', 'dejaDebloquee', 'fonds' (avec `manque`).
  */
-export function acheterTroupe(profil, type, maintenant) {
+export function acheterTroupe(profil, type, maintenant, monnaie) {
   if (typeof type !== 'string' || !possede(R.troupes, type) || R.troupes[type].aVenir) return { erreur: 'inconnue' };
   if (!AVANCEES.includes(type) || !(R.troupes[type].prix > 0)) return { erreur: 'pasEnVente' };
   const p = migrerProfil(profil);
   if (p.debloquees[type]) return { erreur: 'dejaDebloquee' };
   const prix = prixDeTroupe(p, type, maintenant);
-  if (p.couronnes < prix) return { erreur: 'fonds', manque: prix - p.couronnes };
-  p.couronnes -= prix;
+  const paiement = payer(p, prix, 'couronnes', monnaie, 'troupe');
+  if (paiement.erreur) return paiement;
   p.debloquees[type] = 'achat';
   if (p.boutique.offreLigue && p.boutique.offreLigue.troupe === type) p.boutique.offreLigue = null;
-  noter(p, { op: 'boutique', article: 'troupe', troupe: type, prix });
+  noter(p, { op: 'boutique', article: 'troupe', troupe: type, prix, ...payeAutrement(paiement) });
   return { profil: p, evenements: [
-    { type: 'couronnes', variation: -prix, origine: 'troupe', total: p.couronnes },
+    paiement.evenement,
     { type: 'troupeDebloquee', troupe: type, origine: 'achat' },
   ] };
 }
@@ -1260,19 +1292,19 @@ export function acheterTroupe(profil, type, maintenant) {
  * Achète d'un coup toutes les troupes qui restent, au prix du lot.
  * Renvoie `{ profil, evenements }`, ou `{ erreur }` : 'pasEnVente' (il en reste trop peu), 'fonds' (avec `manque`).
  */
-export function acheterToutesLesTroupes(profil) {
+export function acheterToutesLesTroupes(profil, monnaie) {
   const p = migrerProfil(profil);
   const lot = lotDeTroupes(p);
   if (!lot) return { erreur: 'pasEnVente' };
-  if (p.couronnes < lot.prix) return { erreur: 'fonds', manque: lot.prix - p.couronnes };
-  p.couronnes -= lot.prix;
-  const evenements = [{ type: 'couronnes', variation: -lot.prix, origine: 'lotTroupes', total: p.couronnes }];
+  const paiement = payer(p, lot.prix, 'couronnes', monnaie, 'lotTroupes');
+  if (paiement.erreur) return paiement;
+  const evenements = [paiement.evenement];
   for (const type of lot.troupes) {
     p.debloquees[type] = 'achat';
     evenements.push({ type: 'troupeDebloquee', troupe: type, origine: 'achat' });
   }
   p.boutique.offreLigue = null;
-  noter(p, { op: 'boutique', article: 'lotTroupes', troupes: lot.troupes.length, prix: lot.prix });
+  noter(p, { op: 'boutique', article: 'lotTroupes', troupes: lot.troupes.length, prix: lot.prix, ...payeAutrement(paiement) });
   return { profil: p, evenements };
 }
 
@@ -1499,17 +1531,20 @@ export function prixDePiece(profil, id, jour) {
  * `{ profil, evenements }` (eclats, piece — et les pièces que sa collection
  * donne alors), ou `{ erreur }` : 'pasEnVente', 'fonds' (avec `manque`).
  */
-export function acheterPiece(profil, id, jour) {
+export function acheterPiece(profil, id, jour, monnaie) {
   const p = migrerProfil(profil);
   const prix = prixDePiece(p, id, jour);
   if (prix === null) return { erreur: 'pasEnVente' };
-  if (p.eclats < prix) return { erreur: 'fonds', manque: prix - p.eclats };
+  // (On regarde d'abord si la somme y est : rien ne bouge, pas même la sélection du jour, tant qu'elle manque.)
+  const dans = monnaie === 'couronnes' ? 'couronnes' : 'eclats';
+  const du = deuxPrix(prix, 'eclats')[dans];
+  if (p[dans] < du) return { erreur: 'fonds', manque: du - p[dans], ...(dans !== 'eclats' ? { monnaie: dans } : {}) };
   // (Pris dans la sélection du jour : un de moins à prix réduit aujourd'hui.)
   if (selectionDuJour(p, jour).includes(id)) p.selection = { jour, achats: (p.selection.jour === jour ? p.selection.achats : 0) + 1 };
-  p.eclats -= prix;
-  const evenements = [{ type: 'eclats', variation: -prix, origine: 'piece', total: p.eclats }];
+  const paiement = payer(p, prix, 'eclats', monnaie, 'piece');
+  const evenements = [paiement.evenement];
   donnerPiece(p, id, 'achat', evenements);
-  noter(p, { op: 'boutique', article: 'piece', piece: id, eclats: prix });
+  noter(p, { op: 'boutique', article: 'piece', piece: id, eclats: prix, ...payeAutrement(paiement) });
   return { profil: p, evenements };
 }
 
@@ -1518,7 +1553,7 @@ function lotDeCollection(p, collectionId) {
   const c = collectionDuJeu(collectionId);
   const lot = c && c.source === 'boutique' && possede(R.collections.lots, c.id) ? R.collections.lots[c.id] : null;
   if (!lot) return null;
-  return { collection: c.id, prix: lot.prix, pieces: [...c.pieces], manquantes: c.pieces.filter((id) => !p.pieces.includes(id)) };
+  return { collection: c.id, prix: lot.prix, prixEclats: enEclats(lot.prix), pieces: [...c.pieces], manquantes: c.pieces.filter((id) => !p.pieces.includes(id)) };
 }
 
 /**
@@ -1526,16 +1561,16 @@ function lotDeCollection(p, collectionId) {
  * d'un coup. Renvoie `{ profil, evenements }`, ou `{ erreur }` : 'pasEnVente',
  * 'dejaPossedee', 'fonds' (avec `manque`).
  */
-export function acheterCollection(profil, collectionId) {
+export function acheterCollection(profil, collectionId, monnaie) {
   const p = migrerProfil(profil);
   const lot = lotDeCollection(p, collectionId);
   if (!lot) return { erreur: 'pasEnVente' };
   if (lot.manquantes.length === 0) return { erreur: 'dejaPossedee' };
-  if (p.couronnes < lot.prix) return { erreur: 'fonds', manque: lot.prix - p.couronnes };
-  p.couronnes -= lot.prix;
-  const evenements = [{ type: 'couronnes', variation: -lot.prix, origine: 'collection', total: p.couronnes }];
+  const paiement = payer(p, lot.prix, 'couronnes', monnaie, 'collection');
+  if (paiement.erreur) return paiement;
+  const evenements = [paiement.evenement];
   for (const id of lot.manquantes) donnerPiece(p, id, 'achat', evenements);
-  noter(p, { op: 'boutique', article: 'collection', collection: lot.collection, prix: lot.prix });
+  noter(p, { op: 'boutique', article: 'collection', collection: lot.collection, prix: lot.prix, ...payeAutrement(paiement) });
   return { profil: p, evenements };
 }
 
@@ -1717,6 +1752,7 @@ export function etatDeLaSaison(profil, jour) {
     versLeSuivant: atteint >= R.saisons.paliers ? 0 : p.route.points - atteint * R.saisons.pointsParPalier,
     passe: p.route.passe,
     prixDuPasse: R.saisons.passe.prix,
+    prixDuPasseEnEclats: enEclats(R.saisons.passe.prix),
     joursRestants: joursRestants(jour),
     aPrendre: dus(p).length,
     route,
@@ -1755,16 +1791,16 @@ export function prendreTout(profil) {
  * voie, paliers déjà atteints compris. Renvoie `{ profil, evenements }`
  * (couronnes, passe), ou `{ erreur }` : 'dejaPris', 'fonds' (avec `manque`).
  */
-export function acheterPasse(profil) {
+export function acheterPasse(profil, monnaie) {
   const p = migrerProfil(profil);
   if (p.route.passe) return { erreur: 'dejaPris' };
   const prix = R.saisons.passe.prix;
-  if (p.couronnes < prix) return { erreur: 'fonds', manque: prix - p.couronnes };
-  p.couronnes -= prix;
+  const paiement = payer(p, prix, 'couronnes', monnaie, 'passe');
+  if (paiement.erreur) return paiement;
   p.route.passe = true;
-  noter(p, { op: 'boutique', article: 'passe', saison: p.saison, prix });
+  noter(p, { op: 'boutique', article: 'passe', saison: p.saison, prix, ...payeAutrement(paiement) });
   return { profil: p, evenements: [
-    { type: 'couronnes', variation: -prix, origine: 'passe', total: p.couronnes },
+    paiement.evenement,
     { type: 'passe', saison: p.saison },
   ] };
 }

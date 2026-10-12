@@ -20,6 +20,7 @@ import { htmlEmbleme, htmlPiece, htmlBlason, htmlMedaillon, svgBanniere, titreDu
 import { iconeSVG } from './icones.js';
 import { EN_MAGASIN } from './edition.js';
 import { txt, txtDe, accord } from './langue.js';
+import { enCouronnes } from './progression.js';
 
 /** Les outils prêtés par js/progression-ecrans.js : montrer, retenir, nombre, pluriel, couronnes, euros, jour, heure, coffre. */
 let o = null;
@@ -29,6 +30,23 @@ const possede = (profil, id) => profil.pieces.includes(id);
 /** Un montant en Éclats : le pictogramme, puis le nombre. */
 export const eclats = (n, taille = 14) => `<span class="prog-eclats">${iconeSVG('eclat', taille, 'inline')}${o.nombre(n)}</span>`;
 /** Ce que valent des Couronnes en euros, à peu près : le repère de la boutique (le premier lot). */
+/**
+ * Le second bouton d'un article : le même achat, payé dans l'autre monnaie. Au change, il faut plus
+ * d'Éclats que de Couronnes (voir boutique.change, js/progression-config.js). Il porte `data-m="1"`, et
+ * l'attente de son second toucher se note `<article>~`. `dire` écrit la somme ; `i` reprend ce que le
+ * premier bouton met dans `data-i`.
+ */
+export function boutonAutreMonnaie(act, arg, prix, solde, confirmer, dire, i = '') {
+  const quoi = `data-act="${act}" data-arg="${arg}" data-m="1"`;
+  if (solde < prix) return `<button class="btn small prog-cher prog-autre" ${quoi} data-i="${i}">${dire(prix)}</button>`;
+  return confirmer
+    ? `<button class="btn small danger prog-autre" ${quoi} data-i="${i}1">${txt`Encore : ${dire(prix)}`}</button>`
+    : `<button class="btn small prog-autre" ${quoi} data-i="${i}">${dire(prix)}</button>`;
+}
+
+/** Les deux boutons d'un article, l'un sous l'autre : sa monnaie d'abord, l'autre ensuite. */
+export const deuxPrix = (premier, second) => `<span class="prog-deux-prix">${premier}${second}</span>`;
+
 function environ(couronnes) {
   const lot = R.boutique.lots[0];
   return txt`environ ${Math.round(couronnes * lot.prixCentimes / lot.couronnes / 100)}\u00a0€`;
@@ -111,19 +129,21 @@ function piedDePiece(profil, id, confirmer) {
   }
   const prix = prixDePiece(profil, id, o.jour());
   if (prix === null) return `<span class="col-verrou">${iconeSVG('cadenas', 12, 'inline')}</span>`;
-  if (profil.eclats < prix) return `<button class="btn small prog-cher" data-act="acheterPiece" data-arg="${id}">${eclats(prix)}</button>`;
-  return confirmer === id
-    ? `<button class="btn small danger" data-act="acheterPiece" data-arg="${id}" data-i="1">${txt`Encore : ${eclats(prix)}`}</button>`
-    : `<button class="btn small primary" data-act="acheterPiece" data-arg="${id}">${eclats(prix)}</button>`;
+  const enEclats = profil.eclats < prix ? `<button class="btn small prog-cher" data-act="acheterPiece" data-arg="${id}">${eclats(prix)}</button>`
+    : confirmer === id
+      ? `<button class="btn small danger" data-act="acheterPiece" data-arg="${id}" data-i="1">${txt`Encore : ${eclats(prix)}`}</button>`
+      : `<button class="btn small primary" data-act="acheterPiece" data-arg="${id}">${eclats(prix)}</button>`;
+  return deuxPrix(enEclats, boutonAutreMonnaie('acheterPiece', id, enCouronnes(prix), profil.couronnes, confirmer === `${id}~`, o.couronnes));
 }
 
-/** Le bouton d'une collection vendue entière : son prix en Couronnes, en deux touchers. */
-function boutonDeLot(lot, solde, confirmer) {
+/** Les boutons d'une collection vendue entière : son prix en Couronnes, ou en Éclats au change ; en deux touchers. */
+function boutonDeLot(lot, profil, confirmer) {
   if (!lot.manquantes.length) return `<span class="prog-acquis">${txt('À toi')}</span>`;
-  if (solde < lot.prix) return `<button class="btn small prog-cher" data-act="acheterCollection" data-arg="${lot.collection}">${o.couronnes(lot.prix)}</button>`;
-  return confirmer === lot.collection
-    ? `<button class="btn small danger" data-act="acheterCollection" data-arg="${lot.collection}" data-i="1">${txt`Toucher encore : ${o.couronnes(lot.prix)}`}</button>`
-    : `<button class="btn small primary" data-act="acheterCollection" data-arg="${lot.collection}">${o.couronnes(lot.prix)}</button>`;
+  const enCouronnes_ = profil.couronnes < lot.prix ? `<button class="btn small prog-cher" data-act="acheterCollection" data-arg="${lot.collection}">${o.couronnes(lot.prix)}</button>`
+    : confirmer === lot.collection
+      ? `<button class="btn small danger" data-act="acheterCollection" data-arg="${lot.collection}" data-i="1">${txt`Toucher encore : ${o.couronnes(lot.prix)}`}</button>`
+      : `<button class="btn small primary" data-act="acheterCollection" data-arg="${lot.collection}">${o.couronnes(lot.prix)}</button>`;
+  return deuxPrix(enCouronnes_, boutonAutreMonnaie('acheterCollection', lot.collection, lot.prixEclats, profil.eclats, confirmer === `${lot.collection}~`, eclats));
 }
 
 function ecranCollection(id, profil, message = '', { confirmer = '' } = {}) {
@@ -161,7 +181,7 @@ function ecranCollection(id, profil, message = '', { confirmer = '' } = {}) {
     if (c.source === 'boutique') {
       const lot = catalogueBoutique(profil, o.heure(), o.jour()).collections.find((x) => x.collection === c.id);
       chapeau = lot && lot.manquantes.length ? txt`Une collection de la boutique : ses ${c.pieces.length} pièces d’un coup, pour ${o.nombre(lot.prix)} Couronnes${enEuros(lot.prix, ' (', ')')}.` : txt('Cette collection est à toi.');
-      if (lot && lot.manquantes.length) chapeau += `</p><div class="modal-actions">${boutonDeLot(lot, profil.couronnes, confirmer)}</div><p class="col-vide">`;
+      if (lot && lot.manquantes.length) chapeau += `</p><div class="modal-actions">${boutonDeLot(lot, profil, confirmer)}</div><p class="col-vide">`;
     } else if (c.source === 'saison') {
       chapeau = c.id === saison.theme ? txt`La collection de la saison ${saison.numero} : elle se gagne palier après palier, sur la route de la saison.`
         : txt('La collection d’une autre saison.');
@@ -266,14 +286,16 @@ function ecranSaison(profil, message = '', { confirmer = false } = {}) {
   } else {
     const bouton = profil.couronnes < s.prixDuPasse
       ? `<button class="btn prog-cher" data-act="passe">${o.couronnes(s.prixDuPasse)}</button>`
-      : confirmer
+      : confirmer === true
         ? `<button class="btn danger" data-act="passe" data-i="1">${txt`Toucher encore : ${o.couronnes(s.prixDuPasse)}`}</button>`
         : `<button class="btn primary" data-act="passe">${o.couronnes(s.prixDuPasse)}</button>`;
+    // (… ou en Éclats, au change : `confirmer` vaut alors 'eclats'.)
+    const enEclats = boutonAutreMonnaie('passe', '', s.prixDuPasseEnEclats, profil.eclats, confirmer === 'eclats', eclats);
     passe = `
       <div class="col-passe">
         <p>${txt`<b>Le Passe de saison</b> ouvre la voie de droite : ${contenuDuPasse()}.`} ${txt('Ni coffre, ni fragment, ni niveau.')}</p>
         ${dejaLa ? `<p class="col-deja-passe">${txt`Cette collection est déjà passée par ici : tu as ${dejaLa} de ces pièces. Celles-là te rendront des Éclats à la place (${eclats(eclatsRendus)} en tout).`}</p>` : ''}
-        <div class="modal-actions">${bouton}</div>
+        <div class="modal-actions">${bouton}${enEclats}</div>
         <p class="hint">${txt`${o.nombre(s.prixDuPasse)} Couronnes${enEuros(s.prixDuPasse)}.`} ${txt('Acheté en cours de saison, il donne aussi les paliers déjà atteints.')}</p>
       </div>`;
   }
@@ -396,7 +418,7 @@ export function htmlRayonDesCollections(profil, c, confirmer) {
           <b>${p.nom}</b>
           <small>${rarete(p)} · ${collectionDuJeu(p.collection).nom} · <s>${o.nombre(x.prixPlein)}</s></small>
         </span>
-        ${bouton}
+        ${deuxPrix(bouton, boutonAutreMonnaie('acheterPiece', x.piece, x.prixCouronnes, c.couronnes, confirmer === `${x.piece}~`, o.couronnes, 's'))}
       </li>`;
   }).join('');
   const teintures = c.atelier.map((x) => {
@@ -409,7 +431,7 @@ export function htmlRayonDesCollections(profil, c, confirmer) {
       <li class="prog-article ${x.possedee ? 'acquis' : ''}">
         <span class="prog-vignette col-vignette">${htmlPiece(x.piece)}</span>
         <span class="prog-offre-texte"><b>${p.nom}</b><small>${x.possedee ? txt('À porter depuis ton blason.') : txt('Pour toutes tes troupes')}</small></span>
-        ${bouton}
+        ${x.possedee ? bouton : deuxPrix(bouton, boutonAutreMonnaie('acheterPiece', x.piece, x.prixCouronnes, c.couronnes, confirmer === `${x.piece}~`, o.couronnes, 's'))}
       </li>`;
   }).join('');
   const lots = c.collections.map((lot) => {
@@ -422,7 +444,9 @@ export function htmlRayonDesCollections(profil, c, confirmer) {
           <small>${txt`${col.emblemes.length} autocollants, sa bannière, son cadre et ses deux mots de titre`}${lot.manquantes.length ? enEuros(lot.prix, ' · ') : ''}</small>
         </span>
         ${lot.manquantes.length
-    ? `<button class="btn small ${c.couronnes < lot.prix ? 'prog-cher' : 'primary'}" data-ecran="collection" data-arg="${col.id}">${o.couronnes(lot.prix)}</button>`
+    // (Ses deux prix mènent à sa page : l'achat s'y fait, tout son contenu sous les yeux.)
+    ? deuxPrix(`<button class="btn small ${c.couronnes < lot.prix ? 'prog-cher' : 'primary'}" data-ecran="collection" data-arg="${col.id}">${o.couronnes(lot.prix)}</button>`,
+      `<button class="btn small ${c.eclats < lot.prixEclats ? 'prog-cher ' : ''}prog-autre" data-ecran="collection" data-arg="${col.id}">${eclats(lot.prixEclats)}</button>`)
     : `<span class="prog-acquis">${txt('À toi')}</span>`}
       </li>`;
   }).join('');
@@ -475,7 +499,9 @@ const REFUS = txt('Sauvegarde impossible sur cet appareil : ce ne sera pas reten
  * `revenir(profil, message, confirmer)` : pour un autocollant acheté depuis
  * la boutique, redessine la boutique.
  */
-export function agirSurLesCollections(act, arg, i, profil, revenir) {
+export function agirSurLesCollections(act, arg, i, profil, revenir, m) {
+  // (`m` : le bouton de l'autre monnaie — des Couronnes pour ce qui se dit en Éclats, et l'inverse.)
+  const autre = m === '1';
   if (act === 'porter' || act === 'retirer') {
     if (act === 'porter' && !PIECES[arg]) { ecranAlbum(profil); return true; }
     const genre = act === 'retirer' ? arg : PIECES[arg].genre;
@@ -491,11 +517,12 @@ export function agirSurLesCollections(act, arg, i, profil, revenir) {
     const p = PIECES[arg];
     const boutique = typeof i === 'string' && i[0] === 's';
     const montrer = (prof, message, confirmer) => (boutique ? revenir(prof, message, confirmer) : ecranCollection(p ? p.collection : '', prof, message, { confirmer }));
-    const prix = prixDePiece(profil, arg, o.jour());
-    if (prix === null) { montrer(profil, ''); return true; }
-    if (profil.eclats < prix) { montrer(profil, p.genre === 'teinture' ? txt`Il te manque ${eclats(prix - profil.eclats)} pour cette teinture.` : txt`Il te manque ${eclats(prix - profil.eclats)} pour cet autocollant.`); return true; }
-    if (i !== '1' && i !== 's1') { montrer(profil, '', arg); return true; }
-    const r = acheterPiece(profil, arg, o.jour());
+    const sonPrix = prixDePiece(profil, arg, o.jour());
+    if (sonPrix === null) { montrer(profil, ''); return true; }
+    const prix = autre ? enCouronnes(sonPrix) : sonPrix, solde = autre ? profil.couronnes : profil.eclats, dire = autre ? o.couronnes : eclats;
+    if (solde < prix) { montrer(profil, p.genre === 'teinture' ? txt`Il te manque ${dire(prix - solde)} pour cette teinture.` : txt`Il te manque ${dire(prix - solde)} pour cet autocollant.`); return true; }
+    if (i !== '1' && i !== 's1') { montrer(profil, '', autre ? `${arg}~` : arg); return true; }
+    const r = acheterPiece(profil, arg, o.jour(), autre ? 'couronnes' : undefined);
     if (r.erreur) { montrer(profil, ''); return true; }
     const ok = o.retenir(r.profil);
     const enPlus = r.evenements.filter((e) => e.type === 'piece' && e.origine === 'collection').map((e) => pieceEnPhrase(e.piece));
@@ -509,9 +536,10 @@ export function agirSurLesCollections(act, arg, i, profil, revenir) {
     // (L'achat se fait sur la page de la collection : tout son contenu y est sous les yeux.)
     const montrer = (prof, message, confirmer) => ecranCollection(arg, prof, message, { confirmer });
     if (!c || !lot || !lot.manquantes.length) { montrer(profil, ''); return true; }
-    if (profil.couronnes < lot.prix) { montrer(profil, txt`Il te manque ${o.couronnes(lot.prix - profil.couronnes)} pour cette collection.`); return true; }
-    if (i !== '1') { montrer(profil, '', arg); return true; }
-    const r = acheterCollection(profil, arg);
+    const prix = autre ? lot.prixEclats : lot.prix, solde = autre ? profil.eclats : profil.couronnes, dire = autre ? eclats : o.couronnes;
+    if (solde < prix) { montrer(profil, txt`Il te manque ${dire(prix - solde)} pour cette collection.`); return true; }
+    if (i !== '1') { montrer(profil, '', autre ? `${arg}~` : arg); return true; }
+    const r = acheterCollection(profil, arg, autre ? 'eclats' : undefined);
     if (r.erreur) { montrer(profil, ''); return true; }
     const ok = o.retenir(r.profil);
     ecranCollection(arg, r.profil, ok ? txt`${c.nom} : toute la collection est à toi.` : REFUS);
@@ -532,6 +560,15 @@ export function agirSurLesCollections(act, arg, i, profil, revenir) {
   if (act === 'passe') {
     const s = etatDeLaSaison(profil, o.jour());
     if (s.passe) { ecranSaison(profil); return true; }
+    if (autre) {
+      // Le Passe en Éclats, au change.
+      if (profil.eclats < s.prixDuPasseEnEclats) { ecranSaison(profil, txt`Il te manque ${eclats(s.prixDuPasseEnEclats - profil.eclats)} pour le Passe.`); return true; }
+      if (i !== '1') { ecranSaison(profil, '', { confirmer: 'eclats' }); return true; }
+      const paye = acheterPasse(profil, 'eclats');
+      if (paye.erreur) { ecranSaison(profil); return true; }
+      ecranSaison(paye.profil, o.retenir(paye.profil) ? txt('Le Passe de saison est à toi : la voie de droite est ouverte.') : REFUS);
+      return true;
+    }
     if (profil.couronnes < s.prixDuPasse) {
       ecranSaison(profil, `${txt`Il te manque ${o.couronnes(s.prixDuPasse - profil.couronnes)} pour le Passe.`} <button class="btn small" data-ecran="boutique">${txt('Boutique')}</button>`);
       return true;
