@@ -14,12 +14,12 @@ import {
   lireProgression, ecrireProgression, quandLaProgressionSEcrit,
 } from './save.js';
 import { brancher as brancherRangementDurable, hoteDeLApplication } from './rangement-durable.js';
-import { appliquerResultat, reglagesDePartie, issueDePartie } from './progression.js';
+import { appliquerResultat, reglagesDePartie, issueDePartie, formatConseille, debutant, prochainPalier, prendreCoffreDeRecrue } from './progression.js';
 import { matiereDe } from './collections-config.js';
 import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
 import { guichetParDefaut } from './achats.js';
 import { txt, accord, traduireLaPage } from './langue.js';
-import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal } from './progression-ecrans.js';
+import { installerProgression, reglerPeuple, htmlBandeau, htmlFinDePartie, jourLocal, versLaLigueSuivante, phraseDuCoffreDeRecrue } from './progression-ecrans.js';
 import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, incidentNonLu, marquerIncidentsLus, phraseIncident } from './save.js';
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
@@ -568,9 +568,22 @@ class Game {
       passer: () => quitterLeGuide(this, 'accueil'),
       jouer: () => quitterLeGuide(this, 'partie'),
       accueil: () => quitterLeGuide(this, 'accueil'),
+      // (La première partie qui suit : sa durée, pour le dire sur le bouton — 0 si le format n'a pas de chronomètre.)
+      duree: () => Math.round((GAME_MODES[settings.mode].timeLimit || 0) / 60),
     });
-    this.guide.surEtape = (etape) => this.ecranDuGuide.etape(etape);
+    this.guide.surEtape = (etape) => this.ecranDuGuide.etape(etape, etape.fin ? this.cadeauDeRecrue() : null);
     this.guide.demarrer();
+  }
+
+  /**
+   * La fin de la partie guidée donne le coffre de recrue, une seule fois par joueur (js/progression.js) :
+   * rend la phrase qui l'annonce, ou rien s'il a déjà été donné.
+   */
+  cadeauDeRecrue() {
+    const r = prendreCoffreDeRecrue(lireProgression());
+    if (r.erreur) return null;
+    ecrireProgression(r.profil);
+    return phraseDuCoffreDeRecrue(r.evenements);
   }
 
   /** Un panneau de la partie est-il ouvert ? ('ouvriers' ou 'construire') */
@@ -1505,10 +1518,17 @@ class Game {
 
 let currentGame = null;
 const stored = loadSetup();
+// Le format : celui que le joueur a choisi, sinon celui que l'accueil conseille — court pour ses premières
+// parties (js/progression.js, formatConseille). Un réglage enregistré avant cette question vaut choix, sauf
+// pour qui débute : lui passe au format court.
+const formatChoisi = !!GAME_MODES[stored.mode]
+  && (typeof stored.formatChoisi === 'boolean' ? stored.formatChoisi : !debutant(lireProgression()));
+const formatDeDepart = formatChoisi ? stored.mode : formatConseille(lireProgression());
 const settings = {
-  mode: GAME_MODES[stored.mode] ? stored.mode : DEFAULT_MODE,
+  mode: formatDeDepart,
+  formatChoisi,
   difficulty: DIFFICULTIES[stored.difficulty] ? stored.difficulty : 'normal',
-  mapSize: MAP_SIZES[stored.mapSize] ? stored.mapSize : GAME_MODES[DEFAULT_MODE].mapSize,
+  mapSize: formatChoisi && MAP_SIZES[stored.mapSize] ? stored.mapSize : GAME_MODES[formatDeDepart].mapSize,
   speed: loadSpeed(),
   civ: civDe(stored.civ),
   civAdverse: civDe(stored.civAdverse),
@@ -1633,6 +1653,7 @@ function refreshLigue() {
 /** En partie classée, la difficulté ne se choisit pas : l'adversaire suit la ligue. */
 function refreshType() {
   const classee = partieClassee();
+  refreshJouer();   // (la promesse du bouton ne vaut qu'en partie classée)
   // (Par équipes : la partie n'est jamais classée, et l'accueil le dit.)
   const equipes = document.getElementById('equipes-note');
   if (equipes) equipes.classList.toggle('hidden', !GAME_MODES[settings.mode].equipes);
@@ -1694,9 +1715,28 @@ function refreshReglages() {
     : txt`Libre · ${resume}`;
 }
 
+/**
+ * Tant que le joueur n'a pas choisi son format, l'accueil suit celui qu'on lui conseille : court pour ses
+ * premières parties classées, puis celui de tous les jours. Le format conseillé porte sa mention.
+ */
+function suivreLeFormatConseille() {
+  const conseille = formatConseille(lireProgression());
+  if (!settings.formatChoisi && settings.mode !== conseille) {
+    settings.mode = conseille;
+    settings.mapSize = GAME_MODES[conseille].mapSize;
+    storeSetup(settings);
+  }
+  document.querySelectorAll('#mode-options [data-mode]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === settings.mode);
+    b.classList.toggle('conseille', b.dataset.mode === conseille);
+  });
+  document.querySelectorAll('#map-options [data-map]').forEach((b) => b.classList.toggle('active', b.dataset.map === settings.mapSize));
+}
+
 function showStartScreen() {
   currentGame = null;
   musique.mettre('menu');
+  suivreLeFormatConseille();
   habiller(settings.civ);
   document.getElementById('start-screen').classList.remove('hidden');
   document.getElementById('hud').classList.add('hidden');
@@ -1731,6 +1771,8 @@ function refreshPalmares() {
  * (voir toucherNouvellePartie) ; passé le délai, il se désarme tout seul.
  */
 let partieEnAttente = false;   // la carte « Reprendre » est affichée
+/** En dessous de ce nombre de victoires, le bouton « Jouer » dit ce qui sépare de la ligue suivante. */
+const VICTOIRES_A_PORTEE = 5;
 let effacerJusqua = 0;         // « Nouvelle partie » armé jusqu'à cet instant (0 : au repos)
 let minuterieEffacer = 0;
 
@@ -1740,6 +1782,14 @@ function refreshJouer() {
   if (!play) return;
   const arme = partieEnAttente && performance.now() < effacerJusqua;
   play.textContent = arme ? txt('Effacer la partie en cours ?') : partieEnAttente ? txt('Nouvelle partie') : txt('Jouer');
+  // La promesse : quand la ligue suivante est à portée, le bouton dit en combien de victoires.
+  const profil = !arme && !partieEnAttente && partieClassee() ? lireProgression() : null;
+  const palier = profil ? prochainPalier(profil) : null;
+  if (palier && palier.victoires <= VICTOIRES_A_PORTEE) {
+    const promesse = document.createElement('small');
+    promesse.textContent = versLaLigueSuivante(profil);
+    play.appendChild(promesse);
+  }
   play.classList.toggle('primary', !partieEnAttente);
   play.classList.toggle('arme', arme);
 }
@@ -1819,7 +1869,7 @@ function setupStartScreen() {
   const modeBox = document.getElementById('mode-options');
   modeBox.innerHTML = Object.values(GAME_MODES).map((m) => `
     <button class="option ${m.id === settings.mode ? 'active' : ''}" data-mode="${m.id}">
-      <span class="option-name">${iconeSVG(m.icon, 17, 'inline')} ${m.name}</span>
+      <span class="option-name">${iconeSVG(m.icon, 17, 'inline')} ${m.name} <span class="option-conseil">${txt('Conseillé')}</span></span>
       <span class="option-desc">${m.desc}</span>
     </button>`).join('');
 
@@ -1898,6 +1948,7 @@ function setupStartScreen() {
   modeBox.querySelectorAll('[data-mode]').forEach((btn) => {
     btn.addEventListener('click', () => {
       settings.mode = btn.dataset.mode;
+      settings.formatChoisi = true;   // dès lors, l'accueil ne propose plus le sien (suivreLeFormatConseille)
       // Chaque format a sa carte de prédilection ; rien n'empêche d'en changer.
       settings.mapSize = GAME_MODES[settings.mode].mapSize;
       storeSetup(settings);

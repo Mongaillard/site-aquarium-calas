@@ -207,7 +207,9 @@ export default {
   "Score final": "Puntuación final",
   "Score : un point toutes les {0} secondes par position tenue.": "Puntuación: un punto cada {0} segundos por posición mantenida.",
   "Score : la moitié des ressources récoltées, le prix de ce qui est encore debout, et deux fois le prix de ce qui a été abattu chez l’autre.": "Puntuación: la mitad de los recursos recolectados, el precio de lo que sigue en pie y el doble del precio de lo que se ha abatido en el bando contrario.",
-  "Nouvelle partie": "Nueva partida",
   "Menu principal": "Menú principal",
   "Allié": "Aliado",
+  // La fin de partie : rejouer le même format, avec sa durée quand il a un chronomètre.
+  "Rejouer": "Jugar otra vez",
+  "Rejouer · {0} min": "Jugar otra vez · {0} min",
 };

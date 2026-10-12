@@ -17,7 +17,8 @@ const html = (texte) => String(texte).replace(/[&<>"]/g, (c) => ({ '&': '&amp;',
 export class EcranDuGuide {
   /**
    * `jeu` : la partie (son canevas, sa caméra, son interface, son moteur audio).
-   * `sorties` : `passer()` (le joueur quitte le guide), `jouer()` et `accueil()` (les deux boutons de la fin).
+   * `sorties` : `passer()` (le joueur quitte le guide), `jouer()` et `accueil()` (les deux boutons de la fin),
+   * `duree()` (les minutes de la première partie, 0 si elle n'a pas de chronomètre).
    */
   constructor(jeu, guide, sorties) {
     this.jeu = jeu;
@@ -36,6 +37,7 @@ export class EcranDuGuide {
           <button class="guide-passer" type="button">${html(txt('Passer le guide'))}</button>
         </div>
         <p class="guide-texte"></p>
+        <p class="guide-cadeau hidden"></p>
         <div class="guide-boutons"></div>
       </div>
       <div class="guide-anneau hidden"></div>
@@ -45,7 +47,7 @@ export class EcranDuGuide {
     this.racine = racine;
     this.noeuds = {
       voile: racine.querySelector('.guide-voile'), bulle: racine.querySelector('.guide-bulle'),
-      pas: racine.querySelector('.guide-pas'), texte: racine.querySelector('.guide-texte'),
+      pas: racine.querySelector('.guide-pas'), texte: racine.querySelector('.guide-texte'), cadeau: racine.querySelector('.guide-cadeau'),
       boutons: racine.querySelector('.guide-boutons'), anneau: racine.querySelector('.guide-anneau'),
       trace: racine.querySelector('.guide-trace'), doigt: racine.querySelector('.guide-doigt'),
     };
@@ -53,17 +55,25 @@ export class EcranDuGuide {
     document.getElementById('hud').classList.add('avec-guide');
   }
 
-  /** Une étape commence : son bouton s'il y en a un, et sa phrase dite. */
-  etape(etape) {
+  /**
+   * Une étape commence : son bouton s'il y en a un, et sa phrase dite. `cadeau` : à la dernière étape, la phrase
+   * du coffre de recrue qui vient d'être donné (rien s'il l'avait déjà été) — il s'ouvre d'ici.
+   */
+  etape(etape, cadeau = null) {
     const { noeuds, guide, jeu } = this;
     noeuds.pas.textContent = `${guide.numero + 1} / ${guide.total}`;
     const boutons = [];
     if (etape.suite) boutons.push({ mot: etape.suite(), fait: () => guide.continuer() });
     if (etape.fin) {
-      boutons.push({ mot: txt('Jouer ma première partie'), fait: () => this.sorties.jouer() });
+      const minutes = this.sorties.duree ? this.sorties.duree() : 0;
+      // (Le coffre s'ouvre par l'écran des coffres : c'est `data-ecran` qui l'appelle, js/progression-ecrans.js.)
+      if (cadeau) boutons.push({ mot: txt('Ouvrir mon coffre'), ecran: 'coffres', fait: () => {} });
+      boutons.push({ mot: minutes ? txt`Jouer ma première partie · ${minutes} min` : txt('Jouer ma première partie'), second: !!cadeau, fait: () => this.sorties.jouer() });
       boutons.push({ mot: txt('Retour à l’accueil'), discret: true, fait: () => this.sorties.accueil() });
     }
-    noeuds.boutons.innerHTML = boutons.map((b, i) => `<button type="button" class="btn ${b.discret ? 'ghost' : 'primary'}" data-bouton="${i}">${html(b.mot)}</button>`).join('');
+    noeuds.cadeau.textContent = cadeau || '';
+    noeuds.cadeau.classList.toggle('hidden', !cadeau);
+    noeuds.boutons.innerHTML = boutons.map((b, i) => `<button type="button" class="btn ${b.discret ? 'ghost' : b.second ? 'second' : 'primary'}" data-bouton="${i}"${b.ecran ? ` data-ecran="${b.ecran}"` : ''}>${html(b.mot)}</button>`).join('');
     noeuds.boutons.querySelectorAll('[data-bouton]').forEach((noeud) => {
       noeud.addEventListener('click', () => { jeu.audio.resume(); jeu.audio.play('click'); boutons[Number(noeud.dataset.bouton)].fait(); });
     });

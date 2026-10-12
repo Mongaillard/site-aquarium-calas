@@ -270,4 +270,9 @@ export default {
   "Offre de ligue : {0} à moitié prix, {1} h": "League offer: {0} at half price, {1} h",
   "Ouvrir mes {0} coffres": "Open my {0} chests",
   "Ouvrir mon coffre": "Open my chest",
+  // Les débuts : le coffre de recrue, et ce qui sépare de la ligue suivante (accueil et fin de partie).
+  "Partie guidée": "Guided game",
+  "Encore {0} victoires pour la {1}": "{0} more wins to reach the {1}",
+  "Encore une victoire pour la {0}": "One more win to reach the {0}",
+  "Cadeau de recrue : {0}.": "Recruit’s gift: {0}.",
 };

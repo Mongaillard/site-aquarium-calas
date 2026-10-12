@@ -277,7 +277,7 @@ console.log('\n--- En français, rien ne bouge ---');
   check('l’écran de fin : le titre, la raison, le record, le compte des parties, le tableau, la règle du score',
     sansEspaces(f.fin).startsWith('Victoire ! Temps écoulé après 10:00 — le score départage Nouveau record ! 3 990 points — le précédent était de 1 250 Express · Normal : 2 victoires, 1 défaite Vous Adversaire Ressources récoltées ')
     && sansEspaces(f.fin).includes('Points de récolte 1 500 1 200 Troupes et bâtiments debout 2 100 2 400 Ennemis abattus 390 360 Score final 3 990 3 960 Score : la moitié des ressources récoltées')
-    && f.fin.endsWith('Nouvelle partie Menu principal'), f.fin.slice(0, 200));
+    && f.fin.endsWith('Rejouer · 10 min Menu principal'), f.fin.slice(-60));
   check('… par équipes : une colonne par place, l’adversaire abrégé, la somme de chaque bord',
     sansEspaces(f.finParEquipes).includes('2 contre 2 · Normal : 1 victoire, 0 défaite Vous Allié Adv. 1 Adv. 2 Bâtiment principal debout debout debout tombé Unités formées')
     && sansEspaces(f.finParEquipes).includes('Score 900 800 700 600 Par équipe 1 700 1 300 Au bout du temps, la somme des scores de chaque équipe départage.'), f.finParEquipes.slice(0, 260));
@@ -341,7 +341,7 @@ console.log('\n--- En anglais, les mêmes écrans ---');
   check('l’écran de fin : les nombres à l’anglaise (3,990), les victoires et les défaites accordées',
     a.fin.startsWith('Victory! Time’s up after 10:00 — the score decides New record! 3,990 points — the previous one was 1,250 Express · Normal: 2 wins, 1 loss You Opponent Resources gathered ')
     && a.fin.includes('Gathering points 1,500 1,200 Troops and buildings standing 2,100 2,400 Enemies taken down 390 360 Final score 3,990 3,960 Score: half the resources gathered')
-    && a.fin.includes('New game'), a.fin.slice(0, 200));
+    && a.fin.includes('Play again · 10 min'), a.fin.slice(-60));
   check('… par équipes : les lignes du tableau et la somme de chaque bord',
     a.finParEquipes.includes('2 vs 2 · Normal: 1 win, 0 losses You ') && a.finParEquipes.includes('Main building standing standing standing fallen Units trained')
     && a.finParEquipes.includes('Per team 1,700 1,300 When time runs out, each team’s total score decides.'), a.finParEquipes.slice(0, 260));

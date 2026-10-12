@@ -348,6 +348,9 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
 }
 #start-screen .reglages .option.active { border-color: var(--b-encre); background: var(--b-jaune); box-shadow: 0 4px 0 var(--b-encre); }
 #start-screen .reglages .option-name { font-weight: 900; }
+/* Le format conseillé au joueur porte sa mention (js/main.js, suivreLeFormatConseille). */
+#start-screen .option .option-conseil { display: none; }
+#start-screen .option.conseille .option-conseil { display: inline-block; margin-left: 6px; padding: 1px 8px 2px; vertical-align: middle; font-family: var(--b-texte); font-size: 12px; font-weight: 900; letter-spacing: .02em; text-transform: none; color: var(--b-papier); background: var(--b-rouge); border: 2px solid var(--b-encre); border-radius: 999px; }
 #start-screen .reglages .option-desc { font-weight: 700; color: var(--b-gris); }
 #start-screen .reglages .option svg { fill: var(--b-encre); }
 #start-screen .reglage-note { font-weight: 700; color: var(--b-gris); }
@@ -389,6 +392,8 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
   letter-spacing: 2px;
 }
 #start-screen #btn-play.arme { background: var(--b-rouge); color: var(--b-papier); font-size: 19px; letter-spacing: .5px; }
+/* La promesse sous « Jouer » : « Encore 3 victoires pour la ligue de Pierre » (js/main.js, refreshJouer). */
+#start-screen #btn-play small { display: block; margin-top: 4px; font-family: var(--b-texte); font-size: 15px; font-weight: 900; line-height: 1.2; letter-spacing: 0; text-transform: none; }
 #start-screen #btn-play:active { transform: translateY(5px); box-shadow: 0 3px 0 var(--b-encre); }
 #start-screen .palmares { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: var(--b-gris); }
 

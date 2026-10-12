@@ -765,7 +765,7 @@ img.visage {
 /* Les précisions du menu de pause : sous leurs réglages, en retrait. */
 .modal-card .hint { margin: 8px 0 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .modal-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
-/* Écran de fin : « Nouvelle partie » et « Menu principal » restent à l'écran
+/* Écran de fin : « Rejouer » et « Menu principal » restent à l'écran
    quand le tableau dépasse (petit téléphone, téléphone couché) — ils collent au
    bas de la carte, sur son fond. La marge du bas passe de la carte aux boutons,
    comme à l'accueil : collés, ils descendent jusqu'à son bord. */
@@ -777,6 +777,8 @@ img.visage {
   padding: 10px 20px 20px;
   background: linear-gradient(180deg, transparent 0, var(--panel-solid) 10px);
 }
+/* « Rejouer · 5 min » tient sur une ligne : c'est lui qu'on touche, il prend la place qu'il lui faut. */
+.modal-card.fin .modal-actions .btn.primary { flex: 2 1 auto; white-space: nowrap; }
 
 .scores { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .scores th, .scores td { padding: 7px 6px; text-align: right; border-bottom: 1px solid var(--border); }

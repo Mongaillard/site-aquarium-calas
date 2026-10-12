@@ -271,4 +271,9 @@ export default {
   "Offre de ligue : {0} à moitié prix, {1} h": "Oferta de liga: {0} a mitad de precio, {1} h",
   "Ouvrir mes {0} coffres": "Abrir mis {0} cofres",
   "Ouvrir mon coffre": "Abrir mi cofre",
+  // Les débuts : le coffre de recrue, et ce qui sépare de la ligue suivante (accueil et fin de partie).
+  "Partie guidée": "Partida guiada",
+  "Encore {0} victoires pour la {1}": "Faltan {0} victorias para la {1}",
+  "Encore une victoire pour la {0}": "Falta una victoria para la {0}",
+  "Cadeau de recrue : {0}.": "Regalo de recluta: {0}.",
 };

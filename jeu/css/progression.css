@@ -209,6 +209,10 @@
 .prog-fin-elo.monte b { color: var(--good); }
 .prog-fin-elo.descend b { color: var(--error); }
 .prog-fin-elo span { color: var(--muted); }
+/* « Encore 2 victoires pour la ligue de Pierre », et ce qu'elle donne : la raison de rejouer. */
+.prog-fin-suite { display: grid; gap: 2px; padding: 8px 12px; border: 2px solid currentColor; border-radius: 12px; }
+.prog-fin-suite b { font-size: 16px; }
+.prog-fin-suite small { font-size: 13px; color: var(--muted); }
 .prog-fin-coffres { display: flex; flex-wrap: wrap; gap: 8px 14px; }
 .prog-fin-coffre { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 8px; }
 .prog-fin-coffre img { grid-row: span 2; }

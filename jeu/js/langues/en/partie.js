@@ -247,4 +247,8 @@ export default {
   "Pas d’inquiétude : ta partie se sauvegarde toute seule.": "No need to worry: your game saves itself.",
   "À toi de jouer.": "Your move.",
   "Partie guidée : elle ne compte ni au classement ni au palmarès.": "Guided game: it counts toward neither your ranking nor your record.",
+  // Les débuts (état des lieux du 12/10/2026) : le format conseillé, et la fin de la partie guidée avec son coffre de recrue.
+  "Conseillé": "Recommended",
+  "Jouer ma première partie · {0} min": "Play my first game · {0} min",
+  "Ouvrir mon coffre": "Open my chest",
 };

@@ -79,6 +79,16 @@ export const PROGRESSION = figer(traduire({
   //  plancher : une défaite ne fait jamais passer sous ce score
   elo: { depart: 0, victoire: 30, defaite: -15, egalite: 0, plancher: 0 },
 
+  // --- Les débuts ----------------------------------------------------------------
+  //  La première heure doit être courte (état des lieux du 12/10/2026) : tant que le
+  //  joueur n'a pas choisi lui-même un format, l'accueil lui propose `format` pour ses
+  //  `parties` premières parties classées, puis `ensuite`. Rien n'est verrouillé : c'est
+  //  le réglage de départ, pas une règle. Trois victoires en Escarmouche font 90 Elo :
+  //  la ligue Pierre en un quart d'heure de jeu.
+  //  recrue : ce que donne la fin de la partie guidée, une seule fois par joueur (un
+  //  coffre et des Éclats, pour voir un coffre s'ouvrir avant la première vraie partie).
+  debut: { parties: 3, format: 'escarmouche', ensuite: 'express', recrue: { coffre: 'argent', eclats: 20 } },
+
   // --- Recherche d'adversaire --------------------------------------------------
   //  fenetre  : écart d'Elo accepté au départ (H)
   //  pas      : ce dont elle s'élargit toutes les `periode` secondes

@@ -247,4 +247,8 @@ export default {
   "Pas d’inquiétude : ta partie se sauvegarde toute seule.": "Tranquilo: tu partida se guarda sola.",
   "À toi de jouer.": "Te toca jugar.",
   "Partie guidée : elle ne compte ni au classement ni au palmarès.": "Partida guiada: no cuenta ni para la clasificación ni para el palmarés.",
+  // Les débuts (état des lieux du 12/10/2026) : le format conseillé, et la fin de la partie guidée avec son coffre de recrue.
+  "Conseillé": "Recomendado",
+  "Jouer ma première partie · {0} min": "Jugar mi primera partida · {0} min",
+  "Ouvrir mon coffre": "Abrir mi cofre",
 };

@@ -71,7 +71,7 @@ const AVANCEES = EXISTANTES.filter((type) => R.troupes[type].gratuite);
 /** Parmi elles, celles que l'ordinateur ne forme que si la partie les lui donne (voir reglagesDePartie). */
 const EN_PLUS = AVANCEES.filter((type) => R.troupes[type].enPlus);
 const ORIGINES = ['ligue', 'parties', 'achat'];   // d'une troupe avancée ; une troupe de base est « base »
-const ORIGINES_DE_COFFRE = ['victoire', 'defaite', 'egalite', 'promotion', 'semaine', 'saison', 'route', 'bataille', 'autre'];
+const ORIGINES_DE_COFFRE = ['victoire', 'defaite', 'egalite', 'promotion', 'semaine', 'saison', 'route', 'bataille', 'recrue', 'autre'];
 const ISSUES = ['victoire', 'defaite', 'egalite', 'abandon', 'abandonAdverse', 'annulee'];
 const COMPTEURS = { victoire: 'victoires', defaite: 'defaites', egalite: 'egalites' };
 
@@ -147,6 +147,7 @@ function semaineDe(jour) {
  *   comptees        : identifiants des dernières parties comptées — la même
  *                     partie, reprise ailleurs, ne se compte pas deux fois
  *   coffres         : ceux qui attendent d'être ouverts, `{ type, origine }`
+ *   recrue          : le coffre de recrue (la fin de la partie guidée) a été donné
  *   troupes         : niveau et fragments de chaque troupe du jeu
  *   debloquees      : type → d'où vient la troupe (base, ligue, parties, achat)
  *   eclats          : la monnaie gratuite — donnée par les coffres et par les
@@ -190,6 +191,7 @@ export function profilNeuf() {
     parties: 0, victoires: 0, defaites: 0, egalites: 0, abandonsPrecoces: 0,
     comptees: [],
     coffres: [],
+    recrue: false,
     troupes,
     debloquees,
     eclats: 0,
@@ -238,6 +240,7 @@ function lireProfil(o) {
       p.coffres.push({ type: coffre.type, origine: ORIGINES_DE_COFFRE.includes(coffre.origine) ? coffre.origine : 'autre' });
     }
   }
+  p.recrue = o.recrue === true;
   if (estObjet(o.troupes)) {
     for (const type of EXISTANTES) {
       const lue = possede(o.troupes, type) ? o.troupes[type] : null;
@@ -361,6 +364,47 @@ export function plafondDe(ligue) {
 function donnerCoffre(p, type, origine, evenements) {
   p.coffres.push({ type, origine });
   evenements.push({ type: 'coffre', coffre: type, origine });
+}
+
+/**
+ * Le format que l'accueil propose à qui n'en a pas choisi : court pour les premières parties classées,
+ * puis celui de tous les jours (R.debut).
+ */
+export function formatConseille(profil) {
+  return debutant(profil) ? R.debut.format : R.debut.ensuite;
+}
+
+/** Le joueur en est-il à ses premières parties classées ? (R.debut.parties) */
+export function debutant(profil) {
+  return migrerProfil(profil).parties < R.debut.parties;
+}
+
+/**
+ * Ce qui sépare le joueur de la ligue suivante : `{ ligue, manque, victoires }` — la fiche de cette ligue, les
+ * points d'Elo qui manquent, et le nombre de victoires que cela fait. Rien (null) dans la plus haute ligue.
+ */
+export function prochainPalier(profil) {
+  const p = migrerProfil(profil);
+  const suivante = R.ligues[p.ligue];
+  if (!suivante) return null;
+  const manque = Math.max(1, suivante.seuil - p.elo);
+  return { ligue: suivante, manque, victoires: Math.ceil(manque / R.elo.victoire) };
+}
+
+/**
+ * Le coffre de recrue : ce que donne la fin de la partie guidée, une seule fois par joueur (R.debut.recrue).
+ * `{ erreur: 'dejaPris' }` s'il l'a déjà été — le guide se rejoue, le cadeau non.
+ */
+export function prendreCoffreDeRecrue(profil) {
+  const p = migrerProfil(profil);
+  if (p.recrue) return { erreur: 'dejaPris' };
+  const evenements = [];
+  const { coffre, eclats } = R.debut.recrue;
+  p.recrue = true;
+  donnerCoffre(p, coffre, 'recrue', evenements);
+  donnerEclats(p, eclats, 'recrue', evenements);
+  noter(p, { op: 'recrue', coffre, eclats });
+  return { profil: p, evenements };
 }
 
 /**

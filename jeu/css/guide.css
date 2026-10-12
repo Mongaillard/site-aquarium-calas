@@ -76,6 +76,9 @@
 }
 .guide-boutons .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--b-encre); }
 .guide-boutons .btn.ghost { font-family: var(--b-texte); font-size: 15px; font-weight: 800; background: var(--b-blanc); }
+/* La dernière étape, quand le coffre de recrue vient d'être donné : il s'annonce, et « Ouvrir mon coffre » passe devant « Jouer ». */
+.guide-cadeau { margin: 10px 0 0; padding: 8px 12px; font-size: 15px; font-weight: 800; line-height: 1.3; color: var(--b-encre); background: var(--b-jaune); border: 3px solid var(--b-encre); border-radius: 12px; }
+.guide-boutons .btn.second { background: var(--b-blanc); }
 
 /* L'anneau : il bat sur la cible, au rythme du doigt. */
 .guide-anneau, .guide-doigt, .guide-trace { position: absolute; left: 0; top: 0; width: 0; height: 0; }

@@ -1335,7 +1335,7 @@ export class UI {
       ${this.textePalmares(palmares, exact)}
       ${summary}
       <div class="modal-actions">
-        <button class="btn primary" data-act="again">${txt('Nouvelle partie')}</button>
+        <button class="btn primary" data-act="again">${this.world.mode.timeLimit ? txt`Rejouer · ${Math.round(this.world.mode.timeLimit / 60)} min` : txt('Rejouer')}</button>
         <button class="btn" data-act="menu">${txt('Menu principal')}</button>
       </div>`, { wide: true, fin: true });   // « fin » : ces deux boutons restent à l'écran (voir la feuille de style)
     modal.querySelector('[data-act="again"]').addEventListener('click', () => this.game.restart(), this.ecoute());

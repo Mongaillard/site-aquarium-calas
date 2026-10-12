@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { PROGRESSION as R } from './progression-config.js';
-import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour } from './progression.js';
+import { ouvrirCoffre, ameliorer, coutAmelioration, probabilitesDe, definitionAuNiveau, semaineDuJour, prochainPalier } from './progression.js';
 import { catalogueBoutique, acheterTroupe, acheterToutesLesTroupes, prendreCouronnesDEssai, ouvrirLaSaison } from './progression.js';
 import { lireProgression, ecrireProgression, effacerLesDonnees } from './save.js';
 import { EN_MAGASIN, EDITEUR, nomComplet } from './edition.js';
@@ -33,7 +33,7 @@ import {
 
 /** Les troupes que le jeu sait former, dans l'ordre des réglages. */
 const TROUPES = Object.keys(R.troupes).filter((type) => !R.troupes[type].aVenir && UNIT_TYPES[type]);
-const ORIGINES = { victoire: txt('Victoire'), defaite: txt('Défaite'), egalite: txt('Égalité'), promotion: txt('Promotion'), semaine: txt('Semaine jouée'), saison: txt('Fin de saison'), route: txt('Route de saison'), bataille: txt('Points de bataille') };
+const ORIGINES = { victoire: txt('Victoire'), defaite: txt('Défaite'), egalite: txt('Égalité'), promotion: txt('Promotion'), semaine: txt('Semaine jouée'), saison: txt('Fin de saison'), route: txt('Route de saison'), bataille: txt('Points de bataille'), recrue: txt('Partie guidée') };
 
 let civ = DEFAULT_CIV;          // le peuple dont on montre les noms et les portraits
 let surChangement = () => {};   // l'accueil se redessine quand le profil change
@@ -166,17 +166,37 @@ export function fermerProgression() {
   n.innerHTML = '';
 }
 
+/** Ce qu'une ligue donne à qui y entre : son coffre, sa troupe, ses pièces, ses Couronnes. */
+function lotsDeLigue(l) {
+  const lots = [];
+  if (l.promotion) lots.push(R.coffres[l.promotion.coffre].nom);
+  if (l.troupe && UNIT_TYPES[l.troupe]) lots.push(nomTroupe(l.troupe));
+  for (const cadeau of (l.promotion && l.promotion.cadeaux) || []) {
+    const p = PIECES[cadeau.piece];
+    if (p) lots.push(p.genre === 'grade' ? txt`titre «\u00a0${p.nom}\u00a0»` : p.nom);
+  }
+  if (l.promotion) lots.push(txt`${R.boutique.parLigue} Couronnes`);
+  return lots;
+}
+
+/** « Encore 3 victoires pour la ligue de Pierre » : la distance à la ligue suivante, comptée en victoires. Rien dans la plus haute. */
+export function versLaLigueSuivante(profil) {
+  const palier = prochainPalier(profil);
+  if (!palier) return '';
+  return palier.victoires > 1
+    ? txt`Encore ${palier.victoires} victoires pour la ${ligueEnPhrase(palier.ligue)}`
+    : txt`Encore une victoire pour la ${ligueEnPhrase(palier.ligue)}`;
+}
+
+/** La fin de la partie guidée : ce que le coffre de recrue vient de donner, en une phrase. */
+export function phraseDuCoffreDeRecrue(evenements) {
+  return txt`Cadeau de recrue : ${resumeDesGains(evenements)}.`;
+}
+
 function ecranLigues(profil) {
   const lignes = [...R.ligues].reverse().map((l) => {
     const etat = l.numero === profil.ligue ? 'actuelle' : l.numero <= profil.plusHauteLigue ? 'atteinte' : '';
-    const lots = [];
-    if (l.promotion) lots.push(R.coffres[l.promotion.coffre].nom);
-    if (l.troupe && UNIT_TYPES[l.troupe]) lots.push(nomTroupe(l.troupe));
-    for (const cadeau of (l.promotion && l.promotion.cadeaux) || []) {
-      const p = PIECES[cadeau.piece];
-      if (p) lots.push(p.genre === 'grade' ? txt`titre «\u00a0${p.nom}\u00a0»` : p.nom);
-    }
-    if (l.promotion) lots.push(txt`${R.boutique.parLigue} Couronnes`);
+    const lots = lotsDeLigue(l);
     return `
       <li class="prog-ligue ${etat}">
         ${ecu(l.numero)}
@@ -846,6 +866,13 @@ export function htmlFinDePartie(evenements, profil) {
   }
   for (const e of de('offreOuverte')) {
     if (e.offre === 'ligue') lignes.push(`<p class="prog-fin-offre"><button class="btn small prog-attend" data-ecran="boutique">${iconeSVG('couronne', 16, 'inline')} ${txt`Offre de ligue : ${nomTroupe(e.troupe)} à moitié prix, ${R.boutique.offres.ligue.heures} h`}</button></p>`);
+  }
+  // Et après : ce qui sépare de la ligue suivante, et ce qu'elle donne. (L'accueil le dit aussi, mais c'est ici,
+  // partie finie, que se décide la suivante.)
+  const palier = prochainPalier(profil);
+  if (palier) {
+    const lots = lotsDeLigue(palier.ligue);
+    lignes.push(`<p class="prog-fin-suite"><b>${versLaLigueSuivante(profil)}</b>${lots.length ? ` <small>${lots.join(' · ')}</small>` : ''}</p>`);
   }
   const coffres = de('coffre');
   if (coffres.length) {

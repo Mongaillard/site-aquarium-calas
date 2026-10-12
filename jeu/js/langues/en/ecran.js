@@ -207,7 +207,9 @@ export default {
   "Score final": "Final score",
   "Score : un point toutes les {0} secondes par position tenue.": "Score: one point every {0} seconds per point held.",
   "Score : la moitié des ressources récoltées, le prix de ce qui est encore debout, et deux fois le prix de ce qui a été abattu chez l’autre.": "Score: half the resources gathered, the cost of what is still standing, and twice the cost of what was taken down on the other side.",
-  "Nouvelle partie": "New game",
   "Menu principal": "Main menu",
   "Allié": "Ally",
+  // La fin de partie : rejouer le même format, avec sa durée quand il a un chronomètre.
+  "Rejouer": "Play again",
+  "Rejouer · {0} min": "Play again · {0} min",
 };
