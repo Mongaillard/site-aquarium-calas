@@ -132,7 +132,7 @@ check('chaque étape a été annoncée une fois, dans l’ordre', vues.join() ==
 console.log('--- Les voix ---');
 const voix = voixDuGuide();
 check('onze phrases dites, une par étape parlée', voix.length === 11 && new Set(voix).size === 11);
-check('le guide parle français, anglais et espagnol', LANGUES_DITES.join() === 'fr,en,es');
+check('le guide ne parle que là où il a une voix du pays : en français pour l’instant', LANGUES_DITES.join() === 'fr');
 const absentes = voix.filter((v) => !fs.existsSync(path.join(RACINE, cheminDeLaVoix('fr', v))));
 check('chaque phrase a son fichier en français', absentes.length === 0, absentes.join(', '));
 check('le guide ne parle que dans les langues qui ont leurs fichiers', LANGUES_DITES.every((l) => voix.every((v) => fs.existsSync(path.join(RACINE, cheminDeLaVoix(l, v))))));
