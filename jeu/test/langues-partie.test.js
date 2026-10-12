@@ -22,8 +22,8 @@ const possede = (objet, cle) => Object.prototype.hasOwnProperty.call(objet, cle)
 const egal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Les fichiers de la partie (ceux qui portent du texte, et ceux qui n'en montrent pas au joueur), et leurs tables. */
-const FICHIERS = ['js/main.js', 'js/game.js', 'js/save.js', 'js/ai.js', 'js/sprites.js', 'js/modele3d.js', 'js/ordres.js', 'js/render.js', 'js/rendu3d.js', 'js/guide.js', 'js/guide-ecran.js', 'js/rappels.js'];
-const TABLES = ['js/sprites.js:textesATraduire'];
+const FICHIERS = ['js/main.js', 'js/game.js', 'js/save.js', 'js/ai.js', 'js/sprites.js', 'js/modele3d.js', 'js/ordres.js', 'js/render.js', 'js/rendu3d.js', 'js/guide.js', 'js/guide-ecran.js', 'js/rappels.js', 'js/rivaux.js'];
+const TABLES = ['js/sprites.js:textesATraduire', 'js/rivaux.js:textesATraduire'];
 
 /**
  * Ce que le joueur lirait, dans la langue du processus. Les modules du jeu ne

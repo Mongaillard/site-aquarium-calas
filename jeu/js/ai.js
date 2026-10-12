@@ -65,10 +65,24 @@ const ZONE_BATTUE = 1.5;
 const ZONE_EVITEE = 3;
 
 export class AIPlayer {
-  constructor(world, playerIndex, difficulty) {
+  constructor(world, playerIndex, difficulty, caractere = null) {
     this.world = world;
     this.index = playerIndex;
+    // Le caractère d'un rival (js/rivaux.js) : il ne change pas la force de l'ordinateur — sa récolte, le niveau
+    // de ses troupes, la trêve promise au débutant —, seulement sa façon de s'en servir : la taille de ses
+    // vagues, le temps entre deux, et ce qu'il forme. Sans caractère, rien ne change.
+    this.caractere = caractere;
+    if (caractere) {
+      difficulty = {
+        ...difficulty,
+        armyTrigger: Math.max(2, Math.round(difficulty.armyTrigger * caractere.vagues.depart)),
+        armyStep: Math.max(1, Math.round(difficulty.armyStep * caractere.vagues.pas)),
+        attackDelay: Math.round(difficulty.attackDelay * caractere.vagues.delai),
+      };
+    }
     this.difficulty = difficulty;
+    // (Dans un format court, la patience d'un caractère : aucune vague avant cette heure de jeu.)
+    this.patience = caractere && world.mode && world.mode.aiTroupes ? caractere.patienceCourte || 0 : 0;
     // Générateur dédié, dérivé de la graine de la partie : l'IA reste
     // imprévisible d'une partie à l'autre, mais rejouable à l'identique.
     this.rng = new RNG((world.seed || 1) + 7919 * (playerIndex + 1));
@@ -537,7 +551,7 @@ export class AIPlayer {
   nextBuilding() {
     // Format court (Escarmouche) : il ne bâtit que la liste du format, dans
     // l'ordre — ni camps ni fermes ni maisons : son bois va aux soldats.
-    const liste = this.world.mode.aiBatiments;
+    const liste = this.world.mode.aiBatiments && this.caractere ? this.caractere.batimentsCourts : this.world.mode.aiBatiments;
     if (liste) return liste.find((type) => !this.has(type)) || null;
     const player = this.player;
     const popRoom = player.popCap - player.pop;
@@ -560,6 +574,8 @@ export class AIPlayer {
     if (this.has('mill') && this.villagers.length >= 10 && this.countFarms() < farmTarget) return 'farm';
 
     if (player.age >= 1) {
+      // (Un rival bâtit d'abord le bâtiment de son caractère : l'écurie du Cavalier passe avant l'archerie.)
+      if (this.caractere && this.caractere.prefere && !this.has(this.caractere.prefere)) return this.caractere.prefere;
       if (!this.has('archery')) return 'archery';
       if (!this.has('stable')) return 'stable';
       if (!this.has('blacksmith')) return 'blacksmith';
@@ -759,7 +775,10 @@ export class AIPlayer {
   manageMilitary() {
     const player = this.player;
     // (Le format peut imposer sa composition : en Escarmouche, la caserne offerte doit servir dès la première seconde.)
-    const roster = this.world.mode.aiTroupes || ARMY_COMPOSITION[Math.min(player.age, ARMY_COMPOSITION.length - 1)];
+    // (Un rival forme les troupes de son caractère — dans un format court, sa liste courte.)
+    const c = this.caractere;
+    const roster = c ? (this.world.mode.aiTroupes ? c.troupesCourtes : c.troupes[Math.min(player.age, c.troupes.length - 1)])
+      : this.world.mode.aiTroupes || ARMY_COMPOSITION[Math.min(player.age, ARMY_COMPOSITION.length - 1)];
 
     // Ce qu'on met de côté avant de former un soldat de plus : le bâtiment
     // voulu, et le prix d'une Hydre tant que le Temple n'en a pas donné assez.
@@ -899,7 +918,7 @@ export class AIPlayer {
       : comptee ? this.troupesAuCamp() : this.army;
     // (Par équipes : ceux qu'une consigne a postés chez un allié ne partent pas en vague.)
     if (!enPositions && this.gardes.size > 0) prets = prets.filter((u) => !this.gardes.has(u.id));
-    let attente = this.attackTimer > 0 || this.world.time < this.treve || prets.length < this.armyTarget;
+    let attente = this.attackTimer > 0 || this.world.time < this.treve || this.world.time < this.patience || prets.length < this.armyTarget;
     const objectif = !attente && enPositions ? this.objectifPosition() : null;
     if (objectif) {
       const vague = (comptee ? prets.slice(0, this.armyTarget) : prets).filter((u) => !u.def.heal);

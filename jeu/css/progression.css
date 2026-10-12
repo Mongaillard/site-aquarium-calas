@@ -269,3 +269,5 @@
 .rappels-reglages p { margin: 0 0 8px; }
 .rappels-choix { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-weight: 800; }
 .rappels-choix input { width: 22px; height: 22px; accent-color: var(--b-encre); }
+/* La fin d'une partie classée nomme le rival : « Tu as battu Barbe-Salée, le Pillard. » */
+.fin-rival { margin: 0 0 8px; font-weight: 800; }

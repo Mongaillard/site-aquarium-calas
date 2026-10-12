@@ -25,6 +25,7 @@ import { etatTemoin, lireTemoin, ecrireTemoin, fermerTemoin, releverTemoin, inci
 import { Camera, Renderer } from './render.js';
 import { InputController } from './input.js';
 import { Guide, partieGuidee } from './guide.js';
+import { rivalDeLaLigue, ficheDuRival } from './rivaux.js';
 import { EcranDuGuide } from './guide-ecran.js';
 import { UI, FoyersAttaque, toucherArmee, resumeReglages, toucherNouvellePartie, texteDeConsigne } from './ui.js';
 import { AudioEngine } from './audio.js';
@@ -234,6 +235,10 @@ class Game {
     // Le conseil de départ, pour une partie neuve seulement : à la reprise,
     // les villageois travaillent déjà.
     if (!repris && !this.tutoriel) this.ui.toast(txt`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
+    if (!repris && this.world.rival) {
+      const r = ficheDuRival(this.world.rival);
+      this.ui.toast(txt`En face : ${nomDuRival(this.world.rival)} (ordinateur). « ${r.phrase} »`, 'warn');
+    }
     if (!repris && this.world.essai) this.ui.toast(txt`Partie d’essai : ${ESSAI_NOMBRE} ${nomDe(this.world.essai, this.civ, ESSAI_NOMBRE)} t’attendent près de ton centre.`, 'good');
     if (this.tutoriel) this.installerLeGuide();
     this.loop = this.loop.bind(this);
@@ -555,7 +560,10 @@ class Game {
       },
     });
     ecrireProgression(r.profil);
-    return htmlFinDePartie(r.evenements, r.profil);
+    const rival = this.world.rival ? nomDuRival(this.world.rival) : '';
+    const issue = issueDePartie(result);
+    const phrase = !rival ? '' : issue === 'victoire' ? txt`Tu as battu ${rival}.` : issue === 'egalite' ? txt`Égalité contre ${rival}.` : txt`${rival} l’emporte cette fois.`;
+    return `${phrase ? `<p class="fin-rival">${phrase}</p>` : ''}${htmlFinDePartie(r.evenements, r.profil)}`;
   }
 
   pruneSelection() {
@@ -1566,7 +1574,15 @@ function avecProgression(options, classee) {
   return {
     ...options, ...reglagesDePartie(lireProgression(), classee ? 'classe' : 'libre'), classee: !!classee,
     partieId: classee ? `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}` : null,
+    // (En face, en partie classée : le rival de la ligue — un ordinateur, avec un nom et un caractère. js/rivaux.js)
+    ...(classee ? { rival: rivalDeLaLigue(lireProgression().ligue).id } : {}),
   };
+}
+
+/** « Barbe-Salée, le Pillard » : un rival tel qu'on le nomme dans une phrase. */
+function nomDuRival(id) {
+  const r = ficheDuRival(id);
+  return r ? `${r.nom}, ${r.caractere}` : '';
 }
 
 /** Les réglages de la partie guidée (js/guide.js), avec les peuples choisis à l'accueil. */
@@ -1862,10 +1878,12 @@ function refreshPalmares() {
   if (!node) return;
   // (En partie classée, c'est le bandeau de ligue qui dit où l'on en est.)
   const resume = partieClassee() ? '' : resumePalmares(lignePalmares(lirePalmares(), settings.mode, settings.difficulty));
-  node.textContent = resume
-    ? txt`${GAME_MODES[settings.mode].name}, ${DIFFICULTIES[settings.difficulty].name} : ${resume}`
+  // (En partie classée : qui attend en face — le rival de la ligue, et sa façon de jouer.)
+  const rival = partieClassee() ? ficheDuRival(rivalDeLaLigue(lireProgression().ligue).id) : null;
+  node.textContent = rival ? txt`En face : ${rival.nom}, ${rival.caractere} (ordinateur). ${rival.trait}`
+    : resume ? txt`${GAME_MODES[settings.mode].name}, ${DIFFICULTIES[settings.difficulty].name} : ${resume}`
     : '';
-  node.classList.toggle('hidden', !resume);
+  node.classList.toggle('hidden', !resume && !rival);
 }
 
 /**

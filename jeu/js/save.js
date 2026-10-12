@@ -225,6 +225,8 @@ export function serializeWorld(world, extra = {}) {
     ais: world.ais.map(serializeAI),
     // (Champ écrit pour une partie d'essai seulement : les sauvegardes des autres parties ne changent pas.)
     ...(world.essai ? { essai: world.essai } : {}),
+    // (Partie classée : le rival d'en face, pour qu'il garde son nom et son caractère à la reprise.)
+    ...(world.rival ? { rival: world.rival } : {}),
     // (Par équipes : qui tient chaque place — le joueur, un ordinateur, un joueur à distance.)
     ...(world.parEquipes ? { places: world.places.map((p) => p.controle) } : {}),
     // (Prise de positions : qui tient quoi, les prises entamées, et où en est le compte des points.)
@@ -259,6 +261,7 @@ export function restoreWorld(data) {
     troupesEnPlus: (data.players || []).map((j) => j && j.enPlus),
     // (Partie d'essai : la troupe essayée, pour ses places de population offertes.)
     essai: data.essai,
+    rival: data.rival,
   });
   world.time = data.time || 0;
   world.humanIndex = data.humanIndex || 0;

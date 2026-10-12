@@ -9,6 +9,7 @@ import {
   START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, COULEURS_EQUIPES, GAME_MODES, DEFAULT_MODE,
   DEFAULT_CIV, civDe, nomDe, ficheDe,
 } from './config.js';
+import { rivalConnu, caractereDuRival, ficheDuRival } from './rivaux.js';
 import { GameMap, BLOCK } from './map.js';
 import { PathFinder } from './pathfinding.js';
 import { Unit, Animal, Building, Projectile, STATE, computeDamage } from './entities.js';
@@ -112,6 +113,9 @@ export class World {
     this.mode = GAME_MODES[this.modeId];
     // La partie guidée (js/guide.js) se joue sans chronomètre : le format reste le sien, moins sa limite de temps.
     this.tutoriel = !!options.tutoriel;
+    // Le rival d'une partie classée (js/rivaux.js) : son nom pour l'adversaire, son caractère pour l'ordinateur.
+    // Sans rival, l'ordinateur joue comme il a toujours joué.
+    this.rival = typeof options.rival === 'string' && rivalConnu(options.rival) && !GAME_MODES[this.modeId].equipes ? options.rival : null;
     if (this.tutoriel) this.mode = { ...this.mode, timeLimit: 0 };
     this.mapSizeId = MAP_SIZES[options.mapSize] ? options.mapSize : this.mode.mapSize;
     this.difficultyId = DIFFICULTIES[options.difficulty] ? options.difficulty : 'normal';
@@ -172,7 +176,7 @@ export class World {
     if (!this.parEquipes) {
       this.players = [
         makePlayer(0, options.playerName || txt('Vous'), false, civDe(civs[0])),
-        makePlayer(1, txt('Adversaire'), true, civDe(civs[1])),
+        makePlayer(1, this.rival ? ficheDuRival(this.rival).nom : txt('Adversaire'), true, civDe(civs[1])),
       ];
       this.players[1].mods.gatherRate = this.difficulty.gatherBonus;
     } else {
@@ -405,7 +409,7 @@ export class World {
 
   /** Branche une intelligence artificielle sur un joueur (mise en place ou reprise). */
   addAI(playerIndex) {
-    const ai = new AIPlayer(this, playerIndex, this.difficulty);
+    const ai = new AIPlayer(this, playerIndex, this.difficulty, this.rival ? caractereDuRival(this.rival) : null);
     this.ais.push(ai);
     return ai;
   }
