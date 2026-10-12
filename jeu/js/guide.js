@@ -275,9 +275,10 @@ export function voixDuGuide() {
 /**
  * Les langues où le guide parle : ailleurs, il se lit sans rien dire. Une langue n'entre ici qu'avec une voix
  * du pays : la voix française, à qui l'on fait dire de l'anglais ou de l'espagnol, garde son accent
- * (essayé puis retiré le 12/10/2026 — voir assets/voix/SOURCES.md).
+ * (essayé puis retiré le 12/10/2026 — voir assets/voix/SOURCES.md). L'anglais a la sienne : la voix
+ * d'origine du moteur, qui parle anglais.
  */
-export const LANGUES_DITES = ['fr'];
+export const LANGUES_DITES = ['fr', 'en'];
 
 /** Le chemin d'une phrase dite, dans une langue. */
 export const cheminDeLaVoix = (langue, nom) => `assets/voix/${langue}/${nom}.mp4`;
