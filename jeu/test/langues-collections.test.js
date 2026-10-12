@@ -104,7 +104,7 @@ console.log('\n--- L’anglais ---');
     const saison = P.saisonDuJour('2026-10-09');
     const neuf = { ...P.profilNeuf(), saison };
     const base = { ...neuf, eclats: 400, couronnes: 520, pieces: [...neuf.pieces, 'bassecour.cochon-couronne', 'bassecour.poule-guerriere', 'ligues.recrue', 'ligues.bronze'],
-      blason: { ...neuf.blason, embleme: 'bassecour.cochon-couronne', banniere: 'ligues.bronze' }, route: { points: 250, passe: false, pris: { gratuit: [1], passe: [] } } };
+      blason: { ...neuf.blason, embleme: 'bassecour.cochon-couronne', banniere: 'ligues.bronze' }, route: { points: 450, passe: false, pris: { gratuit: [1], passe: [] } } };
     const r = {};
     r.langue = L.LANGUE;
     r.genres = K.NOMS_DES_GENRES;
@@ -140,7 +140,7 @@ console.log('\n--- L’anglais ---');
     r.passe = geste({ act: 'passe', i: '1' });
     poser({ ...base, couronnes: 0 });
     r.sansLeSou = geste({ act: 'passe' });
-    poser({ ...neuf, route: { points: 3000, passe: false, pris: { gratuit: [], passe: [] } }, pieces: [...neuf.pieces, ...K.collection('citrouilles').pieces] });
+    poser({ ...neuf, route: { points: 6000, passe: false, pris: { gratuit: [], passe: [] } }, pieces: [...neuf.pieces, ...K.collection('citrouilles').pieces] });
     r.finie = ecran('saison');
     poser({ ...neuf, eclats: 2000, couronnes: 350 });
     r.boutique = ecran('boutique');
@@ -152,7 +152,7 @@ console.log('\n--- L’anglais ---');
     // Le mois a tourné : ce que la saison passée a donné, et repris au classement.
     const novembre = new VraieDate(2026, 10, 2, 12).getTime();
     globalThis.Date = class extends VraieDate { constructor(...a) { super(...(a.length ? a : [novembre])); } static now() { return novembre; } };
-    poser({ ...neuf, parties: 40, victoires: 30, defaites: 10, elo: 2350, ligue: 8, plusHauteLigue: 8, promotions: [2, 3, 4, 5, 6, 7, 8], route: { points: 250, passe: false, pris: { gratuit: [1], passe: [] } } });
+    poser({ ...neuf, parties: 40, victoires: 30, defaites: 10, elo: 2350, ligue: 8, plusHauteLigue: 8, promotions: [2, 3, 4, 5, 6, 7, 8], route: { points: 450, passe: false, pris: { gratuit: [1], passe: [] } } });
     r.moisSuivant = ecran('saison');
     r.sansTraduction = [...L.SANS_TRADUCTION];
     console.log(JSON.stringify(r));`);
@@ -209,7 +209,7 @@ console.log('\n--- L’anglais ---');
 
   t = texte(m.saison);
   check('l’écran de la saison : son numéro, son thème, ce qu’il reste, le palier, la règle des points',
-    /<h2>Season 1<\/h2>/.test(m.saison) && /Night of the Pumpkins 23 days left Tier 2 of 30 · 50 \S+ out of 100 toward the next/.test(t)
+    /<h2>Season 1<\/h2>/.test(m.saison) && /Night of the Pumpkins 23 days left Tier 2 of 30 · 50 \S+ out of 200 toward the next/.test(t)
     && /A ranked game: 20 points\. A win: 20 more\. The first win of the day: another 40\./.test(t) && propre(m.saison), t.slice(0, 200));
   check('… le Passe : ce qu’il contient, ce qu’il ne contient pas, son prix et son équivalent en euros',
     /<b>The Season Pass<\/b> opens the right-hand track: 12 stickers, 4 crest pieces \(banner, frame, two title words\), 400 Crowns and 400 Shards\. No chests, no fragments, no levels\./.test(m.saison)

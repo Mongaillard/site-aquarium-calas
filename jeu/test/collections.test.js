@@ -48,6 +48,8 @@ const avecCoffre = (profil, ...types) => ({ ...profil, coffres: types.map((type)
 const avecPieces = (profil, ...ids) => ({ ...profil, pieces: [...profil.pieces, ...ids] });
 const partie = (issue, jour, extra = {}) => ({ issue, duree: 600, contreOrdinateur: 'echelle', jour, alea: () => 0, ...extra });
 /** Un profil qui a `points` points sur la route de la saison 1. */
+/** Un joueur d'après ses premiers jours : ses points de saison ne comptent plus double (R.saisons.premiersJours, test/objectifs.test.js). */
+const rode = (profil) => ({ ...profil, premierJour: '2026-01-01' });
 const enRoute = (points, extra = {}) => ({ ...profilNeuf(), route: { points, passe: false, pris: { gratuit: [], passe: [] } }, ...extra });
 
 // --- Le catalogue ---------------------------------------------------------------------
@@ -365,7 +367,7 @@ console.log('\n--- La route ---');
 {
   const route = S.route;
   const compte = (voie, cle) => route.filter((l) => l[voie][cle] !== undefined).length;
-  check('trente paliers de cent points, deux voies pleines', route.length === 30 && S.paliers === 30 && S.pointsParPalier === 100 && route.every((l) => Object.keys(l.gratuit).length === 1 && Object.keys(l.passe).length === 1));
+  check('trente paliers de deux cents points, deux voies pleines', route.length === 30 && S.paliers === 30 && S.pointsParPalier === 200 && route.every((l) => Object.keys(l.gratuit).length === 1 && Object.keys(l.passe).length === 1));
   check('LA RÈGLE : la voie du Passe ne contient ni coffre, ni fragment, ni niveau — que des pièces, des Couronnes et des Éclats',
     route.every((l) => ['embleme', 'piece', 'couronnes', 'eclats'].includes(Object.keys(l.passe)[0])) && !/coffre|fragment|niveau/.test(JSON.stringify(route.map((l) => l.passe))));
   check('la voie gratuite : 8 coffres, 150 Couronnes, 6 autocollants, des Éclats',
@@ -386,26 +388,28 @@ console.log('\n--- La route ---');
 
   // Les points.
   const J = '2026-10-09';
-  const v1 = appliquerResultat(profilNeuf(), partie('victoire', J));
+  const v1 = appliquerResultat(rode(profilNeuf()), partie('victoire', J));
   check('une victoire, la première du jour : 20 + 20 + 40 = 80 points de saison',
     v1.profil.route.points === 80 && egal(parType(v1.evenements, 'pointsDeSaison'), [{ type: 'pointsDeSaison', variation: 80, total: 80, palier: 0, paliersGagnes: 0, premiereVictoireDuJour: true }]));
   const v2 = appliquerResultat(v1.profil, partie('victoire', J));
-  check('la seconde victoire du jour : 40, et le premier palier s’ouvre', v2.profil.route.points === 120 && parType(v2.evenements, 'pointsDeSaison')[0].paliersGagnes === 1 && parType(v2.evenements, 'pointsDeSaison')[0].palier === 1);
+  check('la seconde victoire du jour : 40 de plus', v2.profil.route.points === 120 && parType(v2.evenements, 'pointsDeSaison')[0].paliersGagnes === 0);
+  const ouvre = parType(appliquerResultat(rode(enRoute(S.pointsParPalier - 20)), partie('defaite', J)).evenements, 'pointsDeSaison')[0];
+  check('… et le point qui atteint le compte ouvre le premier palier', ouvre.paliersGagnes === 1 && ouvre.palier === 1 && ouvre.total === S.pointsParPalier);
   const d = appliquerResultat(v2.profil, partie('defaite', J));
   check('une défaite jouée jusqu’au bout : 20 points', d.profil.route.points === 140);
   check('une défaite d’avant deux minutes : rien', appliquerResultat(v2.profil, partie('defaite', J, { duree: 60 })).profil.route.points === 120);
   const lendemain = appliquerResultat(d.profil, partie('victoire', '2026-10-10'));
   check('le lendemain, la première victoire rapporte de nouveau son supplément', lendemain.profil.route.points - pointsDesObjectifs(lendemain.evenements) === 220);
   check('une égalité : 20 points, sans entamer la première victoire du jour',
-    appliquerResultat(profilNeuf(), partie('egalite', J)).profil.route.points === 20 && appliquerResultat(appliquerResultat(profilNeuf(), partie('egalite', J)).profil, partie('victoire', J)).profil.route.points === 100);
-  const plein = appliquerResultat(enRoute(2990), partie('victoire', J));
-  check('au bout de la route, les points s’arrêtent', plein.profil.route.points === 3000 && parType(plein.evenements, 'pointsDeSaison')[0].variation === 10
-    && appliquerResultat(plein.profil, partie('victoire', '2026-10-11')).profil.route.points === 3000);
+    appliquerResultat(rode(profilNeuf()), partie('egalite', J)).profil.route.points === 20 && appliquerResultat(appliquerResultat(rode(profilNeuf()), partie('egalite', J)).profil, partie('victoire', J)).profil.route.points === 100);
+  const plein = appliquerResultat(enRoute(S.paliers * S.pointsParPalier - 10), partie('victoire', J));
+  check('au bout de la route, les points s’arrêtent', plein.profil.route.points === S.paliers * S.pointsParPalier && parType(plein.evenements, 'pointsDeSaison')[0].variation === 10
+    && appliquerResultat(plein.profil, partie('victoire', '2026-10-11')).profil.route.points === S.paliers * S.pointsParPalier);
   check('des chiffres ronds partout : les points, les prix, les Éclats', [...Object.values(S.points), S.pointsParPalier, S.passe.prix, ...Object.values(C.eclats.parCoffre), ...Object.values(C.eclats.doublon), ...Object.values(C.eclats.prix)].every((n) => Number.isInteger(n) && n % 5 === 0));
 
   // Prendre.
-  const p = enRoute(350);
-  check('350 points : trois paliers ouverts', etatDeLaSaison(p, J).palier === 3 && etatDeLaSaison(p, J).versLeSuivant === 50 && etatDeLaSaison(p, J).aPrendre === 3);
+  const p = enRoute(3 * S.pointsParPalier + 50);
+  check('trois paliers et 50 points : trois paliers ouverts', etatDeLaSaison(p, J).palier === 3 && etatDeLaSaison(p, J).versLeSuivant === 50 && etatDeLaSaison(p, J).aPrendre === 3);
   const un = prendrePalier(p, 'gratuit', 1);
   check('prendre le palier 1 : 20 Éclats', un.profil.eclats === 20 && egal(un.profil.route.pris.gratuit, [1]) && egal(un.evenements.map((e) => e.type), ['palierPris', 'eclats']));
   const deux = prendrePalier(un.profil, 'gratuit', 2);
@@ -430,18 +434,18 @@ console.log('\n--- La route ---');
   const pris = prendreTout(passe.profil);
   check('… un autocollant, 40 Éclats, 100 Couronnes', pris.profil.pieces.includes('citrouilles.araignee-au-hamac') && pris.profil.eclats === 60 && pris.profil.couronnes === 120);
   // Toute la route, les deux voies.
-  const bout = prendreTout(acheterPasse({ ...enRoute(3000), couronnes: 500 }).profil);
+  const bout = prendreTout(acheterPasse({ ...enRoute(S.paliers * S.pointsParPalier), couronnes: 500 }).profil);
   check('la route entière avec le Passe : toute la collection de la saison sauf son étendard et son grade de champion, 550 Couronnes, 660 Éclats, 8 coffres',
     collection('citrouilles').pieces.filter((id) => !bout.profil.pieces.includes(id)).join() === 'citrouilles.etendard,citrouilles.champion'
     && bout.profil.couronnes === 550 && bout.profil.eclats === 660 && bout.profil.coffres.length === 8, `${bout.profil.couronnes} Couronnes, ${bout.profil.eclats} Éclats, ${bout.profil.coffres.length} coffres`);
   check('… sans le Passe : 6 autocollants, 150 Couronnes, 260 Éclats, 8 coffres — et aucune pièce de la voie payante',
-    (() => { const g = prendreTout(enRoute(3000)).profil; return g.pieces.filter((id) => PIECES[id].collection === 'citrouilles').length === 6 && g.couronnes === 150 && g.eclats === 260 && g.coffres.length === 8; })());
+    (() => { const g = prendreTout(enRoute(S.paliers * S.pointsParPalier)).profil; return g.pieces.filter((id) => PIECES[id].collection === 'citrouilles').length === 6 && g.couronnes === 150 && g.eclats === 260 && g.coffres.length === 8; })());
 }
 
 // --- D'une saison à l'autre ------------------------------------------------------------------------
 console.log('\n--- D’une saison à l’autre ---');
 {
-  const p = { ...enRoute(450), elo: 950, ligue: 5, plusHauteLigue: 5, promotions: [2, 3, 4, 5] };
+  const p = rode({ ...enRoute(4 * S.pointsParPalier + 50), elo: 950, ligue: 5, plusHauteLigue: 5, promotions: [2, 3, 4, 5] });
   check('dans le mois de sa saison, rien ne bouge', ouvrirLaSaison(p, '2026-10-31').evenements.length === 0 && egal(ouvrirLaSaison(p, '2026-10-31').profil, migrerProfil(p)));
   const r = ouvrirLaSaison(p, '2026-11-01');
   check('le mois tourne : la saison 2 commence, la route repart de zéro, le Passe est à reprendre',
@@ -456,7 +460,7 @@ console.log('\n--- D’une saison à l’autre ---');
   const loin = ouvrirLaSaison(p, '2027-03-15');
   check('trois mois d’absence : une seule remise, et l’on reprend à la saison du jour', loin.profil.saison === 6 && loin.profil.elo === 850 && loin.profil.saisons.length === 1 && parType(loin.evenements, 'remiseDeSaison').length === 1);
   check('une horloge qui recule ne ramène pas à la saison d’avant', ouvrirLaSaison(r.profil, '2026-10-15').profil.saison === 2 && ouvrirLaSaison(r.profil, 'n’importe quoi').evenements.length === 0);
-  const nouveau = appliquerResultat(profilNeuf(), partie('victoire', '2026-11-03'));
+  const nouveau = appliquerResultat(rode(profilNeuf()), partie('victoire', '2026-11-03'));
   check('un joueur arrivé en novembre n’a pas de saison à finir : il rejoint la saison 2 sans annonce ni saison fantôme',
     nouveau.profil.saison === 2 && nouveau.profil.saisons.length === 0 && !nouveau.evenements.some((e) => ['saison', 'remiseDeSaison', 'recompenseSaison'].includes(e.type))
     && nouveau.profil.route.points - pointsDesObjectifs(nouveau.evenements) === 80);
@@ -468,7 +472,7 @@ console.log('\n--- D’une saison à l’autre ---');
   const jouee = appliquerResultat(p, partie('victoire', '2026-11-02'));
   check('une partie jouée le mois suivant ferme d’abord la saison, puis compte pour la nouvelle',
     jouee.profil.saison === 2 && jouee.profil.route.points === 80 && jouee.profil.elo === 880 && jouee.evenements.findIndex((e) => e.type === 'saison') < jouee.evenements.findIndex((e) => e.type === 'elo'));
-  const avecPasse = ouvrirLaSaison({ ...p, route: { points: 450, passe: true, pris: { gratuit: [1, 2, 3, 4], passe: [1] } } }, '2026-11-01');
+  const avecPasse = ouvrirLaSaison({ ...p, route: { points: 4 * S.pointsParPalier + 50, passe: true, pris: { gratuit: [1, 2, 3, 4], passe: [1] } } }, '2026-11-01');
   check('avec le Passe : ses paliers atteints sont donnés aussi, et le Passe ne vaut que pour sa saison',
     parType(avecPasse.evenements, 'palierPris').map((e) => `${e.voie}${e.palier}`).join() === 'passe2,passe3,passe4' && avecPasse.profil.route.passe === false);
   // Les plus hautes ligues.
@@ -507,7 +511,7 @@ console.log('\n--- Les écrans ---');
   const aujourdhui = `${mois.getFullYear()}-${String(mois.getMonth() + 1).padStart(2, '0')}-${String(mois.getDate()).padStart(2, '0')}`;
   const saison = saisonDuJour(aujourdhui), theme = collection(themeDeSaison(saison));
   const col = DES_COFFRES[0];
-  const base = { ...profilNeuf(), saison, eclats: 400, couronnes: 520, pieces: [...profilNeuf().pieces, col.emblemes[0], col.emblemes[1], 'ligues.recrue'], route: { points: 250, passe: false, pris: { gratuit: [1], passe: [] } } };
+  const base = { ...profilNeuf(), saison, eclats: 400, couronnes: 520, pieces: [...profilNeuf().pieces, col.emblemes[0], col.emblemes[1], 'ligues.recrue'], route: { points: 2 * R.saisons.pointsParPalier + 50, passe: false, pris: { gratuit: [1], passe: [] } } };
   base.blason = { ...base.blason, embleme: col.emblemes[0] };
   poser(base);
 
@@ -565,7 +569,7 @@ console.log('\n--- Les écrans ---');
   ouvrirProgression('saison');
   page = noeud.innerHTML; t = texte(page);
   check(`l’écran de la saison : son numéro, sa collection (${theme.nom}), ce qu’il reste, le palier, la règle des points`,
-    new RegExp(`<h2>Saison ${saison}</h2>`).test(page) && t.includes(theme.nom) && /Il reste \d+ jours|Dernier jour/.test(t) && /Palier 2 sur 30 · 50 points sur 100/.test(t) && /Une partie classée : 20 points/.test(t));
+    new RegExp(`<h2>Saison ${saison}</h2>`).test(page) && t.includes(theme.nom) && /Il reste \d+ jours|Dernier jour/.test(t) && /Palier 2 sur 30 · 50 points sur 200/.test(t) && /Une partie classée : 20 points/.test(t));
   check('… la route : trente paliers, deux voies ; le premier est pris, le deuxième à prendre, la voie du Passe est fermée',
     (page.match(/class="col-palier /g) || []).length === 30 && /class="col-case pris" data-voie="gratuit"/.test(page) && /data-act="palier" data-arg="gratuit" data-i="2"/.test(page)
     && (page.match(/class="col-case ferme" data-voie="passe"/g) || []).length === 30 && propre(page));
@@ -614,10 +618,10 @@ console.log('\n--- Les écrans ---');
   t = texte(noeud.innerHTML).replace(/\u00a0/g, ' ');
   check('la route des ligues nomme ses cadeaux : titre « Recrue », Bannière de Bronze, Cadre d’Or, 50 Couronnes',
     /titre « Recrue »/.test(t) && /Bannière de Bronze/.test(t) && /Cadre d’Or/.test(t) && /Cadre des Légendes/.test(t) && /50 Couronnes/.test(t));
-  const promue = appliquerResultat({ ...profilNeuf(), elo: 60 }, partie('victoire', aujourdhui, { instant: Date.now() / 1000 }));
+  const promue = appliquerResultat(rode({ ...profilNeuf(), elo: 60 }), partie('victoire', aujourdhui, { instant: Date.now() / 1000 }));
   const fin = texte(htmlFinDePartie(promue.evenements, promue.profil)).replace(/\u00a0/g, ' ');
   check('fin de partie : le cadeau de la ligue et les points de saison', /Cadeau de ligue : titre « Recrue »/.test(fin) && /\+80 points de saison \(première victoire du jour\)/.test(fin), fin.slice(0, 200));
-  const palier = appliquerResultat({ ...enRoute(90), saison }, partie('defaite', aujourdhui));
+  const palier = appliquerResultat({ ...enRoute(R.saisons.pointsParPalier - 10), saison }, partie('defaite', aujourdhui));
   check('… un palier atteint se propose aussitôt', /data-ecran="saison">palier 1 à prendre/.test(htmlFinDePartie(palier.evenements, palier.profil)));
   check('… une épithète gagnée se dit comme un titre, pas comme un bout de phrase',
     /Gagné : titre « … des Citrouilles »/.test(texte(htmlFinDePartie([{ type: 'piece', piece: 'citrouilles.epithete', origine: 'saison', doublon: false, eclats: 0 }], profilNeuf())).replace(/\u00a0/g, ' ')));
@@ -630,7 +634,7 @@ console.log('\n--- Les écrans ---');
   ouvrirProgression('collection', 'ligues');
   check('une bannière est « Portée », un cadre « Porté »', (noeud.innerHTML.match(/class="col-porte">Portée</g) || []).length === 1 && (noeud.innerHTML.match(/class="col-porte">Porté</g) || []).length === 1);
   ouvrirProgression('saison');
-  check('« 0 point », pas « 0 points »', /Palier 0 sur 30 · 0 point sur 100/.test(texte(noeud.innerHTML)));
+  check('« 0 point », pas « 0 points »', /Palier 0 sur 30 · 0 point sur 200/.test(texte(noeud.innerHTML)));
   check('un autocollant est « Commun », pas « Commune »', (() => { ouvrirProgression('collection', col.id); return />Commun</.test(noeud.innerHTML) && !/>Commune</.test(noeud.innerHTML); })());
 
   // Les autocollants du jour : la boutique dit combien il en reste.
@@ -684,7 +688,7 @@ console.log('\n--- Les écrans ---');
   globalThis.Date = class extends VraieDate { constructor(...a) { super(...(a.length ? a : [leDeux])); } static now() { return leDeux; } };
   try {
     const joue = { ...profilNeuf(), saison, parties: 40, victoires: 30, defaites: 10, elo: 2350, ligue: 8, plusHauteLigue: 8, promotions: [2, 3, 4, 5, 6, 7, 8],
-      couronnes: 600, route: { points: 250, passe: false, pris: { gratuit: [1], passe: [] } } };
+      couronnes: 600, route: { points: 2 * R.saisons.pointsParPalier + 50, passe: false, pris: { gratuit: [1], passe: [] } } };
     check('le mois suivant, la tuile de la saison porte un « ! » pour qui a joué — pas pour un profil neuf',
       /Saison <b class="prog-pastille">!<\/b>/.test(htmlBandeau(migrerProfil(joue))) && !/prog-pastille">!/.test(htmlBandeau(profilNeuf())));
     poser(joue);

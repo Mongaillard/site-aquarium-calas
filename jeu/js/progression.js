@@ -337,7 +337,9 @@ function lireProfil(o) {
     }
   }
   p.joursJoues = entier(o.joursJoues, 0, GRAND, 0);
-  p.premierJour = rangDuJour(o.premierJour) === null ? '' : o.premierJour;
+  // (Une fiche d'avant ces compteurs a déjà joué : son premier jour connu est celui de ses compteurs du jour,
+  // pour qu'elle ne passe pas pour un nouveau joueur — voir facteurDesPoints.)
+  p.premierJour = rangDuJour(o.premierJour) === null ? (p.parties > 0 ? p.jour.date : '') : o.premierJour;
   // (Une fiche d'avant ces compteurs : son dernier jour de jeu est celui de ses compteurs du jour.)
   p.dernierJour = rangDuJour(o.dernierJour) === null ? p.jour.date : o.dernierJour;
   if (estObjet(o.victoiresPar)) {
@@ -1773,8 +1775,19 @@ function compterLaSaison(p, issue, evenements) {
     if (premiere) points += s.premiereVictoireDuJour;
     p.jour.victoires++;
   }
-  const r = avancerSurLaRoute(p, points);
-  evenements.push({ type: 'pointsDeSaison', variation: r.gagnes, total: p.route.points, palier: r.palier, paliersGagnes: r.paliersGagnes, premiereVictoireDuJour: premiere });
+  const facteur = facteurDesPoints(p);
+  const r = avancerSurLaRoute(p, points * facteur);
+  evenements.push({ type: 'pointsDeSaison', variation: r.gagnes, total: p.route.points, palier: r.palier, paliersGagnes: r.paliersGagnes, premiereVictoireDuJour: premiere, ...(facteur > 1 ? { facteur } : {}) });
+}
+
+/**
+ * Par combien comptent les points de saison aujourd'hui : pendant ses premiers jours (R.saisons.premiersJours),
+ * un nouveau joueur les gagne en double.
+ */
+function facteurDesPoints(p) {
+  const premier = rangDuJour(p.premierJour), aujourdhui = rangDuJour(p.jour.date);
+  const { jours, facteur } = R.saisons.premiersJours;
+  return premier !== null && aujourdhui !== null && aujourdhui >= premier && aujourdhui - premier < jours ? facteur : 1;
 }
 
 /** Ajoute des points à la route de la saison, sans dépasser son bout : ce qui a été ajouté, le palier atteint, les paliers franchis. */
@@ -1827,8 +1840,9 @@ function compterLesObjectifs(p, issue, partie, evenements) {
   const jour = p.jour.date;
   if (!jour) return;
   const faits = estObjet(partie.faits) ? partie.faits : {};
+  const facteur = facteurDesPoints(p);
   const payer = (portee, objectif, points) => {
-    const r = avancerSurLaRoute(p, points);
+    const r = avancerSurLaRoute(p, points * facteur);
     evenements.push({ type: 'objectif', portee, objectif: objectif.id, points: r.gagnes, total: p.route.points, palier: r.palier, paliersGagnes: r.paliersGagnes });
   };
   if (p.objectifs.jour !== jour) { p.objectifs.jour = jour; p.objectifs.faits = []; }

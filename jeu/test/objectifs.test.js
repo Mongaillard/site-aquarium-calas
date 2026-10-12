@@ -41,6 +41,8 @@ function jouer(profil, issue, jour, faits = {}, extra = {}) {
   return appliquerResultat(profil, { issue, duree: 280, contreOrdinateur: 'echelle', jour, instant: 1_800_000_000 + numero * 600, id: `objectif-${numero}`, format: 'escarmouche', faits, ...extra });
 }
 const parType = (evenements, type) => evenements.filter((e) => e.type === type);
+/** Un joueur d'après ses premiers jours : ses points de saison ne comptent plus double (voir « Les premiers jours », plus bas). */
+const rode = () => ({ ...profilNeuf(), premierJour: '2026-01-01' });
 
 // --- Les réglages -----------------------------------------------------------------------
 console.log('--- Les réglages ---');
@@ -79,7 +81,7 @@ console.log('--- Tirés de la date ---');
 console.log('--- Les objectifs du jour ---');
 {
   const jJouer = jourOu((d) => d[0].genre === 'jouer');
-  const perdue = jouer(profilNeuf(), 'defaite', jJouer);
+  const perdue = jouer(rode(), 'defaite', jJouer);
   const o = parType(perdue.evenements, 'objectif');
   check('« Jouer une partie classée » : une défaite jouée jusqu’au bout suffit, et paie ses points de saison',
     o.length === 1 && o[0].portee === 'jour' && o[0].objectif === 'jouer' && o[0].points === O.points.jour && perdue.profil.objectifs.faits.includes('jouer')
@@ -89,33 +91,33 @@ console.log('--- Les objectifs du jour ---');
   check('… une seule fois par jour', parType(encore.evenements, 'objectif').length === 0 && encore.profil.route.points === perdue.profil.route.points + R.saisons.points.partie);
   const lendemain = jouer(encore.profil, 'defaite', plus(jJouer, O.faciles.length));
   check('… et il revient le jour où la date le ramène', parType(lendemain.evenements, 'objectif').some((e) => e.objectif === 'jouer') && egal(lendemain.profil.objectifs.faits, ['jouer']));
-  const eclair = jouer(profilNeuf(), 'defaite', jJouer, {}, { duree: 30 });
+  const eclair = jouer(rode(), 'defaite', jJouer, {}, { duree: 30 });
   check('une défaite d’avant deux minutes n’atteint aucun objectif', parType(eclair.evenements, 'objectif').length === 0 && eclair.profil.objectifs.faits.length === 0);
-  const annulee = jouer(profilNeuf(), 'annulee', jJouer);
+  const annulee = jouer(rode(), 'annulee', jJouer);
   check('une partie annulée non plus', parType(annulee.evenements, 'objectif').length === 0);
 
   const jGagner = jourOu((d) => d[1].id === 'gagner');
   check('« Gagner une partie classée » : une défaite ne le fait pas, une victoire oui',
-    !jouer(profilNeuf(), 'defaite', jGagner).profil.objectifs.faits.includes('gagner') && jouer(profilNeuf(), 'victoire', jGagner).profil.objectifs.faits.includes('gagner'));
+    !jouer(rode(), 'defaite', jGagner).profil.objectifs.faits.includes('gagner') && jouer(rode(), 'victoire', jGagner).profil.objectifs.faits.includes('gagner'));
   const jSolarien = jourOu((d) => d[1].id === 'gagnerSolarien');
   check('« Gagner avec les Solariens » : gagner avec les Atlantes ne compte pas',
-    !jouer(profilNeuf(), 'victoire', jSolarien, { civ: 'atlante' }).profil.objectifs.faits.includes('gagnerSolarien')
-    && jouer(profilNeuf(), 'victoire', jSolarien, { civ: 'solarien' }).profil.objectifs.faits.includes('gagnerSolarien')
-    && !jouer(profilNeuf(), 'defaite', jSolarien, { civ: 'solarien' }).profil.objectifs.faits.includes('gagnerSolarien'));
+    !jouer(rode(), 'victoire', jSolarien, { civ: 'atlante' }).profil.objectifs.faits.includes('gagnerSolarien')
+    && jouer(rode(), 'victoire', jSolarien, { civ: 'solarien' }).profil.objectifs.faits.includes('gagnerSolarien')
+    && !jouer(rode(), 'defaite', jSolarien, { civ: 'solarien' }).profil.objectifs.faits.includes('gagnerSolarien'));
   const jFormer = jourOu((d) => d[0].id === 'former12');
   check('« Former 12 unités » : onze ne suffisent pas, douze oui — même en perdant',
-    !jouer(profilNeuf(), 'defaite', jFormer, { formees: 11 }).profil.objectifs.faits.includes('former12') && jouer(profilNeuf(), 'defaite', jFormer, { formees: 12 }).profil.objectifs.faits.includes('former12'));
+    !jouer(rode(), 'defaite', jFormer, { formees: 11 }).profil.objectifs.faits.includes('former12') && jouer(rode(), 'defaite', jFormer, { formees: 12 }).profil.objectifs.faits.includes('former12'));
   const jPertes = jourOu((d) => d[1].id === 'pertes6');
   check('« Gagner en perdant moins de 6 unités » : il faut gagner, et que les pertes soient dites',
-    jouer(profilNeuf(), 'victoire', jPertes, { perdues: 5 }).profil.objectifs.faits.includes('pertes6') && !jouer(profilNeuf(), 'victoire', jPertes, { perdues: 6 }).profil.objectifs.faits.includes('pertes6')
-    && !jouer(profilNeuf(), 'defaite', jPertes, { perdues: 0 }).profil.objectifs.faits.includes('pertes6') && !jouer(profilNeuf(), 'victoire', jPertes, {}).profil.objectifs.faits.includes('pertes6'));
+    jouer(rode(), 'victoire', jPertes, { perdues: 5 }).profil.objectifs.faits.includes('pertes6') && !jouer(rode(), 'victoire', jPertes, { perdues: 6 }).profil.objectifs.faits.includes('pertes6')
+    && !jouer(rode(), 'defaite', jPertes, { perdues: 0 }).profil.objectifs.faits.includes('pertes6') && !jouer(rode(), 'victoire', jPertes, {}).profil.objectifs.faits.includes('pertes6'));
   const jDeux = jourOu((d) => d[0].id === 'abattre8' && d[1].genre === 'gagner' && !d[1].civ);
-  const doublee = jouer(profilNeuf(), 'victoire', jDeux, { abattus: 9 });
+  const doublee = jouer(rode(), 'victoire', jDeux, { abattus: 9 });
   check('une même partie peut atteindre les deux objectifs du jour', parType(doublee.evenements, 'objectif').length === 2 && doublee.profil.objectifs.faits.length === 2);
   check('des faits illisibles ne font rien gagner, sans erreur',
-    jouer(profilNeuf(), 'victoire', jFormer, { formees: 'beaucoup', abattus: -4, baties: NaN }).profil.objectifs.faits.every((id) => TOUS.find((x) => x.id === id).genre === 'gagner')
-    && !jouer(profilNeuf(), 'defaite', jFormer, null).erreur);
-  const auBout = jouer({ ...profilNeuf(), route: { points: R.saisons.paliers * R.saisons.pointsParPalier - R.saisons.points.partie - 10, passe: false, pris: { gratuit: [], passe: [] } } }, 'defaite', jJouer);
+    jouer(rode(), 'victoire', jFormer, { formees: 'beaucoup', abattus: -4, baties: NaN }).profil.objectifs.faits.every((id) => TOUS.find((x) => x.id === id).genre === 'gagner')
+    && !jouer(rode(), 'defaite', jFormer, null).erreur);
+  const auBout = jouer({ ...rode(), route: { points: R.saisons.paliers * R.saisons.pointsParPalier - R.saisons.points.partie - 10, passe: false, pris: { gratuit: [], passe: [] } } }, 'defaite', jJouer);
   check('au bout de la route, un objectif ne la fait pas déborder', auBout.profil.route.points === R.saisons.paliers * R.saisons.pointsParPalier && parType(auBout.evenements, 'objectif')[0].points === 10);
 }
 
@@ -124,24 +126,24 @@ console.log('--- L’objectif de la semaine ---');
 {
   const jV = jourOu((d, s, j) => s.genre === 'victoires' && semaineDuJour(plus(j, 6)) === semaineDuJour(j));   // un lundi
   const seuil = objectifDeLaSemaine(jV).seuil;
-  let p = profilNeuf(), paye = [];
+  let p = rode(), paye = [];
   for (let i = 0; i < seuil; i++) { const r = jouer(p, 'victoire', plus(jV, i % 3)); p = r.profil; paye.push(parType(r.evenements, 'objectif').filter((e) => e.portee === 'semaine').length); }
   check(`« Gagner ${seuil} parties classées » : la dernière victoire le paie, pas avant`, egal(paye, [...Array(seuil - 1).fill(0), 1]) && p.objectifs.semaine.fait && p.objectifs.semaine.avance === seuil);
   const apresCoup = jouer(p, 'victoire', plus(jV, 3));
   check('… une seule fois dans la semaine', parType(apresCoup.evenements, 'objectif').every((e) => e.portee !== 'semaine'));
-  check('… une défaite ne l’avance pas', jouer(profilNeuf(), 'defaite', jV).profil.objectifs.semaine.avance === 0);
+  check('… une défaite ne l’avance pas', jouer(rode(), 'defaite', jV).profil.objectifs.semaine.avance === 0);
   check('… ce qu’il rapporte est dit, en points de saison', parType(jouer({ ...p, objectifs: { ...p.objectifs, semaine: { ...p.objectifs.semaine, fait: false, avance: seuil - 1 } } }, 'victoire', jV).evenements, 'objectif').some((e) => e.portee === 'semaine' && e.points === O.points.semaine));
   const semaineSuivante = jouer(p, 'defaite', plus(jV, 7));
   check('le lundi suivant, la semaine repart de zéro', semaineSuivante.profil.objectifs.semaine.fait === false && semaineSuivante.profil.objectifs.semaine.numero === semaineDuJour(jV) + 1);
 
   const jJ = jourOu((d, s, j) => s.genre === 'jours' && semaineDuJour(plus(j, 6)) === semaineDuJour(j));
   const quatre = objectifDeLaSemaine(jJ).seuil;
-  p = profilNeuf(); paye = [];
+  p = rode(); paye = [];
   for (let i = 0; i < quatre; i++) { const r = jouer(p, 'defaite', plus(jJ, i)); p = jouer(r.profil, 'defaite', plus(jJ, i)).profil; paye.push(parType(r.evenements, 'objectif').filter((e) => e.portee === 'semaine').length); }
   check(`« Jouer ${quatre} jours différents » : deux parties le même jour comptent pour un jour`, egal(paye, [...Array(quatre - 1).fill(0), 1]) && p.objectifs.semaine.avance === quatre);
 
   const jP = jourOu((d, s) => s.genre === 'peuples');
-  const a1 = jouer(profilNeuf(), 'victoire', jP, { civ: 'atlante' });
+  const a1 = jouer(rode(), 'victoire', jP, { civ: 'atlante' });
   const a2 = jouer(a1.profil, 'victoire', jP, { civ: 'atlante' });
   const s1 = jouer(a2.profil, 'victoire', jP, { civ: 'solarien' });
   check('« Gagner avec les deux peuples » : deux victoires avec le même n’en font qu’une, l’autre peuple le finit',
@@ -178,6 +180,32 @@ console.log('--- Les jours joués, le bon retour ---');
     egal(v.profil.victoiresPar, { civ: { atlante: 1, solarien: 1 }, format: { escarmouche: 1, express: 1 } }) && egal(jouer(profilNeuf(), 'defaite', DEPART, { civ: 'atlante' }).profil.victoiresPar, { civ: {}, format: {} }));
 }
 
+// --- Les premiers jours : des points doublés ----------------------------------------------------------
+console.log('--- Les premiers jours ---');
+{
+  const { jours, facteur } = R.saisons.premiersJours;
+  const base = R.saisons.points.partie + R.saisons.points.victoire + R.saisons.points.premiereVictoireDuJour;
+  const jJouer = jourOu((d) => d[0].genre === 'jouer');
+  const premiere = jouer(profilNeuf(), 'victoire', jJouer);
+  const saison = parType(premiere.evenements, 'pointsDeSaison')[0], objectif = parType(premiere.evenements, 'objectif').find((e) => e.objectif === 'jouer');
+  check(`un nouveau joueur gagne ses points de saison ${facteur} fois : la première victoire en vaut ${base * facteur}, et l’événement le dit`,
+    Number.isInteger(facteur) && facteur > 1 && saison.variation === base * facteur && saison.facteur === facteur && premiere.profil.premierJour === jJouer);
+  check('… ses objectifs aussi', objectif.points === O.points.jour * facteur);
+  let p = premiere.profil;
+  const dernier = jouer(p, 'defaite', plus(jJouer, jours - 1));
+  check(`… jusqu’à son jour n° ${jours} compris`, parType(dernier.evenements, 'pointsDeSaison')[0].variation === R.saisons.points.partie * facteur);
+  const apres = jouer(dernier.profil, 'defaite', plus(jJouer, jours));
+  check('… le lendemain, les points reprennent leur valeur, et l’événement ne parle plus de facteur',
+    parType(apres.evenements, 'pointsDeSaison')[0].variation === R.saisons.points.partie && parType(apres.evenements, 'pointsDeSaison')[0].facteur === undefined);
+  const ancienne = migrerProfil({ parties: 40, victoires: 25, defaites: 15, jour: { date: DEPART, parties: 2, abandonsPrecoces: 0, victoires: 1 } });
+  check('une fiche d’avant ces compteurs a déjà joué : elle ne passe pas pour un nouveau joueur', ancienne.premierJour === DEPART
+    && parType(jouer(ancienne, 'defaite', plus(DEPART, jours + 3)).evenements, 'pointsDeSaison')[0].variation === R.saisons.points.partie);
+  const auBout = jouer({ ...profilNeuf(), route: { points: R.saisons.paliers * R.saisons.pointsParPalier - 5, passe: false, pris: { gratuit: [], passe: [] } } }, 'victoire', jJouer);
+  check('même doublés, les points ne font pas déborder la route', auBout.profil.route.points === R.saisons.paliers * R.saisons.pointsParPalier && parType(auBout.evenements, 'pointsDeSaison')[0].variation === 5);
+  check(`la route d’un mois : ${R.saisons.paliers} paliers de ${R.saisons.pointsParPalier} points — un nouveau joueur assidu en voit le bout malgré tout`,
+    R.saisons.pointsParPalier === 200 && R.saisons.paliers * R.saisons.pointsParPalier === 6000);
+}
+
 // --- La fiche -----------------------------------------------------------------------------------
 console.log('--- La fiche ---');
 {
@@ -208,27 +236,27 @@ console.log('--- Les écrans ---');
   const { htmlAujourdhui, htmlFinDePartie } = await import('../js/progression-ecrans.js');
   const texte = (html) => html.replace(/<[^>]*>/g, ' ').replace(/[  ]/g, ' ').replace(/\s+/g, ' ').trim();
   const jour = jourOu((d) => d[0].genre === 'jouer');
-  const neuve = htmlAujourdhui(profilNeuf(), jour);
+  const neuve = htmlAujourdhui(rode(), jour);
   const [o1, o2] = objectifsDuJour(jour);
   check('la carte « Aujourd’hui » nomme les deux objectifs du jour et celui de la semaine, avec leurs points',
     texte(neuve).includes(o1.nom) && texte(neuve).includes(o2.nom) && texte(neuve).includes(objectifDeLaSemaine(jour).nom)
     && (neuve.match(new RegExp(`<b>\\+${O.points.jour}</b>`, 'g')) || []).length === 2 && neuve.includes(`<b>+${O.points.semaine}</b>`));
   check('… rien n’y est coché, et un joueur neuf n’y lit pas de jours joués', !/class="fait"/.test(neuve) && !/jours? joué/.test(texte(neuve)));
-  const jouee = jouer(profilNeuf(), 'defaite', jour).profil;
+  const jouee = jouer(rode(), 'defaite', jour).profil;
   const cochee = htmlAujourdhui(jouee, jour);
   check('… après une partie : l’objectif atteint est coché, l’autre non, et le jour joué se lit', (cochee.match(/<li class="fait">/g) || []).length === 1 && /1 jour joué/.test(texte(cochee)));
   check('… l’avance de la semaine se lit en « fait / à faire »', new RegExp(`\\d+ / ${objectifDeLaSemaine(jour).seuil}`).test(texte(cochee)));
   check('… elle dit d’où viennent les points : de la saison, en partie classée', /points de saison/.test(texte(neuve)) && /partie classée/.test(texte(neuve)));
   check('… au pluriel après deux jours', /2 jours joués/.test(texte(htmlAujourdhui(jouer(jouee, 'defaite', plus(jour, 1)).profil, plus(jour, 1)))));
   check('rien d’étrange à l’écran : ni « undefined », ni « NaN »', !/undefined|NaN|\[object/.test(neuve + cochee));
-  check('une date illisible : pas de carte', htmlAujourdhui(profilNeuf(), 'x') === '');
+  check('une date illisible : pas de carte', htmlAujourdhui(rode(), 'x') === '');
 
-  const r = jouer(profilNeuf(), 'defaite', jour);
+  const r = jouer(rode(), 'defaite', jour);
   const fin = texte(htmlFinDePartie(r.evenements, r.profil));
   check('la fin de partie dit l’objectif atteint et ce qu’il rapporte', fin.includes(`Objectif du jour : ${o1.nom} · +${O.points.jour} points de saison`), fin.slice(0, 300));
-  const hebdo = htmlFinDePartie([{ type: 'objectif', portee: 'semaine', objectif: O.semaine[0].id, points: O.points.semaine, total: 100, palier: 1, paliersGagnes: 1 }], profilNeuf());
+  const hebdo = htmlFinDePartie([{ type: 'objectif', portee: 'semaine', objectif: O.semaine[0].id, points: O.points.semaine, total: 100, palier: 1, paliersGagnes: 1 }], rode());
   check('… celui de la semaine aussi, et le palier qu’il ouvre se propose', texte(hebdo).includes(`Objectif de la semaine : ${O.semaine[0].nom} · +${O.points.semaine} points de saison`) && /data-ecran="saison">palier 1 à prendre/.test(hebdo));
-  check('… et le bon retour', texte(htmlFinDePartie([{ type: 'bonRetour', jours: 9 }], profilNeuf())).includes('Bon retour ! Un coffre t’attendait.'));
+  check('… et le bon retour', texte(htmlFinDePartie([{ type: 'bonRetour', jours: 9 }], rode())).includes('Bon retour ! Un coffre t’attendait.'));
 }
 
 // --- Le branchement -----------------------------------------------------------------------------

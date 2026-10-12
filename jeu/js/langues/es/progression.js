@@ -300,4 +300,5 @@ export default {
   "Gagner 5 parties classées": "Ganar 5 partidas clasificatorias",
   "Jouer 4 jours différents": "Jugar 4 días distintos",
   "Gagner avec les deux peuples": "Ganar con los dos pueblos",
+  "Pendant tes {0} premiers jours, tes points de saison comptent double.": "Durante tus primeros {0} días, tus puntos de temporada cuentan el doble.",
 };

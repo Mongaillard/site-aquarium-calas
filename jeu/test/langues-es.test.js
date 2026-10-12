@@ -120,7 +120,7 @@ async function scenes() {
     m.confidentialite = texte(ecran('confidentialite'));
 
     const base = { ...neuf, eclats: 400, couronnes: 520, pieces: [...neuf.pieces, 'bassecour.cochon-couronne', 'bassecour.poule-guerriere', 'ligues.recrue', 'ligues.bronze'],
-      blason: { ...neuf.blason, embleme: 'bassecour.cochon-couronne', banniere: 'ligues.bronze' }, route: { points: 250, passe: false, pris: { gratuit: [1], passe: [] } } };
+      blason: { ...neuf.blason, embleme: 'bassecour.cochon-couronne', banniere: 'ligues.bronze' }, route: { points: 450, passe: false, pris: { gratuit: [1], passe: [] } } };
     poser(base);
     m.genres = K.NOMS_DES_GENRES;
     m.titres = [B.titreDuBlason(null), B.titreDuBlason({ ...K.BLASON_DE_DEPART, grade: 'monstres.grade', epithete: 'banquet.epithete' }), B.titreDuBlason({ ...K.BLASON_DE_DEPART, grade: 'citrouilles.champion', epithete: 'maree.epithete' }),

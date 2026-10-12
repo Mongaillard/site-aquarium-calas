@@ -299,4 +299,5 @@ export default {
   "Gagner 5 parties classées": "Win 5 ranked games",
   "Jouer 4 jours différents": "Play on 4 different days",
   "Gagner avec les deux peuples": "Win with both peoples",
+  "Pendant tes {0} premiers jours, tes points de saison comptent double.": "For your first {0} days, your season points count double.",
 };

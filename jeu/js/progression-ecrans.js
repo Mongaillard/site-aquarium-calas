@@ -891,6 +891,8 @@ export function htmlFinDePartie(evenements, profil) {
     const aPrendre = `<button class="btn small prog-attend" data-ecran="saison">${txt`palier ${e.palier} à prendre`}</button>`;
     lignes.push(`<p class="prog-fin-saison">${iconeSVG('saison', 16, 'inline')} ${e.paliersGagnes > 0 ? txt`<b>+${e.variation}</b> points de saison${premiere} : ${aPrendre}` : txt`<b>+${e.variation}</b> points de saison${premiere}`}</p>`);
   }
+  // (Les premiers jours d'un nouveau joueur, tous ses points de saison comptent double : on le lui dit.)
+  if (de('pointsDeSaison').some((e) => e.facteur > 1)) lignes.push(`<p class="prog-fin-saison">${txt`Pendant tes ${R.saisons.premiersJours.jours} premiers jours, tes points de saison comptent double.`}</p>`);
   // Les objectifs que cette partie vient d'atteindre : ils paient en points de saison, comme elle.
   for (const e of de('objectif')) {
     const aPrendre = e.paliersGagnes > 0 ? ` <button class="btn small prog-attend" data-ecran="saison">${txt`palier ${e.palier} à prendre`}</button>` : '';

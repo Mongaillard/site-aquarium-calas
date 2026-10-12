@@ -542,8 +542,14 @@ export const PROGRESSION = figer(traduire({
     premiere: '2026-10',
     themes: ['citrouilles', 'tournoi', 'froid'],
     paliers: 30,
-    pointsParPalier: 100,
+    // (200 points par palier depuis le 12/10/2026 : avec les objectifs du jour, un palier par jour de jeu
+    // régulier, et la route finie vers la fin du mois à trois parties par jour — au lieu du jour 23, puis
+    // plus rien. À revoir avec de vraies mesures.)
+    pointsParPalier: 200,
     points: { partie: 20, victoire: 20, premiereVictoireDuJour: 40 },
+    // Les premiers jours d'un nouveau joueur, tous ses points de saison comptent `facteur` fois : arrivé
+    // en cours de mois, il voit quand même le haut de la route.
+    premiersJours: { jours: 7, facteur: 2 },
     passe: { prix: 500 },
     route: [
       { gratuit: { eclats: 20 }, passe: { embleme: 6 } },
