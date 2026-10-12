@@ -62,4 +62,5 @@ export default {
   "Me guider": "Guíame",
   "Plus tard": "Más tarde",
   "Lancer la partie guidée": "Iniciar la partida guiada",
+  "Rappels": "Avisos",
 };

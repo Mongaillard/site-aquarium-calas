@@ -36,6 +36,7 @@ const ASSETS = [
   // La partie guidée : sa logique, son écran, son doigt, et sa voix (français et anglais ; ailleurs elle se lit).
   './js/guide.js',
   './js/guide-ecran.js',
+  './js/rappels.js',
   './assets/guide/doigt.webp',
   './assets/voix/fr/bienvenue.mp4',
   './assets/voix/fr/carte.mp4',

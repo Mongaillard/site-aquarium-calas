@@ -407,6 +407,14 @@ function donnerCoffre(p, type, origine, evenements) {
   evenements.push({ type: 'coffre', coffre: type, origine });
 }
 
+/** Ce qui manque pour le palier suivant de la route de saison : `{ palier, manque }` — rien (null) au bout de la route. */
+export function prochainPalierDeSaison(profil) {
+  const p = migrerProfil(profil);
+  const atteint = palierAtteint(p.route.points);
+  if (atteint >= R.saisons.paliers) return null;
+  return { palier: atteint + 1, manque: (atteint + 1) * R.saisons.pointsParPalier - p.route.points };
+}
+
 /**
  * Le format que l'accueil propose à qui n'en a pas choisi : court pour les premières parties classées,
  * puis celui de tous les jours (R.debut).

@@ -14,7 +14,8 @@ import {
   lireProgression, ecrireProgression, quandLaProgressionSEcrit,
 } from './save.js';
 import { brancher as brancherRangementDurable, hoteDeLApplication } from './rangement-durable.js';
-import { appliquerResultat, reglagesDePartie, issueDePartie, formatConseille, debutant, prochainPalier, prendreCoffreDeRecrue } from './progression.js';
+import { appliquerResultat, reglagesDePartie, issueDePartie, formatConseille, debutant, prochainPalier, prendreCoffreDeRecrue, prochainPalierDeSaison, joursRestants } from './progression.js';
+import { hoteDesRappels, lireReglages as lireRappels, ecrireReglages as ecrireRappels, fautIlDemander, quitterLeJeu, revenirAuJeu, SORTES as SORTES_DE_RAPPELS } from './rappels.js';
 import { matiereDe } from './collections-config.js';
 import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
 import { guichetParDefaut } from './achats.js';
@@ -1663,7 +1664,93 @@ function refreshLigue() {
  */
 function refreshAujourdhui() {
   const box = document.getElementById('aujourdhui-box');
-  if (box) box.innerHTML = guideVu() ? htmlAujourdhui(lireProgression(), jourLocal()) : '';
+  if (!box) return;
+  // (Dans l'application, après une première victoire : la question des rappels prend la place de la carte, une fois.)
+  if (guideVu() && rappels && fautIlDemander(lireRappels(), lireProgression())) box.innerHTML = htmlQuestionDesRappels();
+  else box.innerHTML = guideVu() ? htmlAujourdhui(lireProgression(), jourLocal()) : '';
+}
+
+// --- Les rappels du téléphone (js/rappels.js) : dans l'application seulement --------------------------------
+
+/** L'extension de rappels de l'application ; null dans un navigateur — alors rien ne se demande ni ne se montre. */
+const rappels = hoteDesRappels();
+
+/** La question du jeu, posée une fois avant celle du système. */
+function htmlQuestionDesRappels() {
+  return `
+    <div class="prog-aujourdhui rappels-question">
+      <p class="prog-auj-tete"><b>${txt('Veux-tu qu’on te prévienne ?')}</b></p>
+      <p>${txt('Quand ta partie t’attend, ou que la saison touche à sa fin. Un rappel par jour au plus, jamais la nuit, jamais pour vendre.')}</p>
+      <div class="rappels-boutons">
+        <button class="btn primary" data-rappels="oui">${txt('Oui, préviens-moi')}</button>
+        <button class="btn" data-rappels="non">${txt('Non merci')}</button>
+      </div>
+    </div>`;
+}
+
+/** Ce que le joueur laisse en quittant le jeu : de quoi choisir ses rappels (js/rappels.js, rappelsAProgrammer). */
+function etatPourLesRappels() {
+  const profil = lireProgression(), save = loadSave(), palier = prochainPalierDeSaison(profil);
+  return {
+    maintenant: Date.now(), reglages: lireRappels(),
+    partie: save ? { minutes: Math.floor((save.time || 0) / 60) } : null,
+    saison: palier ? { joursRestants: joursRestants(jourLocal()), manque: palier.manque, palier: palier.palier } : null,
+  };
+}
+
+/** Les trois interrupteurs des rappels, sous leur bouton de l'accueil. */
+function refreshReglagesDesRappels() {
+  const bouton = document.getElementById('btn-rappels'), boite = document.getElementById('rappels-reglages');
+  if (!bouton || !boite) return;
+  bouton.classList.toggle('hidden', !rappels);
+  if (!rappels) { boite.classList.add('hidden'); return; }
+  const r = lireRappels();
+  const noms = { partie: txt('La partie qui t’attend'), saison: txt('La saison qui se termine'), retour: txt('Le retour après une absence') };
+  boite.innerHTML = `
+    <p>${txt('Un rappel par jour au plus, jamais entre 21 h et 9 h, jamais pour vendre. Rien ne sort de ton téléphone.')}</p>
+    ${SORTES_DE_RAPPELS.map((sorte) => `<label class="rappels-choix"><input type="checkbox" data-rappel="${sorte}" ${r.demande && r.actifs[sorte] ? 'checked' : ''}> ${noms[sorte]}</label>`).join('')}`;
+}
+
+function installerLesRappels() {
+  const carte = document.getElementById('aujourdhui-box'), bouton = document.getElementById('btn-rappels'), boite = document.getElementById('rappels-reglages');
+  refreshReglagesDesRappels();
+  if (!rappels) return;
+  if (carte) carte.addEventListener('click', async (ev) => {
+    const cible = ev.target.closest ? ev.target.closest('[data-rappels]') : null;
+    if (!cible) return;
+    audio.resume(); audio.play('click');
+    const oui = cible.dataset.rappels === 'oui';
+    // (La réponse est gardée avant la fenêtre du système : la question du jeu ne revient jamais.)
+    ecrireRappels({ demande: true, actifs: { partie: oui, saison: oui, retour: oui } });
+    refreshAujourdhui();
+    if (oui && !(await rappels.demander())) ecrireRappels({ demande: true, actifs: { partie: false, saison: false, retour: false } });
+    refreshReglagesDesRappels();
+  });
+  if (bouton && boite) {
+    bouton.addEventListener('click', () => {
+      audio.resume(); audio.play('click');
+      const ouvert = boite.classList.toggle('hidden') === false;
+      bouton.setAttribute('aria-expanded', String(ouvert));
+    });
+    boite.addEventListener('change', async (ev) => {
+      const sorte = ev.target && ev.target.dataset ? ev.target.dataset.rappel : null;
+      if (!SORTES_DE_RAPPELS.includes(sorte)) return;
+      const r = lireRappels();
+      // (Cocher une sorte, c'est aussi répondre à la question : le système demande alors sa permission, s'il ne l'a pas.)
+      const actifs = r.demande ? { ...r.actifs } : { partie: false, saison: false, retour: false };
+      actifs[sorte] = ev.target.checked;
+      ecrireRappels({ demande: true, actifs });
+      if (ev.target.checked && (await rappels.permission()) !== 'accordee' && !(await rappels.demander())) {
+        ecrireRappels({ demande: true, actifs: { ...actifs, [sorte]: false } });
+      }
+      refreshReglagesDesRappels();
+      refreshAujourdhui();
+    });
+  }
+  // Quand le joueur quitte le jeu, ses rappels se programment ; quand il revient, ils s'effacent.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') quitterLeJeu(rappels, etatPourLesRappels()); else revenirAuJeu(rappels);
+  });
 }
 
 /** En partie classée, la difficulté ne se choisit pas : l'adversaire suit la ligue. */
@@ -2062,6 +2149,7 @@ for (const geste of ['pointerup', 'touchend', 'click', 'keydown']) {
     if (audio.ctx && audio.ctx.state === 'running') document.removeEventListener(geste, premierGeste, true);
   }, true);
 }
+installerLesRappels();
 // Page à l'arrière-plan : plus un son, musique comprise ; au retour, tout reprend.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') audio.suspendre(); else if (audio.ctx) audio.resume();

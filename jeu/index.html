@@ -103,6 +103,9 @@
     <p class="credits" id="note-autonome" data-txt>Jeu web autonome : il fonctionne hors ligne une fois chargé. Ta progression est gardée sur cet appareil, et avec ton compte là où la page le permet.</p>
     <!-- La politique de confidentialité se lit dans le jeu, l'effacement des données aussi : les magasins le demandent. -->
     <button id="btn-confidentialite" class="btn ghost" data-ecran="confidentialite" data-txt>Confidentialité et données</button>
+    <!-- Les rappels du téléphone (js/rappels.js) : dans l'application seulement ; ailleurs ce bouton reste caché. -->
+    <button id="btn-rappels" class="btn ghost hidden" aria-expanded="false" aria-controls="rappels-reglages" data-txt>Rappels</button>
+    <div id="rappels-reglages" class="howto rappels-reglages hidden"></div>
     <!-- La langue du jeu (js/langue.js) : son nom s'écrit dans chaque langue, pour qui ne lit pas celle-ci. -->
     <button id="btn-langue" class="btn ghost" data-ecran="langue">Langue · Language</button>
   </div>

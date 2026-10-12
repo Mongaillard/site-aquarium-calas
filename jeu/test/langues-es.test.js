@@ -164,7 +164,7 @@ const CAHIERS = {
   fiches: [['js/fiches-troupes.js', 'js/icones.js'], ['js/fiches-troupes.js:textesATraduire']],
   progression: [['js/progression-ecrans.js', 'js/progression-config.js', 'js/progression.js', 'js/achats.js', 'js/edition.js', 'js/rangement-durable.js'], ['js/progression-config.js:textesATraduire']],
   collections: [['js/collections-ecrans.js', 'js/blason.js', 'js/teintures.js', 'js/collections-config.js'], ['js/collections-config.js:textesATraduire']],
-  partie: [['js/main.js', 'js/game.js', 'js/save.js', 'js/ai.js', 'js/sprites.js', 'js/modele3d.js', 'js/ordres.js', 'js/render.js', 'js/rendu3d.js', 'js/guide.js', 'js/guide-ecran.js'], ['js/sprites.js:textesATraduire']],
+  partie: [['js/main.js', 'js/game.js', 'js/save.js', 'js/ai.js', 'js/sprites.js', 'js/modele3d.js', 'js/ordres.js', 'js/render.js', 'js/rendu3d.js', 'js/guide.js', 'js/guide-ecran.js', 'js/rappels.js'], ['js/sprites.js:textesATraduire']],
 };
 for (const [nom, [fichiers, tables]] of Object.entries(CAHIERS)) {
   const r = await verifierCahier('es', nom, fichiers, tables);
