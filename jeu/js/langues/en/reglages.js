@@ -47,7 +47,7 @@ export default {
   "Mercenaire atlante": "Atlantean Mercenary",
   "Mercenaires atlantes": "Atlantean Mercenaries",
   "Sphinx": "Sphinx",
-  "Lion à tête de pharaon invoqué au Temple : encaisse comme une escouade et frappe jusqu’à trois ennemis à la fois. Occupe 3 places de population.": "A lion with a pharaoh’s head, summoned at the Temple: it soaks up damage like a whole squad and strikes up to three enemies at once. Takes 3 population slots.",
+  "Lion à tête de pharaon invoqué au Temple : encaisse comme une escouade et frappe tous les ennemis devant lui. Occupe 3 places de population.": "A lion with a pharaoh’s head, summoned at the Temple: it soaks up damage like a whole squad and strikes every enemy in front of it. Takes 3 population slots.",
   "Palais du Soleil": "Palace of the Sun",
   "Forme les fellahs, stocke les ressources et permet de passer à l’âge suivant.": "Trains fellahs, stores resources and lets you advance to the next age.",
   "Grenier": "Granary",
@@ -181,4 +181,19 @@ export default {
   "100 %": "100%",
   "150 %": "150%",
   "200 %": "200%",
+
+  // Les deux peuples se jouent autrement (js/config.js, CIVILISATIONS) : leur devise, leurs traits, leur technologie propre.
+  "Ils tiennent.": "They hold the line.",
+  "Leurs bâtiments ont 20 % de points de vie en plus.": "Their buildings have 20% more hit points.",
+  "Leurs tours tirent 1 case plus loin.": "Their towers shoot 1 tile farther.",
+  "L’Hydre se soigne seule : 3 points de vie par seconde hors du combat.": "The Hydra heals on its own: 3 hit points per second out of combat.",
+  "Technologie propre : Écailles profondes, +10 points de vie à l’infanterie.": "Unique technology: Deep Scales, +10 hit points for infantry.",
+  "Ils vont vite.": "They move fast.",
+  "Fellahs, Chacals dressés et Méharistes marchent 10 % plus vite.": "Fellahs, Trained Jackals and Camel Riders move 10% faster.",
+  "Le Sphinx frappe tous les ennemis devant lui, mais ne se soigne pas.": "The Sphinx strikes every enemy in front of it, but does not heal.",
+  "Technologie propre : Marche du Soleil, +10 % de vitesse à toute l’armée.": "Unique technology: March of the Sun, +10% speed for the whole army.",
+  "Écailles profondes": "Deep Scales",
+  "Infanterie : +10 points de vie.": "Infantry: +10 hit points.",
+  "Marche du Soleil": "March of the Sun",
+  "Toute l’armée : +10 % de vitesse.": "Whole army: +10% speed.",
 };

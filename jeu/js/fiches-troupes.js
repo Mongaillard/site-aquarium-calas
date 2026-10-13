@@ -104,7 +104,7 @@ export const FICHES = {
     role: 'Un monstre qui encaisse comme une escouade et mord 3 ennemis à la fois.',
     bat: 'Les mêlées serrées, l’infanterie légère, les bâtiments (+9).',
     craint: 'Les tireurs en nombre qui la visent ensemble, et le harcèlement : elle est lente.',
-    conseil: 'Lance-la au cœur de la mêlée, des {priest:p} derrière : c’est là que ses morsures comptent. Elle occupe 3 places.',
+    conseil: 'Lance-la au cœur de la mêlée, puis retire-la blessée : hors du combat, elle se soigne seule. Elle occupe 3 places.',
   },
   pavoisier: {
     role: 'Un mur : son grand bouclier arrête presque toutes les flèches.',
@@ -127,17 +127,17 @@ export const FICHES = {
 };
 
 /**
- * Les fiches qu'un peuple réécrit : sa troupe tient le même rôle (mêmes
- * chiffres, mêmes règles), mais ce n'est pas la même créature — le Sphinx des
- * Solariens n'est pas « elle », et il ne mord pas.
+ * Les fiches qu'un peuple réécrit : ce n'est pas la même créature — le Sphinx
+ * des Solariens n'est pas « elle », il ne mord pas : sa patte balaie tout ce
+ * qui se tient devant lui (World.balayer), et il ne se soigne pas seul.
  */
 export const FICHES_CIV = {
   solarien: {
     hydra: {
-      role: 'Un monstre qui encaisse comme une escouade et frappe 3 ennemis à la fois.',
+      role: 'Un monstre qui encaisse comme une escouade et frappe tous les ennemis devant lui.',
       bat: 'Les mêlées serrées, l’infanterie légère, les bâtiments (+9).',
-      craint: 'Les tireurs en nombre qui le visent ensemble, et le harcèlement : il est lent.',
-      conseil: 'Lance-le au cœur de la mêlée, des {priest:p} derrière : c’est là que ses coups comptent. Il occupe 3 places.',
+      craint: 'Les tireurs en nombre qui le visent ensemble, et le harcèlement : il est lent, et ne se soigne pas seul.',
+      conseil: 'Lance-le là où l’ennemi se serre, des {priest:p} derrière : sa patte les touche tous. Il occupe 3 places.',
     },
   },
 };

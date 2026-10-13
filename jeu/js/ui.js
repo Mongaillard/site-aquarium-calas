@@ -821,6 +821,7 @@ export class UI {
         for (const techId of def.techs || []) {
           const tech = TECHS[techId];
           if (this.world.players[this.world.humanIndex].techs.has(techId)) continue;
+          if (tech.civ && tech.civ !== this.game.civ) continue;   // la technologie propre à un autre peuple
           buttons.push({
             icon: tech.icon, label: tech.name, cost: costLabel(tech.cost),
             check: () => this.world.canResearch(b, techId),
@@ -1186,6 +1187,8 @@ export class UI {
 
   showHelp() {
     const civAdverse = this.world.adversaire(this.world.humanIndex).civ;
+    // (Ce qui fait jouer son peuple autrement : sa devise et ses traits.)
+    const peuple = CIVILISATIONS[civDe(this.game.civ)];
     // Les bâtiments militaires : tout ce qui forme des troupes, hors Centre-Ville (voir World.checkVictory).
     const militaires = Object.values(BUILDING_TYPES)
       .filter((b) => b.trains && b.id !== 'towncenter').map((b) => nomDe(b.id, civAdverse)).join(', ');
@@ -1206,6 +1209,7 @@ export class UI {
         <li>${txt`<b>Garnison</b> : des soldats sélectionnés s'abritent d'un appui sur votre ${nomDe('towncenter', this.game.civ)} ou une tour ; des ${this.game.ouvrier(2)}, par le bouton <b>${ic('garrison')} Abriter</b> puis l'abri. Les occupants s'y soignent et chacun ajoute une flèche. La <b>${ic('cloche')} cloche</b> y envoie tous les ${this.game.ouvrier(2)} d'un coup ; un second coup renvoie chacun à son poste`}</li>
         <li>${txt`<b>C'est vous qui affectez vos ouvriers</b> : quand un gisement s'épuise, le ${this.game.ouvrier()} rapporte son chargement puis attend vos ordres. La barre <b>${ic('ouvriers')} Ouvriers</b> montre qui fait quoi et permet de réaffecter d'un doigt`}</li>
         <li>${txt`Passez les <b>âges</b> depuis le ${nomDe('towncenter', this.game.civ)} pour débloquer de nouvelles unités`}</li>
+        <li>${txt`<b>${peuple.name}</b> : ${peuple.devise} ${peuple.traits.join(' ')}`}</li>
         <li>${txt`<b>Vitesse de jeu</b> : réglable ici même (Tranquille à Blitz ×2) — et depuis l'écran d'accueil`}</li>
         <li>${txt`<b>La partie se sauvegarde toute seule</b> toutes les 30 s et dès que vous quittez l'onglet : vous la retrouverez sur l'écran d'accueil, bouton <b>Reprendre</b>`}</li>
         <li>${txt`<b>Objectif</b> : ne laisser à l'adversaire ni ${nomDe('towncenter', civAdverse)} ni bâtiment militaire (${militaires}), achevé ou en chantier — inutile de raser la dernière ferme. En ${ic('barracks')} Escarmouche, en ${ic('modeExpress')} Express et en ${ic('ralliement')} Prise de positions, son dernier ${nomDe('towncenter', civAdverse)} suffit ; sinon, au bout du temps, le meilleur score l'emporte`}</li>

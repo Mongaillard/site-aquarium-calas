@@ -511,11 +511,11 @@ function partie(options, secondes) {
   return w;
 }
 essai('parties témoins', () => {
-  // Empreintes relevées sur le jeu d'avant ce lot (commit 08481a4), par ce même calcul.
+  // Empreintes relevées par ce même calcul — de nouveau le 13/10/2026 : les deux peuples se jouent autrement.
   const classique = partie({ seed: 808, mapSize: 'small', mode: 'classique', civs: ['atlante', 'solarien'] }, 240);
-  check('la partie Classique témoin (graine 808, quatre minutes) se rejoue à l’identique', empreinte(classique) === 'e3871281', empreinte(classique));
+  check('la partie Classique témoin (graine 808, quatre minutes) se rejoue à l’identique', empreinte(classique) === '5e567654', empreinte(classique));
   const express = partie({ seed: 4242, mapSize: 'small', mode: 'express', civs: ['solarien', 'atlante'] }, 180);
-  check('la partie Express témoin (graine 4242, trois minutes) aussi', empreinte(express) === 'bdedb461', empreinte(express));
+  check('la partie Express témoin (graine 4242, trois minutes) aussi', empreinte(express) === '5f10839c', empreinte(express));
 
   const instantane = JSON.parse(JSON.stringify(serializeWorld(classique)));
   const repris = restoreWorld(instantane);

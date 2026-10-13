@@ -106,6 +106,9 @@ export const ICONES = {
   eclat: { n: 'éclat (dessin original)', d: ['M244 40L116 212h128z', 'M268 40l128 172H268z', 'M116 236h280L256 476z'] },
   album: { n: 'album (dessin original)', d: ['M88 136h320v328H88zM248 196L222 264L149 268L206 314L187 384L248 344L309 384L290 314L347 268L274 264z', 'M136 56h328v328h-32V88H136z'] },
   saison: { n: 'fanion (dessin original)', d: ['M92 36h40v440H92z', 'M152 60l308 100l-308 100z'] },
+  // Dessinées pour le jeu : les technologies propres aux deux peuples — des écailles, un soleil en marche.
+  ecailles: { n: 'écailles (dessin original)', d: ['M56 72h176v80a88 88 0 0 1-176 0z', 'M280 72h176v80a88 88 0 0 1-176 0z', 'M168 250h176v80a88 88 0 0 1-176 0z', 'M56 250h72v80a88 88 0 0 0 44 76a88 88 0 0 1-116-76z', 'M456 250h-72v80a88 88 0 0 1-44 76a88 88 0 0 0 116-76z'] },
+  marche: { n: 'soleil en marche (dessin original)', d: ['M336 160a96 96 0 1 1 0 192a96 96 0 1 1 0-192z', 'M324 40h24v84h-24z', 'M324 388h24v84h-24z', 'M464 244h40v24h-40z', 'M424 96l28-28l17 17l-28 28z', 'M441 399l28 28l-17 17l-28-28z', 'M24 190h170v30H24z', 'M72 241h122v30H72z', 'M24 292h170v30H24z'] },
   // Dessinée pour le jeu : l'étoile d'un but atteint (js/defis-ecrans.js).
   etoile: { n: 'étoile (dessin original)', d: ['M256 32L312 190L480 195L347 298L395 459L256 364L117 459L165 298L32 195L200 190Z'] },
   couronne: { n: 'couronne (dessin original)', d: ['M60 372L36 148l112 92L256 76l108 164l112-92l-24 224z', 'M68 404h376v52H68z'] },

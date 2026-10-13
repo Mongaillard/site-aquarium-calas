@@ -99,7 +99,7 @@ console.log('--- Dans la partie : les vagues ---');
   check('sans scénario, la partie n’en a pas, et son format est celui du jeu', ordinaire.scenario === null && ordinaire.mode === GAME_MODES.escarmouche);
   const w = partie({ id: 'survie' });
   check('la Survie : personne ne bâtit en face — ni bâtiment, ni troupe, ni ordinateur', w.buildings.every((b) => b.playerIndex === 0) && w.units.every((u) => u.playerIndex <= 0) && w.ais.length === 0 && w.places[1].controle === 'distant');
-  check('le joueur a sa base d’Escarmouche, son bâtiment principal entier, et de la place pour 40', w.buildings.some((b) => b.type === 'barracks') && w.buildings.find((b) => b.type === 'towncenter').maxHp === BUILDING_TYPES.towncenter.hp && w.popMax === 40 && w.players[0].resources.food === 1000);
+  check('le joueur a sa base d’Escarmouche, son bâtiment principal entier, et de la place pour 40', w.buildings.some((b) => b.type === 'barracks') && w.buildings.find((b) => b.type === 'towncenter').maxHp === Math.round(BUILDING_TYPES.towncenter.hp * 1.2) && w.popMax === 40 && w.players[0].resources.food === 1000);
   check('pas de rival dans un scénario', partie({ id: 'survie' }, { rival: 'nefer' }).rival === null);
   check('les vagues entrent par trois portes au plus, toutes sur la carte', w.scenario.portes.length >= 1 && w.scenario.portes.length <= 3 && w.scenario.portes.every((p) => p.x > 0 && p.y > 0 && p.x < w.map.pixelWidth && p.y < w.map.pixelHeight));
   check('avant la première minute, rien n’est entré ; l’écran dit « vague 0 sur 12 » et le temps qu’il reste', (() => { avancer(w, 30); const a = w.scenario.affichage(); return w.scenario.vague === 0 && a.vague === 0 && a.vagues === 12 && a.dans === 30 && w.scenario.troupes().length === 0; })());
@@ -139,7 +139,7 @@ console.log('--- Dans la partie : le monstre-chef ---');
   avancer(w, 31);
   const m = w.scenario.monstre();
   check('à son heure il entre, avec ses 2 000 points de vie', !!m && m.type === 'hydra' && m.maxHp === 2000 && m.hp === 2000 && m.chef === true && m.playerIndex === 1 && w.drainEvents().some((e) => e.type === 'chef' && e.etape === 'entre' && e.nom === 'Hydre'));
-  check('les autres Hydres du jeu gardent leurs 280 points de vie', UNIT_TYPES.hydra.hp === 280 && m.def === UNIT_TYPES.hydra);
+  check('les autres Hydres du jeu gardent leurs 280 points de vie, et le monstre n’a pas le soin de celle des Atlantes', UNIT_TYPES.hydra.hp === 280 && m.def === UNIT_TYPES.hydra && !m.def.regen);
   m.hp = 1300;
   avancer(w, 1);
   const renforts = w.scenario.troupes().filter((u) => u.type === 'militia');
@@ -188,7 +188,8 @@ console.log('--- Dans la partie : les règles tordues ---');
   const fourmis = partie({ id: 'defi', jour: '2026-10-14' });
   check('« Fourmilière » : quinze ouvriers par camp, et de la place pour 60', fourmis.units.filter((u) => u.playerIndex === 0 && u.isVillager).length === 15 && fourmis.units.filter((u) => u.playerIndex === 1 && u.isVillager).length === 15 && fourmis.popMax === 60 && fourmis.players[0].popCap >= 16);
   const papier = partie({ id: 'defi', jour: '2026-10-16' });
-  check('« Palais de papier » : les bâtiments principaux n’ont que le quart de leur vie', papier.buildings.filter((b) => b.type === 'towncenter').every((b) => b.maxHp === 350));
+  // (Le quart de 1 400 : 350 pour le Solarien d'en face ; 420 pour le joueur atlante, dont les bâtiments ont 20 % de vie en plus.)
+  check('« Palais de papier » : les bâtiments principaux n’ont que le quart de leur vie', papier.buildings.filter((b) => b.type === 'towncenter').map((b) => b.maxHp).join() === '420,350');
   const tir = partie({ id: 'defi', jour: '2026-10-15' });
   check('« Tir groupé » : une archerie au départ pour chacun, pas de caserne', tir.buildings.filter((b) => b.type === 'archery').length === 2 && !tir.buildings.some((b) => b.type === 'barracks'));
   // Une partie de règle finit comme une autre, et se reprend.

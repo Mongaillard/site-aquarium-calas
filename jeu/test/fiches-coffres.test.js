@@ -44,8 +44,8 @@ for (const civ of CIVS) {
 check('un Solarien lit les noms de son peuple : « Méharistes » là où un Atlante lit « Cavaliers »',
   ficheDeTroupe('ram', 'atlante')[2].texte.includes('les Cavaliers') && ficheDeTroupe('ram', 'solarien')[2].texte.includes('les Méharistes')
   && ficheDeTroupe('hydra', 'solarien')[3].texte.includes('Prêtres du Soleil') && nommer('{champion:p}', 'solarien') === nomDe('champion', 'solarien', 2));
-check('le Sphinx des Solariens a sa propre fiche : mêmes chiffres que l’Hydre, mais « il » frappe',
-  ficheDeTroupe('hydra', 'solarien')[0].texte.includes('frappe 3 ennemis') && ficheDeTroupe('hydra', 'solarien')[2].texte.includes('il est lent')
+check('le Sphinx des Solariens a sa propre fiche : « il » frappe tous les ennemis devant lui, là où l’Hydre en mord 3',
+  ficheDeTroupe('hydra', 'solarien')[0].texte.includes('frappe tous les ennemis devant lui') && ficheDeTroupe('hydra', 'atlante')[0].texte.includes('mord 3 ennemis') && ficheDeTroupe('hydra', 'solarien')[2].texte.includes('il est lent')
   && ficheDeTroupe('hydra', 'solarien')[3].texte.includes('3 places') && ficheDeTroupe('hydra', 'atlante')[2].texte.includes('elle est lente')
   && ficheDeTroupe('militia', 'solarien').every((r) => !r.texte.includes('Hydre')) && nomDe('hydra', 'solarien', 2) === 'Sphinx');
 check('une troupe inconnue n’a pas de fiche', ficheDeTroupe('licorne', 'atlante') === null && ficheDeTroupe('constructor', 'atlante') === null);

@@ -384,7 +384,7 @@ export const BUILDING_TYPES = {
     id: 'blacksmith', name: 'Forge', icon: 'blacksmith', fem: true,
     cost: { wood: 150 }, buildTime: 40, hp: 800, size: 3,
     meleeArmor: 2, pierceArmor: 7, los: 6, age: 1,
-    techs: ['forging', 'scaleArmor', 'fletching'],
+    techs: ['forging', 'scaleArmor', 'fletching', 'ecailles', 'marche'],
     desc: 'Améliore l’armement et l’armure de toutes vos troupes.',
   },
   temple: {
@@ -426,6 +426,17 @@ export const TECHS = {
     id: 'scaleArmor', name: 'Armure d’écailles', icon: 'scaleArmor',
     cost: { food: 120, gold: 40 }, time: 35, age: 1, from: 'blacksmith',
     desc: '+1 armure de mêlée et +1 armure perforante.',
+  },
+  // Les technologies propres à un peuple (`civ`) : lui seul les voit et les recherche (voir CIVILISATIONS).
+  ecailles: {
+    id: 'ecailles', name: 'Écailles profondes', icon: 'ecailles', civ: 'atlante',
+    cost: { food: 200, gold: 100 }, time: 40, age: 1, from: 'blacksmith',
+    desc: 'Infanterie : +10 points de vie.',
+  },
+  marche: {
+    id: 'marche', name: 'Marche du Soleil', icon: 'marche', civ: 'solarien',
+    cost: { food: 200, gold: 100 }, time: 40, age: 1, from: 'blacksmith',
+    desc: 'Toute l’armée : +10 % de vitesse.',
   },
 };
 
@@ -596,17 +607,67 @@ export const COULEURS_EQUIPES = [
 
 export const DEFAULT_CIV = 'atlante';
 /**
- * Les civilisations. Mêmes règles pour toutes à ce stade (coûts, points de
- * vie, IA) : une civilisation change ce que l'on VOIT — bâtiments et troupes
- * (voir IMAGES_CIV dans sprites.js) — et ce que l'interface affiche. `noms`
- * surcharge le nom, le genre (`fem`) et la description d'un type ;
+ * Les civilisations. Une civilisation change ce que l'on VOIT — bâtiments et
+ * troupes (voir IMAGES_CIV dans sprites.js) — et ce que l'interface affiche :
+ * `noms` surcharge le nom, le genre (`fem`) et la description d'un type ;
  * `portraits` surcharge PORTRAITS. Tout type absent garde le nom et le
  * portrait atlantes.
+ *
+ * Et elle se JOUE autrement (état des lieux du 12/10/2026) : les Atlantes
+ * tiennent, les Solariens vont vite. Les prix, les âges et les bâtiments
+ * restent les mêmes pour tous ; un peuple ne change que ceci :
+ *   devise, traits : ce que le joueur en lit (l'accueil, l'aide) ;
+ *   mods    : ce que le camp reçoit dès le départ (voir makePlayer, js/game.js) —
+ *             `porteeDesTours` (cases de portée en plus pour ses tours),
+ *             `vieDesBatiments` (leurs points de vie, en pour cent),
+ *             `construction` (vitesse des chantiers, en pour cent) ;
+ *   vitesse : ses troupes qui marchent plus vite, en pour cent de leur vitesse ;
+ *   troupes : ce qui change dans la définition d'une troupe (voir troupeDe) —
+ *             `regen` (points de vie rendus par seconde hors du combat),
+ *             `balayage` (le coup touche tous les ennemis devant elle) ;
+ *   tech    : sa technologie propre (TECHS) ;
+ *   armee, prefere : ce que son ordinateur forme, âge par âge, et le bâtiment
+ *             militaire qu'il bâtirait d'abord (js/ai.js) — absents, il joue comme toujours.
+ * Les deux peuples sont réglés l'un contre l'autre par des parties entre
+ * ordinateurs (`npm run peuples`, outils/peuples.mjs) : aucun ne doit l'emporter
+ * nettement. Ce que ces mesures ont écarté, le 13/10/2026, sur 80 parties
+ * Express chacune : une portée en plus pour le bâtiment principal des Atlantes
+ * (98 % de victoires) ou une tour offerte au départ (100 %) — l'ordinateur ne
+ * sait pas attaquer ce qui tire ; des chantiers 20 % plus rapides pour les
+ * Solariens (70 %). Avec les traits ci-dessous : 50 %.
  */
 export const CIVILISATIONS = {
-  atlante: { id: 'atlante', name: 'Atlantes', desc: 'Peuple de la mer', noms: {}, portraits: {} },
+  atlante: {
+    id: 'atlante', name: 'Atlantes', desc: 'Peuple de la mer', noms: {}, portraits: {},
+    devise: 'Ils tiennent.',
+    traits: [
+      'Leurs bâtiments ont 20 % de points de vie en plus.',
+      'Leurs tours tirent 1 case plus loin.',
+      'L’Hydre se soigne seule : 3 points de vie par seconde hors du combat.',
+      'Technologie propre : Écailles profondes, +10 points de vie à l’infanterie.',
+    ],
+    mods: { porteeDesTours: 1, vieDesBatiments: 120 },
+    troupes: { hydra: { regen: 3 } },
+    tech: 'ecailles',
+  },
   solarien: {
     id: 'solarien', name: 'Solariens', desc: 'Peuple du désert',
+    devise: 'Ils vont vite.',
+    traits: [
+      'Fellahs, Chacals dressés et Méharistes marchent 10 % plus vite.',
+      'Le Sphinx frappe tous les ennemis devant lui, mais ne se soigne pas.',
+      'Technologie propre : Marche du Soleil, +10 % de vitesse à toute l’armée.',
+    ],
+    vitesse: { villager: 110, scout: 110, knight: 110 },
+    troupes: { hydra: { morsures: 1, balayage: true } },
+    tech: 'marche',
+    // (Aux deux premiers âges, son ordinateur forme ce que forment les autres : des éclaireurs en première ligne
+    // lui faisaient perdre toutes ses parties Express. Ses montures viennent à l'Âge des Châteaux, en nombre.)
+    armee: [
+      ['militia'],
+      ['archer', 'spearman', 'archer'],
+      ['knight', 'horseArcher', 'knight', 'crossbowman', 'champion', 'knight', 'ram', 'catapult', 'priest', 'hydra'],
+    ],
     noms: {
       villager: { name: 'Fellah' },
       militia: { name: 'Garde' },
@@ -615,7 +676,7 @@ export const CIVILISATIONS = {
       champion: { name: 'Garde masqué', pluriel: 'Gardes masqués' },
       priest: { name: 'Prêtre du Soleil', pluriel: 'Prêtres du Soleil' },
       triton: { name: 'Mercenaire atlante', pluriel: 'Mercenaires atlantes' },
-      hydra: { name: 'Sphinx', desc: 'Lion à tête de pharaon invoqué au Temple : encaisse comme une escouade et frappe jusqu’à trois ennemis à la fois. Occupe 3 places de population.' },
+      hydra: { name: 'Sphinx', desc: 'Lion à tête de pharaon invoqué au Temple : encaisse comme une escouade et frappe tous les ennemis devant lui. Occupe 3 places de population.' },
       towncenter: { name: 'Palais du Soleil', desc: 'Forme les fellahs, stocke les ressources et permet de passer à l’âge suivant.' },
       mill: { name: 'Grenier' },
       barracks: { name: 'Cour des Gardes' },               // féminin, comme Caserne
@@ -664,6 +725,28 @@ export function nomDe(type, civ, n = 1) {
   if (n <= 1) return name;
   return pluriel || (/[sxz]$/.test(name) ? name : `${name}s`);   // nom composé : son pluriel est écrit (`pluriel`)
 }
+/**
+ * La définition d'une troupe pour un peuple : celle de UNIT_TYPES — l'objet lui-même quand le peuple n'y change
+ * rien —, sinon une copie où s'appliquent sa vitesse (`vitesse`, en pour cent) et ce que `troupes` y change.
+ * Les RÈGLES s'y lisent (World.defTroupe la porte ensuite au niveau du joueur) ; l'affichage passe par ficheDe.
+ */
+const TROUPES_DES_PEUPLES = {};
+export function troupeDe(type, civ) {
+  const base = UNIT_TYPES[type];
+  const peuple = CIVILISATIONS[civDe(civ)];
+  const pourCent = peuple.vitesse && peuple.vitesse[type];
+  const change = peuple.troupes && peuple.troupes[type];
+  if (!base || (!pourCent && !change)) return base;
+  const cle = `${peuple.id}:${type}`;
+  if (!TROUPES_DES_PEUPLES[cle]) {
+    TROUPES_DES_PEUPLES[cle] = Object.freeze({ ...base, ...(pourCent ? { speed: (base.speed * pourCent) / 100 } : {}), ...(change || {}) });
+  }
+  return TROUPES_DES_PEUPLES[cle];
+}
+/** La technologie propre à un peuple (son identifiant dans TECHS), ou null. */
+export function techDe(civ) {
+  return CIVILISATIONS[civDe(civ)].tech || null;
+}
 /** Le portrait d'un type dans cette civilisation, à défaut celui des Atlantes, ou null. */
 export function portraitDe(type, civ) {
   return CIVILISATIONS[civDe(civ)].portraits[type] || PORTRAITS[type] || null;
@@ -708,6 +791,11 @@ export function textesDesTables(visite) {
   };
   for (const table of TABLES_DE_TEXTE) marcher(table, 0);
   for (const ressource of Object.keys(RESOURCE_LABELS)) visite(RESOURCE_LABELS, ressource);
+  // (Ce qui fait jouer chaque peuple autrement : sa devise et ses traits.)
+  for (const peuple of Object.values(CIVILISATIONS)) {
+    visite(peuple, 'devise');
+    peuple.traits.forEach((_, i) => visite(peuple.traits, i));
+  }
 }
 
 /** Le pluriel français d'un nom : celui qui est écrit, sinon la règle (« s », sauf après s, x ou z). */

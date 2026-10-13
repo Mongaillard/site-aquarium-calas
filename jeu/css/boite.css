@@ -259,6 +259,17 @@ body[data-civ="solarien"] #start-screen .couvercle-capitale[data-civ="solarien"]
 /* --- Les deux peuples --------------------------------------------------------- */
 
 #start-screen .options.peuples { gap: 12px; margin-top: 18px; }
+/* Sous les deux tuiles : la devise du peuple choisi sur une ligne, ses traits repliés dessous — ce qu'il change à la partie. */
+#start-screen .civ-traits { margin: 10px 2px 0; color: var(--b-encre); font-size: 13.5px; font-weight: 700; line-height: 1.35; }
+#start-screen .civ-traits summary { display: flex; align-items: baseline; gap: 8px; min-height: 30px; cursor: pointer; list-style: none; }
+#start-screen .civ-traits summary::-webkit-details-marker { display: none; }
+#start-screen .civ-traits summary b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 17px; letter-spacing: .01em; }
+#start-screen .civ-traits summary span { color: var(--b-gris); font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+#start-screen .civ-traits summary span::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 7px; border: solid var(--b-encre); border-width: 0 3px 3px 0; transform: translateY(-3px) rotate(45deg); }
+#start-screen .civ-traits[open] summary span::after { transform: translateY(1px) rotate(-135deg); }
+#start-screen .civ-traits ul { display: grid; gap: 2px; margin: 4px 0 0; padding: 0; list-style: none; }
+#start-screen .civ-traits li { position: relative; padding-left: 16px; color: var(--b-gris); }
+#start-screen .civ-traits li::before { content: ''; position: absolute; left: 2px; top: .45em; width: 7px; height: 7px; background: var(--b-jaune); border: 2px solid var(--b-encre); border-radius: 50%; }
 #start-screen .option.peuple {
   position: relative;
   display: grid;

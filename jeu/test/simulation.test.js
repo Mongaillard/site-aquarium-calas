@@ -844,7 +844,7 @@ function empreinte(world) {
 }
 
 {
-  // Civilisations : un champ sur le joueur, gardé par la sauvegarde, sans effet sur les règles.
+  // Civilisations : un champ sur le joueur, gardé par la sauvegarde. (Ses effets sur les règles : test/peuples.test.js.)
   const w = new World({ seed: 808, mapSize: 'small', difficulty: 'normal', civs: ['solarien', 'atlante'] });
   check('civilisations : chaque camp porte la sienne', w.players[0].civ === 'solarien' && w.players[1].civ === 'atlante');
   check('civilisations : Atlantes par défaut, et pour une valeur inconnue',
@@ -863,7 +863,10 @@ function empreinte(world) {
     advance(m, 60);
     return empreinte(m);
   };
-  check('civilisations : mêmes règles, la partie se joue à l’identique', jouer(['solarien', 'solarien']) === jouer(['atlante', 'atlante']));
+  // (Depuis que les peuples se jouent autrement — test/peuples.test.js —, deux Solariens ne font plus la partie de
+  // deux Atlantes : leurs ouvriers marchent plus vite. La même partie, elle, se rejoue toujours à l'identique.)
+  check('civilisations : la même partie se rejoue à l’identique, peuple par peuple', jouer(['solarien', 'solarien']) === jouer(['solarien', 'solarien']) && jouer(['atlante', 'atlante']) === jouer(['atlante', 'atlante']));
+  check('civilisations : deux peuples, deux parties — les Solariens ne jouent plus celle des Atlantes', jouer(['solarien', 'solarien']) !== jouer(['atlante', 'atlante']));
   check('civilisations : les noms suivent le camp, les règles non',
     nomDe('villager', 'solarien') === 'Fellah' && nomDe('villager', 'solarien', 3) === 'Fellahs' && nomDe('villager', 'atlante', 3) === 'Villageois'
     && nomDe('towncenter', 'solarien') === 'Palais du Soleil' && ficheDe('archery', 'solarien').fem === false

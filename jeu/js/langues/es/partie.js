@@ -357,4 +357,7 @@ export default {
   "Le réveil de l’Hydre": "El despertar de la Hidra",
   "Un monstre-chef de 2 000 points de vie marche sur ta base. Abats-le en moins de 8 minutes.": "Un monstruo jefe de 2000 puntos de vida avanza hacia tu base. Abátelo en menos de 8 minutos.",
   "Huit vagues, une par minute, sur la carte du jour.": "Ocho oleadas, una por minuto, en el mapa del día.",
+
+  // L’accueil : sous les deux peuples, les traits de celui qu’on a choisi (js/main.js).
+  "Ses atouts": "Sus ventajas",
 };

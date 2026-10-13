@@ -461,9 +461,10 @@ console.log('\n--- La simulation, à l’identique ---');
     };
   };
   const AVANT = [
-    { seed: 4101, civs: ['solarien', 'atlante'], temps: 600, ages: [1, 1], scores: [4678, 4698], entites: 136, positions: 1080594078, terrain: 4156755414, ressources: [[93, 161, 316], [151, 119, 343]] },
-    { seed: 77, civs: ['atlante', 'solarien'], temps: 600, ages: [0, 0], scores: [3968, 4234], entites: 121, positions: 354925785, terrain: 1086135328, ressources: [[271, 308, 403], [389, 373, 377]] },
-    { seed: 2024, civs: ['solarien', 'solarien'], temps: 600, ages: [1, 1], scores: [4438, 5148], entites: 130, positions: 2956986616, terrain: 1239323807, ressources: [[35, 171, 400], [187, 53, 420]] },
+    // (Relevées de nouveau le 13/10/2026 : les peuples se jouent autrement — js/config.js, CIVILISATIONS. Le terrain, lui, n'a pas bougé.)
+    { seed: 4101, civs: ['solarien', 'atlante'], temps: 600, ages: [1, 1], scores: [4765, 4698], entites: 136, positions: 3551583723, terrain: 4156755414, ressources: [[165, 15, 320], [151, 119, 343]] },
+    { seed: 77, civs: ['atlante', 'solarien'], temps: 600, ages: [0, 0], scores: [3968, 4161], entites: 119, positions: 3922527211, terrain: 1086135328, ressources: [[271, 308, 403], [25, 362, 400]] },
+    { seed: 2024, civs: ['solarien', 'solarien'], temps: 600, ages: [0, 1], scores: [4471, 5064], entites: 129, positions: 3800167612, terrain: 1239323807, ressources: [[59, 448, 384], [165, 121, 277]] },
   ];
   /** Une partie IA contre IA ; `afficher` : tout ce que le rendu calcule désormais, refait toutes les cinq secondes de jeu. */
   const partie = ({ seed, civs }, afficher) => {
@@ -486,7 +487,7 @@ console.log('\n--- La simulation, à l’identique ---');
   for (const attendu of AVANT) {
     const { seed, civs, ...valeurs } = attendu;
     const nue = partie(attendu, false), affichee = partie(attendu, true);
-    check(`graine ${seed} (${civs.join(' contre ')}) : dix minutes identiques à celles d’avant le lot`, JSON.stringify(nue) === JSON.stringify(valeurs),
+    check(`graine ${seed} (${civs.join(' contre ')}) : dix minutes identiques à celles du dernier relevé`, JSON.stringify(nue) === JSON.stringify(valeurs),
       `âges ${nue.ages.join('/')}, scores ${nue.scores.join('/')}, ${nue.entites} entités, positions ${nue.positions}`);
     check(`graine ${seed} : calculer le sol et le décor en cours de partie n’y change rien`, JSON.stringify(affichee) === JSON.stringify(valeurs));
   }

@@ -47,7 +47,7 @@ export default {
   "Mercenaire atlante": "Mercenario atlante",
   "Mercenaires atlantes": "Mercenarios atlantes",
   "Sphinx": "Sphinx",
-  "Lion à tête de pharaon invoqué au Temple : encaisse comme une escouade et frappe jusqu’à trois ennemis à la fois. Occupe 3 places de population.": "León con cabeza de faraón invocado en el Templo: aguanta como un escuadrón y golpea hasta a tres enemigos a la vez. Ocupa 3 plazas de población.",
+  "Lion à tête de pharaon invoqué au Temple : encaisse comme une escouade et frappe tous les ennemis devant lui. Occupe 3 places de population.": "León con cabeza de faraón invocado en el Templo: aguanta como un escuadrón y golpea a todos los enemigos que tiene delante. Ocupa 3 plazas de población.",
   "Palais du Soleil": "Palacio del Sol",
   "Forme les fellahs, stocke les ressources et permet de passer à l’âge suivant.": "Forma fellahs, almacena recursos y permite avanzar a la siguiente edad.",
   "Grenier": "Granero",
@@ -181,4 +181,19 @@ export default {
   "100 %": "100%",
   "150 %": "150%",
   "200 %": "200%",
+
+  // Les deux peuples se jouent autrement (js/config.js, CIVILISATIONS) : leur devise, leurs traits, leur technologie propre.
+  "Ils tiennent.": "Aguantan.",
+  "Leurs bâtiments ont 20 % de points de vie en plus.": "Sus edificios tienen un 20% más de puntos de vida.",
+  "Leurs tours tirent 1 case plus loin.": "Sus torres disparan 1 casilla más lejos.",
+  "L’Hydre se soigne seule : 3 points de vie par seconde hors du combat.": "La Hidra se cura sola: 3 puntos de vida por segundo fuera del combate.",
+  "Technologie propre : Écailles profondes, +10 points de vie à l’infanterie.": "Tecnología propia: Escamas profundas, +10 puntos de vida para la infantería.",
+  "Ils vont vite.": "Van deprisa.",
+  "Fellahs, Chacals dressés et Méharistes marchent 10 % plus vite.": "Los Fellahs, los Chacales adiestrados y los Jinetes de camello andan un 10% más rápido.",
+  "Le Sphinx frappe tous les ennemis devant lui, mais ne se soigne pas.": "El Sphinx golpea a todos los enemigos que tiene delante, pero no se cura.",
+  "Technologie propre : Marche du Soleil, +10 % de vitesse à toute l’armée.": "Tecnología propia: Marcha del Sol, +10% de velocidad para todo el ejército.",
+  "Écailles profondes": "Escamas profundas",
+  "Infanterie : +10 points de vie.": "Infantería: +10 puntos de vida.",
+  "Marche du Soleil": "Marcha del Sol",
+  "Toute l’armée : +10 % de vitesse.": "Todo el ejército: +10% de velocidad.",
 };

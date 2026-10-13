@@ -225,4 +225,7 @@ export default {
   "Ton bâtiment principal est tombé à la vague {0} sur {1}": "Tu edificio principal ha caído en la oleada {0} de {1}",
   "Ton bâtiment principal est tombé après {0}": "Tu edificio principal ha caído tras {0}",
   "Durée": "Duración",
+
+  // L’aide de la partie rappelle les traits du peuple joué.
+  "<b>{0}</b> : {1} {2}": "<b>{0}</b>: {1} {2}",
 };

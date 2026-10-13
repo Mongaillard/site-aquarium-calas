@@ -5,7 +5,7 @@
 //   3. militaire  : composition d'armée, défense de la base, vagues d'attaque
 // ---------------------------------------------------------------------------
 
-import { TILE, BUILDING_TYPES, UNIT_TYPES, AGES, nomDe, ficheDe } from './config.js';
+import { TILE, BUILDING_TYPES, UNIT_TYPES, AGES, CIVILISATIONS, nomDe, ficheDe, techDe } from './config.js';
 import { dist2, canAfford, RNG } from './utils.js';
 import { STATE, villagerTask, computeDamage } from './entities.js';
 import { BLOCK } from './map.js';
@@ -575,7 +575,9 @@ export class AIPlayer {
 
     if (player.age >= 1) {
       // (Un rival bâtit d'abord le bâtiment de son caractère : l'écurie du Cavalier passe avant l'archerie.)
-      if (this.caractere && this.caractere.prefere && !this.has(this.caractere.prefere)) return this.caractere.prefere;
+      // (Sans rival, c'est son peuple qui dit par où commencer : l'enclos des montures, chez les Solariens.)
+      const prefere = this.caractere ? this.caractere.prefere : CIVILISATIONS[player.civ].prefere;
+      if (prefere && !this.has(prefere)) return prefere;
       if (!this.has('archery')) return 'archery';
       if (!this.has('stable')) return 'stable';
       if (!this.has('blacksmith')) return 'blacksmith';
@@ -761,8 +763,9 @@ export class AIPlayer {
     // la nourriture montait, une technologie la mangeait à deux doigts du but.
     // (La Brouette, elle, se rembourse en récolte : elle n'attend pas.)
     const pourAge = this.ageTarget ? this.ageTarget.cost.food || 0 : 0;
-    for (const tech of ['forging', 'fletching', 'scaleArmor']) {
-      if (player.techs.has(tech)) continue;
+    // (La technologie de son peuple vient après les trois autres.)
+    for (const tech of ['forging', 'fletching', 'scaleArmor', techDe(player.civ)]) {
+      if (!tech || player.techs.has(tech)) continue;
       if (this.world.canResearch(forge, tech).ok && player.resources.food > 250 + pourAge) {
         this.world.researchTech(forge, tech);
         break;
@@ -777,8 +780,10 @@ export class AIPlayer {
     // (Le format peut imposer sa composition : en Escarmouche, la caserne offerte doit servir dès la première seconde.)
     // (Un rival forme les troupes de son caractère — dans un format court, sa liste courte.)
     const c = this.caractere;
+    // (Sans rival, son peuple peut avoir sa liste : les Solariens misent sur leurs montures — CIVILISATIONS, `armee`.)
+    const duPeuple = CIVILISATIONS[player.civ].armee || ARMY_COMPOSITION;
     const roster = c ? (this.world.mode.aiTroupes ? c.troupesCourtes : c.troupes[Math.min(player.age, c.troupes.length - 1)])
-      : this.world.mode.aiTroupes || ARMY_COMPOSITION[Math.min(player.age, ARMY_COMPOSITION.length - 1)];
+      : this.world.mode.aiTroupes || duPeuple[Math.min(player.age, duPeuple.length - 1)];
 
     // Ce qu'on met de côté avant de former un soldat de plus : le bâtiment
     // voulu, et le prix d'une Hydre tant que le Temple n'en a pas donné assez.

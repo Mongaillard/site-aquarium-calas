@@ -7,7 +7,7 @@
 import {
   TILE, TICKS_PER_SECOND, POP_MAX, AGES, UNIT_TYPES, BUILDING_TYPES, TECHS,
   START_RESOURCES, MAP_SIZES, DIFFICULTIES, PLAYER_COLORS, COULEURS_EQUIPES, GAME_MODES, DEFAULT_MODE,
-  DEFAULT_CIV, civDe, nomDe, ficheDe,
+  DEFAULT_CIV, CIVILISATIONS, civDe, nomDe, ficheDe, troupeDe,
 } from './config.js';
 import { rivalConnu, caractereDuRival, ficheDuRival } from './rivaux.js';
 import { Scenario, refDeScenario, scenarioDe, formatDe, interditesDe } from './scenarios.js';
@@ -91,9 +91,12 @@ function makePlayer(index, name, isAI, civ = DEFAULT_CIV) {
     ageProgress: null,
     techs: new Set(),
     defeated: false,
+    // (Les cinq derniers sont affaire de peuple : ses traits de départ, puis sa technologie — voir CIVILISATIONS.)
     mods: {
       attackMelee: 0, attackPierce: 0, meleeArmor: 0, pierceArmor: 0,
       villagerSpeed: 1, villagerCarry: 0, range: 0, gatherRate: 1,
+      porteeDesTours: 0, vieDesBatiments: 100, construction: 100, vieInfanterie: 0, vitesseArmee: 100,
+      ...(CIVILISATIONS[civDe(civ)].mods || {}),
     },
     // `destroyed` : le prix cumulé des troupes et bâtiments adverses abattus (voir detailScore).
     stats: { gathered: { food: 0, wood: 0, gold: 0 }, trained: 0, lost: 0, built: 0, killed: 0, destroyed: 0 },
@@ -250,8 +253,9 @@ export class World {
    * et pour la nature, c'est l'objet de config.js lui-même : rien ne change.
    */
   defTroupe(type, playerIndex) {
-    const base = UNIT_TYPES[type];
     const joueur = this.players[playerIndex];
+    // (Son peuple d'abord : il peut changer la vitesse d'une troupe, ou sa façon de frapper — troupeDe, js/config.js.)
+    const base = joueur ? troupeDe(type, joueur.civ) : UNIT_TYPES[type];
     const niveau = joueur ? joueur.niveaux[type] : 1;
     if (!base || !(niveau > 1)) return base;
     return joueur.defs[type] || (joueur.defs[type] = definitionAuNiveau(base, type, niveau));
@@ -435,6 +439,9 @@ export class World {
     const px = free ? free.tx * TILE + TILE / 2 : x;
     const py = free ? free.ty * TILE + TILE / 2 : y;
     const unit = new Unit(this, playerIndex, type, px, py);
+    // (La technologie des Atlantes : des points de vie en plus pour l'infanterie, celle d'avant comme celle d'après.)
+    const joueur = this.players[playerIndex];
+    if (joueur && joueur.mods.vieInfanterie > 0 && unit.def.class === 'infantry') { unit.maxHp += joueur.mods.vieInfanterie; unit.hp = unit.maxHp; }
     this.entities.push(unit);
     this.units.push(unit);
     this.byId.set(unit.id, unit);
@@ -479,6 +486,9 @@ export class World {
     // pas être une forteresse imprenable.
     const facteur = type === 'towncenter' ? (this.mode.townCenterHp || 1) : 1;
     if (facteur !== 1) { b.maxHp = Math.round(b.maxHp * facteur); b.hp = Math.min(b.hp, b.maxHp); }
+    // (Le trait d'un peuple dont les bâtiments tiennent mieux : leurs points de vie, en pour cent.)
+    const solidite = (this.players[playerIndex] ? this.players[playerIndex].mods.vieDesBatiments : 0) || 100;
+    if (solidite !== 100) { const part = b.hp / b.maxHp; b.maxHp = Math.round((b.maxHp * solidite) / 100); b.hp = b.maxHp * part; }
     this.entities.push(b);
     this.buildings.push(b);
     this.byId.set(b.id, b);
@@ -1036,7 +1046,34 @@ export class World {
       this.effects.push({ kind: 'hit', x: target.x, y: target.y - 6, life: 0.25, max: 0.25 });
       this.pushEvent({ type: 'melee', x: attacker.x, y: attacker.y, player: attacker.playerIndex, combat });
       if (attacker.def.morsures > 1) this.morsuresVoisines(attacker, target);
+      else if (attacker.def.balayage) this.balayer(attacker, target);
     }
+  }
+
+  /**
+   * Le coup du Sphinx : sa patte balaie tout ce qui se tient devant lui. Chaque troupe ennemie à sa portée, du
+   * côté de sa cible et pas dans son dos, reçoit le même coup (chacune avec son armure) — autant qu'il y en a.
+   * Ni hasard ni tir ami ; les bâtiments et les bêtes ne comptent pas. Là où l'Hydre mord trois ennemis au
+   * plus, il n'a pas de limite : il vaut d'autant plus que la mêlée est serrée.
+   */
+  balayer(sphinx, cible) {
+    const portee = sphinx.rangePx() + sphinx.radius;
+    const ax = cible.x - sphinx.x, ay = cible.y - sphinx.y;
+    const touches = [];
+    this.grid.forEachNear(sphinx.x, sphinx.y, portee + TILE, (e) => {
+      if (e === cible || e.dead || e.garrisonedIn || e.kind !== 'unit' || e.isAnimal) return;
+      if (this.allies(e.playerIndex, sphinx.playerIndex)) return;
+      if (e.edgeDistanceTo(sphinx.x, sphinx.y) > portee || (e.x - sphinx.x) * ax + (e.y - sphinx.y) * ay < 0) return;
+      touches.push(e);
+    });
+    // (Dans l'ordre de naissance : le même résultat sur tous les appareils.)
+    touches.sort((a, b) => a.id - b.id);
+    for (const e of touches) {
+      e.takeDamage(computeDamage(sphinx.def, sphinx.player, e), sphinx);
+      this.effects.push({ kind: 'hit', x: e.x, y: e.y - 6, life: 0.25, max: 0.25 });
+    }
+    // (L'arc de sa patte, pour l'œil : voir Renderer.drawEffects.)
+    this.effects.push({ kind: 'balayage', x: sphinx.x, y: sphinx.y, angle: Math.atan2(ay, ax), rayon: portee, life: 0.3, max: 0.3 });
   }
 
   /**
@@ -1360,6 +1397,8 @@ export class World {
     const tech = TECHS[techId];
     const player = this.players[building.playerIndex];
     if (!tech || !building.complete) return { ok: false, reason: txt('Indisponible') };
+    // (La technologie d'un autre peuple n'est pas pour lui.)
+    if (tech.civ && tech.civ !== player.civ) return { ok: false, reason: txt('Indisponible') };
     if (player.techs.has(techId)) return { ok: false, reason: txt('Déjà recherché') };
     // En cours dans N'IMPORTE LEQUEL de ses bâtiments : deux forges (ou deux
     // Centres-Villes) la paieraient et l'appliqueraient deux fois.
@@ -1432,6 +1471,15 @@ export class World {
       case 'forging': mods.attackMelee += 1; break;
       case 'fletching': mods.attackPierce += 1; mods.range += 1; break;
       case 'scaleArmor': mods.meleeArmor += 1; mods.pierceArmor += 1; break;
+      // Les Atlantes : toute l'infanterie gagne dix points de vie — celle qui est là, et celle qui viendra (spawnUnit).
+      case 'ecailles':
+        mods.vieInfanterie += 10;
+        for (const u of this.units) {
+          if (!u.dead && u.playerIndex === player.index && u.def.class === 'infantry') { u.maxHp += 10; u.hp += 10; }
+        }
+        break;
+      // Les Solariens : toute l'armée marche dix pour cent plus vite (Unit.speedPx).
+      case 'marche': mods.vitesseArmee += 10; break;
     }
   }
 

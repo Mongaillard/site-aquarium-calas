@@ -87,7 +87,7 @@ export default {
   "Un monstre qui encaisse comme une escouade et mord 3 ennemis à la fois.": "Un monstruo que aguanta como un escuadrón y muerde a 3 enemigos a la vez.",
   "Les mêlées serrées, l’infanterie légère, les bâtiments (+9).": "Refriegas apretadas, infantería ligera, edificios (+9).",
   "Les tireurs en nombre qui la visent ensemble, et le harcèlement : elle est lente.": "Muchos tiradores apuntándole a la vez y el hostigamiento: es lenta.",
-  "Lance-la au cœur de la mêlée, des {priest:p} derrière : c’est là que ses morsures comptent. Elle occupe 3 places.": "Lánzala al corazón de la refriega, con {priest:p} detrás: ahí es donde cuentan sus mordiscos. Ocupa 3 plazas.",
+  "Lance-la au cœur de la mêlée, puis retire-la blessée : hors du combat, elle se soigne seule. Elle occupe 3 places.": "Lánzala al corazón de la refriega y retírala herida: fuera del combate se cura sola. Ocupa 3 plazas.",
   // pavoisier
   "Un mur : son grand bouclier arrête presque toutes les flèches.": "Un muro: su gran escudo detiene casi todas las flechas.",
   "Les {archer:p}, les {frondeur:p} et les tours.": "{archer:p}, {frondeur:p} y torres.",
@@ -104,7 +104,7 @@ export default {
   "Tout soldat, et les tours : ni armure, ni points de vie.": "Cualquier soldado y las torres: ni armadura ni puntos de vida.",
   "Fais-le passer pendant que ton armée occupe l’ennemi, droit sur ses engins ou sur un bâtiment isolé.": "Cuélalo mientras tu ejército entretiene al enemigo, directo a sus máquinas o a un edificio aislado.",
   // hydra, chez les solariens
-  "Un monstre qui encaisse comme une escouade et frappe 3 ennemis à la fois.": "Un monstruo que aguanta como un escuadrón y golpea a 3 enemigos a la vez.",
-  "Les tireurs en nombre qui le visent ensemble, et le harcèlement : il est lent.": "Muchos tiradores apuntándole a la vez y el hostigamiento: avanza despacio.",
-  "Lance-le au cœur de la mêlée, des {priest:p} derrière : c’est là que ses coups comptent. Il occupe 3 places.": "Lánzalo al corazón de la refriega, con {priest:p} detrás: ahí es donde cuentan sus golpes. Ocupa 3 plazas.",
+  "Un monstre qui encaisse comme une escouade et frappe tous les ennemis devant lui.": "Un monstruo que aguanta como un escuadrón y golpea a todos los enemigos que tiene delante.",
+  "Les tireurs en nombre qui le visent ensemble, et le harcèlement : il est lent, et ne se soigne pas seul.": "Muchos tiradores apuntándole a la vez y el hostigamiento: avanza despacio y no se cura solo.",
+  "Lance-le là où l’ennemi se serre, des {priest:p} derrière : sa patte les touche tous. Il occupe 3 places.": "Lánzalo donde el enemigo se apiña, con {priest:p} detrás: su zarpa los golpea a todos. Ocupa 3 plazas.",
 };

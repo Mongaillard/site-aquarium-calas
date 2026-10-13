@@ -9,6 +9,9 @@ import {
 import { dist, dist2, clamp } from './utils.js';
 import { BLOCK } from './map.js';
 
+/** Une troupe est « hors du combat » quand elle n'a plus reçu de coup depuis tant de secondes (voir `regen`). */
+const HORS_DU_COMBAT = 5;
+
 export const STATE = {
   IDLE: 'idle',
   MOVE: 'move',
@@ -193,7 +196,8 @@ export class Unit extends Entity {
   get isVillager() { return this.type === 'villager'; }
 
   speedPx() {
-    const mult = this.isVillager ? this.player.mods.villagerSpeed : 1;
+    // (L'ouvrier a sa brouette ; l'armée, la technologie de son peuple — en pour cent.)
+    const mult = this.isVillager ? this.player.mods.villagerSpeed : (this.player.mods.vitesseArmee || 100) / 100;
     const own = this.def.speed * TILE * mult;
     // En groupe, tout le monde va au rythme du plus lent (principe d'AoE :
     // une armée arrive ensemble, pas en file indienne).
@@ -604,6 +608,10 @@ export class Unit extends Entity {
   update(dt) {
     if (this.dead || this.garrisonedIn) return;   // à l'abri : hors du jeu
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
+    // Une troupe qui se soigne seule (l'Hydre des Atlantes) : hors du combat — plus un coup reçu depuis un moment.
+    if (this.def.regen && this.hp < this.maxHp && this.world.time - this.lastHitAt >= HORS_DU_COMBAT) {
+      this.hp = Math.min(this.maxHp, this.hp + this.def.regen * dt);
+    }
     if (this.repathCooldown > 0) this.repathCooldown -= dt;
     if (this.approcheSuspendue > 0) this.approcheSuspendue -= dt;
     if (this.gatherAnim > 0) this.gatherAnim -= dt;
@@ -1567,7 +1575,8 @@ export class Building extends Entity {
   }
 
   rangePx() {
-    return ((this.def.range || 0) + this.player.mods.range) * TILE;
+    // (Les flèches barbelées, et le trait d'un peuple dont les tours tirent plus loin.)
+    return ((this.def.range || 0) + this.player.mods.range + (this.type === 'tower' ? this.player.mods.porteeDesTours || 0 : 0)) * TILE;
   }
 
   /**
@@ -1588,7 +1597,8 @@ export class Building extends Entity {
     // caserne attaquée par huit miliciens se terminait à 797/800.
     const du = (p) => this.maxHp * (0.05 + 0.95 * clamp(p / this.def.buildTime, 0, 1));
     const ecart = this.hp - du(this.buildProgress);   // négatif : les dégâts reçus
-    this.buildProgress += dt * this.buildEfficiency();
+    // (Un peuple peut bâtir plus vite : sa vitesse de chantier, en pour cent.)
+    this.buildProgress += dt * this.buildEfficiency() * ((this.player.mods.construction || 100) / 100);
     this.hp = Math.min(this.maxHp, du(this.buildProgress) + ecart);
     if (this.buildProgress >= this.def.buildTime) {
       this.complete = true;

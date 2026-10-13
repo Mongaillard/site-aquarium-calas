@@ -87,7 +87,7 @@ export default {
   "Un monstre qui encaisse comme une escouade et mord 3 ennemis à la fois.": "A monster that soaks up damage like a whole squad and bites 3 enemies at once.",
   "Les mêlées serrées, l’infanterie légère, les bâtiments (+9).": "Tight melees, light infantry, buildings (+9).",
   "Les tireurs en nombre qui la visent ensemble, et le harcèlement : elle est lente.": "Massed ranged units all aiming at it, and hit-and-run attacks: it’s slow.",
-  "Lance-la au cœur de la mêlée, des {priest:p} derrière : c’est là que ses morsures comptent. Elle occupe 3 places.": "Send it into the heart of the melee, with a {priest} or two behind: that’s where its bites count. It takes 3 population slots.",
+  "Lance-la au cœur de la mêlée, puis retire-la blessée : hors du combat, elle se soigne seule. Elle occupe 3 places.": "Send it into the melee, then pull it back when hurt: out of combat, it heals on its own. It takes 3 population slots.",
   // pavoisier
   "Un mur : son grand bouclier arrête presque toutes les flèches.": "A wall: his great shield stops almost every arrow.",
   "Les {archer:p}, les {frondeur:p} et les tours.": "{archer:p}, {frondeur:p} and towers.",
@@ -104,7 +104,7 @@ export default {
   "Tout soldat, et les tours : ni armure, ni points de vie.": "Any soldier, and towers: no armor, hardly any hit points.",
   "Fais-le passer pendant que ton armée occupe l’ennemi, droit sur ses engins ou sur un bâtiment isolé.": "Slip him through while your army keeps the enemy busy, straight at its siege engines or a lone building.",
   // hydra, chez les solariens
-  "Un monstre qui encaisse comme une escouade et frappe 3 ennemis à la fois.": "A monster that soaks up damage like a whole squad and strikes 3 enemies at once.",
-  "Les tireurs en nombre qui le visent ensemble, et le harcèlement : il est lent.": "Massed ranged units all aiming at it, and hit-and-run attacks: it’s slow.",
-  "Lance-le au cœur de la mêlée, des {priest:p} derrière : c’est là que ses coups comptent. Il occupe 3 places.": "Send it into the heart of the melee, with a {priest} or two behind: that’s where its blows count. It takes 3 population slots.",
+  "Un monstre qui encaisse comme une escouade et frappe tous les ennemis devant lui.": "A monster that soaks up damage like a whole squad and strikes every enemy in front of it.",
+  "Les tireurs en nombre qui le visent ensemble, et le harcèlement : il est lent, et ne se soigne pas seul.": "Massed ranged units all aiming at it, and hit-and-run attacks: it’s slow, and it doesn’t heal on its own.",
+  "Lance-le là où l’ennemi se serre, des {priest:p} derrière : sa patte les touche tous. Il occupe 3 places.": "Send it where enemies bunch up, with a {priest} or two behind: its paw hits them all. It takes 3 population slots.",
 };

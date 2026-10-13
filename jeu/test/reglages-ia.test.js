@@ -12,6 +12,12 @@ import { serializeWorld, restoreWorld } from '../js/save.js';
 import { TICKS_PER_SECOND, TILE } from '../js/config.js';
 
 const DT = 1 / TICKS_PER_SECOND;
+/**
+ * Les essais de la tour : le joueur qui la pose est Solarien, l'ordinateur Atlante. Depuis que les peuples se
+ * jouent autrement (js/config.js, CIVILISATIONS), une tour atlante a 20 % de points de vie en plus et tire une
+ * case plus loin : ces essais-ci règlent l'ordinateur contre la tour du jeu, celle des Solariens.
+ */
+const SANS_TRAIT_DE_TOUR = ['solarien', 'atlante'];
 let failures = 0;
 
 function check(label, condition, detail = '') {
@@ -316,7 +322,7 @@ essai('Normal et Difficile', () => {
 
 // Une troupe abritée n'est plus une menace pour findThreat.
 essai('troupe abritée', () => {
-  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   const e = emplacementTour(w, 9, 'derriere');
   const tour = w.spawnBuilding(0, 'tower', e.tx, e.ty, true);
@@ -335,7 +341,7 @@ essai('troupe abritée', () => {
 // vague en 25 minutes, alerte 100 % du temps, Âge Féodal à 20:04, 38 miliciens
 // restés chez eux, tour debout.)
 essai('tour habitée, la partie', () => {
-  const w = new World({ seed: 99, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 99, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   const r = releve(w);
   jouer(w, 7 * 60, r.pas);
@@ -370,7 +376,7 @@ essai('tour habitée, la partie', () => {
 // premiers réglages seuls : Âge Féodal à 22:46 au lieu de 9:47, première vague
 // à 23:06, 47 ouvriers tués, aucun assaut.)
 essai('tour mal placée', () => {
-  const w = new World({ seed: 123, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 123, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   const r = releve(w);
   jouer(w, 7 * 60, r.pas);
@@ -414,7 +420,7 @@ essai('tour mal placée', () => {
 // vague à 17:49, cinq minutes et demie après la chute de la tour, avec 945
 // d'or et 659 de nourriture en caisse.)
 essai('tour au cœur de sa base', () => {
-  const w = new World({ seed: 99, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 99, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const r = releve(w);
   jouer(w, 7 * 60, r.pas);
   const tour = tourHabitee(w, 6, 'ouvriers');
@@ -442,7 +448,7 @@ essai('tour au cœur de sa base', () => {
 // pour un tiers de ses points de vie, dix à la vague suivante.)
 essai('tour vide', () => {
   const partie = (seed, cote, fin, arret) => {
-    const w = new World({ seed, mode: 'classique', difficulty: 'normal' });
+    const w = new World({ seed, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
     const r = releve(w);
     jouer(w, 7 * 60, r.pas);
     const e = emplacementTour(w, 11, cote);
@@ -475,7 +481,7 @@ essai('tour vide', () => {
 // (`d` : la distance de la tour au centre adverse, en cases ; `occupants` : les
 // ouvriers qui la bâtissent et s'y abritent.)
 const partieTourExpress = (seed, { d = 11, niveau = 'normal', occupants = 2 } = {}) => {
-  const w = new World({ seed, mode: 'express', difficulty: niveau });
+  const w = new World({ seed, mode: 'express', difficulty: niveau, civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   const moi = centre(w, 0);
   const e = emplacementTour(w, d, 'devant');
@@ -539,7 +545,7 @@ essai('Express, la tour qui tient la sortie', () => {
 
 // L'assaut du bâtiment qui tire : pas sans de quoi l'abattre, et sans s'y user.
 essai('tour habitée, l’assaut', () => {
-  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 60);
   const tour = tourHabitee(w, 7, 'derriere');
@@ -582,7 +588,7 @@ essai('tour habitée, l’assaut', () => {
 // temps, les survivants décrochent, et elle n'y retourne pas indéfiniment —
 // même après une sauvegarde reprise.
 essai('tour habitée, l’assaut borné', () => {
-  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 5);
   const tour = tourHabitee(w, 7, 'derriere');
@@ -627,7 +633,7 @@ essai('tour habitée, l’assaut borné', () => {
 // rappelle pas. (Avant : ses soldats étaient repris pour l'assaut, la vague
 // était comptée sans avoir eu lieu.)
 essai('tour habitée, la vague partie', () => {
-  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 60);
   // Hors de portée de son centre : rien ne l'occupe, six miliciens n'y suffisent pas.
@@ -649,7 +655,7 @@ essai('tour habitée, la vague partie', () => {
 // en sortent au lieu d'y rester plantés, et aucun ne s'y attaque de lui-même.
 // (Avant : les six y mouraient, « au repos, sans cible » ou un par un au pied du mur.)
 essai('le camp sous les flèches', () => {
-  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 5);
   const tc = centre(w, 1);
@@ -688,7 +694,7 @@ essai('le camp sous les flèches', () => {
 // battu », et les troupes de l'IA s'en prennent d'elles-mêmes à ses bâtiments,
 // tour comprise. Sans cela, plus aucune vague ne raserait sa base.
 essai('chez le joueur', () => {
-  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 5);
   const moi = centre(w, 0);
@@ -716,7 +722,7 @@ essai('chez le joueur', () => {
 // sa base, qui bat un de ses ouvriers. Le terrain est évité, mais l'armée du
 // camp n'y est pas menée : ce serait une vague qui ne dit pas son nom.
 essai('hors de sa base', () => {
-  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 5);
   const tour = tourHabitee(w, 16, 'devant');
@@ -735,7 +741,7 @@ essai('hors de sa base', () => {
 // joueur se plante à côté des siens, hors de portée de tir du centre. (Avant :
 // alerte 100 % du temps, six ouvriers enfermés en moyenne jusqu'à la fin.)
 essai('alerte sans combat', () => {
-  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 120);
   for (const u of armee(w)) w.killEntity(u, null);
@@ -781,7 +787,7 @@ essai('alerte sans combat', () => {
 // sauvegardée ; l'IA croyait le calme revenu, levait l'alerte au milieu des
 // béliers et comptait une vague sans que personne ne parte.)
 essai('alerte, reprise en plein combat', () => {
-  const w = new World({ seed: 2024, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 2024, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 500);
   const tc = centre(w, 1);
@@ -813,7 +819,7 @@ essai('alerte, reprise en plein combat', () => {
 // l'IA n'arrive pas à tuer la tient en alerte tout du long. (Avant : l'épargne
 // sautait, tout partait en miliciens et l'Âge Féodal attendait.)
 essai('épargne en alerte', () => {
-  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 42, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 8 * 60);
   const tc = centre(w, 1);
@@ -835,7 +841,7 @@ essai('épargne en alerte', () => {
 // n'a de soldats, elle puise dans son épargne pour en former. (Sans cela :
 // aucun soldat formé de toute l'attaque, la moitié du prix de l'âge en caisse.)
 essai('épargne, débordée', () => {
-  const w = new World({ seed: 2024, mode: 'classique', difficulty: 'normal' });
+  const w = new World({ seed: 2024, mode: 'classique', difficulty: 'normal', civs: SANS_TRAIT_DE_TOUR });
   const ai = w.ais[0];
   jouer(w, 8 * 60);
   const tc = centre(w, 1);

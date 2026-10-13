@@ -18,7 +18,7 @@ import { profilNeuf, appliquerResultat, tableDesCoffres, verifierProbabilites } 
 import { resumeReglages, texteDeConsigne } from '../js/ui.js';
 import { formatNumber } from '../js/utils.js';
 import { executer, avancer as avancerLeJournal, Journal, ORDRES } from '../js/ordres.js';
-import { COULEURS_EQUIPES } from '../js/config.js';
+import { COULEURS_EQUIPES, CIVILISATIONS } from '../js/config.js';
 
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const lire = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8');
@@ -290,7 +290,9 @@ console.log('--- Gagner ---');
   centre(c, 1).takeDamage(99999, null);
   avancer(c, 1);
   check('raser le bâtiment principal adverse gagne aussi, quels que soient les points', !!c.gameOver && c.gameOver.winner === 0 && c.gameOver.victory === true && !c.gameOver.positions);
-  check('ce bâtiment a tous ses points de vie, deux fois ceux d’Express', centre(terrain(), 0).maxHp === BUILDING_TYPES.towncenter.hp && centre(new World({ seed: 1, mode: 'express' }), 0).maxHp * 2 === BUILDING_TYPES.towncenter.hp);
+  // (Le joueur de ces parties est Atlante : ses bâtiments ont les points de vie du jeu, plus le trait de son peuple.)
+  const solidite = CIVILISATIONS.atlante.mods.vieDesBatiments / 100;
+  check('ce bâtiment a tous ses points de vie, deux fois ceux d’Express', centre(terrain(), 0).maxHp === Math.round(BUILDING_TYPES.towncenter.hp * solidite) && centre(new World({ seed: 1, mode: 'express' }), 0).maxHp * 2 === centre(terrain(), 0).maxHp);
 }
 
 console.log('--- La sauvegarde ---');

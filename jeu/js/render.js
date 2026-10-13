@@ -2622,7 +2622,7 @@ export class Renderer {
     const ctx = this.ctx;
     for (const fx of this.world.effects) {
       // Comme les projectiles et les sons : un combat hors de vue ne se montre pas.
-      if ((fx.kind === 'hit' || fx.kind === 'death' || fx.kind === 'impact' || fx.kind === 'soin') && !this.world.isVisible(fx.x, fx.y)) continue;
+      if ((fx.kind === 'hit' || fx.kind === 'death' || fx.kind === 'impact' || fx.kind === 'soin' || fx.kind === 'balayage') && !this.world.isVisible(fx.x, fx.y)) continue;
       const t = 1 - fx.life / fx.max;
       if (fx.kind === 'hit') {
         ctx.strokeStyle = `rgba(255,220,120,${1 - t})`;
@@ -2630,6 +2630,15 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(fx.x, fx.y, 4 + t * 10, 0, Math.PI * 2);
         ctx.stroke();
+      } else if (fx.kind === 'balayage') {
+        // Le coup de patte du Sphinx : un arc clair devant lui, qui s'ouvre et s'efface.
+        ctx.strokeStyle = `rgba(255,236,170,${(1 - t) * 0.9})`;
+        ctx.lineWidth = 5 * (1 - t) + 1.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.ellipse(fx.x, fx.y, fx.rayon * (0.55 + t * 0.45), fx.rayon * (0.55 + t * 0.45) * 0.72, 0, fx.angle - 1.25, fx.angle + 1.25);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
       } else if (fx.kind === 'impact') {
         // Le boulet d'une catapulte : l'onde de son rayon, qui s'efface.
         ctx.strokeStyle = `rgba(230,200,150,${(1 - t) * 0.9})`;

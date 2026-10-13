@@ -52,7 +52,7 @@ console.log('--- Le français ---');
   check('sans rien demander, les fiches sont en français : leurs titres, leurs phrases',
     LANGUE === 'fr' && egal(RUBRIQUES, [['role', 'Rôle'], ['bat', 'Bat'], ['craint', 'Craint'], ['conseil', 'Conseil']])
     && FICHES.militia.bat === 'Les {spearman:p}, et les tireurs dès qu’il arrive au contact.'
-    && FICHES_CIV.solarien.hydra.role === 'Un monstre qui encaisse comme une escouade et frappe 3 ennemis à la fois.');
+    && FICHES_CIV.solarien.hydra.role === 'Un monstre qui encaisse comme une escouade et frappe tous les ennemis devant lui.');
   check('… chaque phrase est celle qui est écrite dans le module, à la lettre près',
     fiches.length === TROUPES.length + 1 && fiches.every((f) => CLES.every((cle) => source.includes(`${cle}: '${f[cle]}',`))));
   check('… et une fiche lue garde ses noms français et son espace insécable devant « : »',
@@ -130,11 +130,11 @@ console.log('\n--- L’anglais ---');
     && texte('pavoisier', 'solarien', 'bat') === 'Archers, Slingers and towers.'
     && texte('priest', 'atlante', 'role') === 'Heals your wounded troops from 4 tiles away: 8 hit points per heal.'
     && texte('frondeur', 'solarien', 'conseil') === 'Post him facing the enemy’s ranged units, behind your foot soldiers. He’s cheap: train plenty.');
-  check('le Sphinx des Solariens a sa propre fiche : mêmes chiffres que l’Hydre, mais il frappe, elle mord',
+  check('le Sphinx des Solariens a sa propre fiche : il frappe tous les ennemis devant lui, elle en mord 3 et se soigne seule',
     texte('hydra', 'atlante', 'role') === 'A monster that soaks up damage like a whole squad and bites 3 enemies at once.'
-    && texte('hydra', 'solarien', 'role') === 'A monster that soaks up damage like a whole squad and strikes 3 enemies at once.'
-    && texte('hydra', 'atlante', 'conseil') === 'Send it into the heart of the melee, with a Priestess or two behind: that’s where its bites count. It takes 3 population slots.'
-    && texte('hydra', 'solarien', 'conseil') === 'Send it into the heart of the melee, with a Sun Priest or two behind: that’s where its blows count. It takes 3 population slots.'
+    && texte('hydra', 'solarien', 'role') === 'A monster that soaks up damage like a whole squad and strikes every enemy in front of it.'
+    && texte('hydra', 'atlante', 'conseil') === 'Send it into the melee, then pull it back when hurt: out of combat, it heals on its own. It takes 3 population slots.'
+    && texte('hydra', 'solarien', 'conseil') === 'Send it where enemies bunch up, with a Sun Priest or two behind: its paw hits them all. It takes 3 population slots.'
     && texte('hydra', 'solarien', 'bat') === texte('hydra', 'atlante', 'bat') && CIVS.every((civ) => TROUPES.every((t) => !CLES.some((cle) => t !== 'hydra' && civ === 'solarien' && texte(t, civ, cle).includes('Hydra')))));
   check('rien n’est resté sans traduction dans cette partie', m.sans.length === 0, m.sans.slice(0, 3).join(' | '));
 
@@ -174,7 +174,7 @@ console.log('\n--- L’écran ---');
     console.log(JSON.stringify(ecrans));`);
   const montre = (e) => e.html.includes('class="prog-fiche-texte"') && e.attendu.every((r) => e.html.includes(`<div data-rubrique="${r.cle}"><dt>${r.titre}</dt><dd>${r.texte}</dd></div>`));
   check('l’écran de la fiche montre les quatre rubriques en anglais, pour un Atlante comme pour un Solarien',
-    m.length === 3 && m.every(montre) && m[0].html.includes('<dt>Fears</dt><dd>') && m[1].html.includes('Atlantean Mercenaries (+6).</dd>') && m[2].html.includes('<dt>Role</dt><dd>A monster that soaks up damage like a whole squad and strikes 3 enemies at once.</dd>'),
+    m.length === 3 && m.every(montre) && m[0].html.includes('<dt>Fears</dt><dd>') && m[1].html.includes('Atlantean Mercenaries (+6).</dd>') && m[2].html.includes('<dt>Role</dt><dd>A monster that soaks up damage like a whole squad and strikes every enemy in front of it.</dd>'),
     m.filter((e) => !montre(e)).map((e) => `${e.type} (${e.civ})`).join(', '));
   check('… sans un mot de la fiche française', m.every((e) => ficheDeTroupe(e.type, e.civ).every((r) => !e.html.includes(r.texte) && !e.html.includes(`<dt>${r.titre}</dt>`))));
 }

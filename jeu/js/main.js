@@ -1898,6 +1898,17 @@ function capitaleDe(civ) {
   return propre ? propre.src : 'assets/centre-ville.webp';
 }
 
+/**
+ * Sous les deux peuples : ce qui fait jouer autrement celui qu'on a choisi — sa devise, puis ses traits
+ * (js/config.js, CIVILISATIONS). Le choix d'un peuple n'est plus seulement une affaire d'images.
+ */
+function refreshTraits() {
+  const box = document.getElementById('civ-traits');
+  if (!box) return;
+  const peuple = CIVILISATIONS[settings.civ];
+  box.innerHTML = `<summary><b>${peuple.devise}</b> <span>${txt('Ses atouts')}</span></summary><ul>${peuple.traits.map((trait) => `<li>${trait}</li>`).join('')}</ul>`;
+}
+
 /** Les réglages repliés, résumés sur leur ligne. */
 function refreshReglages() {
   const node = document.getElementById('reglages-resume');
@@ -1938,6 +1949,7 @@ function showStartScreen() {
   afficherIncident();
   refreshPalmares();
   refreshReglages();
+  refreshTraits();
   reglerPeuple(settings.civ);
   refreshLigue();
   refreshType();
@@ -2135,6 +2147,7 @@ function setupStartScreen() {
         activate(box, btn);
         if (illustre) habiller(settings[cle]);
         if (illustre) reglerPeuple(settings[cle]);   // les écrans des troupes en prennent les noms et les portraits
+        if (illustre) refreshTraits();
         refreshReglages();
         chargerCivilisation(settings[cle]);   // ses images arrivent pendant que le joueur finit de choisir
         audio.resume(); audio.play('click');

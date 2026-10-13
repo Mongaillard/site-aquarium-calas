@@ -30,9 +30,10 @@ de la carte et la vitesse de jeu.
 
 **Deux civilisations.** Les **Atlantes** (peuple de la mer : marbre blanc, toits
 bleus, tridents) et les **Solariens** (peuple du désert : grès ocre, toits en
-terrasse, disques solaires). À ce stade, les règles sont les mêmes pour les
-deux — coûts, points de vie, IA — : une civilisation change ce que l'on voit et
-ce que l'interface nomme. Les Solariens ont leurs treize bâtiments (Palais du
+terrasse, disques solaires). Une civilisation change ce que l'on voit, ce que
+l'interface nomme — et la façon de jouer (voir « Les deux peuples se jouent
+autrement », plus bas) ; les prix, les âges et les bâtiments restent les mêmes
+pour les deux. Les Solariens ont leurs treize bâtiments (Palais du
 Soleil, Cour des Gardes, Grenier à dômes, Temple du Soleil…) et toutes leurs
 troupes à eux : le Fellah (l'ouvrier), le Garde à coiffe rayée, le Lancier,
 l'Archer, l'Arbalétrier au crâne rasé sous son bandeau, l'Archer monté sur un
@@ -107,6 +108,28 @@ une autre (ses vagues lancées, la vie et l'humeur de son monstre). Contre des v
 du joueur jouent à leur niveau ; contre l'ordinateur (un défi fait d'une règle), il a la force de la ligue.
 Les vagues, les points de vie du monstre et les seuils des étoiles sont des **valeurs de départ**, réglées
 sur des parties où un ordinateur tenait la place du joueur : à revoir en jouant.
+
+### Les deux peuples se jouent autrement
+
+Tout est dans `CIVILISATIONS` (`js/config.js`) : une devise, des traits que l'accueil montre sous le peuple
+choisi (« Ses atouts ») et que l'aide de la partie rappelle, et ce que les règles en font.
+
+| | Atlantes — « Ils tiennent. » | Solariens — « Ils vont vite. » |
+| --- | --- | --- |
+| Dès le départ | Bâtiments à **+20 %** de points de vie ; tours qui tirent **1 case** plus loin | Fellahs, Chacals dressés et Méharistes **10 %** plus rapides |
+| Le monstre du Temple | L'**Hydre** mord trois ennemis et **se soigne seule** : 3 points de vie par seconde, cinq secondes après le dernier coup reçu | Le **Sphinx** frappe **tous** les ennemis devant lui (`World.balayer`), et ne se soigne pas |
+| Technologie propre (Forge, Âge Féodal, 200 nourriture et 100 or) | **Écailles profondes** : +10 points de vie à l'infanterie | **Marche du Soleil** : +10 % de vitesse à toute l'armée |
+
+L'ordinateur solarien forme davantage de montures à l'Âge des Châteaux ; aux deux premiers âges, il forme
+ce que forment les autres. Le monstre-chef d'un scénario reste la troupe du jeu : ni soin ni balayage.
+
+**L'équilibre se mesure**, il ne se devine pas : `npm run peuples` fait jouer Atlantes contre Solariens entre
+deux ordinateurs, chaque carte deux fois en échangeant les places. Sans aucun trait, le résultat est
+exactement moitié-moitié. Les traits ci-dessus tiennent dans l'écart du bruit ; ceux qui en sortaient ont
+été écartés — une portée en plus pour le bâtiment principal des Atlantes (98 % de victoires en Express) ou
+une tour offerte au départ (100 %) : l'ordinateur ne sait pas attaquer ce qui tire ; des chantiers 20 % plus
+rapides pour les Solariens (70 %). C'est une mesure entre ordinateurs : elle dit que les règles ne penchent
+pas, pas que les deux peuples sont aussi agréables à jouer — cela se juge en jouant.
 
 ## Comment on joue
 

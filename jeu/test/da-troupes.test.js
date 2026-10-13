@@ -404,14 +404,15 @@ console.log('\n--- La simulation se déroule à l’identique ---');
   // graines, mêmes durées. Ce lot ne touche à aucune règle : elles ne doivent
   // pas bouger. (Si une règle change un jour à dessein, les relever de nouveau.)
   const parties = [
-    [{ seed: 2026, mapSize: 'small', difficulty: 'normal', civs: ['atlante', 'solarien'] }, 11, '7f34bcce-2764'],
-    [{ seed: 77, mapSize: 'medium', difficulty: 'hard', civs: ['solarien', 'atlante'] }, 9, '86e6c950-2986'],
+    // (Relevées de nouveau le 13/10/2026 : une règle a changé à dessein — les deux peuples se jouent autrement.)
+    [{ seed: 2026, mapSize: 'small', difficulty: 'normal', civs: ['atlante', 'solarien'] }, 11, '6a9a3eb-2785'],
+    [{ seed: 77, mapSize: 'medium', difficulty: 'hard', civs: ['solarien', 'atlante'] }, 9, 'a5006ae-2989'],
   ];
   for (const [options, minutes, attendue] of parties) {
     const w = new World(options);
     for (let i = 0; i < minutes * 60 * TICKS_PER_SECOND; i++) w.update(DT);
     const obtenue = condense(empreinte(w));
-    check(`graine ${options.seed} (${options.civs.join(' contre ')}), ${minutes} minutes : la partie est celle d’avant le lot`, obtenue === attendue,
+    check(`graine ${options.seed} (${options.civs.join(' contre ')}), ${minutes} minutes : la partie est celle du dernier relevé`, obtenue === attendue,
       `${w.units.filter((u) => !u.dead).length} unités, ${w.buildings.filter((b) => !b.dead).length} bâtiments — ${obtenue}`);
     if (options.seed === 2026) {
       // Une sauvegarde se reprend : même état, et les couleurs de camp du jour.

@@ -221,8 +221,8 @@ check('une fiche prend les noms du peuple du joueur : « Jinetes de camello » l
   fiche('solarien.ram', 'craint') === 'Lanceros (+6), Jinetes de camello (+5) y Zapadores (+8): en el cuerpo a cuerpo, está indefenso.'
   && fiche('solarien.champion', 'craint').startsWith('Sphinx, Ballesteros (+8 contra la infantería)') && fiche('atlante.hydra', 'craint').startsWith('Muchos tiradores'), fiche('solarien.ram', 'craint'));
 check('… la Hidra des Atlantes se fait féminine, le Sphinx des Solariens masculin — et le Sphinx a sa propre fiche',
-  fiche('atlante.hydra', 'conseil') === 'Lánzala al corazón de la refriega, con Sacerdotisas detrás: ahí es donde cuentan sus mordiscos. Ocupa 3 plazas.'
-  && fiche('solarien.hydra', 'conseil') === 'Lánzalo al corazón de la refriega, con Sacerdotes del Sol detrás: ahí es donde cuentan sus golpes. Ocupa 3 plazas.'
+  fiche('atlante.hydra', 'conseil') === 'Lánzala al corazón de la refriega y retírala herida: fuera del combate se cura sola. Ocupa 3 plazas.'
+  && fiche('solarien.hydra', 'conseil') === 'Lánzalo donde el enemigo se apiña, con Sacerdotes del Sol detrás: su zarpa los golpea a todos. Ocupa 3 plazas.'
   && fiche('atlante.priest', 'role') === 'Cura a tus tropas heridas, a 4 casillas: 8 puntos de vida por cada curación.');
 check('l’écran de jeu : la consigne à l’allié et la fin de partie se lisent, avec le Palais du Soleil ou le Centro urbano selon le peuple',
   egal(m.consignes, ['Tu aliado está fuera de combate', 'Tu aliado está siendo atacado en casa: primero rechaza al enemigo', 'Tu aliado envía 1 soldado a defenderte', 'Tu aliado envía 4 soldados al ataque'])

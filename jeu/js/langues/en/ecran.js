@@ -225,4 +225,7 @@ export default {
   "Ton bâtiment principal est tombé à la vague {0} sur {1}": "Your main building fell at wave {0} of {1}",
   "Ton bâtiment principal est tombé après {0}": "Your main building fell after {0}",
   "Durée": "Length",
+
+  // L’aide de la partie rappelle les traits du peuple joué.
+  "<b>{0}</b> : {1} {2}": "<b>{0}</b>: {1} {2}",
 };
