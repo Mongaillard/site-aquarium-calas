@@ -19,6 +19,8 @@ import { STATE, villagerTask } from './entities.js';
 import { clamp, dist, bruitPeriodique } from './utils.js';
 
 /** Prise de positions : la couleur d'une position que personne ne tient. */
+/** Un monstre-chef est dessiné une fois et demie plus grand que sa troupe (voir Renderer.enGrand). */
+const TAILLE_DU_CHEF = 1.5;
 const POSITION_NEUTRE = { main: '#b9b3a6', light: '#e8e3d8', dark: '#6f6a60' };
 /**
  * L'illustration du monument d'une position, en trois bannières : bleue
@@ -1579,6 +1581,24 @@ export class Renderer {
   }
 
   /**
+   * Un monstre-chef (js/scenarios.js) se dessine plus grand que la troupe dont il a le corps : la même image,
+   * agrandie depuis ses pieds — ombre, anneau de camp et barre de vie compris. Son ombre, son anneau et son corps
+   * passent par ici — `dessin` est le nom du dessin à refaire en grand : 'dessinerOmbre', 'dessinerSocle',
+   * 'drawUnit'. Rend vrai quand le dessin est fait.
+   */
+  enGrand(u, dessin) {
+    if (!u.chef || this.dessineEnGrand) return false;
+    const ctx = this.ctx, pied = u.y + u.radius * 0.45;
+    this.dessineEnGrand = true;
+    ctx.save();
+    ctx.translate(u.x, pied);
+    ctx.scale(TAILLE_DU_CHEF, TAILLE_DU_CHEF);
+    ctx.translate(-u.x, -pied);
+    try { this[dessin](u); } finally { ctx.restore(); this.dessineEnGrand = false; }
+    return true;
+  }
+
+  /**
    * Style « 3D en direct » : les unités au modèle 3D sont toutes rendues d'un
    * coup, avant l'ordre du peintre — chacune dans sa case d'un canevas WebGL
    * hors écran —, puis chacune y reprend sa case au moment d'être dessinée.
@@ -1839,6 +1859,7 @@ export class Renderer {
   }
 
   drawUnit(u) {
+    if (this.enGrand(u, 'drawUnit')) return;   // un monstre-chef : la même image, plus grande
     const ctx = this.ctx;
     const color = u.player.color;
     const r = u.radius;
@@ -2125,6 +2146,7 @@ export class Renderer {
    * déborde un peu de l'empreinte — son bord fondu compris.
    */
   dessinerOmbre(u) {
+    if (this.enGrand(u, 'dessinerOmbre')) return;
     const image = this.imageOmbre();
     if (!image) return;
     const rx = this.empreinte(u), ry = rx * APLAT;
@@ -2142,6 +2164,7 @@ export class Renderer {
    * drawEntities). Un animal sauvage n'a pas de camp : pas d'anneau.
    */
   dessinerSocle(u) {
+    if (this.enGrand(u, 'dessinerSocle')) return;
     if (u.isAnimal && u.playerIndex < 0) return;
     const ctx = this.ctx;
     const rx = this.empreinte(u), sol = u.y + u.radius * 0.45;

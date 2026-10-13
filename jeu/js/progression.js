@@ -80,6 +80,8 @@ const existe = (type) => typeof type === 'string' && possede(R.troupes, type) &&
 const OBJECTIFS_DU_JOUR = [...R.objectifs.faciles, ...R.objectifs.moyens].map((o) => o.id);
 /** Un nom de peuple ou de format, tel que la partie le dit : court, en lettres. */
 const nomCourt = (v) => typeof v === 'string' && /^[A-Za-z]{1,24}$/.test(v);
+/** Les étoiles d'un scénario se gardent en un nombre, une par bit : trois buts, donc de 0 à 7. */
+const TOUTES_LES_ETOILES = 7;
 const ligueValide = (ligue) => entier(ligue, 1, NB_LIGUES, 1);
 
 // Les collections (js/collections-config.js), relevées une fois.
@@ -177,6 +179,11 @@ function semaineDe(jour) {
  *   joursJoues      : le nombre de jours où l'on a joué une partie classée : il ne retombe jamais ;
  *                     `premierJour` et `dernierJour` en sont les bornes (le bon retour s'y lit)
  *   victoiresPar    : les victoires classées comptées par peuple (`civ`) et par `format`
+ *   defi            : le défi du jour (js/scenarios.js) — le `jour` où on l'a joué, ses étoiles déjà
+ *                     payées ce jour-là (`acquis` : une étoile par bit, de 0 à 7), et le nombre de jours
+ *                     où il en a donné au moins une (`reussis`, qui ne retombe jamais)
+ *   scenarios       : par scénario qui porte un nom, ses étoiles déjà gagnées (`acquis`, comme ci-dessus),
+ *                     son `record` (0 : aucun) et le nombre de `parties` qu'on y a jouées
  *   rechercheFermeeJusqua : heure (en secondes) jusqu'à laquelle la recherche
  *                     d'adversaire est fermée ; 0 si elle est ouverte
  *   operations, journal : nombre d'opérations faites, et les dernières
@@ -217,6 +224,8 @@ export function profilNeuf() {
     objectifs: { jour: '', faits: [], semaine: { numero: 0, avance: 0, vus: [], fait: false } },
     joursJoues: 0, premierJour: '', dernierJour: '',
     victoiresPar: { civ: {}, format: {} },
+    defi: { jour: '', acquis: 0, reussis: 0 },
+    scenarios: {},
     rechercheFermeeJusqua: 0,
     operations: 0,
     journal: [],
@@ -350,6 +359,17 @@ function lireProfil(o) {
         const n = entier(lues[cle], 0, GRAND, 0);
         if (n > 0) p.victoiresPar[genre][cle] = n;
       }
+    }
+  }
+  if (estObjet(o.defi)) {
+    if (rangDuJour(o.defi.jour) !== null) { p.defi.jour = o.defi.jour; p.defi.acquis = entier(o.defi.acquis, 0, TOUTES_LES_ETOILES, 0); }
+    p.defi.reussis = entier(o.defi.reussis, 0, GRAND, 0);
+  }
+  if (estObjet(o.scenarios)) {
+    for (const id of Object.keys(o.scenarios).filter(nomCourt).slice(0, 64)) {
+      const lu = o.scenarios[id];
+      if (!estObjet(lu)) continue;
+      p.scenarios[id] = { acquis: entier(lu.acquis, 0, TOUTES_LES_ETOILES, 0), record: entier(lu.record, 0, GRAND, 0), parties: entier(lu.parties, 0, GRAND, 0) };
     }
   }
   p.rechercheFermeeJusqua = estNombre(o.rechercheFermeeJusqua) && o.rechercheFermeeJusqua > 0 ? o.rechercheFermeeJusqua : 0;
@@ -1883,6 +1903,89 @@ export function etatDesObjectifs(profil, jour) {
     avance: cetteSemaine ? Math.min(hebdo.seuil, p.objectifs.semaine.avance) : 0,
   } : null;
   return { duJour, semaine, joursJoues: p.joursJoues };
+}
+
+// --- Les défis et les scénarios ------------------------------------------------------
+
+/** Combien d'étoiles dans ce nombre (une par bit). */
+export function nombreDEtoiles(acquis) {
+  let n = 0;
+  for (let bit = 1; bit <= TOUTES_LES_ETOILES; bit <<= 1) if (acquis & bit) n++;
+  return n;
+}
+
+/** Les étoiles d'un nombre, but par but : [vrai, faux, vrai]. */
+export function etoilesAcquises(acquis) {
+  return [1, 2, 4].map((bit) => (acquis & bit) !== 0);
+}
+
+/**
+ * Où en est un scénario pour ce joueur : `acquis` (ses étoiles, but par but), `etoiles` (leur nombre),
+ * `record` (0 : aucun) et `parties`. Pour le défi du jour (`id` « defi »), les étoiles sont celles de `jour`.
+ */
+export function etatDeScenario(profil, id, jour) {
+  const p = migrerProfil(profil);
+  if (id === 'defi') {
+    const acquis = p.defi.jour === jour ? p.defi.acquis : 0;
+    return { acquis: etoilesAcquises(acquis), etoiles: nombreDEtoiles(acquis), record: 0, parties: 0, reussis: p.defi.reussis };
+  }
+  const s = possede(p.scenarios, id) ? p.scenarios[id] : { acquis: 0, record: 0, parties: 0 };
+  return { acquis: etoilesAcquises(s.acquis), etoiles: nombreDEtoiles(s.acquis), record: s.record, parties: s.parties };
+}
+
+/**
+ * Une partie de scénario est finie (js/scenarios.js). `partie` = {
+ *   scenario : son identifiant — « defi » pour le défi du jour ;
+ *   jour     : « AAAA-MM-JJ », le jour d'ici (pour le défi : celui du défi joué) ;
+ *   etoiles  : les buts atteints dans cette partie, [vrai, faux, vrai] ;
+ *   record   : la valeur à garder au palmarès, ou rien ; `sens` : 'haut' (la plus haute tient) ou 'bas'.
+ * }
+ * Une étoile se paie une fois, en points de saison (R.defis) : la première fois pour un scénario qui porte un
+ * nom, une fois par jour pour le défi du jour — le défi d'un autre jour que `jourDIci` ne paie rien.
+ * Renvoie `{ profil, evenements }` : « etoiles » `{ scenario, gagnees, nouvelles, acquis, points, total,
+ * palier, paliersGagnes }` — toujours —, « record » `{ scenario, valeur, ancien }` quand il est battu, et ceux
+ * d'un changement de saison si le mois a tourné.
+ */
+export function appliquerScenario(profil, partie) {
+  const p = migrerProfil(profil);
+  const evenements = [];
+  if (!estObjet(partie) || !nomCourt(partie.scenario)) return { profil: p, evenements, erreur: 'scenario' };
+  const jour = rangDuJour(partie.jour) === null ? '' : partie.jour;
+  const jourDIci = rangDuJour(partie.jourDIci) === null ? jour : partie.jourDIci;
+  changerDeJour(p, jourDIci);
+  changerDeSaison(p, jourDIci, evenements);
+  const gagnees = [0, 1, 2].map((i) => Array.isArray(partie.etoiles) && partie.etoiles[i] === true);
+  const masque = gagnees.reduce((m, oui, i) => (oui ? m | (1 << i) : m), 0);
+  const duJour = partie.scenario === 'defi';
+  let avant = 0, apres = 0, payees = true;
+  if (duJour) {
+    // (Le défi d'hier, fini aujourd'hui — une partie reprise après minuit : ses étoiles ne se paient plus.)
+    payees = !!jour && jour === p.jour.date;
+    if (payees) {
+      if (p.defi.jour !== jour) { p.defi.jour = jour; p.defi.acquis = 0; }
+      avant = p.defi.acquis;
+      apres = p.defi.acquis = avant | masque;
+      if (avant === 0 && apres !== 0) p.defi.reussis++;
+    }
+  } else {
+    const s = possede(p.scenarios, partie.scenario) ? p.scenarios[partie.scenario] : (p.scenarios[partie.scenario] = { acquis: 0, record: 0, parties: 0 });
+    s.parties++;
+    avant = s.acquis;
+    apres = s.acquis = avant | masque;
+    const valeur = entier(partie.record, 0, GRAND, 0);
+    if (valeur > 0 && (s.record === 0 || (partie.sens === 'bas' ? valeur < s.record : valeur > s.record))) {
+      evenements.push({ type: 'record', scenario: partie.scenario, valeur, ancien: s.record });
+      s.record = valeur;
+    }
+  }
+  const nouvelles = nombreDEtoiles(apres) - nombreDEtoiles(avant);
+  const r = avancerSurLaRoute(p, nouvelles * R.defis.points.etoile * facteurDesPoints(p));
+  evenements.unshift({
+    type: 'etoiles', scenario: partie.scenario, gagnees, nouvelles, acquis: etoilesAcquises(payees ? apres : masque), payees,
+    points: r.gagnes, total: p.route.points, palier: r.palier, paliersGagnes: r.paliersGagnes,
+  });
+  noter(p, { op: 'scenario', scenario: partie.scenario, jour, etoiles: nombreDEtoiles(masque) });
+  return { profil: p, evenements };
 }
 
 /**

@@ -30,6 +30,7 @@ import {
   aPrendreDansLaSaison, htmlPiecesDuCoffre, htmlRayonDesCollections, pieceEnEtiquette, resumeDesGains, enEuros,
   boutonAutreMonnaie, deuxPrix,
 } from './collections-ecrans.js';
+import { brancherDefis, ECRANS_DES_DEFIS, agirSurLesDefis, htmlTuileDesDefis } from './defis-ecrans.js';
 
 /** Les troupes que le jeu sait former, dans l'ordre des réglages. */
 const TROUPES = Object.keys(R.troupes).filter((type) => !R.troupes[type].aVenir && UNIT_TYPES[type]);
@@ -38,6 +39,7 @@ const ORIGINES = { victoire: txt('Victoire'), defaite: txt('Défaite'), egalite:
 let civ = DEFAULT_CIV;          // le peuple dont on montre les noms et les portraits
 let surChangement = () => {};   // l'accueil se redessine quand le profil change
 let surEssai = null;            // lance une partie d'essai (main.js) ; absent : pas de bouton
+let surScenario = null;         // lance une partie de scénario (main.js) ; absent : rien ne se lance
 let titreMontre = '';           // l'écran affiché (son titre) ; vide : aucun
 
 const nombre = (v, decimales = 2) => nombreLocal(v, { maximumFractionDigits: decimales });
@@ -123,6 +125,7 @@ export function htmlBandeau(profil) {
     </div>
     ${htmlBourses(profil)}
     <div class="prog-bandeau-actions">
+      ${htmlTuileDesDefis(profil, jourLocal())}
       ${tuile('coffres', 'coffre', txt('Coffres'), coffres)}
       ${tuile('troupes', 'militia', txt('Troupes'), prets)}
       ${tuile('album', 'album', txt('Album'), 0)}
@@ -676,13 +679,14 @@ const ECRANS = {
   boutique: (p) => ecranBoutique(p),
   confidentialite: () => ecranConfidentialite(),
   ...ECRANS_DES_COLLECTIONS,
+  ...ECRANS_DES_DEFIS,
 };
 
 /**
  * Ouvre un écran de la progression : « ligues », « coffres », « troupes »,
  * « probas » (un type de coffre), « fiche » (une troupe), « boutique »,
  * « album », « collection » (son identifiant), « blason », « saison »,
- * « confidentialite ».
+ * « defis », « confidentialite ».
  */
 export function ouvrirProgression(ecran, arg) {
   if (ECRANS[ecran]) ECRANS[ecran](lireProgression(), arg);
@@ -742,6 +746,7 @@ function agir(act, arg, i, m) {
   }
   const profil = lireProgression();
   if (agirSurLesCollections(act, arg, i, profil, (p, message, confirmer) => ecranBoutique(p, message, { confirmer }), m)) return undefined;
+  if (agirSurLesDefis(act, arg, i, profil)) return undefined;
   if (act === 'ouvrir') {
     const r = ouvrirCoffre(profil, Number(i) || 0, Math.random);
     if (r.erreur) return ecranCoffres(profil);
@@ -818,6 +823,12 @@ export function jourLocal(date = new Date()) {
 }
 
 brancherCollections({ montrer, retenir, nombre, pluriel, couronnes, euros, coffre, heure, ligueEnPhrase, jour: () => jourLocal() });
+/** Une durée telle que le chronomètre l'écrit : « 5:12 ». */
+const dureeEnClair = (secondes) => `${Math.floor(secondes / 60)}:${String(Math.floor(secondes % 60)).padStart(2, '0')}`;
+brancherDefis({
+  montrer, fermer: () => fermerProgression(), nombre, duree: dureeEnClair, jour: () => jourLocal(),
+  lancer: (ref, sur) => (surScenario ? surScenario(ref, sur) : 'refus'),
+});
 
 /** Le peuple dont les écrans montrent les noms et les portraits. */
 export function reglerPeuple(nouveau) { civ = nouveau || DEFAULT_CIV; reglerPeupleDesTeintures(civ); }
@@ -826,9 +837,10 @@ export function reglerPeuple(nouveau) { civ = nouveau || DEFAULT_CIV; reglerPeup
  * À appeler une fois : pose les écouteurs. Tout bouton qui porte `data-ecran`
  * (dans l'accueil, l'écran de fin ou les écrans eux-mêmes) ouvre cet écran.
  */
-export function installerProgression({ quandLeProfilChange = () => {}, quandOnEssaie = null, guichet = null } = {}) {
+export function installerProgression({ quandLeProfilChange = () => {}, quandOnEssaie = null, quandOnJoueUnScenario = null, guichet = null } = {}) {
   surChangement = quandLeProfilChange;
   surEssai = quandOnEssaie;
+  surScenario = quandOnJoueUnScenario;
   // Les ventes en argent réel : par le guichet donné (js/achats.js). Sans guichet, rien ne s'achète ainsi.
   if (guichet) {
     ouvrirLesVentes(guichet, RANGEMENT, { quandUnAchatArrive: apresAchat })

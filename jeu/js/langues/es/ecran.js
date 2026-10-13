@@ -212,4 +212,17 @@ export default {
   // La fin de partie : rejouer le même format, avec sa durée quand il a un chronomètre.
   "Rejouer": "Jugar otra vez",
   "Rejouer · {0} min": "Jugar otra vez · {0} min",
+
+  // Les scénarios (js/scenarios.js) : le compteur de vagues, le monstre-chef, ce qui a tranché à la fin.
+  "Vague {0}/{1}": "Oleada {0}/{1}",
+  "Vague {0}/{1} · {2}": "Oleada {0}/{1} · {2}",
+  "dans {0}": "en {0}",
+  "{0} : la règle du défi l’interdit": "{0}: la regla del desafío lo prohíbe",
+  "Les {0} vagues sont repoussées, en {1}": "Las {0} oleadas rechazadas, en {1}",
+  "Monstre abattu en {0} : {1}": "Monstruo abatido en {0}: {1}",
+  "Temps écoulé : {0} tient encore, avec {1} points de vie": "Se acabó el tiempo: {0} sigue en pie, con {1} puntos de vida",
+  "Abandon à la vague {0} sur {1}, après {2}": "Abandono en la oleada {0} de {1}, tras {2}",
+  "Ton bâtiment principal est tombé à la vague {0} sur {1}": "Tu edificio principal ha caído en la oleada {0} de {1}",
+  "Ton bâtiment principal est tombé après {0}": "Tu edificio principal ha caído tras {0}",
+  "Durée": "Duración",
 };

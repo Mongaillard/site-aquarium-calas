@@ -85,6 +85,29 @@ l'onglet passe en arrière-plan (un appel qui arrive, un écran qui s'éteint). 
 retour, l'écran d'accueil propose **Reprendre la partie** avec son format, son
 âge et son chrono. Une partie finie ou abandonnée efface sa sauvegarde.
 
+### Les défis et les scénarios
+
+Un **scénario** est une partie écrite d'avance (`js/scenarios.js`) : il emprunte un format, en change ce
+qu'il veut, et peut avoir son but à lui. Ses briques : des **vagues** écrites (l'heure, les troupes, la
+porte de la carte par où elles entrent), un **monstre-chef** (une troupe aux points de vie fixés, qui
+change quand sa vie passe sous un seuil : il appelle des soldats, il frappe plus vite), un **but** (tenir
+toutes les vagues, abattre le monstre) et **trois buts à étoile**. La tuile « Défis » de l'accueil ouvre
+leur écran (`js/defis-ecrans.js`).
+
+| Défi | Ce que c'est |
+| --- | --- |
+| **Tenir le Fort** | Survie : douze vagues, une par minute, de plus en plus fortes ; la dernière amène une Hydre. Personne ne bâtit en face. Étoiles : voir arriver la vague 6, la vague 9, tenir les douze. Le record garde la plus haute vague |
+| **Le réveil de l'Hydre** | Monstre-chef : une Hydre de 2 000 points de vie, dessinée une fois et demie plus grande, qui appelle quatre soldats sous les deux tiers de sa vie et enrage sous le tiers. À abattre en moins de 8 minutes. Le record garde le meilleur temps |
+| **Le défi du jour** | Tiré de la date, le même pour tous, sans serveur : la carte change chaque jour, la règle suit le jour de la semaine — dimanche le monstre-chef, lundi « Tous à pied » (aucune cavalerie), mardi « Mur de lances », mercredi « Fourmilière » (15 ouvriers au départ), jeudi « Tir groupé », vendredi « Palais de papier » (bâtiments principaux au quart de leur vie), samedi la Survie en huit vagues |
+
+Une **étoile** rapporte 20 points de saison (`defis.points` des réglages) : la première fois pour un
+scénario qui porte un nom, une fois par jour pour le défi du jour — jamais d'Éclats ni de coffre. Une
+partie de scénario ne compte ni au classement ni au palmarès ; elle se sauvegarde et se reprend comme
+une autre (ses vagues lancées, la vie et l'humeur de son monstre). Contre des vagues, seules les troupes
+du joueur jouent à leur niveau ; contre l'ordinateur (un défi fait d'une règle), il a la force de la ligue.
+Les vagues, les points de vie du monstre et les seuils des étoiles sont des **valeurs de départ**, réglées
+sur des parties où un ordinateur tenait la place du joueur : à revoir en jouant.
+
 ## Comment on joue
 
 | Geste | Effet |
@@ -1027,6 +1050,7 @@ jeu/
 │   ├── entities.js       unités (machine à états), animaux, bâtiments, projectiles
 │   ├── game.js           le monde : ordres, économie, combat, troupeau, brouillard, victoire
 │   ├── ai.js             l'adversaire
+│   ├── scenarios.js      les scénarios : vagues, monstre-chef, buts à étoile, défi du jour
 │   ├── save.js           sauvegarde et reprise, palmarès, profil du joueur
 │   ├── progression-config.js  classement, ligues, coffres, niveaux : tous les réglages
 │   ├── progression.js    … et toutes les règles, en fonctions pures

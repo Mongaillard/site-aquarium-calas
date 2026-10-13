@@ -14,7 +14,9 @@ import {
   lireProgression, ecrireProgression, quandLaProgressionSEcrit,
 } from './save.js';
 import { brancher as brancherRangementDurable, hoteDeLApplication } from './rangement-durable.js';
-import { appliquerResultat, reglagesDePartie, issueDePartie, formatConseille, debutant, prochainPalier, prendreCoffreDeRecrue, prochainPalierDeSaison, joursRestants } from './progression.js';
+import { appliquerResultat, reglagesDePartie, issueDePartie, formatConseille, debutant, prochainPalier, prendreCoffreDeRecrue, prochainPalierDeSaison, joursRestants, appliquerScenario } from './progression.js';
+import { scenarioDe, optionsDeScenario, etoilesDe, consigneDe } from './scenarios.js';
+import { htmlFinDeScenario, titreDeScenario } from './defis-ecrans.js';
 import { hoteDesRappels, lireReglages as lireRappels, ecrireReglages as ecrireRappels, fautIlDemander, quitterLeJeu, revenirAuJeu, SORTES as SORTES_DE_RAPPELS } from './rappels.js';
 import { matiereDe } from './collections-config.js';
 import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
@@ -155,6 +157,8 @@ class Game {
     this.essai = this.world.essai;
     // Partie guidée (js/guide.js) : elle ne compte nulle part non plus, et ne s'enregistre pas.
     this.tutoriel = !!this.world.tutoriel;
+    // Partie de scénario (js/scenarios.js) : elle ne compte ni au classement ni au palmarès — elle a ses étoiles.
+    this.scenario = this.world.scenario;
     // Les images propres à chaque camp (partie neuve ou reprise) ; sans effet pour les Atlantes.
     for (const p of this.world.players) chargerCivilisation(p.civ);
     this.canvas = document.getElementById('game');
@@ -234,7 +238,9 @@ class Game {
     window.addEventListener('pagehide', this.onLeave);
     // Le conseil de départ, pour une partie neuve seulement : à la reprise,
     // les villageois travaillent déjà.
-    if (!repris && !this.tutoriel) this.ui.toast(txt`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
+    if (!repris && !this.tutoriel && !this.scenario) this.ui.toast(txt`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
+    // (Un scénario dit d'abord ce qu'il attend du joueur.)
+    if (!repris && this.scenario) this.ui.toast(consigneDe(this.scenario.def), 'warn');
     if (!repris && this.world.rival) {
       const r = ficheDuRival(this.world.rival);
       this.ui.toast(txt`En face : ${nomDuRival(this.world.rival)} (ordinateur). « ${r.phrase} »`, 'warn');
@@ -521,6 +527,24 @@ class Game {
           } else this.ui.toast(txt('L’adversaire prend une position'), 'warn');
           break;
         }
+        // Scénario : une vague entre sur la carte. Le repère de la mini-carte et le message disent par où.
+        case 'vague':
+          this.audio.play('alert');
+          this.foyers.signaler(event.x, event.y);
+          this.lastAttackPoint = { x: event.x, y: event.y };
+          this.ui.toast(txt`Vague ${event.numero} sur ${event.total} en approche`, 'error', () => this.voirAttaque());
+          this.vibrate([18, 60, 18]);
+          break;
+        // Scénario : le monstre-chef entre, appelle des renforts, enrage.
+        case 'chef':
+          this.audio.play('alert');
+          this.foyers.signaler(event.x, event.y);
+          this.lastAttackPoint = { x: event.x, y: event.y };
+          this.ui.toast(event.etape === 'entre' ? txt`Monstre en vue : ${event.nom}`
+            : event.etape === 'renforts' ? txt`${event.nom} : des renforts lui arrivent`
+              : txt`${event.nom} : la rage ! Ses coups pleuvent plus vite`, 'error', () => this.voirAttaque());
+          this.vibrate([18, 60, 18]);
+          break;
         case 'gameOver':
           this.musique.mettre('silence');   // la place au jingle de fin
           this.audio.play(event.result.victory ? 'victory' : 'defeat');
@@ -530,7 +554,9 @@ class Game {
           // de fin dit ce qu'elle y change.
           // Une partie classée compte au classement, pas au palmarès : sa
           // difficulté est celle de la ligue, elle fausserait les records.
-          if (this.classee) this.ui.showGameOver(event.result, null, this.compterPartieClassee(event.result));
+          // Une partie de scénario a ses étoiles et son record à elle (js/progression.js, appliquerScenario).
+          if (this.scenario) this.ui.showGameOver(event.result, null, this.compterScenario(event.result));
+          else if (this.classee) this.ui.showGameOver(event.result, null, this.compterPartieClassee(event.result));
           // Une partie d'essai (trois soldats offerts au départ) ne compte pas non plus au palmarès.
           else if (this.tutoriel) this.ui.showGameOver(event.result, null, `<p class="fin-note">${txt('Partie guidée : elle ne compte ni au classement ni au palmarès.')}</p>`);
           else if (this.essai) this.ui.showGameOver(event.result, null, `<p class="fin-note">${txt('Partie d’essai : elle ne compte ni au classement ni au palmarès.')}</p>`);
@@ -564,6 +590,23 @@ class Game {
     const issue = issueDePartie(result);
     const phrase = !rival ? '' : issue === 'victoire' ? txt`Tu as battu ${rival}.` : issue === 'egalite' ? txt`Égalité contre ${rival}.` : txt`${rival} l’emporte cette fois.`;
     return `${phrase ? `<p class="fin-rival">${phrase}</p>` : ''}${htmlFinDePartie(r.evenements, r.profil)}`;
+  }
+
+  /**
+   * Une partie de scénario finie : ses buts atteints deviennent des étoiles, payées en points de saison la
+   * première fois (une fois par jour pour le défi du jour), et son record entre au profil. Rend le bloc de
+   * l'écran de fin.
+   */
+  compterScenario(result) {
+    const s = this.scenario, def = s.def;
+    const bilan = s.bilan(result);
+    const record = def.record === 'vague' ? bilan.vague : def.record === 'temps' && bilan.victoire ? bilan.temps : 0;
+    const r = appliquerScenario(lireProgression(), {
+      scenario: s.ref.id, jour: s.ref.jour || jourLocal(), jourDIci: jourLocal(),
+      etoiles: etoilesDe(def, bilan), record, sens: def.record === 'temps' ? 'bas' : 'haut',
+    });
+    ecrireProgression(r.profil);
+    return htmlFinDeScenario(def, bilan, r.evenements);
   }
 
   pruneSelection() {
@@ -1490,6 +1533,8 @@ class Game {
     // (Rejouer la partie guidée : la même, depuis le début.)
     if (this.tutoriel) { startGame(partieDuGuide()); return; }
     clearSave();
+    // (Rejouer un scénario : le même, sur la même carte.)
+    if (this.scenario) { startGame(partieDeScenario(this.scenario.ref)); return; }
     // Après une reprise, `options` ne porte que la sauvegarde : on relit le
     // format, la carte et les civilisations sur la partie qui s'achève.
     const w = this.world;
@@ -1649,6 +1694,36 @@ function essayerTroupe(type, sur) {
     civs: [settings.civ, settings.civAdverse],
     speed: settings.speed, seed: Math.floor(Math.random() * 1e9),
   }, false), type));
+  return 'lancee';
+}
+
+/**
+ * Les réglages d'une partie de scénario (js/scenarios.js) : ceux du scénario, les peuples de l'accueil, et ce
+ * que la progression donne. Contre l'ordinateur (un défi fait d'une règle), il a la force de la ligue, comme
+ * en partie classée — sans rien de classé. Contre des vagues, elles sont écrites : seules les troupes du joueur
+ * jouent à leur niveau.
+ */
+function partieDeScenario(ref) {
+  const options = optionsDeScenario(ref, [settings.civ, settings.civAdverse]);
+  const def = scenarioDe(ref);
+  if (!options || !def) return null;
+  const r = reglagesDePartie(lireProgression(), def.adversaire === 'aucun' ? 'libre' : 'classe');
+  return { difficulty: 'normal', ...options, ...r, classee: false, partieId: null, speed: settings.speed };
+}
+
+/**
+ * Le bouton « Jouer » d'un défi (js/defis-ecrans.js). Une partie qui dort serait effacée : la première fois on
+ * répond « confirmer », et l'écran demande un second toucher — comme pour une partie d'essai.
+ */
+function lancerScenario(ref, sur) {
+  const options = partieDeScenario(ref);
+  if (!options) return 'refus';
+  if (currentGame && !currentGame.world.gameOver) return 'refus';   // une partie se joue : pas de défi par-dessus
+  if (loadSave() && !sur) return 'confirmer';
+  if (currentGame) currentGame.destroy();
+  abandonnerPartieClasseeEnCours();
+  clearSave();
+  startGame(options);
   return 'lancee';
 }
 
@@ -1938,6 +2013,8 @@ function refreshResumeCard() {
     return;
   }
   const mode = GAME_MODES[save.mode] || GAME_MODES[DEFAULT_MODE];
+  // (Une partie de scénario qui dort porte le nom du scénario, pas celui du format qu'il emprunte.)
+  const scenario = save.scenario ? scenarioDe(save.scenario) : null;
   const player = save.players[save.humanIndex || 0];
   const age = AGES[player ? player.age : 0];
   const civs = save.players.map((p) => CIVILISATIONS[civDe(p && p.civ)].name);
@@ -1951,8 +2028,9 @@ function refreshResumeCard() {
     : formatClock(save.time);
   box.innerHTML = `
     <button id="btn-resume" class="btn primary large">${txt('Reprendre la partie')}</button>
-    <p class="resume-info">${txt`${civs[moi]} contre ${civs[face]}`} · ${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
-      · ${DIFFICULTIES[save.difficulty] ? DIFFICULTIES[save.difficulty].name : ''}</p>
+    ${scenario ? `<p class="resume-info">${titreDeScenario(scenario)} · ${formatClock(save.time)}</p>`
+    : `<p class="resume-info">${txt`${civs[moi]} contre ${civs[face]}`} · ${iconeSVG(mode.icon, 13, 'inline')} ${mode.name} · ${age.name} · ${chrono}
+      · ${DIFFICULTIES[save.difficulty] ? DIFFICULTIES[save.difficulty].name : ''}</p>`}
     ${save.classee ? `<p class="resume-info">${txt('Partie classée : la quitter compte comme une défaite.')}</p>` : ''}
     <button id="btn-drop-save" class="btn ghost small">${txt('Abandonner cette partie')}</button>`;
   document.getElementById('btn-resume').addEventListener('click', () => {
@@ -2150,7 +2228,7 @@ function setupStartScreen() {
   });
 }
 
-installerProgression({ quandLeProfilChange: refreshLigue, quandOnEssaie: essayerTroupe, guichet: guichetParDefaut() });
+installerProgression({ quandLeProfilChange: refreshLigue, quandOnEssaie: essayerTroupe, quandOnJoueUnScenario: lancerScenario, guichet: guichetParDefaut() });
 // Là où la page offre un rangement par personne, le profil y est gardé aussi :
 // s'il y est plus avancé qu'ici (autre appareil, stockage effacé), il revient.
 brancherRangementDurable({ hote: window.claude || hoteDeLApplication(), lire: lireProgression, ecrire: ecrireProgression }).then((rangement) => {

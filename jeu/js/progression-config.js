@@ -128,6 +128,14 @@ export const PROGRESSION = figer(traduire({
   //  revient sans rien avoir perdu, et avec un cadeau. Un seul par retour, jamais récurrent.
   retour: { apres: 4, coffre: 'argent' },
 
+  // --- Les défis et les scénarios (js/scenarios.js) -------------------------------
+  //  Un scénario a trois buts à étoile. Chaque étoile se paie une fois, en points de
+  //  saison : la première fois qu'on la gagne pour un scénario qui porte un nom, une
+  //  fois par jour pour le défi du jour. Jamais d'Éclats : les coffres en donnent déjà
+  //  assez, et dix Éclats font une Couronne (état des lieux du 12/10/2026).
+  //   points.etoile : ce que rapporte une étoile
+  defis: { points: { etoile: 20 } },
+
   // --- Recherche d'adversaire --------------------------------------------------
   //  fenetre  : écart d'Elo accepté au départ (H)
   //  pas      : ce dont elle s'élargit toutes les `periode` secondes

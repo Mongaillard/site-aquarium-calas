@@ -1,0 +1,101 @@
+/* ---------------------------------------------------------------------------
+   Les défis (js/defis-ecrans.js, js/scenarios.js) : la tuile de l'accueil,
+   l'écran « Défis », ce que la partie affiche d'un scénario — le compteur de
+   vagues, la vie du monstre-chef — et ce que sa fin annonce. Direction « Boîte
+   de jeu » : contour d'encre, aplats francs, ombre pleine.
+   --------------------------------------------------------------------------- */
+
+/* --- Les étoiles : creuses tant que le but reste à atteindre, jaunes ensuite. --- */
+.defi-etoiles { display: inline-flex; flex: none; gap: 2px; }
+.defi-etoiles i,
+.defi-buts li > i { display: flex; flex: none; }
+.defi-etoiles svg,
+.defi-buts li > i svg { fill: var(--b-papier); stroke: var(--b-encre); stroke-width: 44px; paint-order: stroke; overflow: visible; }
+.defi-etoiles i.pleine svg,
+.defi-buts li > i.pleine svg { fill: var(--b-jaune); }
+
+/* --- La tuile de l'accueil : large, au-dessus des six autres. --- */
+#start-screen .prog-bandeau-actions .btn.tuile-defis {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 60px;
+  margin-bottom: 6px;
+  padding: 8px 14px;
+  text-align: left;
+}
+#start-screen .prog-bandeau-actions .btn.tuile-defis > svg { flex: none; width: 30px; height: 30px; fill: var(--b-jaune); stroke: var(--b-encre); stroke-width: 44px; paint-order: stroke; overflow: visible; }
+.tuile-defis-texte { display: grid; flex: 1 1 auto; min-width: 0; gap: 1px; }
+.tuile-defis-texte b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 20px; line-height: 1.05; letter-spacing: .01em; }
+.tuile-defis-texte small { overflow: hidden; font-size: 13px; font-weight: 800; color: var(--b-gris); text-overflow: ellipsis; white-space: nowrap; }
+#start-screen .tuile-defis .defi-etoiles svg { width: 20px; height: 20px; margin: 0; }
+#start-screen .tuile-defis .defi-etoiles i:not(.pleine) svg { fill: var(--b-papier); }
+#start-screen .tuile-defis .defi-etoiles i.pleine svg { fill: var(--b-jaune); }
+
+/* --- L'écran « Défis » : une carte par scénario. --- */
+.defi-carte { display: grid; gap: 8px; margin: 14px 0 0; padding: 12px 14px 14px; color: var(--b-encre); background: var(--b-blanc); border: 3px solid var(--b-encre); border-radius: 18px; box-shadow: 0 5px 0 var(--b-encre); }
+.defi-carte p,
+.defi-carte ul,
+.defi-fin ul { margin: 0; padding: 0; }
+.defi-tete { display: flex; align-items: center; gap: 8px; }
+.defi-tete > svg { flex: none; fill: var(--b-encre); }
+.defi-tete b { flex: 1 1 auto; min-width: 0; font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 20px; line-height: 1.1; letter-spacing: .01em; }
+.defi-resume { font-size: 15px; font-weight: 700; line-height: 1.35; }
+.defi-bref,
+.defi-record { font-size: 13px; font-weight: 800; color: var(--b-gris); }
+.defi-record { color: var(--b-encre); }
+.defi-demain { margin: 10px 2px 0; font-size: 13px; font-weight: 700; line-height: 1.35; color: var(--b-gris); }
+.defi-buts { display: grid; gap: 7px; list-style: none; }
+.defi-buts li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; line-height: 1.25; }
+.defi-buts li > b { font-variant-numeric: tabular-nums; }
+.defi-buts li.fait span { color: var(--b-gris); }
+#progression .defi-carte .btn { width: 100%; margin-top: 2px; }
+#progression .defi-carte .btn.arme { background: var(--b-rouge); color: var(--b-papier); }
+
+/* --- La fin d'une partie de scénario : ses trois buts, dans le carton de sable. --- */
+.defi-fin { display: grid; gap: 8px; }
+.defi-fin-titre { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; }
+.defi-fin-titre b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 19px; line-height: 1.1; }
+.defi-fin .defi-buts li { grid-template-columns: auto 1fr; }
+/* (Une étoile gagnée avant cette partie : son but reste coché, en retrait.) */
+.defi-fin .defi-buts li.ancien span { color: var(--b-gris); }
+.defi-fin .defi-buts li.fait:not(.ancien) span { color: var(--b-encre); }
+.defi-fin .record { margin: 0; font-weight: 900; }
+
+/* --- En partie : le compteur de vagues, dans le cartouche de l'âge. --- */
+#scenario-box { flex: 0 0 auto; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#hud #scenario-box { color: var(--b-encre); }
+#hud #scenario-box.urgent { color: var(--error); }
+
+/* --- En partie : la vie du monstre-chef, à la place du premier message — les messages descendent d'un cran. --- */
+#chef-box {
+  position: absolute;
+  z-index: 4;
+  top: calc(74px + var(--safe-top));
+  left: calc(10px + var(--safe-left));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: min(60vw, 320px, calc(100vw - 150px - var(--safe-left) - var(--safe-right)));
+  padding: 4px 10px;
+  color: var(--b-encre);
+  background: var(--b-papier);
+  border: 3px solid var(--b-encre);
+  border-radius: 12px;
+  box-shadow: 0 4px 0 var(--b-encre);
+  font-size: 12.5px;
+  font-weight: 900;
+  pointer-events: none;
+}
+#chef-box b { flex: none; font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 14px; }
+#chef-box em { flex: none; font-style: normal; font-variant-numeric: tabular-nums; }
+.chef-barre { flex: 1 1 auto; min-width: 24px; height: 10px; overflow: hidden; background: var(--b-blanc); border: 2px solid var(--b-encre); border-radius: 6px; }
+.chef-barre i { display: block; width: 100%; height: 100%; background: var(--b-rouge); }
+#chef-box:not(.hidden) ~ #alerts { top: calc(118px + var(--safe-top)); }
+
+/* --- Le menu de pause rappelle les buts du scénario. --- */
+.pause-buts { display: grid; gap: 3px; }
+.pause-buts span { display: flex; align-items: center; gap: 6px; }
+.pause-buts svg { flex: none; fill: var(--b-jaune); stroke: var(--b-encre); stroke-width: 44px; paint-order: stroke; overflow: visible; }

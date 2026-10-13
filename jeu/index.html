@@ -19,6 +19,8 @@
   <link rel="stylesheet" href="css/collections.css">
   <!-- La partie guidée : la bulle de consigne et le doigt qui montre où toucher. -->
   <link rel="stylesheet" href="css/guide.css">
+  <!-- Les défis : la tuile de l'accueil, l'écran « Défis », le compteur de vagues et la vie du monstre-chef. -->
+  <link rel="stylesheet" href="css/defis.css">
 </head>
 <body>
 
@@ -137,6 +139,8 @@
           <b id="score-adverse">0</b>
         </span>
         <span id="positions-box" class="hidden" aria-label="Les positions : à qui elles sont" data-txt-attr="aria-label"></span>
+        <!-- Scénario (js/scenarios.js) : la vague en cours et le temps avant la suivante. -->
+        <span id="scenario-box" class="hidden"></span>
         <div class="age-progress hidden"><span id="age-bar"></span></div>
       </div>
     </div>
@@ -146,6 +150,9 @@
       <button id="btn-menu" class="icon-btn" aria-label="Menu" data-txt-attr="aria-label" data-icone="menu"></button>
     </div>
   </header>
+
+  <!-- Scénario : la vie du monstre-chef, sous la barre du haut. -->
+  <div id="chef-box" class="hidden"><b id="chef-nom"></b><span class="chef-barre"><i id="chef-vie"></i></span><em id="chef-points"></em></div>
 
   <div id="minimap-wrap">
     <canvas id="minimap" width="160" height="160"></canvas>

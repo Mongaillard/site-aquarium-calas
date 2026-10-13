@@ -212,4 +212,17 @@ export default {
   // La fin de partie : rejouer le même format, avec sa durée quand il a un chronomètre.
   "Rejouer": "Play again",
   "Rejouer · {0} min": "Play again · {0} min",
+
+  // Les scénarios (js/scenarios.js) : le compteur de vagues, le monstre-chef, ce qui a tranché à la fin.
+  "Vague {0}/{1}": "Wave {0}/{1}",
+  "Vague {0}/{1} · {2}": "Wave {0}/{1} · {2}",
+  "dans {0}": "in {0}",
+  "{0} : la règle du défi l’interdit": "{0}: not allowed by the challenge rule",
+  "Les {0} vagues sont repoussées, en {1}": "All {0} waves repelled, in {1}",
+  "Monstre abattu en {0} : {1}": "Monster slain in {0}: {1}",
+  "Temps écoulé : {0} tient encore, avec {1} points de vie": "Time’s up: {0} is still standing, with {1} hit points left",
+  "Abandon à la vague {0} sur {1}, après {2}": "Resigned at wave {0} of {1}, after {2}",
+  "Ton bâtiment principal est tombé à la vague {0} sur {1}": "Your main building fell at wave {0} of {1}",
+  "Ton bâtiment principal est tombé après {0}": "Your main building fell after {0}",
+  "Durée": "Length",
 };

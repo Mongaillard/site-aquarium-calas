@@ -17,6 +17,7 @@ import { STYLES, etatModeles3d, portraitAdverse } from './sprites.js';
 import { ficheCiv, spriteDe, imagePourJoueur } from './sprites.js';
 import { resumeIncident } from './save.js';
 import { EN_MAGASIN } from './edition.js';
+import { butsDe } from './scenarios.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -240,6 +241,8 @@ export class UI {
       timer: el('game-timer'),
       scoreBox: el('score-box'), scoreMoi: el('score-moi'), scoreAdverse: el('score-adverse'),
       positionsBox: el('positions-box'),
+      scenarioBox: el('scenario-box'),
+      chefBox: el('chef-box'), chefNom: el('chef-nom'), chefVie: el('chef-vie'), chefPoints: el('chef-points'),
       selection: el('selection-panel'), commands: el('command-panel'),
       alerts: el('alerts'), buildMenu: el('build-menu'), modal: el('modal'),
       workerBar: el('worker-bar'), workerMenu: el('worker-menu'),
@@ -278,8 +281,19 @@ export class UI {
       this.nodes.positionsBox.innerHTML = this.world.positions.map(() => '<i></i>').join('');
       this.etatDesPositions = '';
     }
+    // Scénario : le compteur de vagues et la vie du monstre-chef (voir majScenario). Cachés hors scénario.
+    const scenario = this.world.scenario;
+    if (this.nodes.scenarioBox) {
+      const vagues = !!(scenario && scenario.def.vagues);
+      this.nodes.scenarioBox.classList.toggle('hidden', !vagues);
+      this.nodes.scenarioBox.textContent = '';
+      // (Des vagues sans limite de temps : le compte à rebours de la prochaine vague tient lieu de chronomètre.)
+      this.nodes.timer.classList.toggle('hidden', vagues && !this.world.mode.timeLimit);
+    }
+    if (this.nodes.chefBox) this.nodes.chefBox.classList.toggle('hidden', !(scenario && scenario.def.chef));
     if (this.nodes.scoreBox) {
-      this.nodes.scoreBox.classList.toggle('hidden', !this.world.mode.timeLimit);
+      // (Un scénario qui a son but à lui ne se joue pas au score, même chronométré.)
+      this.nodes.scoreBox.classList.toggle('hidden', !this.world.mode.timeLimit || !!(scenario && scenario.juge));
       // (Le ton sombre de chaque camp : c'est lui qui se lit sur le papier de la barre.)
       this.nodes.scoreMoi.style.color = this.world.players[this.world.humanIndex].color.dark;
       this.nodes.scoreAdverse.style.color = this.world.adversaire(this.world.humanIndex).color.dark;
@@ -368,7 +382,9 @@ export class UI {
       : formatTime(this.world.time));
     this.nodes.timer.classList.toggle('urgent', limite > 0 && limite - this.world.time < 60);
     // … et le score des deux camps : c'est lui qui tranchera au bout du temps.
-    if (limite) {
+    const scenario = this.world.scenario;
+    if (scenario) this.majScenario(scenario.affichage());
+    if (limite && !(scenario && scenario.juge)) {
       const adverse = this.world.adversaire(this.world.humanIndex);
       // (Par équipes : la somme de chaque bord — c'est elle qui tranchera.)
       const mien = this.world.parEquipes ? this.world.scoreEquipe(player.equipe) : this.world.score(player);
@@ -395,6 +411,25 @@ export class UI {
     this.refreshDisabledStates();
     if (!this.nodes.workerMenu.classList.contains('hidden')) this.renderWorkerRows();
     if (!this.nodes.buildMenu.classList.contains('hidden')) this.refreshBuildMenu();
+  }
+
+  /**
+   * Scénario : où en sont les vagues (« Vague 3/12 · suivante 0:42 ») et le monstre-chef (son nom, sa barre de
+   * vie, ses points — ou le temps avant son entrée). `a` : Scenario.affichage (js/scenarios.js).
+   */
+  majScenario(a) {
+    if (a.vagues && this.nodes.scenarioBox) {
+      // (Le chiffre qui suit est le temps avant la vague suivante : il remplace le chronomètre de la partie.)
+      const texte = a.dans === null ? txt`Vague ${a.vague}/${a.vagues}` : txt`Vague ${a.vague}/${a.vagues} · ${formatTime(a.dans)}`;
+      this.setText('scenario', this.nodes.scenarioBox, texte);
+      this.nodes.scenarioBox.classList.toggle('urgent', a.dans !== null && a.dans <= 10);
+    }
+    if (a.chef && this.nodes.chefBox) {
+      this.setText('chefNom', this.nodes.chefNom, a.chef.nom);
+      this.setText('chefPoints', this.nodes.chefPoints, a.chef.dans !== null ? txt`dans ${formatTime(a.chef.dans)}` : `${formatNumber(a.chef.vie)} / ${formatNumber(a.chef.max)}`);
+      const part = `${Math.max(0, Math.min(100, Math.round((100 * a.chef.vie) / a.chef.max)))}%`;
+      if (this.lastValues.chefVie !== part) { this.lastValues.chefVie = part; this.nodes.chefVie.style.width = part; }
+    }
   }
 
   // --- Ouvriers -------------------------------------------------------------
@@ -774,7 +809,10 @@ export class UI {
             icon: u.icon, troupe: unitType, label: nomDe(unitType, this.game.civ), cost: costLabel(u.cost), time: u.trainTime,
             // Une troupe pas encore débloquée : montrée, sous cadenas (voir js/progression.js).
             verrou: this.world.players[this.world.humanIndex].interdites.has(unitType),
-            check: () => (this.world.players[this.world.humanIndex].interdites.has(unitType)
+            // (Interdite par la règle d'un défi : ce n'est pas une troupe à débloquer, et le message le dit.)
+            check: () => (this.world.interditesParLaRegle.has(unitType)
+              ? { ok: false, reason: txt`${nomDe(unitType, this.game.civ)} : la règle du défi l’interdit` }
+              : this.world.players[this.world.humanIndex].interdites.has(unitType)
               ? { ok: false, reason: txt`${nomDe(unitType, this.game.civ)} : troupe à débloquer — vois « Troupes » à l’accueil` }
               : this.world.canTrain(b, unitType)),
             action: () => this.game.trainUnit(b, unitType),
@@ -1093,6 +1131,7 @@ export class UI {
       </button>`).join('');
     const modal = this.showModal(`
       <h2>${txt('Partie en pause')}</h2>
+      ${this.world.scenario ? `<p class="hint pause-buts"><b>${this.world.mode.name}</b> ${butsDe(this.world.scenario.def).map((but) => `<span>${iconeSVG('etoile', 13, 'inline')} ${but}</span>`).join('')}</p>` : ''}
       <p class="hint">${txt`La partie est sauvegardée : vous pouvez fermer l'onglet et la reprendre plus tard.`}</p>
       <h3 class="modal-sub">${txt('Vitesse de jeu')}</h3>
       <div class="options row">${vitesses}</div>
@@ -1222,6 +1261,16 @@ export class UI {
   /** Pourquoi la partie s'arrête, en une phrase : la conquête n'attend plus la dernière ferme, autant dire ce qui a tranché. */
   raisonDeFin(result) {
     const duree = formatTime(result.time);
+    // Scénario qui a son but à lui : ce qui a tranché — les vagues tenues, le monstre abattu, le bâtiment principal tombé.
+    const scenario = this.world.scenario;
+    if (scenario && scenario.juge) {
+      const a = scenario.affichage(), raison = result.scenario ? result.scenario.raison : '';
+      if (raison === 'tenu') return txt`Les ${a.vagues} vagues sont repoussées, en ${duree}`;
+      if (raison === 'abattu') return txt`Monstre abattu en ${duree} : ${a.chef.nom}`;
+      if (raison === 'temps') return txt`Temps écoulé : ${a.chef.nom} tient encore, avec ${formatNumber(a.chef.vie)} points de vie`;
+      if (a.vagues) return result.resigned ? txt`Abandon à la vague ${a.vague} sur ${a.vagues}, après ${duree}` : txt`Ton bâtiment principal est tombé à la vague ${a.vague} sur ${a.vagues}`;
+      return result.resigned ? txt`Vous avez abandonné après ${duree}` : txt`Ton bâtiment principal est tombé après ${duree}`;
+    }
     // (Prise de positions : le but atteint, ou les points au bout du temps.)
     if (result.positions) {
       const but = this.world.mode.positions.but;
@@ -1304,7 +1353,17 @@ export class UI {
       </table>
       ${result.scores ? `<p class="fin-note">${txt('Au bout du temps, la somme des scores de chaque équipe départage.')}</p>` : ''}`;
     };
-    const summary = this.world.parEquipes ? tableDesEquipes() : `
+    // Scénario contre des vagues : personne ne bâtit en face, le tableau ne compte que le joueur.
+    const seul = this.world.scenario && this.world.scenario.def.adversaire === 'aucun';
+    const tableDuScenario = () => `
+      <table class="scores">
+        <tr><td>${txt('Durée')}</td><td>${formatTime(result.time)}</td></tr>
+        <tr><td>${txt('Unités formées')}</td><td>${player.stats.trained}</td></tr>
+        <tr><td>${txt('Unités perdues')}</td><td>${player.stats.lost}</td></tr>
+        <tr><td>${txt('Ennemis abattus')}</td><td>${player.stats.killed}</td></tr>
+        <tr><td>${txt('Bâtiments construits')}</td><td>${player.stats.built}</td></tr>
+      </table>`;
+    const summary = seul ? tableDuScenario() : this.world.parEquipes ? tableDesEquipes() : `
       <table class="scores">
         <tr><th></th><th>${txt('Vous')}</th><th>${txt('Adversaire')}</th></tr>
         <tr><td>${txt('Ressources récoltées')}</td>

@@ -10,6 +10,7 @@ import {
   DEFAULT_CIV, civDe, nomDe, ficheDe,
 } from './config.js';
 import { rivalConnu, caractereDuRival, ficheDuRival } from './rivaux.js';
+import { Scenario, refDeScenario, scenarioDe, formatDe, interditesDe } from './scenarios.js';
 import { GameMap, BLOCK } from './map.js';
 import { PathFinder } from './pathfinding.js';
 import { Unit, Animal, Building, Projectile, STATE, computeDamage } from './entities.js';
@@ -109,13 +110,17 @@ export class World {
     this.nextId = 1;            // identifiants d'entités, propres à cette partie
     // Les identifiants des réglages sont conservés tels quels : une sauvegarde
     // doit pouvoir recréer exactement le même monde (voir save.js).
-    this.modeId = GAME_MODES[options.mode] ? options.mode : DEFAULT_MODE;
-    this.mode = GAME_MODES[this.modeId];
+    // Un scénario (js/scenarios.js) : une partie écrite d'avance. Il emprunte un format, en change ce qu'il veut,
+    // et peut avoir son but à lui. Sans scénario, la partie est celle d'avant, au pas près.
+    const refScenario = refDeScenario(options.scenario);
+    const scenario = refScenario ? scenarioDe(refScenario) : null;
+    this.modeId = scenario ? scenario.base : GAME_MODES[options.mode] ? options.mode : DEFAULT_MODE;
+    this.mode = scenario ? formatDe(scenario) : GAME_MODES[this.modeId];
     // La partie guidée (js/guide.js) se joue sans chronomètre : le format reste le sien, moins sa limite de temps.
     this.tutoriel = !!options.tutoriel;
     // Le rival d'une partie classée (js/rivaux.js) : son nom pour l'adversaire, son caractère pour l'ordinateur.
     // Sans rival, l'ordinateur joue comme il a toujours joué.
-    this.rival = typeof options.rival === 'string' && rivalConnu(options.rival) && !GAME_MODES[this.modeId].equipes ? options.rival : null;
+    this.rival = typeof options.rival === 'string' && rivalConnu(options.rival) && !GAME_MODES[this.modeId].equipes && !scenario ? options.rival : null;
     if (this.tutoriel) this.mode = { ...this.mode, timeLimit: 0 };
     this.mapSizeId = MAP_SIZES[options.mapSize] ? options.mapSize : this.mode.mapSize;
     this.difficultyId = DIFFICULTIES[options.difficulty] ? options.difficulty : 'normal';
@@ -134,12 +139,14 @@ export class World {
     // ne regardent jamais qui tient une place : alliés, vue partagée, victoire
     // et scores ne dépendent que des équipes.
     const equipes = Array.isArray(this.mode.equipes) ? this.mode.equipes : [0, 1];
-    const tenues = Array.isArray(options.places) ? options.places : [];
+    // (Un scénario sans adversaire qui bâtit : personne ne tient la place d'en face, ses vagues y entrent toutes seules.)
+    const tenues = scenario && scenario.adversaire === 'aucun' ? ['local', 'distant'] : Array.isArray(options.places) ? options.places : [];
     this.places = equipes.map((equipe, i) => ({
       equipe, controle: ['local', 'ordinateur', 'distant'].includes(tenues[i]) ? tenues[i] : (i === 0 ? 'local' : 'ordinateur'),
     }));
     this.parEquipes = equipes.length > 2;
     this.map = new GameMap(mapSize.tiles, this.seed, equipes.length);
+    this.scenario = null;       // posé plus bas, une fois le joueur de cet appareil connu
     // Format « Prise de positions » : la carte est aménagée avant tout le reste,
     // partie neuve ou rechargée (voir GameMap.amenagerPositions). Une position :
     //   camp    : qui la tient (-1 : personne) ;
@@ -203,6 +210,10 @@ export class World {
     // Les troupes à débloquer : jamais l'ouvrier, sans lui il n'y a pas de partie.
     const interdites = Array.isArray(options.troupesInterdites) ? options.troupesInterdites : [];
     this.players.forEach((joueur, i) => { joueur.interdites = troupesLues(interdites[i]); });
+    // (Une règle de scénario vaut pour les deux camps : ce qu'elle interdit s'ajoute à ce que chacun n'a pas débloqué.)
+    // (Le jeu sait les distinguer : « à débloquer » pour les unes, « la règle l'interdit » pour les autres — voir canTrain.)
+    this.interditesParLaRegle = new Set(scenario ? interditesDe(scenario) : []);
+    for (const joueur of this.players) for (const type of this.interditesParLaRegle) joueur.interdites.add(type);
     // Les troupes en plus : celles que la partie permet à l'ordinateur de former
     // au-delà de son ordinaire. Une troupe à la fois interdite et en plus reste
     // interdite (voir canTrain).
@@ -223,6 +234,8 @@ export class World {
 
     this.fog = this.createFog();
     this.ais = [];
+    // (Le scénario se pose sur la carte encore neuve : ses portes ne dépendent que d'elle — partie neuve ou reprise.)
+    if (scenario) this.scenario = new Scenario(this, refScenario, scenario);
 
     // Reprise d'une partie : le contenu du monde vient de la sauvegarde, pas
     // d'une mise en place neuve.
@@ -257,7 +270,10 @@ export class World {
       p.resources = { ...(this.mode.resources || START_RESOURCES) };
       p.age = this.mode.startAge || 0;
     }
+    const scenario = this.scenario ? this.scenario.def : null;
     this.map.startPositions.forEach((start, index) => {
+      // (Scénario sans adversaire qui bâtit : la place d'en face reste vide, les vagues y entreront.)
+      if (scenario && scenario.adversaire === 'aucun' && index !== this.humanIndex) return;
       const tc = this.spawnBuilding(index, 'towncenter', start.tx - 1, start.ty - 1, true);
       const spawn = tc.spawnPoint();
       for (let i = 0; i < villagers; i++) {
@@ -266,7 +282,7 @@ export class World {
           spawn.x + Math.cos(angle) * TILE * 1.6,
           spawn.y + Math.sin(angle) * TILE * 1.6);
       }
-      this.spawnUnit(index, 'scout', spawn.x + TILE * 2.5, spawn.y + TILE * 1.2);
+      if (!(scenario && scenario.sansEclaireur)) this.spawnUnit(index, 'scout', spawn.x + TILE * 2.5, spawn.y + TILE * 1.2);
       this.poserBatimentsDeDepart(index, start);
       // La troupe à l'essai : trois, en arc à l'opposé de l'éclaireur.
       if (this.essai && index === this.humanIndex) {
@@ -565,7 +581,10 @@ export class World {
       this.updateFog();
     }
 
+    if (this.scenario) this.scenario.avancer();
     if (this.positions.length) this.updatePositions();
+    // (Un scénario qui a son but à lui dit la fin lui-même : voir Scenario.juger.)
+    if (this.scenario && this.scenario.juge) return;
     this.checkVictory();
     this.checkTimeLimit();
   }
@@ -1317,6 +1336,7 @@ export class World {
     const player = this.players[building.playerIndex];
     const def = UNIT_TYPES[unitType];
     if (!def || !building.complete) return { ok: false, reason: txt('Bâtiment en construction') };
+    if (this.interditesParLaRegle.has(unitType)) return { ok: false, reason: txt('La règle du défi l’interdit') };
     if (player.interdites.has(unitType)) return { ok: false, reason: txt('Troupe à débloquer') };
     if ((def.age || 0) > player.age) return { ok: false, reason: txt`Âge requis : ${AGES[def.age].name}` };
     if (building.queue.length >= 8) return { ok: false, reason: txt('File d’attente pleine') };
@@ -2191,7 +2211,8 @@ export class World {
    * pendant la partie, l'écran de fin et le palmarès les reprennent.
    */
   avecScores(resultat) {
-    if (!this.mode.timeLimit) return resultat;
+    // (Un scénario qui a son but à lui ne se joue pas au score, même s'il a un chronomètre.)
+    if (!this.mode.timeLimit || (this.scenario && this.scenario.juge)) return resultat;
     const detail = this.players.map((p) => this.detailScore(p));
     const scores = detail.map((d) => d.total);
     // (Par équipes : la somme de chacune, dans l'ordre des numéros d'équipe.)

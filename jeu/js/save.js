@@ -227,6 +227,8 @@ export function serializeWorld(world, extra = {}) {
     ...(world.essai ? { essai: world.essai } : {}),
     // (Partie classée : le rival d'en face, pour qu'il garde son nom et son caractère à la reprise.)
     ...(world.rival ? { rival: world.rival } : {}),
+    // (Partie de scénario : lequel, et où il en est — ses vagues lancées, son monstre-chef. Voir js/scenarios.js.)
+    ...(world.scenario ? { scenario: world.scenario.etat() } : {}),
     // (Par équipes : qui tient chaque place — le joueur, un ordinateur, un joueur à distance.)
     ...(world.parEquipes ? { places: world.places.map((p) => p.controle) } : {}),
     // (Prise de positions : qui tient quoi, les prises entamées, et où en est le compte des points.)
@@ -262,7 +264,11 @@ export function restoreWorld(data) {
     // (Partie d'essai : la troupe essayée, pour ses places de population offertes.)
     essai: data.essai,
     rival: data.rival,
+    // (Champ absent : une partie ordinaire. Un scénario que le jeu ne connaît plus est ignoré de même.)
+    scenario: data.scenario,
   });
+  // (Une sauvegarde de scénario que cette version ne sait plus lire : mieux vaut une partie neuve.)
+  if (data.scenario && !world.scenario) return null;
   world.time = data.time || 0;
   world.humanIndex = data.humanIndex || 0;
   world.rng.s = data.rng >>> 0;
@@ -471,6 +477,9 @@ export function restoreWorld(data) {
     ai.consigne = saved.consigne ? { ...saved.consigne } : null;
     ai.poserZones();
   }
+
+  // (Le scénario reprend où il en était : son monstre-chef retrouve ses points de vie et ce que ses phases ont changé.)
+  if (world.scenario) world.scenario.reprendre(data.scenario);
 
   // 6. Terrain découvert, population, état dérivé.
   world.fog.explored = decodeBytes(data.fog, world.map.w * world.map.h);

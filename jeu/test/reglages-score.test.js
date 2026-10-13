@@ -627,7 +627,7 @@ function fausseInterface(w) {
     && /id="btn-play"[\s\S]{0,200}<\/div>\s*<p id="palmares" class="palmares hidden"><\/p>/.test(html));
   check('index.html : l’objectif de l’accueil décrit la nouvelle règle', html.includes('ni bâtiment principal ni bâtiment militaire')
     && !html.includes('détruire tous les bâtiments et ouvriers adverses'));
-  check('ui.js : le score n’est montré que sur un format chronométré', ui.includes("scoreBox.classList.toggle('hidden', !this.world.mode.timeLimit)"));
+  check('ui.js : le score n’est montré que sur un format chronométré — et pas dans un scénario qui a son but à lui', ui.includes("scoreBox.classList.toggle('hidden', !this.world.mode.timeLimit || !!(scenario && scenario.juge))"));
   check('main.js : la fin de partie inscrit au palmarès, l’accueil le relit à chaque changement de format ou de difficulté',
     /showGameOver\(event\.result, inscrireAuPalmares\(/.test(main) && (main.match(/refreshPalmares\(\);/g) || []).length >= 3);
   check('css : les nouveaux éléments ont leur style', ['#score-box', '.palmares', '.fin-palmares', '.fin-note'].every((s) => css.includes(s + ' ')));

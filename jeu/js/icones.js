@@ -106,6 +106,8 @@ export const ICONES = {
   eclat: { n: 'éclat (dessin original)', d: ['M244 40L116 212h128z', 'M268 40l128 172H268z', 'M116 236h280L256 476z'] },
   album: { n: 'album (dessin original)', d: ['M88 136h320v328H88zM248 196L222 264L149 268L206 314L187 384L248 344L309 384L290 314L347 268L274 264z', 'M136 56h328v328h-32V88H136z'] },
   saison: { n: 'fanion (dessin original)', d: ['M92 36h40v440H92z', 'M152 60l308 100l-308 100z'] },
+  // Dessinée pour le jeu : l'étoile d'un but atteint (js/defis-ecrans.js).
+  etoile: { n: 'étoile (dessin original)', d: ['M256 32L312 190L480 195L347 298L395 459L256 364L117 459L165 298L32 195L200 190Z'] },
   couronne: { n: 'couronne (dessin original)', d: ['M60 372L36 148l112 92L256 76l108 164l112-92l-24 224z', 'M68 404h376v52H68z'] },
   info: { n: 'information (dessin original)', d: ['M256 48a208 208 0 1 0 0 416a208 208 0 0 0 0-416zm-26 176h52v148h-52zm0-84h52v52h-52z'] },
   retour: { n: 'chevron (dessin original)', d: ['M328 72l44 44l-140 140l140 140l-44 44l-184-184z'] },
