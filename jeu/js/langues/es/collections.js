@@ -68,6 +68,7 @@ export default {
   "Route de saison": "Ruta de temporada",
   "En Éclats": "En Esquirlas",
   "Offre de bienvenue": "Oferta de bienvenida",
+  "Campagne": "Campaña",
   "Saison {0}": "Temporada {0}",
 
   // --- Une collection ------------------------------------------------------------
@@ -88,6 +89,8 @@ export default {
   "Une teinture habille tes troupes d’une autre matière, en partie : l’or et l’acier changent, jamais le tissu de ton camp. Elle ne change rien au combat. Chacune s’achète en Éclats.": "Un tinte viste a tus tropas con otro material durante la partida: cambian el oro y el acero, nunca la tela de tu bando. No cambia nada en el combate. Cada uno se compra con Esquirlas.",
   "Les cadeaux des ligues : ils arrivent à chaque promotion.": "Los regalos de las ligas: llegan con cada ascenso.",
   "Les pièces de l’offre de bienvenue : elles ne viennent de nulle part ailleurs.": "Las piezas de la oferta de bienvenida: no vienen de ningún otro sitio.",
+  "Les pièces de la campagne : un chapitre fini donne un mot de titre, toutes ses étoiles donnent sa suite.": "Las piezas de la campaña: un capítulo terminado da una palabra de título, y todas sus estrellas dan su continuación.",
+  "Voir la campagne": "Ver la campaña",
   "Et avec elle": "Y con ella",
   "Ses pièces": "Sus piezas",
   "{0} : c’est sur ton blason.": "{0}: ya está en tu blasón.",
@@ -199,6 +202,7 @@ export default {
   "Le Grand Tournoi": "El Gran Torneo",
   "Le Grand Froid": "El Gran Frío",
   "Le Pionnier": "El Pionero",
+  "La Campagne": "La Campaña",
 
   // --- Le Départ -----------------------------------------------------------------
   "Villageois": "Aldeano",
@@ -427,4 +431,8 @@ export default {
   // --- Le Pionnier (l'offre de bienvenue) ---------------------------------------
   "Cadre du Pionnier": "Marco del Pionero",
   "Pionnier": "Pionero",
+
+  // --- La Campagne (ce que ses chapitres donnent) --------------------------------
+  "Découvreur": "Descubridor",
+  "de la Rive": "de la Orilla",
 };

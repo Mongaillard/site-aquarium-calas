@@ -62,7 +62,7 @@ export function enEuros(couronnes, avant = ', ', apres = '') {
   return EN_MAGASIN && !R.boutique.argentReel ? '' : `${avant}${environ(couronnes)}${apres}`;
 }
 
-const SOURCES = { coffres: txt('Dans les coffres'), boutique: txt('À la boutique'), ligues: txt('Par les ligues'), saison: txt('Route de saison'), atelier: txt('En Éclats'), offre: txt('Offre de bienvenue') };
+const SOURCES = { coffres: txt('Dans les coffres'), boutique: txt('À la boutique'), ligues: txt('Par les ligues'), saison: txt('Route de saison'), atelier: txt('En Éclats'), offre: txt('Offre de bienvenue'), campagne: txt('Campagne') };
 /** Les genres de pièces qui s'accordent au féminin : « la Bannière », « Portée ». */
 const FEMININS = ['banniere', 'teinture'];
 /** La rareté d'un autocollant : « Commun », « Rare », « Épique ». */
@@ -192,6 +192,9 @@ function ecranCollection(id, profil, message = '', { confirmer = '' } = {}) {
       chapeau = txt('Une teinture habille tes troupes d’une autre matière, en partie : l’or et l’acier changent, jamais le tissu de ton camp. Elle ne change rien au combat. Chacune s’achète en Éclats.');
     } else if (c.source === 'offre') {
       chapeau = txt('Les pièces de l’offre de bienvenue : elles ne viennent de nulle part ailleurs.');
+    } else if (c.source === 'campagne') {
+      chapeau = txt('Les pièces de la campagne : un chapitre fini donne un mot de titre, toutes ses étoiles donnent sa suite.');
+      chapeau += `</p><div class="modal-actions"><button class="btn primary" data-ecran="defis">${iconeSVG('etoile', 16, 'inline')} ${txt('Voir la campagne')}</button></div><p class="col-vide">`;
     } else {
       chapeau = txt('Les cadeaux des ligues : ils arrivent à chaque promotion.');
     }

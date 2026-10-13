@@ -82,8 +82,8 @@ console.log('--- Le catalogue ---');
   check('chaque cadre a une forme que l’on sait tracer, chaque bannière un motif — et leurs couleurs',
     ids.every((id) => { const p = PIECES[id]; return p.genre === 'cadre' ? FORMES.includes(p.forme) && /^#/.test(p.couleur) && /^#/.test(p.fond) : p.genre === 'banniere' ? MOTIFS.includes(p.motif) && /^#/.test(p.fond) && /^#/.test(p.trait) : true; }));
   check('aucun nom de pièce ne porte d’emoji ni de chiffre', ids.every((id) => !/\p{Extended_Pictographic}|\d/u.test(PIECES[id].nom)));
-  check('les grades et les épithètes font des titres : 21 premiers mots (dont « Pionnier », celui de l’offre de bienvenue), 11 suites',
-    ids.filter((id) => PIECES[id].genre === 'grade').length === 21 && ids.filter((id) => PIECES[id].genre === 'epithete').length === 11
+  check('les grades et les épithètes font des titres : 22 premiers mots (dont « Pionnier », celui de l’offre de bienvenue, et « Découvreur », celui de la campagne), 12 suites',
+    ids.filter((id) => PIECES[id].genre === 'grade').length === 22 && ids.filter((id) => PIECES[id].genre === 'epithete').length === 12
     && ids.filter((id) => PIECES[id].genre === 'epithete').every((id) => /^(de la|des|du|de l’) /.test(PIECES[id].nom)));
   // Les ligues donnent des pièces qui existent.
   const cadeaux = R.ligues.flatMap((l) => (l.promotion ? l.promotion.cadeaux.map((c) => c.piece) : []));

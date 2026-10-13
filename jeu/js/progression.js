@@ -1937,6 +1937,59 @@ export function etatDeScenario(profil, id, jour) {
   return { acquis: etoilesAcquises(s.acquis), etoiles: nombreDEtoiles(s.acquis), record: s.record, parties: s.parties };
 }
 
+// --- La campagne ---------------------------------------------------------------------
+// Ses chapitres et leurs missions sont des scénarios qui portent un nom (R.campagne) : leurs étoiles et leurs
+// records se rangent avec ceux des autres, dans `scenarios`. Rien de plus dans le profil : ce qui est ouvert se
+// déduit de ce qui est gagné.
+
+/**
+ * Où en est la campagne pour ce joueur, chapitre par chapitre : `ouvert` (le précédent est fini), `fini` (ses
+ * missions toutes gagnées), ses `etoiles` sur `total`, ses `missions` — chacune `ouverte` (jouable), `gagnee`,
+ * avec ses étoiles et son record — et ce qu'il donne : `pieces.fini`, `pieces.etoiles` (`{ id, acquise }`).
+ * Une mission est gagnée quand sa première étoile l'est : c'est toujours « gagner la partie ».
+ */
+export function etatDeLaCampagne(profil) {
+  const p = migrerProfil(profil);
+  let precedentFini = true;
+  return R.campagne.chapitres.map((c) => {
+    let ouverte = precedentFini;
+    const missions = c.missions.map((id, rang) => {
+      const e = etatDeScenario(p, id);
+      const m = { id, rang: rang + 1, ouverte, gagnee: e.acquis[0], acquis: e.acquis, etoiles: e.etoiles, record: e.record, parties: e.parties };
+      ouverte = ouverte && m.gagnee;
+      return m;
+    });
+    const etoiles = missions.reduce((somme, m) => somme + m.etoiles, 0), total = 3 * missions.length;
+    const etat = {
+      id: c.id, ouvert: precedentFini, fini: missions.every((m) => m.gagnee), etoiles, total, missions,
+      pieces: {
+        fini: c.pieces && c.pieces.fini ? { id: c.pieces.fini, acquise: p.pieces.includes(c.pieces.fini) } : null,
+        etoiles: c.pieces && c.pieces.etoiles ? { id: c.pieces.etoiles, acquise: p.pieces.includes(c.pieces.etoiles) } : null,
+      },
+    };
+    precedentFini = etat.fini;
+    return etat;
+  });
+}
+
+/** Vrai si ce scénario peut se jouer : toujours, sauf une mission de la campagne dont la précédente n'est pas gagnée. */
+export function scenarioOuvert(profil, id) {
+  for (const chapitre of etatDeLaCampagne(profil)) {
+    const mission = chapitre.missions.find((m) => m.id === id);
+    if (mission) return mission.ouverte;
+  }
+  return true;
+}
+
+/** Ce qu'un chapitre doit à qui l'a fini, ou en a toutes les étoiles : donné une fois, jamais changé en Éclats. */
+function donnerLesPiecesDeLaCampagne(p, evenements) {
+  for (const chapitre of etatDeLaCampagne(p)) {
+    const { fini, etoiles } = chapitre.pieces;
+    if (fini && chapitre.fini && !fini.acquise) donnerPiece(p, fini.id, 'campagne', evenements);
+    if (etoiles && chapitre.etoiles === chapitre.total && !etoiles.acquise) donnerPiece(p, etoiles.id, 'campagne', evenements);
+  }
+}
+
 /**
  * Une partie de scénario est finie (js/scenarios.js). `partie` = {
  *   scenario : son identifiant — « defi » pour le défi du jour ;
@@ -1947,13 +2000,15 @@ export function etatDeScenario(profil, id, jour) {
  * Une étoile se paie une fois, en points de saison (R.defis) : la première fois pour un scénario qui porte un
  * nom, une fois par jour pour le défi du jour — le défi d'un autre jour que `jourDIci` ne paie rien.
  * Renvoie `{ profil, evenements }` : « etoiles » `{ scenario, gagnees, nouvelles, acquis, points, total,
- * palier, paliersGagnes }` — toujours —, « record » `{ scenario, valeur, ancien }` quand il est battu, et ceux
- * d'un changement de saison si le mois a tourné.
+ * palier, paliersGagnes }` — toujours —, « record » `{ scenario, valeur, ancien }` quand il est battu, « piece »
+ * pour ce qu'un chapitre de la campagne donne à qui vient de le finir, et ceux d'un changement de saison si le
+ * mois a tourné. Une mission de la campagne qui n'est pas encore ouverte ne compte pas (`erreur: 'fermee'`).
  */
 export function appliquerScenario(profil, partie) {
   const p = migrerProfil(profil);
   const evenements = [];
   if (!estObjet(partie) || !nomCourt(partie.scenario)) return { profil: p, evenements, erreur: 'scenario' };
+  if (!scenarioOuvert(p, partie.scenario)) return { profil: p, evenements, erreur: 'fermee' };
   const jour = rangDuJour(partie.jour) === null ? '' : partie.jour;
   const jourDIci = rangDuJour(partie.jourDIci) === null ? jour : partie.jourDIci;
   changerDeJour(p, jourDIci);
@@ -1988,6 +2043,7 @@ export function appliquerScenario(profil, partie) {
     type: 'etoiles', scenario: partie.scenario, gagnees, nouvelles, acquis: etoilesAcquises(payees ? apres : masque), payees,
     points: r.gagnes, total: p.route.points, palier: r.palier, paliersGagnes: r.paliersGagnes,
   });
+  if (!duJour) donnerLesPiecesDeLaCampagne(p, evenements);
   noter(p, { op: 'scenario', scenario: partie.scenario, jour, etoiles: nombreDEtoiles(masque) });
   return { profil: p, evenements };
 }

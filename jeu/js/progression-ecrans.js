@@ -689,7 +689,8 @@ const ECRANS = {
  * Ouvre un écran de la progression : « ligues », « coffres », « troupes »,
  * « probas » (un type de coffre), « fiche » (une troupe), « boutique »,
  * « album », « collection » (son identifiant), « blason », « saison »,
- * « defis », « confidentialite ».
+ * « defis » (la campagne et les défis), « mission » (son identifiant),
+ * « confidentialite ».
  */
 export function ouvrirProgression(ecran, arg) {
   if (ECRANS[ecran]) ECRANS[ecran](lireProgression(), arg);
@@ -829,7 +830,7 @@ brancherCollections({ montrer, retenir, nombre, pluriel, couronnes, euros, coffr
 /** Une durée telle que le chronomètre l'écrit : « 5:12 ». */
 const dureeEnClair = (secondes) => `${Math.floor(secondes / 60)}:${String(Math.floor(secondes % 60)).padStart(2, '0')}`;
 brancherDefis({
-  montrer, fermer: () => fermerProgression(), nombre, duree: dureeEnClair, jour: () => jourLocal(),
+  montrer, fermer: () => fermerProgression(), nombre, duree: dureeEnClair, jour: () => jourLocal(), peuple: () => civ,
   lancer: (ref, sur) => (surScenario ? surScenario(ref, sur) : 'refus'),
 });
 

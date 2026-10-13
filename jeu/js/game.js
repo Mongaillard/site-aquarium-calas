@@ -276,8 +276,12 @@ export class World {
     }
     const scenario = this.scenario ? this.scenario.def : null;
     this.map.startPositions.forEach((start, index) => {
-      // (Scénario sans adversaire qui bâtit : la place d'en face reste vide, les vagues y entreront.)
-      if (scenario && scenario.adversaire === 'aucun' && index !== this.humanIndex) return;
+      // (Scénario sans adversaire qui bâtit : la place d'en face reste vide, les vagues y entreront —
+      // ou elle porte un camp écrit d'avance, bâti et gardé, où personne ne forme rien.)
+      if (scenario && scenario.adversaire === 'aucun' && index !== this.humanIndex) {
+        if (scenario.camp) this.scenario.poserLeCamp();
+        return;
+      }
       const tc = this.spawnBuilding(index, 'towncenter', start.tx - 1, start.ty - 1, true);
       const spawn = tc.spawnPoint();
       for (let i = 0; i < villagers; i++) {
@@ -484,7 +488,11 @@ export class World {
     const b = new Building(this, playerIndex, type, tx, ty, complete);
     // Format de partie : en Express, le Centre-Ville est l'objectif, il ne peut
     // pas être une forteresse imprenable.
-    const facteur = type === 'towncenter' ? (this.mode.townCenterHp || 1) : 1;
+    // (Scénario : les bâtiments d'un camp écrit d'avance tiennent ce qu'il en dit — `camp.vie`, en pour cent.
+    // Dit ici, et non à la pose du camp : une partie reprise retrouve les mêmes points de vie.)
+    const camp = this.scenario && this.scenario.def.camp;
+    const facteur = type === 'towncenter' ? (this.mode.townCenterHp || 1)
+      : camp && camp.vie && playerIndex === this.scenario.ennemi ? camp.vie / 100 : 1;
     if (facteur !== 1) { b.maxHp = Math.round(b.maxHp * facteur); b.hp = Math.min(b.hp, b.maxHp); }
     // (Le trait d'un peuple dont les bâtiments tiennent mieux : leurs points de vie, en pour cent.)
     const solidite = (this.players[playerIndex] ? this.players[playerIndex].mods.vieDesBatiments : 0) || 100;

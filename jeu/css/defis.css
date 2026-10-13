@@ -1,8 +1,9 @@
 /* ---------------------------------------------------------------------------
-   Les défis (js/defis-ecrans.js, js/scenarios.js) : la tuile de l'accueil,
-   l'écran « Défis », ce que la partie affiche d'un scénario — le compteur de
-   vagues, la vie du monstre-chef — et ce que sa fin annonce. Direction « Boîte
-   de jeu » : contour d'encre, aplats francs, ombre pleine.
+   La campagne et les défis (js/defis-ecrans.js, js/scenarios.js) : la tuile de
+   l'accueil, l'écran « Campagne et défis », l'écran d'une mission et son récit,
+   ce que la partie affiche d'un scénario — le compteur de vagues, la vie du
+   monstre-chef — et ce que sa fin annonce. Direction « Boîte de jeu » : contour
+   d'encre, aplats francs, ombre pleine.
    --------------------------------------------------------------------------- */
 
 /* --- Les étoiles : creuses tant que le but reste à atteindre, jaunes ensuite. --- */
@@ -53,6 +54,43 @@
 #progression .defi-carte .btn { width: 100%; margin-top: 2px; }
 #progression .defi-carte .btn.arme { background: var(--b-rouge); color: var(--b-papier); }
 
+/* --- La campagne : un chapitre, ses missions dans l'ordre, ce qu'il donne. --- */
+.campagne-compte { display: inline-flex; flex: none; align-items: center; gap: 4px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.campagne-compte svg { fill: var(--b-jaune); stroke: var(--b-encre); stroke-width: 44px; paint-order: stroke; overflow: visible; }
+.defi-carte .campagne-missions { display: grid; gap: 8px; margin: 2px 0 0; padding: 0; list-style: none; }
+#progression .defi-carte .btn.mission-bouton,
+.mission.fermee { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; width: 100%; min-height: 58px; margin: 0; padding: 8px 12px; text-align: left; }
+.mission.fermee { color: var(--b-gris); background: transparent; border: 3px dashed var(--b-gris); border-radius: 14px; }
+.mission-rang { display: grid; flex: none; place-items: center; width: 30px; height: 30px; font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 17px; line-height: 1; color: var(--b-papier); background: var(--b-encre); border-radius: 50%; }
+.mission.fermee .mission-rang { color: var(--b-gris); background: transparent; border: 3px solid var(--b-gris); }
+.mission.fermee .mission-rang svg { fill: var(--b-gris); }
+.mission-texte { display: grid; min-width: 0; gap: 2px; }
+.mission-texte b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 17px; line-height: 1.1; letter-spacing: .01em; }
+.mission-texte small { font-size: 12px; font-weight: 700; line-height: 1.3; color: var(--b-gris); white-space: normal; }
+#progression .defi-carte .mission.a-jouer .btn.mission-bouton { background: var(--b-jaune); }
+.mission.a-jouer .mission-texte small { color: var(--b-encre); }
+/* (Dans un bouton, les étoiles gardent leurs deux états : creuses sur papier, pleines en jaune — sur le bouton jaune, en blanc.) */
+#progression .mission-bouton .defi-etoiles svg { width: 18px; height: 18px; margin: 0; fill: var(--b-papier); stroke: var(--b-encre); }
+#progression .mission-bouton .defi-etoiles i.pleine svg { fill: var(--b-jaune); }
+#progression .mission.a-jouer .mission-bouton .defi-etoiles i.pleine svg { fill: var(--b-blanc); }
+.defi-carte .campagne-prix { display: grid; gap: 5px; margin: 2px 0 0; padding: 8px 0 0; list-style: none; border-top: 2px dashed var(--b-gris); }
+.campagne-prix li { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; line-height: 1.3; }
+.campagne-prix li > i { display: flex; flex: none; }
+.campagne-prix li > i svg { fill: var(--b-papier); stroke: var(--b-encre); stroke-width: 44px; paint-order: stroke; overflow: visible; }
+.campagne-prix li > i.pleine svg { fill: var(--b-jaune); }
+.campagne-prix li.fait span { color: var(--b-gris); }
+
+/* --- Le récit d'une mission : la narratrice, son portrait, ce qu'elle dit. --- */
+.recit { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 12px; margin: 14px 0 0; }
+.recit-portrait { width: 64px; height: 64px; object-fit: cover; background: var(--b-blanc); border: 3px solid var(--b-encre); border-radius: 16px; box-shadow: 0 4px 0 var(--b-encre); }
+.recit-bulle { position: relative; padding: 10px 14px 12px; color: var(--b-encre); background: var(--b-blanc); border: 3px solid var(--b-encre); border-radius: 18px; box-shadow: 0 5px 0 var(--b-encre); }
+.recit-bulle b { display: block; margin-bottom: 4px; font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 16px; line-height: 1.1; letter-spacing: .01em; }
+.recit-bulle p { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.4; }
+/* (Après la victoire : la suite de l'histoire, dans le carton de fin.) */
+.defi-fin .recit-apres { margin: 0; font-size: 15px; font-weight: 700; font-style: italic; line-height: 1.4; }
+.defi-fin .campagne-gain { margin: 0; }
+#modal .defi-fin .campagne-suite { width: 100%; margin-top: 4px; }
+
 /* --- La fin d'une partie de scénario : ses trois buts, dans le carton de sable. --- */
 .defi-fin { display: grid; gap: 8px; }
 .defi-fin-titre { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; }
@@ -67,6 +105,8 @@
 #scenario-box { flex: 0 0 auto; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
 #hud #scenario-box { color: var(--b-encre); }
 #hud #scenario-box.urgent { color: var(--error); }
+/* (Derrière le chronomètre — une mission qui se compte et se chronomètre —, le même point que partout dans le cartouche.) */
+#game-timer:not(.hidden) ~ #scenario-box:not(.hidden)::before { content: '·'; margin-right: 6px; font-weight: 400; color: var(--muted); }
 
 /* --- En partie : la vie du monstre-chef, à la place du premier message — les messages descendent d'un cran. --- */
 #chef-box {

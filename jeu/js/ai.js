@@ -72,6 +72,10 @@ export class AIPlayer {
     // de ses troupes, la trêve promise au débutant —, seulement sa façon de s'en servir : la taille de ses
     // vagues, le temps entre deux, et ce qu'il forme. Sans caractère, rien ne change.
     this.caractere = caractere;
+    // Une répartition imposée de ses ouvriers (`{ food, wood, gold }`, des parts qui font 1) : pour les mesures
+    // seulement (outils/missions.mjs — un joueur à qui on demande de la nourriture y met ses ouvriers). Sans
+    // elle, celle de son âge (JOB_RATIOS).
+    this.repartition = null;
     if (caractere) {
       difficulty = {
         ...difficulty,
@@ -380,7 +384,7 @@ export class AIPlayer {
     if (this.zones.length > 0) this.quitterZones();
 
     // Répartition : on vise des proportions par ressource selon l'âge.
-    const ratios = JOB_RATIOS[Math.min(player.age, JOB_RATIOS.length - 1)];
+    const ratios = this.repartition || JOB_RATIOS[Math.min(player.age, JOB_RATIOS.length - 1)];
     const jobs = { food: 0, wood: 0, gold: 0 };
     const idle = [];
     const now = this.world.time;

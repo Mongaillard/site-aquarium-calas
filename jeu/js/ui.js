@@ -281,11 +281,14 @@ export class UI {
       this.nodes.positionsBox.innerHTML = this.world.positions.map(() => '<i></i>').join('');
       this.etatDesPositions = '';
     }
-    // Scénario : le compteur de vagues et la vie du monstre-chef (voir majScenario). Cachés hors scénario.
+    // Scénario : le compteur de vagues — ou ce qui est récolté, ce qu'il reste du camp à raser — et la vie du
+    // monstre-chef (voir majScenario). Cachés hors scénario.
     const scenario = this.world.scenario;
     if (this.nodes.scenarioBox) {
-      const vagues = !!(scenario && scenario.def.vagues);
-      this.nodes.scenarioBox.classList.toggle('hidden', !vagues);
+      // (Des maraudeurs ne se comptent pas : la case montre alors le but de la partie, s'il se compte.)
+      const vagues = !!(scenario && scenario.def.vagues && !scenario.def.maraudeurs);
+      const compte = !!(scenario && scenario.def.but && ['recolter', 'raser'].includes(scenario.def.but.genre));
+      this.nodes.scenarioBox.classList.toggle('hidden', !vagues && !compte);
       this.nodes.scenarioBox.textContent = '';
       // (Des vagues sans limite de temps : le compte à rebours de la prochaine vague tient lieu de chronomètre.)
       this.nodes.timer.classList.toggle('hidden', vagues && !this.world.mode.timeLimit);
@@ -418,6 +421,9 @@ export class UI {
    * vie, ses points — ou le temps avant son entrée). `a` : Scenario.affichage (js/scenarios.js).
    */
   majScenario(a) {
+    // (Le but qui se compte : la nourriture récoltée sur ce qu'il en faut, les bâtiments du camp encore debout.)
+    if (a.recolte && this.nodes.scenarioBox) this.setText('scenario', this.nodes.scenarioBox, txt`Nourriture ${formatNumber(a.recolte.fait)}/${formatNumber(a.recolte.but)}`);
+    if (a.camp && this.nodes.scenarioBox) this.setText('scenario', this.nodes.scenarioBox, txt`Camp : ${a.camp.reste} sur ${a.camp.total}`);
     if (a.vagues && this.nodes.scenarioBox) {
       // (Le chiffre qui suit est le temps avant la vague suivante : il remplace le chronomètre de la partie.)
       const texte = a.dans === null ? txt`Vague ${a.vague}/${a.vagues}` : txt`Vague ${a.vague}/${a.vagues} · ${formatTime(a.dans)}`;
@@ -1132,7 +1138,7 @@ export class UI {
       </button>`).join('');
     const modal = this.showModal(`
       <h2>${txt('Partie en pause')}</h2>
-      ${this.world.scenario ? `<p class="hint pause-buts"><b>${this.world.mode.name}</b> ${butsDe(this.world.scenario.def).map((but) => `<span>${iconeSVG('etoile', 13, 'inline')} ${but}</span>`).join('')}</p>` : ''}
+      ${this.world.scenario ? `<p class="hint pause-buts"><b>${this.world.mode.name}</b> ${butsDe(this.world.scenario.def, this.world.players[this.world.humanIndex].civ).map((but) => `<span>${iconeSVG('etoile', 13, 'inline')} ${but}</span>`).join('')}</p>` : ''}
       <p class="hint">${txt`La partie est sauvegardée : vous pouvez fermer l'onglet et la reprendre plus tard.`}</p>
       <h3 class="modal-sub">${txt('Vitesse de jeu')}</h3>
       <div class="options row">${vitesses}</div>
@@ -1271,6 +1277,10 @@ export class UI {
       const a = scenario.affichage(), raison = result.scenario ? result.scenario.raison : '';
       if (raison === 'tenu') return txt`Les ${a.vagues} vagues sont repoussées, en ${duree}`;
       if (raison === 'abattu') return txt`Monstre abattu en ${duree} : ${a.chef.nom}`;
+      if (raison === 'recolte') return txt`Greniers pleins en ${duree} : ${formatNumber(a.recolte.but)} de nourriture`;
+      if (raison === 'rase') return txt`Le camp est rasé, en ${duree}`;
+      if (raison === 'temps' && a.recolte) return txt`Temps écoulé : ${formatNumber(a.recolte.fait)} de nourriture sur ${formatNumber(a.recolte.but)}`;
+      if (raison === 'temps' && a.camp) return txt`Temps écoulé : le camp tient encore, avec ${a.camp.reste} de ses ${a.camp.total} bâtiments`;
       if (raison === 'temps') return txt`Temps écoulé : ${a.chef.nom} tient encore, avec ${formatNumber(a.chef.vie)} points de vie`;
       if (a.vagues) return result.resigned ? txt`Abandon à la vague ${a.vague} sur ${a.vagues}, après ${duree}` : txt`Ton bâtiment principal est tombé à la vague ${a.vague} sur ${a.vagues}`;
       return result.resigned ? txt`Vous avez abandonné après ${duree}` : txt`Ton bâtiment principal est tombé après ${duree}`;

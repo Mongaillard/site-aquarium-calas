@@ -66,6 +66,7 @@ export default {
   "Route de saison": "Season road",
   "En Éclats": "For Shards",
   "Offre de bienvenue": "Welcome offer",
+  "Campagne": "Campaign",
   "Saison {0}": "Season {0}",
 
   // --- Une collection ------------------------------------------------------------
@@ -86,6 +87,8 @@ export default {
   "Une teinture habille tes troupes d’une autre matière, en partie : l’or et l’acier changent, jamais le tissu de ton camp. Elle ne change rien au combat. Chacune s’achète en Éclats.": "A dye dresses your troops in another material during games: gold and steel change, never your side’s cloth. It changes nothing in combat. Each one is bought with Shards.",
   "Les cadeaux des ligues : ils arrivent à chaque promotion.": "League gifts: they arrive with each promotion.",
   "Les pièces de l’offre de bienvenue : elles ne viennent de nulle part ailleurs.": "The welcome offer’s pieces: they come from nowhere else.",
+  "Les pièces de la campagne : un chapitre fini donne un mot de titre, toutes ses étoiles donnent sa suite.": "Campaign pieces: finishing a chapter gives a title word, and earning all its stars gives its front part.",
+  "Voir la campagne": "See the campaign",
   "Et avec elle": "And with it",
   "Ses pièces": "Its pieces",
   "{0} : c’est sur ton blason.": "{0}: it’s on your crest.",
@@ -197,6 +200,7 @@ export default {
   "Le Grand Tournoi": "The Grand Tournament",
   "Le Grand Froid": "The Big Freeze",
   "Le Pionnier": "The Pioneer",
+  "La Campagne": "The Campaign",
 
   // --- Le Départ -----------------------------------------------------------------
   "Villageois": "Villager",
@@ -425,4 +429,8 @@ export default {
   // --- Le Pionnier (l'offre de bienvenue) ---------------------------------------
   "Cadre du Pionnier": "Pioneer Frame",
   "Pionnier": "Pioneer",
+
+  // --- La Campagne (ce que ses chapitres donnent) --------------------------------
+  "Découvreur": "Pathfinder",
+  "de la Rive": "Far Shore",
 };

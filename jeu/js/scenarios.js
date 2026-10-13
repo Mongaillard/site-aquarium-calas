@@ -8,17 +8,20 @@
 //     marchent sur le bâtiment principal du joueur ;
 //   - un MONSTRE-CHEF : une troupe aux points de vie fixés, qui change quand
 //     sa vie passe sous un seuil (il appelle des soldats, il frappe plus vite) ;
-//   - un BUT qui n'est pas « raser l'autre » : tenir, abattre le monstre… ;
+//   - un CAMP d'en face, bâti et gardé, où personne ne forme rien ;
+//   - un BUT qui n'est pas « raser l'autre » : tenir, abattre le monstre,
+//     récolter, raser le camp… ;
 //   - trois BUTS À ÉTOILE, chacun gagné une fois (js/progression.js).
 // Le défi du jour est un scénario tiré de la date : le même pour tous, sans
-// serveur. Les autres portent un nom et ne changent pas.
+// serveur. Les autres portent un nom et ne changent pas. Ceux d'un chapitre
+// de la CAMPAGNE se racontent, et s'ouvrent l'un après l'autre.
 //
 // Ce module ne touche ni à l'écran ni au profil : il décrit, et il fait vivre
 // le scénario dans la partie (World, js/game.js). Il tourne sans navigateur
 // (test/scenarios.test.js).
 // ---------------------------------------------------------------------------
 
-import { TILE, UNIT_TYPES, GAME_MODES, nomDe } from './config.js';
+import { TILE, UNIT_TYPES, BUILDING_TYPES, GAME_MODES, CIVILISATIONS, nomDe, civDe, troupeDe } from './config.js';
 import { STATE } from './entities.js';
 import { txt, nombreLocal } from './langue.js';
 
@@ -73,13 +76,26 @@ export function interditesDe(def) {
 //   format    : ce que le scénario change au format ;
 //   adversaire: 'aucun' — personne ne bâtit en face, tout vient des vagues —,
 //               ou 'ordinateur' (par défaut) ;
-//   civAdverse: le peuple d'en face, quand le scénario y tient ;
+//   civAdverse: le peuple d'en face, quand le scénario y tient — 'autre' : l'autre peuple que
+//               celui du joueur ;
 //   portes    : 'coins' — les vagues entrent par les trois autres coins de la
 //               carte — ; sinon par le coin d'en face seulement ;
 //   vagues    : `{ a, troupes, porte }` — l'heure (secondes), ce qui entre, par où ;
-//   chef      : `{ type, vie, a, phases }` ; une phase `{ sous, appelle, def, annonce }`
-//               se joue une fois, quand sa vie passe sous `sous` pour cent ;
-//   but       : `{ genre: 'tenir' }` (toutes les vagues), `{ genre: 'abattre', avant }` ;
+//   maraudeurs: vrai quand les vagues ne sont pas le sujet de la partie — des pillards qui
+//               gênent : l'écran les annonce sans les compter ;
+//   chef      : `{ type, vie, a, phases, duPeuple }` ; une phase `{ sous, appelle, def, annonce }`
+//               se joue une fois, quand sa vie passe sous `sous` pour cent ; `duPeuple` : le
+//               monstre garde ce que son peuple lui donne (le Sphinx balaie, l'Hydre se soigne) ;
+//   camp      : `{ batiments, garde, vie }` — ce que le camp d'en face a de bâti (posé autour de
+//               sa place, achevé), les troupes qui le gardent, en attitude défensive, et ce que
+//               ses bâtiments tiennent, en pour cent de leurs points de vie (un camp de fortune
+//               n'est pas une forteresse) ;
+//   but       : `{ genre: 'tenir' }` (toutes les vagues), `{ genre: 'abattre', avant }`,
+//               `{ genre: 'recolter', quoi, combien, avant }` (ce que le joueur récolte pendant
+//               la partie — de la nourriture, le seul `quoi` écrit), `{ genre: 'raser', avant }`
+//               (tous les bâtiments du camp) ;
+//   chapitre  : le chapitre de la campagne dont il est une mission, et `recit` : ce qui se dit
+//               `avant` la partie et `apres` la victoire (voir CHAPITRES) ;
 //   etoiles   : les trois buts à étoile (voir etoilesDe) ;
 //   record    : ce que le palmarès garde — 'vague' (la plus haute) ou 'temps' (le plus court).
 
@@ -126,7 +142,113 @@ export const SCENARIOS = {
     etoiles: [{ genre: 'victoire' }, { genre: 'temps', sous: 360 }, { genre: 'centre', part: 50 }],
     record: 'temps',
   },
+
+  // --- La campagne, chapitre 1 : La rive d'en face ------------------------------------------
+  // Trois missions qui se suivent, trois façons de jouer : récolter sous la menace, aller raser
+  // un camp gardé, abattre le monstre que ce camp gardait. Elles se jouent avec le peuple du
+  // joueur, contre l'autre : dans un récit, {0} est le peuple d'en face et {1} son monstre.
+  riveGreniers: {
+    id: 'riveGreniers', nom: 'Pied à terre', icone: 'food', chapitre: 'rive',
+    resume: 'Les greniers sont vides. Remplis-les malgré les maraudeurs.',
+    base: 'express', graine: 20261101, adversaire: 'aucun', civAdverse: 'autre', maraudeurs: true,
+    format: { timeLimit: 420, townCenterHp: 1 },
+    vagues: [vague(150, { scout: 2 }), vague(255, { militia: 3 }), vague(345, { scout: 2, archer: 2 })],
+    but: { genre: 'recolter', quoi: 'food', combien: 800, avant: 420 },
+    etoiles: [{ genre: 'victoire' }, { genre: 'temps', sous: 360 }, { genre: 'pertes', sous: 2 }],
+    record: 'temps',
+    recit: {
+      avant: [
+        'Nous avons traversé de nuit, et la terre d’en face est bonne.',
+        'Mais nos greniers sont vides, et les {0} rôdent déjà.',
+        'Remplis-les avant qu’ils ne reviennent en nombre.',
+      ],
+      apres: ['Les greniers sont pleins : nous restons.', 'Les {0}, eux, n’ont pas dit leur dernier mot.'],
+    },
+  },
+  riveCamp: {
+    id: 'riveCamp', nom: 'Le camp d’en face', icone: 'barracks', chapitre: 'rive',
+    resume: 'Les maraudeurs sortent d’un camp, de l’autre côté de la carte. Va le raser.',
+    base: 'escarmouche', graine: 20261102, adversaire: 'aucun', civAdverse: 'autre', maraudeurs: true,
+    format: { timeLimit: 600, townCenterHp: 1, popMax: 40, popStart: 32 },
+    camp: { batiments: ['barracks', 'archery', 'tower'], garde: { spearman: 3, archer: 3 }, vie: 50 },
+    vagues: [
+      vague(100, { militia: 3 }),
+      vague(200, { militia: 2, archer: 2 }),
+      vague(300, { spearman: 3, archer: 2 }),
+      vague(400, { militia: 4, archer: 2 }),
+      vague(500, { knight: 3 }),
+    ],
+    but: { genre: 'raser', avant: 600 },
+    etoiles: [{ genre: 'victoire' }, { genre: 'temps', sous: 480 }, { genre: 'pertes', sous: 12 }],
+    record: 'temps',
+    recit: {
+      avant: [
+        'Leurs maraudeurs sortent d’un camp, de l’autre côté de la carte.',
+        'Tant qu’il tient debout, ils reviendront.',
+        'Va le raser : tous ses bâtiments, tour comprise.',
+      ],
+      apres: ['Le camp des {0} n’est plus qu’un tas de pierres.', 'Mais sous ces pierres, quelque chose a bougé.'],
+    },
+  },
+  riveGardien: {
+    id: 'riveGardien', nom: 'Ce que le camp gardait', icone: 'hydra', chapitre: 'rive',
+    resume: 'Un monstre marche sur tes murs, avec ce qu’il reste des maraudeurs. Abats-le.',
+    base: 'escarmouche', graine: 20261103, adversaire: 'aucun', civAdverse: 'autre', portes: 'coins', maraudeurs: true,
+    format: { timeLimit: 540, townCenterHp: 1, popMax: 40, popStart: 32, resources: { food: 2000, wood: 2000, gold: 1000 }, batimentsDeDepart: ['barracks', 'archery'] },
+    chef: {
+      type: 'hydra', vie: 2000, a: 120, duPeuple: true,
+      phases: [
+        { sous: 70, appelle: { spearman: 3 }, annonce: 'renforts' },
+        { sous: 40, appelle: { archer: 3 }, annonce: 'renforts' },
+        { sous: 20, def: { attackSpeed: 1.5, speed: 1.2 }, annonce: 'rage' },
+      ],
+    },
+    vagues: [vague(200, { militia: 3 }, 1), vague(320, { militia: 3, archer: 2 }, 2), vague(440, { knight: 3 }, 1)],
+    but: { genre: 'abattre', avant: 540 },
+    etoiles: [{ genre: 'victoire' }, { genre: 'temps', sous: 420 }, { genre: 'centre', part: 50 }],
+    record: 'temps',
+    recit: {
+      avant: [
+        'En rasant leur camp, tu as réveillé ce qu’il gardait.',
+        'Leur {1} marche sur nous, avec ce qu’il reste des {0}.',
+        'Abats ce monstre avant qu’il ne rase nos murs.',
+      ],
+      apres: ['Le monstre est à terre, et la rive est à nous.', 'Les {0} parlent déjà de revanche : c’est une autre histoire.'],
+    },
+  },
 };
+
+// --- La campagne ----------------------------------------------------------------------------
+// Un chapitre raconte une histoire en quelques missions. L'ordre des missions, ce qui les ouvre et
+// ce que le chapitre donne sont des réglages du profil (PROGRESSION.campagne,
+// js/progression-config.js) ; ici, son nom et ce qu'il raconte.
+
+export const CHAPITRES = {
+  rive: {
+    id: 'rive', nom: 'La rive d’en face',
+    resume: 'Ton peuple traverse. En face, la terre est bonne — et déjà prise.',
+  },
+};
+
+/** Les missions d'un chapitre, dans l'ordre où la table des scénarios les écrit. */
+export function missionsDe(chapitre) {
+  return Object.keys(SCENARIOS).filter((id) => SCENARIOS[id].chapitre === chapitre);
+}
+
+/** Les scénarios qui portent un nom sans être d'un chapitre : ceux de l'écran des défis. */
+export const SCENARIOS_LIBRES = Object.keys(SCENARIOS).filter((id) => !SCENARIOS[id].chapitre);
+
+/**
+ * Un récit de mission dans la langue du joueur : ses phrases, où {0} devient le peuple d'en face
+ * et {1} son monstre. `civ` : le peuple du joueur.
+ */
+export function recitDe(def, moment, civ) {
+  const phrases = def && def.recit && Array.isArray(def.recit[moment]) ? def.recit[moment] : [];
+  const face = peupleAdverseDe(def, civ);
+  // (Les noms des peuples et des troupes sont déjà dans la langue du joueur : js/config.js les traduit en se chargeant.)
+  const valeurs = [CIVILISATIONS[face].name, nomDe('hydra', face)];
+  return phrases.map((phrase) => txt(phrase).replace(/\{(\d)\}/g, (trou, i) => (valeurs[Number(i)] !== undefined ? valeurs[Number(i)] : trou)));
+}
 
 // --- Le défi du jour ----------------------------------------------------------------
 
@@ -216,6 +338,18 @@ export function formatDe(def) {
 }
 
 /**
+ * Le peuple d'en face dans ce scénario, pour un joueur de ce peuple : celui que le scénario impose,
+ * l'autre que le sien (`civAdverse: 'autre'`), ou `parDefaut` — celui qu'il a choisi à l'accueil.
+ */
+export function peupleAdverseDe(def, civ, parDefaut) {
+  if (def && def.civAdverse === 'autre') {
+    const mien = civDe(civ);
+    return Object.keys(CIVILISATIONS).find((c) => c !== mien) || mien;
+  }
+  return civDe((def && def.civAdverse) || parDefaut);
+}
+
+/**
  * Les réglages d'une partie de ce scénario (World, js/game.js). `civs` : le
  * peuple du joueur, puis celui qu'il a choisi en face — le scénario impose
  * parfois le sien.
@@ -225,7 +359,7 @@ export function optionsDeScenario(ref, civs = []) {
   if (!def) return null;
   return {
     scenario: r, mode: def.base, mapSize: GAME_MODES[def.base].mapSize, seed: def.graine,
-    civs: [civs[0], def.civAdverse || civs[1]],
+    civs: [civs[0], def.civAdverse ? peupleAdverseDe(def, civs[0]) : civs[1]],
     ...(def.adversaire === 'aucun' ? { places: ['local', 'distant'] } : {}),
   };
 }
@@ -257,17 +391,25 @@ export function etoilesDe(def, bilan) {
   });
 }
 
-/** Le nom du monstre-chef d'un scénario, dans la langue du joueur (« Hydre », « Sphinx »). */
-export function nomDuChef(def) {
-  return def && def.chef ? nomDe(def.chef.type, def.civAdverse) : '';
+/**
+ * Le nom du monstre-chef d'un scénario, dans la langue du joueur (« Hydre », « Sphinx »). `civ` : le peuple
+ * du joueur — il ne compte que si le monstre est celui de « l'autre peuple ».
+ */
+export function nomDuChef(def, civ) {
+  return def && def.chef ? nomDe(def.chef.type, peupleAdverseDe(def, civ)) : '';
 }
 
-/** Un but à étoile, en une phrase. */
-export function texteDuBut(def, but) {
+/** Combien de bâtiments le camp d'un scénario a à raser. */
+const batimentsDuCampDe = (def) => (def.camp && Array.isArray(def.camp.batiments) ? def.camp.batiments.length : 0);
+
+/** Un but à étoile, en une phrase. `civ` : le peuple du joueur (voir nomDuChef). */
+export function texteDuBut(def, but, civ) {
   switch (but.genre) {
     case 'victoire':
       if (def.but && def.but.genre === 'tenir') return txt`Tenir les ${def.vagues.length} vagues`;
-      if (def.but && def.but.genre === 'abattre') return txt`Abattre le monstre : ${nomDuChef(def)}`;
+      if (def.but && def.but.genre === 'abattre') return txt`Abattre le monstre : ${nomDuChef(def, civ)}`;
+      if (def.but && def.but.genre === 'recolter') return txt`Récolter ${nombreLocal(def.but.combien)} de nourriture en moins de ${Math.round(def.but.avant / 60)} minutes`;
+      if (def.but && def.but.genre === 'raser') return txt`Raser le camp : ses ${batimentsDuCampDe(def)} bâtiments`;
       return txt('Gagner la partie');
     case 'net': return txt('Raser le bâtiment principal adverse avant la fin du temps');
     case 'temps': return txt`Gagner en moins de ${Math.round(but.sous / 60)} minutes`;
@@ -278,15 +420,17 @@ export function texteDuBut(def, but) {
   }
 }
 
-/** Les trois buts d'un scénario, en phrases. */
-export function butsDe(def) {
-  return (def.etoiles || []).map((but) => texteDuBut(def, but));
+/** Les trois buts d'un scénario, en phrases. `civ` : le peuple du joueur (voir nomDuChef). */
+export function butsDe(def, civ) {
+  return (def.etoiles || []).map((but) => texteDuBut(def, but, civ));
 }
 
-/** La consigne de départ d'un scénario, en une phrase : ce qu'il faut faire pour gagner. */
-export function consigneDe(def) {
+/** La consigne de départ d'un scénario, en une phrase : ce qu'il faut faire pour gagner. `civ` : le peuple du joueur. */
+export function consigneDe(def, civ) {
   if (def.but && def.but.genre === 'tenir') return txt`${def.vagues.length} vagues arrivent, une par minute. Défends ton bâtiment principal.`;
-  if (def.but && def.but.genre === 'abattre') return txt`Un monstre approche : ${nomDuChef(def)}, ${nombreLocal(def.chef.vie)} points de vie. Abats-le en moins de ${Math.round(def.but.avant / 60)} minutes.`;
+  if (def.but && def.but.genre === 'abattre') return txt`Un monstre approche : ${nomDuChef(def, civ)}, ${nombreLocal(def.chef.vie)} points de vie. Abats-le en moins de ${Math.round(def.but.avant / 60)} minutes.`;
+  if (def.but && def.but.genre === 'recolter') return txt`Récolte ${nombreLocal(def.but.combien)} de nourriture en moins de ${Math.round(def.but.avant / 60)} minutes. Des maraudeurs rôdent.`;
+  if (def.but && def.but.genre === 'raser') return txt`Leur camp est de l’autre côté de la carte : rase ses ${batimentsDuCampDe(def)} bâtiments en moins de ${Math.round(def.but.avant / 60)} minutes.`;
   return txt(def.resume);
 }
 
@@ -351,6 +495,61 @@ export class Scenario {
     return this.monde.units.filter((u) => !u.dead && !u.isAnimal && u.playerIndex === ennemi);
   }
 
+  /** Les bâtiments du camp d'en face encore debout. */
+  batimentsDuCamp() {
+    const ennemi = this.ennemi;
+    return this.monde.buildings.filter((b) => !b.dead && b.playerIndex === ennemi);
+  }
+
+  /** Ce que le joueur a récolté depuis le début de la partie, de la ressource que le but demande. */
+  recolte() {
+    const but = this.def.but, moi = this.monde.players[this.monde.humanIndex];
+    return but && but.quoi ? Math.floor(moi.stats.gathered[but.quoi] || 0) : 0;
+  }
+
+  /**
+   * Le camp d'en face (`def.camp`), posé à la mise en place d'une partie neuve (World.setupStartingPositions) :
+   * ses bâtiments, achevés, autour de la place adverse — le premier dessus, les autres en couronne, du côté du
+   * joueur d'abord —, et sa garde devant eux, en attitude défensive : elle engage ce qui approche, puis revient
+   * à son poste. Personne n'y bâtit ni n'y forme : ce qui en sort est écrit (`vagues`). Une partie reprise
+   * retrouve son camp dans la sauvegarde, tel qu'il était.
+   */
+  poserLeCamp() {
+    const camp = this.def.camp, monde = this.monde, ennemi = this.ennemi;
+    if (!camp) return;
+    const place = monde.map.startPositions[ennemi], moi = monde.map.startPositions[monde.humanIndex];
+    const versMoi = Math.atan2(moi.ty - place.ty, moi.tx - place.tx);
+    const poses = [];
+    (camp.batiments || []).forEach((type, k) => {
+      const fiche = BUILDING_TYPES[type];
+      if (!fiche) return;
+      const demi = (fiche.size - 1) / 2;
+      // (Le premier sur la place même ; les suivants de part et d'autre de la route qui mène au joueur, de plus en plus loin.)
+      const angle = versMoi + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.9;
+      for (let r = k === 0 ? 0 : 5; r <= 12 && poses.length <= k; r++) {
+        for (const ecart of [0, 0.35, -0.35, 0.7, -0.7]) {
+          const tx = Math.round(place.tx + (k === 0 ? 0 : Math.cos(angle + ecart) * r) - demi), ty = Math.round(place.ty + (k === 0 ? 0 : Math.sin(angle + ecart) * r) - demi);
+          if (!monde.canPlace(ennemi, type, tx, ty, true)) continue;
+          poses.push(monde.spawnBuilding(ennemi, type, tx, ty, true));
+          break;
+        }
+      }
+    });
+    // La garde : en arc devant le camp, du côté d'où le joueur viendra.
+    const centre = { x: place.tx * TILE + TILE / 2, y: place.ty * TILE + TILE / 2 };
+    const total = Object.values(camp.garde || {}).reduce((somme, n) => somme + n, 0);
+    let i = 0;
+    for (const [type, nombre] of Object.entries(camp.garde || {})) {
+      if (!UNIT_TYPES[type]) continue;
+      for (let k = 0; k < nombre; k++, i++) {
+        const angle = versMoi + ((i + 0.5) / Math.max(1, total) - 0.5) * 2.2, rayon = TILE * (3.4 + (i % 2) * 1.1);
+        const garde = monde.spawnUnit(ennemi, type, centre.x + Math.cos(angle) * rayon, centre.y + Math.sin(angle) * rayon);
+        garde.setStance('defensive');
+      }
+    }
+    return poses;
+  }
+
   /** Le bâtiment principal du joueur, s'il tient encore. */
   centre() {
     const moi = this.monde.humanIndex;
@@ -393,7 +592,8 @@ export class Scenario {
       || this.monde.units.find((u) => !u.dead && !u.isAnimal && u.playerIndex === moi && !u.garrisonedIn);
     if (!cible) return;
     for (const u of this.troupes()) {
-      if (u.state === STATE.IDLE && !u.def.heal) u.attackEntity(cible);
+      // (La garde d'un camp — attitude défensive — tient son poste : seuls les assaillants repartent.)
+      if (u.state === STATE.IDLE && !u.def.heal && u.stance === 'aggressive') u.attackEntity(cible);
     }
   }
 
@@ -419,7 +619,8 @@ export class Scenario {
     const c = this.def.chef;
     monstre.chef = true;
     monstre.maxHp = c.vie;
-    let def = UNIT_TYPES[c.type];
+    // (`duPeuple` : il garde ce que son peuple donne à cette troupe — le Sphinx balaie, l'Hydre se soigne.)
+    let def = c.duPeuple ? troupeDe(c.type, this.monde.players[this.ennemi].civ) : UNIT_TYPES[c.type];
     for (const phase of c.phases.slice(0, this.phase)) if (phase.def) def = { ...def, ...phase.def };
     monstre.def = def;
   }
@@ -445,7 +646,7 @@ export class Scenario {
       const v = vagues[this.vague++];
       const porte = this.portes[(v.porte || 0) % this.portes.length];
       this.envoyer(this.faireEntrer(v.troupes, porte));
-      monde.pushEvent({ type: 'vague', numero: this.vague, total: vagues.length, x: porte.x, y: porte.y });
+      monde.pushEvent({ type: 'vague', numero: this.vague, total: vagues.length, maraudeurs: !!def.maraudeurs, x: porte.x, y: porte.y });
     }
     if (def.chef && !this.chefEntre && monde.time + MARGE >= def.chef.a) this.faireEntrerLeChef();
     if (def.chef) this.suivreLeChef();
@@ -462,6 +663,12 @@ export class Scenario {
       if (this.vague >= (this.def.vagues || []).length && this.troupes().length === 0) issue = { victoire: true, raison: 'tenu' };
     } else if (but.genre === 'abattre') {
       if (this.chefEntre && !this.monstre()) issue = { victoire: true, raison: 'abattu' };
+      else if (but.avant && monde.time + MARGE >= but.avant) issue = { victoire: false, raison: 'temps' };
+    } else if (but.genre === 'recolter') {
+      if (this.recolte() >= but.combien) issue = { victoire: true, raison: 'recolte' };
+      else if (but.avant && monde.time + MARGE >= but.avant) issue = { victoire: false, raison: 'temps' };
+    } else if (but.genre === 'raser') {
+      if (this.batimentsDuCamp().length === 0) issue = { victoire: true, raison: 'rase' };
       else if (but.avant && monde.time + MARGE >= but.avant) issue = { victoire: false, raison: 'temps' };
     }
     if (!issue) return;
@@ -492,13 +699,16 @@ export class Scenario {
 
   /**
    * Ce que l'écran montre pendant la partie : la vague en cours et le temps
-   * avant la suivante, la vie du monstre-chef. Rien pour un scénario sans vague
-   * ni monstre.
+   * avant la suivante, la vie du monstre-chef, ce qui est récolté, ce qu'il
+   * reste du camp. Rien pour un scénario sans rien de tout cela.
    */
   affichage() {
-    const monde = this.monde, vagues = this.def.vagues || [];
+    const monde = this.monde, vagues = this.def.vagues || [], but = this.def.but;
     const etat = {};
-    if (vagues.length) {
+    if (but && but.genre === 'recolter') etat.recolte = { quoi: but.quoi, fait: Math.min(but.combien, this.recolte()), but: but.combien };
+    if (but && but.genre === 'raser') etat.camp = { reste: this.batimentsDuCamp().length, total: batimentsDuCampDe(this.def) };
+    // (Des maraudeurs ne se comptent pas : l'écran montre le but de la partie, pas leurs vagues.)
+    if (vagues.length && !this.def.maraudeurs) {
       const suivante = vagues[this.vague];
       etat.vague = this.vague;
       etat.vagues = vagues.length;
@@ -513,6 +723,28 @@ export class Scenario {
       };
     }
     return etat;
+  }
+
+  /**
+   * Les troupes que le scénario fera paraître sous peu, ou qui sont déjà sur la carte : celles des vagues qui
+   * entrent d'ici `horizon` secondes, le monstre-chef avant son entrée, ce qu'il appellera une fois là, et tout
+   * ce que le scénario a déjà de vivant (la garde d'un camp, que le joueur n'a pas encore vue). L'écran s'en
+   * sert pour préparer leurs images à l'avance, comme celles d'une troupe en formation (main.js, veiller) :
+   * sans cela, une troupe qui entre toute faite paraît d'abord sous sa silhouette d'attente.
+   */
+  aVenir(horizon = 30) {
+    const monde = this.monde, def = this.def, types = new Set();
+    for (const v of (def.vagues || []).slice(this.vague)) {
+      if (v.a - monde.time > horizon) break;
+      for (const type of Object.keys(v.troupes)) types.add(type);
+    }
+    const chef = def.chef;
+    if (chef && (this.chefEntre || chef.a - monde.time <= horizon)) {
+      if (!this.chefEntre) types.add(chef.type);
+      for (const phase of chef.phases.slice(this.phase)) for (const type of Object.keys(phase.appelle || {})) types.add(type);
+    }
+    for (const u of this.troupes()) types.add(u.type);
+    return [...types].filter((type) => UNIT_TYPES[type]);
   }
 
   /** Ce que la sauvegarde garde du scénario. */
@@ -538,8 +770,16 @@ export class Scenario {
 
 /** Les textes des scénarios et des règles, pour les dictionnaires (outils/langues.mjs). */
 export function textesATraduire(visite) {
-  for (const table of [REGLES, SCENARIOS]) {
-    for (const fiche of Object.values(table)) { visite(fiche, 'nom'); visite(fiche, 'resume'); }
+  for (const table of [REGLES, SCENARIOS, CHAPITRES]) {
+    for (const fiche of Object.values(table)) {
+      visite(fiche, 'nom');
+      visite(fiche, 'resume');
+      // (Le récit d'une mission : ses phrases d'avant et d'après, une à une.)
+      for (const moment of ['avant', 'apres']) {
+        const phrases = fiche.recit && fiche.recit[moment];
+        if (Array.isArray(phrases)) phrases.forEach((_, i) => visite(phrases, i));
+      }
+    }
   }
   // (Le défi du samedi a son résumé à lui.)
   const samedi = { resume: 'Huit vagues, une par minute, sur la carte du jour.' };

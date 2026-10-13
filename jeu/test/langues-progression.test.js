@@ -208,7 +208,8 @@ console.log('\n--- L’anglais ---');
   check('acheter en Couronnes : ce qu’il manque, « Tap again », puis la troupe débloquée',
     /You are 50 short for this purchase\./.test(v.manque) && v.confirmer === true && v.achete.includes('Catapult: unlocked. Ready to train in your next game.'), v.manque.slice(0, 120));
   check('ouvrir un coffre, essayer une troupe, effacer ses données : les boutons parlent anglais',
-    v.ouverture.titre === 'Wooden Chest' && /\+4 fragments/.test(v.ouverture.texte) && /Next chest \(1\) My troops My album Close$/.test(v.ouverture.texte)
+    // (Le coffre se tire au hasard : le nombre de fragments dépend de la rareté des troupes tirées.)
+    v.ouverture.titre === 'Wooden Chest' && /\+\d+ fragments/.test(v.ouverture.texte) && /Next chest \(1\) My troops My album Close$/.test(v.ouverture.texte)
     && v.essai.includes('Tap again: the game in progress will be erased') && v.effacer.includes('Tap again: erase everything, for good'), v.ouverture.texte.slice(-80));
   check('acheter au guichet simulé : la boutique reconnaît son titre traduit et dit ce qu’il en est',
     v.simule.includes('Trial version: this purchase is simulated, no payment is requested.') && v.simule.includes('Simulated purchase: no payment. Tap again')

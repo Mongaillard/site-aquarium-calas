@@ -165,7 +165,7 @@ console.log('\n--- L’anglais ---');
   check('marqué « en », le jeu parle anglais', m.langue === 'en');
   check('les tables sont traduites : les genres, les collections',
     egal(m.genres, { embleme: 'Sticker', cadre: 'Frame', banniere: 'Banner', grade: 'Title', epithete: 'Title', teinture: 'Dye' })
-    && egal(m.collections, ['The Start', 'The Barnyard', 'The High Tide', 'The Sands', 'The Construction Site', 'War Bloopers', 'The Monsters', 'The Banquet', 'The Court', 'The Leagues', 'The Dyes', 'Night of the Pumpkins', 'The Grand Tournament', 'The Big Freeze', 'The Pioneer']), m.collections.join(', '));
+    && egal(m.collections, ['The Start', 'The Barnyard', 'The High Tide', 'The Sands', 'The Construction Site', 'War Bloopers', 'The Monsters', 'The Banquet', 'The Court', 'The Leagues', 'The Dyes', 'Night of the Pumpkins', 'The Grand Tournament', 'The Big Freeze', 'The Pioneer', 'The Campaign']), m.collections.join(', '));
   check('… les pièces : un grade, un autocollant, une bannière et un cadre nommés d’après leur collection, une épithète, un étendard, une teinture',
     egal(m.noms, ['Villager', 'Major Blunder', 'Barnyard Banner', 'Barnyard Frame', 'Barnyard', 'Night Pennant', 'Jade Dye', 'Bear Hug', 'Gold Frame']), m.noms.join(', '));
   check('… pas les identifiants, que les sauvegardes contiennent : les pièces, leur genre, leur rareté, leur dessin ; les collections et leur rangement ; le blason de départ',

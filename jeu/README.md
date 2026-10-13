@@ -91,9 +91,10 @@ retour, l'écran d'accueil propose **Reprendre la partie** avec son format, son
 Un **scénario** est une partie écrite d'avance (`js/scenarios.js`) : il emprunte un format, en change ce
 qu'il veut, et peut avoir son but à lui. Ses briques : des **vagues** écrites (l'heure, les troupes, la
 porte de la carte par où elles entrent), un **monstre-chef** (une troupe aux points de vie fixés, qui
-change quand sa vie passe sous un seuil : il appelle des soldats, il frappe plus vite), un **but** (tenir
-toutes les vagues, abattre le monstre) et **trois buts à étoile**. La tuile « Défis » de l'accueil ouvre
-leur écran (`js/defis-ecrans.js`).
+change quand sa vie passe sous un seuil : il appelle des soldats, il frappe plus vite), un **camp** d'en
+face (bâti et gardé, où personne ne forme rien), un **but** (tenir toutes les vagues, abattre le monstre,
+récolter, raser le camp) et **trois buts à étoile**. La tuile « Campagne et défis » de l'accueil ouvre leur
+écran (`js/defis-ecrans.js`).
 
 | Défi | Ce que c'est |
 | --- | --- |
@@ -109,6 +110,45 @@ du joueur jouent à leur niveau ; contre l'ordinateur (un défi fait d'une règl
 Les vagues, les points de vie du monstre et les seuils des étoiles sont des **valeurs de départ**, réglées
 sur des parties où un ordinateur tenait la place du joueur : à revoir en jouant.
 
+### La campagne
+
+Un **chapitre** est une suite de scénarios qui se racontent. Le premier, **« La rive d'en face »**, a trois
+missions gratuites, trois façons de jouer :
+
+| Mission | Ce qu'on y fait | Réglages |
+| --- | --- | --- |
+| 1. **Pied à terre** | Récolter 800 de nourriture en moins de 7 minutes, pendant que des maraudeurs passent trois fois | Départ d'Express. Étoiles : y arriver, en moins de 6 minutes, en perdant moins de 2 unités |
+| 2. **Le camp d'en face** | Aller raser un camp de l'autre côté de la carte : une caserne, une archerie, une tour, six gardes. Des maraudeurs en sortent toutes les 100 secondes | Départ d'Escarmouche, 10 minutes. Les bâtiments du camp tiennent la moitié de leurs points de vie (`camp.vie`). Étoiles : le raser, en moins de 8 minutes, en perdant moins de 12 unités |
+| 3. **Ce que le camp gardait** | Abattre le monstre du peuple d'en face, 2 000 points de vie, qui arrive à 2 minutes avec des renforts | 9 minutes. Le monstre garde ce que son peuple lui donne (`chef.duPeuple`) : le Sphinx balaie, l'Hydre se soigne. Étoiles : l'abattre, en moins de 7 minutes, avec le bâtiment principal à moitié de sa vie |
+
+Elle se joue **avec le peuple du joueur, contre l'autre** (`civAdverse: 'autre'`) : un Atlante affronte les
+Solariens et leur Sphinx, un Solarien les Atlantes et leur Hydre. Le récit le dit — dans une phrase, `{0}`
+est le peuple d'en face et `{1}` son monstre (`recitDe`) — et c'est le prêtre ou la prêtresse du peuple du
+joueur qui raconte : trois phrases avant la partie (l'écran de la mission), deux après la victoire (l'écran
+de fin, suivi du bouton de la mission suivante).
+
+Une mission **s'ouvre quand la précédente est gagnée** (sa première étoile, toujours « gagner ») ; l'ordre et
+ce que le chapitre donne sont des réglages (`campagne`, `js/progression-config.js`), ses noms et son récit
+sont avec les scénarios (`CHAPITRES`, `SCENARIOS`, `js/scenarios.js`). Le profil ne garde rien de plus que
+pour un autre scénario : étoiles, record, parties (`etatDeLaCampagne`, `scenarioOuvert`,
+`js/progression.js`). Chaque étoile rapporte ses 20 points de saison, une fois. Le chapitre fini donne le
+titre **« Découvreur »**, ses neuf étoiles sa suite, **« de la Rive »** (collection « La Campagne ») : de
+l'apparence, jamais d'Éclats, et rien de la campagne ne se vend.
+
+**Régler une mission** : `npm run missions` (`outils/missions.mjs`) la fait jouer par un ordinateur assis à
+la place du joueur, et note ce qui arrive minute par minute. C'est un repère, pas une mesure de difficulté —
+un ordinateur partage sa récolte entre les trois ressources et ne sait pas attaquer ce qui tire ; l'outil
+sait donc lui imposer une répartition d'ouvriers (`--ouvriers 80,15,5`) et un assaut groupé (`--assaut 14`).
+Ce qu'il a donné : la mission 1 se gagne en 5 min 06 à 5 min 28 avec des ouvriers mis sur la nourriture, et
+se perd de peu (740 sur 800) en récoltant de tout ; la mission 2 se gagne vers 7 min 40 avec un assaut de
+quatorze soldats, et pas avec dix ; la mission 3, l'ordinateur la gagne entre 7 min 43 et 8 min 34 selon le
+peuple, son bâtiment principal entre 20 et 50 %. Ce sont des **valeurs de départ**, à revoir en jouant.
+
+**Ajouter une mission ou un chapitre** : une entrée dans `SCENARIOS` avec son `chapitre` et son `recit` (un
+identifiant en lettres seules : le profil n'en garde pas d'autre), le chapitre dans `CHAPITRES` et dans
+`campagne.chapitres`, ses phrases dans les cahiers `partie` des langues. Tests :
+`node test/campagne.test.js`.
+
 ### Les deux peuples se jouent autrement
 
 Tout est dans `CIVILISATIONS` (`js/config.js`) : une devise, des traits que l'accueil montre sous le peuple
@@ -121,7 +161,8 @@ choisi (« Ses atouts ») et que l'aide de la partie rappelle, et ce que les rè
 | Technologie propre (Forge, Âge Féodal, 200 nourriture et 100 or) | **Écailles profondes** : +10 points de vie à l'infanterie | **Marche du Soleil** : +10 % de vitesse à toute l'armée |
 
 L'ordinateur solarien forme davantage de montures à l'Âge des Châteaux ; aux deux premiers âges, il forme
-ce que forment les autres. Le monstre-chef d'un scénario reste la troupe du jeu : ni soin ni balayage.
+ce que forment les autres. Le monstre-chef d'un scénario reste la troupe du jeu : ni soin ni balayage —
+sauf celui de la campagne, qui est le monstre de son peuple (`chef.duPeuple`).
 
 **L'équilibre se mesure**, il ne se devine pas : `npm run peuples` fait jouer Atlantes contre Solariens entre
 deux ordinateurs, chaque carte deux fois en échangeant les places. Sans aucun trait, le résultat est

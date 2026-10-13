@@ -136,6 +136,19 @@ export const PROGRESSION = figer(traduire({
   //   points.etoile : ce que rapporte une étoile
   defis: { points: { etoile: 20 } },
 
+  // --- La campagne (js/scenarios.js, CHAPITRES) ------------------------------------
+  //  Ses chapitres, dans l'ordre, et les missions de chacun, dans l'ordre : une mission
+  //  s'ouvre quand la précédente est gagnée (sa première étoile) ; la première d'un
+  //  chapitre, quand le chapitre d'avant est fini. Ses étoiles se paient comme celles
+  //  des autres scénarios (defis.points). `pieces` : ce que le chapitre donne en plus,
+  //  une fois, de l'apparence — `fini` : ses missions toutes gagnées ; `etoiles` : toutes
+  //  leurs étoiles. Rien de la campagne ne se vend.
+  campagne: {
+    chapitres: [
+      { id: 'rive', missions: ['riveGreniers', 'riveCamp', 'riveGardien'], pieces: { fini: 'campagne.grade', etoiles: 'campagne.epithete' } },
+    ],
+  },
+
   // --- Recherche d'adversaire --------------------------------------------------
   //  fenetre  : écart d'Elo accepté au départ (H)
   //  pas      : ce dont elle s'élargit toutes les `periode` secondes

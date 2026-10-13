@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  REGLES, SCENARIOS, SEMAINE_DES_DEFIS, defiDuJour, refDeScenario, scenarioDe, optionsDeScenario, formatDe, interditesDe,
+  REGLES, SCENARIOS, CHAPITRES, SEMAINE_DES_DEFIS, defiDuJour, refDeScenario, scenarioDe, optionsDeScenario, formatDe, interditesDe,
   etoilesDe, butsDe, consigneDe, nomDuChef, textesATraduire,
 } from '../js/scenarios.js';
 import { PROGRESSION as R } from '../js/progression-config.js';
@@ -51,7 +51,9 @@ for (const s of Object.values(SCENARIOS)) {
   const c = SCENARIOS.hydre.chef;
   check('le monstre-chef : une Hydre de 2 000 points de vie, deux phases, huit minutes', c.type === 'hydra' && c.vie === 2000 && c.phases.length === 2 && c.phases[0].sous > c.phases[1].sous && SCENARIOS.hydre.but.avant === 480 && nomDuChef(SCENARIOS.hydre) === 'Hydre');
   const vus = []; textesATraduire((objet, champ) => vus.push(objet[champ]));
-  check('tous leurs textes se traduisent : noms et résumés', vus.length === (Object.keys(REGLES).length + Object.keys(SCENARIOS).length) * 2 + 1 && vus.every((t) => typeof t === 'string' && t.length > 3));
+  // (Un nom et un résumé par règle, par scénario et par chapitre de la campagne, le résumé du samedi, et le récit des missions — test/campagne.test.js.)
+  const recits = Object.values(SCENARIOS).reduce((n, s) => n + (s.recit ? s.recit.avant.length + s.recit.apres.length : 0), 0);
+  check('tous leurs textes se traduisent : noms, résumés et récits', vus.length === (Object.keys(REGLES).length + Object.keys(SCENARIOS).length + Object.keys(CHAPITRES).length) * 2 + 1 + recits && vus.every((t) => typeof t === 'string' && t.length > 3));
 }
 
 // --- Le défi du jour ---------------------------------------------------------------------------

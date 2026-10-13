@@ -14,7 +14,7 @@ import {
   lireProgression, ecrireProgression, quandLaProgressionSEcrit,
 } from './save.js';
 import { brancher as brancherRangementDurable, hoteDeLApplication } from './rangement-durable.js';
-import { appliquerResultat, reglagesDePartie, issueDePartie, formatConseille, debutant, prochainPalier, prendreCoffreDeRecrue, prochainPalierDeSaison, joursRestants, appliquerScenario } from './progression.js';
+import { appliquerResultat, reglagesDePartie, issueDePartie, formatConseille, debutant, prochainPalier, prendreCoffreDeRecrue, prochainPalierDeSaison, joursRestants, appliquerScenario, scenarioOuvert } from './progression.js';
 import { scenarioDe, optionsDeScenario, etoilesDe, consigneDe } from './scenarios.js';
 import { htmlFinDeScenario, titreDeScenario } from './defis-ecrans.js';
 import { hoteDesRappels, lireReglages as lireRappels, ecrireReglages as ecrireRappels, fautIlDemander, quitterLeJeu, revenirAuJeu, SORTES as SORTES_DE_RAPPELS } from './rappels.js';
@@ -242,7 +242,7 @@ class Game {
     // les villageois travaillent déjà.
     if (!repris && !this.tutoriel && !this.scenario) this.ui.toast(txt`Affectez vos ${this.ouvrier(2)} : touchez-les, puis touchez un arbre, un buisson ou un filon.`);
     // (Un scénario dit d'abord ce qu'il attend du joueur.)
-    if (!repris && this.scenario) this.ui.toast(consigneDe(this.scenario.def), 'warn');
+    if (!repris && this.scenario) this.ui.toast(consigneDe(this.scenario.def, this.world.players[this.world.humanIndex].civ), 'warn');
     if (!repris && this.world.rival) {
       const r = ficheDuRival(this.world.rival);
       this.ui.toast(txt`En face : ${nomDuRival(this.world.rival)} (ordinateur). « ${r.phrase} »`, 'warn');
@@ -307,6 +307,12 @@ class Game {
    * et le témoin de coupure, tenu à jour tant que la partie dure.
    */
   veiller(now) {
+    // (Scénario : ses troupes entrent toutes faites, sans passer par une formation — leurs images se préparent
+    // donc ici, un peu avant qu'elles paraissent. Demander deux fois la même ne coûte rien.)
+    if (this.scenario) {
+      const civ = this.world.players[this.scenario.ennemi].civ;
+      for (const type of this.scenario.aVenir()) prevoirTroupe(type, civ);
+    }
     try { entretenirMemoire(now / 1000, this.troupesEnJeu()); } catch { /* le ménage ne doit jamais arrêter la boucle */ }
     if (now >= this.prochainTemoin) { this.prochainTemoin = now + TEMOIN_INTERVAL * 1000; this.marquer(); }
   }
@@ -332,6 +338,11 @@ class Game {
       if (fx.kind !== 'cadavre') continue;
       const civ = this.world.players[fx.joueur]?.civ;
       couples.set(`${fx.type}|${civ}`, [fx.type, civ]);
+    }
+    // (Scénario : ce qui va entrer sous peu est déjà en préparation — voir veiller. Le ménage n'y touche pas.)
+    if (this.scenario) {
+      const civ = this.world.players[this.scenario.ennemi].civ;
+      for (const type of this.scenario.aVenir()) couples.set(`${type}|${civ}`, [type, civ]);
     }
     return [...couples.values()];
   }
@@ -534,7 +545,8 @@ class Game {
           this.audio.play('alert');
           this.foyers.signaler(event.x, event.y);
           this.lastAttackPoint = { x: event.x, y: event.y };
-          this.ui.toast(txt`Vague ${event.numero} sur ${event.total} en approche`, 'error', () => this.voirAttaque());
+          // (Des maraudeurs : ils gênent, ils ne se comptent pas.)
+          this.ui.toast(event.maraudeurs ? txt('Des maraudeurs approchent ! Touchez pour voir où') : txt`Vague ${event.numero} sur ${event.total} en approche`, 'error', () => this.voirAttaque());
           this.vibrate([18, 60, 18]);
           break;
         // Scénario : le monstre-chef entre, appelle des renforts, enrage.
@@ -608,7 +620,7 @@ class Game {
       etoiles: etoilesDe(def, bilan), record, sens: def.record === 'temps' ? 'bas' : 'haut',
     });
     ecrireProgression(r.profil);
-    return htmlFinDeScenario(def, bilan, r.evenements, r.profil);
+    return htmlFinDeScenario(def, bilan, r.evenements, r.profil, this.world.players[this.world.humanIndex].civ);
   }
 
   pruneSelection() {
@@ -1720,6 +1732,8 @@ function partieDeScenario(ref) {
 function lancerScenario(ref, sur) {
   const options = partieDeScenario(ref);
   if (!options) return 'refus';
+  // (Une mission de la campagne ne se joue qu'une fois la précédente gagnée.)
+  if (!scenarioOuvert(lireProgression(), ref.id)) return 'refus';
   if (currentGame && !currentGame.world.gameOver) return 'refus';   // une partie se joue : pas de défi par-dessus
   if (loadSave() && !sur) return 'confirmer';
   if (currentGame) currentGame.destroy();

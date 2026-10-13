@@ -22,7 +22,9 @@
 //              (PROGRESSION.collections.atelier) — les teintures des troupes ;
 //   offre    : ses pièces viennent avec une offre de la boutique en argent réel,
 //              et de nulle part ailleurs (PROGRESSION.boutique.offres) — de
-//              l'apparence, que ni les Éclats ni les Couronnes n'achètent.
+//              l'apparence, que ni les Éclats ni les Couronnes n'achètent ;
+//   campagne : ses pièces se gagnent en finissant les chapitres de la campagne
+//              (PROGRESSION.campagne) — rien ne les achète.
 //
 // Une teinture (`genre: 'teinture'`) habille les troupes du joueur d'une autre
 // matière : `matiere` est sa clé dans js/teintures.js, `pastille` sa couleur
@@ -316,6 +318,15 @@ const DEFINITIONS = [
     pieces: [
       { id: 'cadre', genre: 'cadre', nom: 'Cadre du Pionnier', forme: 'etoile', dents: 8, couleur: CYAN, fond: MARINE },
       { id: 'grade', genre: 'grade', nom: 'Pionnier' },
+    ],
+  },
+  // Ce que la campagne donne (PROGRESSION.campagne.chapitres) : un mot de titre pour un chapitre fini, et sa
+  // suite pour toutes ses étoiles — « Découvreur de la Rive ».
+  {
+    id: 'campagne', nom: 'La Campagne', source: 'campagne',
+    pieces: [
+      { id: 'grade', genre: 'grade', nom: 'Découvreur' },
+      { id: 'epithete', genre: 'epithete', nom: 'de la Rive' },
     ],
   },
 ];
