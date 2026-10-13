@@ -169,6 +169,7 @@ export default {
   "Offre de ligue : {0} à moitié prix": "League offer: {0} at half price",
   "{0} au lieu de <s>{1}</s> · encore {2}": "{0} instead of <s>{1}</s> · {2} left",
   "Offre de bienvenue : {0}": "Welcome offer: {0}",
+  "Le cadre et le titre ne viennent que d’ici : ni Couronnes ni Éclats ne les achètent.": "The frame and the title come only from here: neither Crowns nor Shards can buy them.",
   "{0}, une seule fois · encore {1}": "{0}, one time only · {1} left",
   "Achat simulé : aucun paiement.": "Simulated purchase: no payment.",
   "Bientôt": "Soon",

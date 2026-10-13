@@ -532,12 +532,15 @@ function ecranBoutique(profil, message = '', { confirmer = '', surPlace = false 
           ${deuxPrix(boutonAcheter('acheter', o.troupe, o.prix, c.couronnes, confirmer === o.troupe), boutonAutreMonnaie('acheter', o.troupe, o.prix * c.change, c.eclats, confirmer === `${o.troupe}~`, eclats))}
         </li>`;
     }
-    const contenu = [...o.troupes.map(nomTroupe), txt`${nombre(o.couronnes)} Couronnes`].join(' + ');
+    // (Ses pièces d'abord : c'est ce qu'elle a de propre — un cadre et un mot de titre qu'on ne trouve nulle part ailleurs.)
+    const contenu = [...(o.pieces || []).map(pieceEnEtiquette), ...o.troupes.map(nomTroupe), txt`${nombre(o.couronnes)} Couronnes`].join(' + ');
+    const cadre = (o.pieces || []).find((id) => PIECES[id].genre === 'cadre');
     return `
       <li class="prog-offre">
-        <span class="prog-vignette">${iconeSVG('couronne', 30)}</span>
+        <span class="prog-vignette">${cadre ? htmlPiece(cadre) : iconeSVG('couronne', 30)}</span>
         <span class="prog-offre-texte">
           <b>${txt`Offre de bienvenue : ${contenu}`}</b>
+          ${(o.pieces || []).length ? `<small>${txt('Le cadre et le titre ne viennent que d’ici : ni Couronnes ni Éclats ne les achètent.')}</small>` : ''}
           <small>${confirmer === 'argent:bienvenue' ? txt('Achat simulé : aucun paiement.') : txt`${prixAffiche(bienvenue) || euros(o.prixCentimes)}, une seule fois · encore ${resteEnClair(o.reste)}`}</small>
         </span>
         ${vendable(bienvenue) ? boutonArgent('acheterOffre', 'bienvenue', bienvenue, o.prixCentimes, confirmer === 'argent:bienvenue') : `<button class="btn small" disabled>${txt('Bientôt')}</button>`}

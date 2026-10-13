@@ -170,6 +170,7 @@ export default {
   "Offre de ligue : {0} à moitié prix": "Oferta de liga: {0} a mitad de precio",
   "{0} au lieu de <s>{1}</s> · encore {2}": "{0} en lugar de <s>{1}</s> · quedan {2}",
   "Offre de bienvenue : {0}": "Oferta de bienvenida: {0}",
+  "Le cadre et le titre ne viennent que d’ici : ni Couronnes ni Éclats ne les achètent.": "El marco y el título solo vienen de aquí: ni Coronas ni Esquirlas los compran.",
   "{0}, une seule fois · encore {1}": "{0}, una sola vez · quedan {1}",
   "Achat simulé : aucun paiement.": "Compra simulada: ningún pago.",
   "Bientôt": "Próximamente",

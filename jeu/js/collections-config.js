@@ -19,12 +19,15 @@
 //              étendard et un grade de champion, pour les plus hautes ligues ;
 //   ligues   : les cadeaux des promotions (PROGRESSION.ligues[…].promotion) ;
 //   atelier  : ses pièces s'achètent une à une, en Éclats, chacune à son prix
-//              (PROGRESSION.collections.atelier) — les teintures des troupes.
+//              (PROGRESSION.collections.atelier) — les teintures des troupes ;
+//   offre    : ses pièces viennent avec une offre de la boutique en argent réel,
+//              et de nulle part ailleurs (PROGRESSION.boutique.offres) — de
+//              l'apparence, que ni les Éclats ni les Couronnes n'achètent.
 //
 // Une teinture (`genre: 'teinture'`) habille les troupes du joueur d'une autre
 // matière : `matiere` est sa clé dans js/teintures.js, `pastille` sa couleur
 // dans les menus. Elle se porte comme le reste du blason, et ne change rien
-// au combat.
+// au combat. Chaque saison a la sienne (`teinture`) : la vedette de son Passe.
 //
 // Les autocollants sont dessinés (par ChatGPT, d'après nos demandes) et rangés
 // par planches de neuf, 3 × 3 : `rang` est la case, de gauche à droite et de
@@ -246,6 +249,7 @@ const DEFINITIONS = [
     cadre: { forme: 'fleur', dents: 10, couleur: CITROUILLE, fond: NUIT },
     etendard: { nom: 'Étendard de la Nuit', fond: CITROUILLE, trait: ENCRE, motif: 'damier' },
     champion: 'Épouvantail en chef',
+    teinture: { nom: 'Teinture de feu follet', matiere: 'feuFollet', pastille: '#93d63c' },
   },
   {
     id: 'tournoi', nom: 'Le Grand Tournoi', source: 'saison', planches: ['tournoi', 'tournoi2'],
@@ -274,6 +278,7 @@ const DEFINITIONS = [
     cadre: { forme: 'creneaux', dents: 12, couleur: BLEU, fond: BLANC },
     etendard: { nom: 'Étendard du Tournoi', fond: MARINE, trait: JAUNE, motif: 'bandes' },
     champion: 'Roi de la joute',
+    teinture: { nom: 'Teinture de pourpre', matiere: 'pourpre', pastille: '#8f2aa3' },
   },
   {
     id: 'froid', nom: 'Le Grand Froid', source: 'saison', planches: ['froid', 'froid2'],
@@ -302,6 +307,16 @@ const DEFINITIONS = [
     cadre: { forme: 'pointes', dents: 8, couleur: BLANC, fond: GLACE },
     etendard: { nom: 'Étendard du Grand Froid', fond: MARINE, trait: BLANC, motif: 'etoiles' },
     champion: 'Maître des neiges',
+    teinture: { nom: 'Teinture de neige', matiere: 'neige', pastille: '#f4f6f8' },
+  },
+  // Ce que seule l'offre de bienvenue donne (PROGRESSION.boutique.offres.bienvenue) : un cadre et un mot de
+  // titre. De l'apparence, à contenu fixe et affiché — la seule chose du jeu qui ne se gagne pas en jouant.
+  {
+    id: 'pionnier', nom: 'Le Pionnier', source: 'offre',
+    pieces: [
+      { id: 'cadre', genre: 'cadre', nom: 'Cadre du Pionnier', forme: 'etoile', dents: 8, couleur: CYAN, fond: MARINE },
+      { id: 'grade', genre: 'grade', nom: 'Pionnier' },
+    ],
   },
 ];
 
@@ -319,6 +334,8 @@ function piecesDe(d) {
   if (d.epithete) ajouter('epithete', 'epithete', d.epithete, E);
   if (d.etendard) { const { nom, ...reste } = d.etendard; ajouter('etendard', 'banniere', nom, E, reste); }
   if (d.champion) ajouter('champion', 'grade', d.champion, E);
+  // (La teinture d'une saison : la vedette de son Passe.)
+  if (d.teinture) { const { nom, ...reste } = d.teinture; ajouter('teinture', 'teinture', nom, E, reste); }
   return pieces;
 }
 
@@ -389,6 +406,15 @@ export function composerTitre(grade, epithete) {
 
 /** Ce que tout joueur porte au départ : son blason avant d'avoir rien gagné. */
 export const BLASON_DE_DEPART = Object.freeze({ embleme: null, cadre: 'depart.cadre', banniere: 'depart.banniere', grade: 'depart.grade', epithete: null, teinture: null });
+
+/**
+ * La bannière que porte ce blason, telle que la partie la plante au sol près du bâtiment principal du joueur
+ * (js/render.js, dessinerEtendard) : `{ fond, trait, motif }`. Celle du départ pour un blason sans bannière lisible.
+ */
+export function banniereDe(blason) {
+  const p = (blason && piece(blason.banniere)) || PIECES[BLASON_DE_DEPART.banniere];
+  return p && p.genre === 'banniere' ? { fond: p.fond, trait: p.trait, motif: p.motif } : null;
+}
 
 /** La matière (clé de js/teintures.js) de la teinture que porte ce blason, ou null : les troupes telles qu'elles sont peintes. */
 export function matiereDe(blason) {

@@ -249,10 +249,12 @@ check('les collections : les genres, le titre du joueur (grade puis épithète),
   && egal(m.pieces, ['el Estandarte del Corral', 'el Marco de Oro', 'el Gallardete de la Noche', 'el título «Domador»', 'el título «… de las Calabazas»', 'la pegatina «El General Metepatas»', 'el Tinte de plata'])
   && m.gains === '20 Esquirlas, 50 Coronas, la pegatina «Calabaza con casco», el título «Zampacalabazas»', m.titres.join(' | '));
 check('… l’album, une collection, le blason, la saison et son Pase, un coffre ouvert',
-  m.album.includes('Cada cofre contiene al menos una pegatina') && m.album.includes('La Noche de las Calabazas 0 de 24 · Temporada 1')
+  m.album.includes('Cada cofre contiene al menos una pegatina') && m.album.includes('La Noche de las Calabazas 0 de 25 · Temporada 1')
   && m.collection.includes('Sus pegatinas salen de los cofres.') && m.collection.includes('Una pegatina común vale 30 Esquirlas, una rara 100 y una épica 300.')
   && m.porte.includes('Gallina guerrera: ya está en tu blasón.') && m.blason.includes('Título: la primera palabra') && m.blason.includes('Tinte de las tropas')
   && m.saison.includes('Hito 2 de 30') && m.saison.includes('El Pase de temporada abre la vía de la derecha') && m.passe.includes('Pase de temporada: es tuyo.')
+  && m.saison.includes('Tinte de fuego fatuo La estrella de la temporada: tus tropas la llevan en la partida. En el hito 30 del Pase, y en ningún otro sitio.')
+  && m.saison.includes('el tinte de la temporada, 12 pegatinas, 4 piezas de blasón (estandarte, marco, dos palabras de título), 200 Coronas y 440 Esquirlas')
   && m.coffreOuvert.includes('Cofre de plata') && m.coffreOuvert.includes('Mis tropas') && m.coffreOuvert.includes('Mi álbum'), m.saison.slice(0, 120));
 check('rien n’est resté sans traduction dans toutes ces scènes', m.sansTraduction.length === 0, m.sansTraduction.slice(0, 3).join(' | '));
 check('aucun écran ne montre « undefined », « NaN » ou un trou « {0} » resté dans le texte',

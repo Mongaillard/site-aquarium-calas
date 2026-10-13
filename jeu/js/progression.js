@@ -1375,6 +1375,7 @@ export function catalogueBoutique(profil, maintenant, jour) {
   const b = R.boutique.offres.bienvenue;
   if (t !== null && !p.boutique.bienvenuePrise && p.boutique.bienvenueJusqua > t) {
     offres.push({ id: 'bienvenue', prixCentimes: b.prixCentimes, troupes: b.troupes.filter((type) => !p.debloquees[type]), couronnes: b.couronnes,
+      pieces: (b.pieces || []).filter((id) => existePiece(id) && !p.pieces.includes(id)),
       jusqua: p.boutique.bienvenueJusqua, reste: p.boutique.bienvenueJusqua - t, disponible: reel });
   }
   return {
@@ -1498,6 +1499,9 @@ export function prendreOffreDeBienvenue(profil, preuve) {
     evenements.push({ type: 'troupeDebloquee', troupe: type, origine: 'achat' });
   }
   if (preuve.restauration !== true) crediter(p, b.couronnes, 'bienvenue', evenements);
+  // Ses pièces à elle : de l'apparence qui ne vient de nulle part ailleurs. (Déjà là — un achat restauré — : rien à
+  // redonner, et surtout pas d'Éclats à la place.)
+  for (const id of b.pieces || []) if (!p.pieces.includes(id)) donnerPiece(p, id, 'bienvenue', evenements);
   retenirTransaction(p, preuve.transaction);
   noter(p, { op: 'boutique', article: 'bienvenue', ...(preuve.restauration === true ? { restauration: true } : {}) });
   return { profil: p, evenements };

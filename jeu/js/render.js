@@ -1554,6 +1554,15 @@ export class Renderer {
       if (pos.x < view.left - TILE * 3 || pos.x > view.right + TILE * 3 || pos.y < view.top - TILE * 2 || pos.y > view.bottom + TILE * 5) continue;
       list.push({ kind: 'position', pos, y: pos.y + 12 });
     }
+    // L'étendard du joueur : planté au sol à l'angle de chacun de ses bâtiments principaux, classé à son pied.
+    if (this.etendard) {
+      for (const b of this.world.buildings) {
+        if (b.dead || !b.complete || b.type !== 'towncenter' || b.playerIndex !== this.world.humanIndex) continue;
+        const p = this.piedDeLEtendard(b);
+        if (p.x < view.left - TILE * 2 || p.x > view.right + TILE * 2 || p.y < view.top - TILE || p.y > view.bottom + TILE * 3) continue;
+        list.push({ kind: 'etendard', x: p.x, y: p.y });
+      }
+    }
     this.preparer3d(list);
     const rang = (e) => (e.kind === 'building' ? e.ty * TILE + 8 : e.kind === 'vegetation' ? (e.ty + 1) * TILE - 6 : e.kind === 'decor' ? e.d.y - 1 : e.y);
     list.sort((a, b) => rang(a) - rang(b));
@@ -1563,6 +1572,7 @@ export class Renderer {
       else if (e.kind === 'vegetation') this.dessinerVegetation(e.res, e.sprite);
       else if (e.kind === 'decor') this.dessinerPiece(e.d, e.sprite);
       else if (e.kind === 'position') this.dessinerMonument(e.pos);
+      else if (e.kind === 'etendard') this.dessinerEtendard(e.x, e.y);
       else {
         // Ce qui est au sol d'abord, pour toute une suite de troupes : leurs
         // ombres, puis leurs anneaux de camp. Dans une mêlée, ni ombre ni
@@ -1578,6 +1588,67 @@ export class Renderer {
         this.drawUnit(e);
       }
     }
+  }
+
+  /** Où l'étendard du joueur se plante : au sol, à l'angle sud-est de son bâtiment principal — jamais sur un toit. */
+  piedDeLEtendard(b) {
+    const demi = (b.size * TILE) / 2;
+    return { x: b.x + demi + 8, y: b.y + demi - 4 };
+  }
+
+  /**
+   * L'étendard du joueur (la bannière de son blason : `this.etendard`, `{ fond, trait, motif }`), planté au sol :
+   * une hampe, son ombre en bas à droite, et la toile à deux pointes aux couleurs de la bannière, cernée d'encre.
+   * Le motif est celui des menus (js/blason.js), simplifié à cette taille : il se lit à vingt pixels.
+   */
+  dessinerEtendard(x, pied) {
+    const e = this.etendard;
+    if (!e) return;
+    const ctx = this.ctx;
+    const L = 25, H = 17, haut = pied - 47, gauche = x + 1.5;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath(); ctx.ellipse(x + 4, pied + 1, 10, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#17120e';
+    ctx.fillRect(x - 2.5, haut - 2, 5, 49);
+    ctx.fillStyle = '#8a6a44';
+    ctx.fillRect(x - 1.2, haut - 0.8, 2.4, 46.6);
+    // La toile : un rectangle à deux pointes, accroché à la hampe par son bord gauche.
+    const toile = () => {
+      ctx.beginPath();
+      ctx.moveTo(gauche, haut); ctx.lineTo(gauche + L, haut); ctx.lineTo(gauche + L - 6, haut + H / 2);
+      ctx.lineTo(gauche + L, haut + H); ctx.lineTo(gauche, haut + H); ctx.closePath();
+    };
+    ctx.save();
+    toile(); ctx.clip();
+    ctx.fillStyle = e.fond; ctx.fillRect(gauche, haut, L, H);
+    ctx.fillStyle = e.trait; ctx.strokeStyle = e.trait; ctx.lineWidth = 2;
+    const point = (dx, dy, r) => { ctx.beginPath(); ctx.arc(gauche + dx, haut + dy, r, 0, Math.PI * 2); ctx.fill(); };
+    if (e.motif === 'bandes') {
+      for (let k = -2; k < 4; k++) { ctx.beginPath(); ctx.moveTo(gauche + k * 9, haut + H); ctx.lineTo(gauche + k * 9 + 4.5, haut + H); ctx.lineTo(gauche + k * 9 + 4.5 + H, haut); ctx.lineTo(gauche + k * 9 + H, haut); ctx.closePath(); ctx.fill(); }
+    } else if (e.motif === 'pois') {
+      for (let l = 0; l < 3; l++) for (let dx = l % 2 ? 7 : 3; dx < L; dx += 8) point(dx, 3 + l * 5.5, 1.7);
+    } else if (e.motif === 'vagues') {
+      for (let l = 0; l < 2; l++) { ctx.beginPath(); ctx.moveTo(gauche - 2, haut + 5 + l * 7); for (let dx = -2; dx < L; dx += 8) ctx.quadraticCurveTo(gauche + dx + 2, haut + 1 + l * 7, gauche + dx + 4, haut + 5 + l * 7), ctx.quadraticCurveTo(gauche + dx + 6, haut + 9 + l * 7, gauche + dx + 8, haut + 5 + l * 7); ctx.stroke(); }
+    } else if (e.motif === 'rayons') {
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * 2 * Math.PI, b = ((i + 0.5) / 8) * 2 * Math.PI; ctx.beginPath(); ctx.moveTo(gauche + L / 2, haut + H / 2); ctx.lineTo(gauche + L / 2 + 40 * Math.cos(a), haut + H / 2 + 40 * Math.sin(a)); ctx.lineTo(gauche + L / 2 + 40 * Math.cos(b), haut + H / 2 + 40 * Math.sin(b)); ctx.closePath(); ctx.fill(); }
+    } else if (e.motif === 'chevrons') {
+      ctx.lineWidth = 2.6;
+      for (let dx = -2; dx < L + 6; dx += 9) { ctx.beginPath(); ctx.moveTo(gauche + dx, haut - 1); ctx.lineTo(gauche + dx + 6, haut + H / 2); ctx.lineTo(gauche + dx, haut + H + 1); ctx.stroke(); }
+    } else if (e.motif === 'damier') {
+      for (let l = 0; l < 4; l++) for (let c = l % 2; c < 7; c += 2) ctx.fillRect(gauche + c * 4.25, haut + l * 4.25, 4.25, 4.25);
+    } else if (e.motif === 'ecailles') {
+      ctx.lineWidth = 1.6;
+      for (let l = 0; l < 4; l++) for (let dx = l % 2 ? -4 : 0; dx < L; dx += 8) { ctx.beginPath(); ctx.arc(gauche + dx + 4, haut + l * 5 - 1, 4, 0, Math.PI); ctx.stroke(); }
+    } else if (e.motif === 'etoiles') {
+      for (const [dx, dy, r] of [[5, 5, 2.6], [14, 11, 3.2], [20, 4, 2.2]]) { ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = (i / 8) * 2 * Math.PI - Math.PI / 2, rayon = i % 2 ? r * 0.42 : r; ctx.lineTo(gauche + dx + rayon * Math.cos(a), haut + dy + rayon * Math.sin(a)); } ctx.closePath(); ctx.fill(); }
+    }
+    ctx.restore();
+    toile();
+    ctx.strokeStyle = '#17120e'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.lineJoin = 'miter';
+    // (Le pommeau de la hampe.)
+    ctx.fillStyle = '#17120e'; ctx.beginPath(); ctx.arc(x, haut - 3, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffc93c'; ctx.beginPath(); ctx.arc(x, haut - 3, 1.7, 0, Math.PI * 2); ctx.fill();
   }
 
   /**

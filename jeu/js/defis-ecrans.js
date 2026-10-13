@@ -13,6 +13,7 @@ import { etatDeScenario } from './progression.js';
 import { SCENARIOS, REGLES, scenarioDe, butsDe, nomDuChef } from './scenarios.js';
 import { GAME_MODES } from './config.js';
 import { iconeSVG } from './icones.js';
+import { htmlMedaillon, titreDuBlason } from './blason.js';
 import { txt } from './langue.js';
 
 /** Les outils prêtés par js/progression-ecrans.js : montrer, fermer, nombre, jour, et `lancer` (main.js). */
@@ -114,9 +115,11 @@ export function htmlTuileDesDefis(profil, jour) {
  * La fin d'une partie de scénario : ses trois buts — atteints à l'instant, déjà gagnés, manqués —, les points
  * de saison qu'elle donne, le record. `evenements` : ceux d'appliquerScenario.
  */
-export function htmlFinDeScenario(def, bilan, evenements) {
+export function htmlFinDeScenario(def, bilan, evenements, profil = null) {
   const e = (evenements || []).find((x) => x.type === 'etoiles');
   if (!e) return '';
+  // (Le joueur d'abord, comme à la fin d'une partie classée : son médaillon et son titre.)
+  const joueur = profil ? `<p class="prog-fin-joueur">${htmlMedaillon(profil.blason)}<b>${titreDuBlason(profil.blason)}</b></p>` : '';
   const buts = butsDe(def);
   const lignes = buts.map((but, i) => {
     const classe = e.gagnees[i] ? 'fait' : e.acquis[i] ? 'fait ancien' : '';
@@ -135,6 +138,7 @@ export function htmlFinDeScenario(def, bilan, evenements) {
   }
   return `
     <div class="prog-fin defi-fin">
+      ${joueur}
       <p class="defi-fin-titre"><b>${titreDeScenario(def)}</b>${htmlEtoiles(e.acquis, 20)}</p>
       <ul class="defi-buts">${lignes}</ul>
       ${points}

@@ -67,6 +67,7 @@ export default {
   "Par les ligues": "Por las ligas",
   "Route de saison": "Ruta de temporada",
   "En Éclats": "En Esquirlas",
+  "Offre de bienvenue": "Oferta de bienvenida",
   "Saison {0}": "Temporada {0}",
 
   // --- Une collection ------------------------------------------------------------
@@ -86,6 +87,7 @@ export default {
   "Voir la route": "Ver la ruta",
   "Une teinture habille tes troupes d’une autre matière, en partie : l’or et l’acier changent, jamais le tissu de ton camp. Elle ne change rien au combat. Chacune s’achète en Éclats.": "Un tinte viste a tus tropas con otro material durante la partida: cambian el oro y el acero, nunca la tela de tu bando. No cambia nada en el combate. Cada uno se compra con Esquirlas.",
   "Les cadeaux des ligues : ils arrivent à chaque promotion.": "Los regalos de las ligas: llegan con cada ascenso.",
+  "Les pièces de l’offre de bienvenue : elles ne viennent de nulle part ailleurs.": "Las piezas de la oferta de bienvenida: no vienen de ningún otro sitio.",
   "Et avec elle": "Y con ella",
   "Ses pièces": "Sus piezas",
   "{0} : c’est sur ton blason.": "{0}: ya está en tu blasón.",
@@ -125,7 +127,9 @@ export default {
   "Passe de saison : à toi.": "Pase de temporada: es tuyo.",
   "Les deux voies sont ouvertes.": "Las dos vías están abiertas.",
   "<b>Le Passe de saison</b> ouvre la voie de droite : {0}.": "<b>El Pase de temporada</b> abre la vía de la derecha: {0}.",
-  "{0} autocollants, {1} pièces de blason (bannière, cadre, deux mots de titre), {2} Couronnes et {3} Éclats": "{0} pegatinas, {1} piezas de blasón (estandarte, marco, dos palabras de título), {2} Coronas y {3} Esquirlas",
+  "la teinture de la saison, {0} autocollants, {1} pièces de blason (bannière, cadre, deux mots de titre), {2} Couronnes et {3} Éclats": "el tinte de la temporada, {0} pegatinas, {1} piezas de blasón (estandarte, marco, dos palabras de título), {2} Coronas y {3} Esquirlas",
+  "La vedette de la saison : elle est à toi. Porte-la depuis ton blason.": "La estrella de la temporada: es tuya. Equípala desde tu blasón.",
+  "La vedette de la saison : tes troupes la portent en partie. Au palier {0} du Passe, et nulle part ailleurs.": "La estrella de la temporada: tus tropas la llevan en la partida. En el hito {0} del Pase, y en ningún otro sitio.",
   "Ni coffre, ni fragment, ni niveau.": "Ni cofres, ni fragmentos, ni niveles.",
   "Cette collection est déjà passée par ici : tu as {0} de ces pièces. Celles-là te rendront des Éclats à la place ({1} en tout).": "Esta colección ya ha pasado por aquí: tienes {0} de estas piezas. Esas te devolverán Esquirlas a cambio ({1} en total).",
   "{0} Couronnes{1}.": "{0} Coronas{1}.",
@@ -194,6 +198,7 @@ export default {
   "La Nuit des Citrouilles": "La Noche de las Calabazas",
   "Le Grand Tournoi": "El Gran Torneo",
   "Le Grand Froid": "El Gran Frío",
+  "Le Pionnier": "El Pionero",
 
   // --- Le Départ -----------------------------------------------------------------
   "Villageois": "Aldeano",
@@ -363,6 +368,7 @@ export default {
   "des Citrouilles": "de las Calabazas",
   "Étendard de la Nuit": "Gallardete de la Noche",
   "Épouvantail en chef": "Espantapájaros en jefe",
+  "Teinture de feu follet": "Tinte de fuego fatuo",
 
   // --- Le Grand Tournoi ----------------------------------------------------------
   "Chevalier en pantoufles": "Caballero en pantuflas",
@@ -389,6 +395,7 @@ export default {
   "du Tournoi": "del Torneo",
   "Étendard du Tournoi": "Gallardete del Torneo",
   "Roi de la joute": "Rey de la justa",
+  "Teinture de pourpre": "Tinte de púrpura",
 
   // --- Le Grand Froid ------------------------------------------------------------
   "Bonhomme de garde": "Muñeco de nieve de guardia",
@@ -415,4 +422,9 @@ export default {
   "du Grand Froid": "del Gran Frío",
   "Étendard du Grand Froid": "Gallardete del Gran Frío",
   "Maître des neiges": "Maestro de las nieves",
+  "Teinture de neige": "Tinte de nieve",
+
+  // --- Le Pionnier (l'offre de bienvenue) ---------------------------------------
+  "Cadre du Pionnier": "Marco del Pionero",
+  "Pionnier": "Pionero",
 };

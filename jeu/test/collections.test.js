@@ -68,9 +68,9 @@ console.log('--- Le catalogue ---');
     themes.filter((c) => c.source !== 'saison').every((c) => c.emblemes.length === 9
       && egal(c.emblemes.map((id) => PIECES[id].rarete[0]).join(''), 'cccccrrre')
       && ['grade', 'banniere', 'cadre', 'epithete'].every((court) => pieceDe(c.id, court)) && c.pieces.length === 13));
-  check('une collection de saison : dix-huit autocollants sur deux planches, et en plus un étendard et un grade de champion',
-    DE_SAISON.every((c) => c.emblemes.length === 18 && c.planches.length === 2 && c.pieces.length === 24
-      && PIECES[pieceDe(c.id, 'etendard')].genre === 'banniere' && PIECES[pieceDe(c.id, 'champion')].genre === 'grade'));
+  check('une collection de saison : dix-huit autocollants sur deux planches, et en plus un étendard, un grade de champion et la teinture de la saison',
+    DE_SAISON.every((c) => c.emblemes.length === 18 && c.planches.length === 2 && c.pieces.length === 25
+      && PIECES[pieceDe(c.id, 'etendard')].genre === 'banniere' && PIECES[pieceDe(c.id, 'champion')].genre === 'grade' && PIECES[pieceDe(c.id, 'teinture')].genre === 'teinture'));
   check('chaque autocollant a sa planche et sa case, de 0 à 8 ; deux autocollants ne partagent jamais une case',
     themes.every((c) => new Set(c.emblemes.map((id) => `${PIECES[id].planche}#${PIECES[id].rang}`)).size === c.emblemes.length
       && c.emblemes.every((id) => c.planches.includes(PIECES[id].planche) && Number.isInteger(PIECES[id].rang) && PIECES[id].rang >= 0 && PIECES[id].rang < 9)));
@@ -82,8 +82,8 @@ console.log('--- Le catalogue ---');
   check('chaque cadre a une forme que l’on sait tracer, chaque bannière un motif — et leurs couleurs',
     ids.every((id) => { const p = PIECES[id]; return p.genre === 'cadre' ? FORMES.includes(p.forme) && /^#/.test(p.couleur) && /^#/.test(p.fond) : p.genre === 'banniere' ? MOTIFS.includes(p.motif) && /^#/.test(p.fond) && /^#/.test(p.trait) : true; }));
   check('aucun nom de pièce ne porte d’emoji ni de chiffre', ids.every((id) => !/\p{Extended_Pictographic}|\d/u.test(PIECES[id].nom)));
-  check('les grades et les épithètes font des titres : 20 premiers mots, 11 suites',
-    ids.filter((id) => PIECES[id].genre === 'grade').length === 20 && ids.filter((id) => PIECES[id].genre === 'epithete').length === 11
+  check('les grades et les épithètes font des titres : 21 premiers mots (dont « Pionnier », celui de l’offre de bienvenue), 11 suites',
+    ids.filter((id) => PIECES[id].genre === 'grade').length === 21 && ids.filter((id) => PIECES[id].genre === 'epithete').length === 11
     && ids.filter((id) => PIECES[id].genre === 'epithete').every((id) => /^(de la|des|du|de l’) /.test(PIECES[id].nom)));
   // Les ligues donnent des pièces qui existent.
   const cadeaux = R.ligues.flatMap((l) => (l.promotion ? l.promotion.cadeaux.map((c) => c.piece) : []));
@@ -299,12 +299,20 @@ console.log('\n--- Les teintures ---');
   check('quatre teintures, chacune une matière que le jeu sait poser : argent, jade, obsidienne, améthyste',
     egal(teintures.map((id) => PIECES[id].matiere), ['argent', 'jade', 'obsidienne', 'amethyste'])
     && teintures.every((id) => PIECES[id].genre === 'teinture' && Object.prototype.hasOwnProperty.call(TEINTURES, PIECES[id].matiere) && /^#[0-9a-f]{6}$/.test(PIECES[id].pastille)));
-  check('elles se vendent une à une, en Éclats : 300, 600, 600, 900 — et nulle part ailleurs (ni coffre, ni route, ni ligue)',
+  check('elles se vendent une à une, en Éclats : 300, 600, 600, 900 — et nulle part ailleurs (ni coffre, ni ligue)',
     egal(teintures.map((id) => C.atelier[id]), [300, 600, 600, 900]) && egal(Object.keys(C.atelier), teintures) && collection('teintures').source === 'atelier'
-    && !JSON.stringify([S.route, R.ligues]).includes('teinture'));
+    && !JSON.stringify(R.ligues).includes('teinture'));
+  // Les teintures de saison : une par thème, au bout de la voie du Passe, et nulle part ailleurs.
+  const deSaison = DE_SAISON.map((c) => pieceDe(c.id, 'teinture'));
+  check('chaque saison a sa teinture, d’une matière que le jeu sait poser et qu’aucune autre pièce n’utilise',
+    deSaison.every((id) => PIECES[id].genre === 'teinture' && Object.prototype.hasOwnProperty.call(TEINTURES, PIECES[id].matiere) && /^#[0-9a-f]{6}$/.test(PIECES[id].pastille))
+    && new Set([...deSaison, ...teintures].map((id) => PIECES[id].matiere)).size === deSaison.length + teintures.length && Object.keys(TEINTURES).length === deSaison.length + teintures.length);
+  check('… elle ne s’achète ni en Éclats ni en Couronnes : seul le dernier palier de la voie du Passe la donne',
+    deSaison.every((id) => !Object.prototype.hasOwnProperty.call(C.atelier, id)) && S.route.filter((l) => l.passe.piece === 'teinture').length === 1 && S.route[29].passe.piece === 'teinture'
+    && S.route.every((l) => l.gratuit.piece !== 'teinture') && [1, 2, 3].every((n) => recompenseDePalier(n, 'passe', 30).piece === pieceDe(themeDeSaison(n), 'teinture')));
   const images = ['origine', ...Object.keys(TEINTURES)].flatMap((m) => ['atlante', 'solarien'].map((c) => `assets/teintures/${m}-${c}.webp`));
-  check('chaque matière a son image sur le soldat de chaque peuple, et celle des troupes d’origine : dix images, gardées hors ligne',
-    images.length === 10 && images.every((f) => fs.existsSync(path.join(RACINE, f)) && sw.includes(`'./${f}'`)), images.filter((f) => !fs.existsSync(path.join(RACINE, f))).join(', '));
+  check('chaque matière a son image sur le soldat de chaque peuple, et celle des troupes d’origine : seize images, gardées hors ligne',
+    images.length === 16 && images.every((f) => fs.existsSync(path.join(RACINE, f)) && sw.includes(`'./${f}'`)), images.filter((f) => !fs.existsSync(path.join(RACINE, f))).join(', '));
   // Acheter, porter, retirer.
   const riche = { ...profilNeuf(), eclats: 700 };
   const achat = acheterPiece(riche, 'teintures.jade', '2026-10-09');
@@ -372,18 +380,18 @@ console.log('\n--- La route ---');
     route.every((l) => ['embleme', 'piece', 'couronnes', 'eclats'].includes(Object.keys(l.passe)[0])) && !/coffre|fragment|niveau/.test(JSON.stringify(route.map((l) => l.passe))));
   check('la voie gratuite : 8 coffres, 150 Couronnes, 6 autocollants, des Éclats',
     compte('gratuit', 'coffre') === 8 && somme(route.map((l) => l.gratuit.couronnes || 0)) === 150 && compte('gratuit', 'embleme') === 6 && compte('gratuit', 'eclats') === 13);
-  check('la voie du Passe : 12 autocollants, la bannière, le cadre, le grade et l’épithète de la saison, 400 Couronnes, des Éclats',
-    compte('passe', 'embleme') === 12 && egal(route.map((l) => l.passe.piece).filter(Boolean).sort(), ['banniere', 'cadre', 'epithete', 'grade'])
-    && somme(route.map((l) => l.passe.couronnes || 0)) === 400 && compte('passe', 'eclats') === 10);
+  check('la voie du Passe : 12 autocollants, la bannière, le cadre, le grade, l’épithète et la teinture de la saison, 200 Couronnes, des Éclats',
+    compte('passe', 'embleme') === 12 && egal(route.map((l) => l.passe.piece).filter(Boolean).sort(), ['banniere', 'cadre', 'epithete', 'grade', 'teinture'])
+    && somme(route.map((l) => l.passe.couronnes || 0)) === 200 && compte('passe', 'eclats') === 11);
   const rangs = route.flatMap((l) => [l.gratuit.embleme, l.passe.embleme]).filter((x) => x !== undefined).sort((a, b) => a - b);
-  check('les dix-huit autocollants de la saison sont sur la route, chacun une fois ; le dernier palier du Passe donne le plus rare',
-    egal(rangs, [...Array(18).keys()]) && route[29].passe.embleme === 17 && DE_SAISON.every((c) => PIECES[c.emblemes[17]].rarete === 'epique'));
-  check('le Passe : 500 Couronnes, dont 400 reviennent à qui finit la route', S.passe.prix === 500);
+  check('les dix-huit autocollants de la saison sont sur la route, chacun une fois ; les trois épiques aux paliers 15, 22 et 28 du Passe',
+    egal(rangs, [...Array(18).keys()]) && egal([15, 16, 17].map((e) => route.findIndex((l) => l.passe.embleme === e) + 1), [15, 22, 28]) && DE_SAISON.every((c) => [15, 16, 17].every((e) => PIECES[c.emblemes[e]].rarete === 'epique')));
+  check('le Passe : 500 Couronnes, dont 200 reviennent à qui finit la route — il ne se rembourse plus presque en entier', S.passe.prix === 500 && somme(route.map((l) => l.passe.couronnes || 0)) * 2 < S.passe.prix);
   check('toute récompense de la route existe, pour chaque saison, sur les deux voies',
     [1, 2, 3].every((n) => route.every((l, i) => ['gratuit', 'passe'].every((voie) => { const r = recompenseDePalier(n, voie, i + 1); return r && (r.genre !== 'piece' || PIECES[r.piece].collection === themeDeSaison(n)); }))));
   check('… une récompense : un coffre, des Couronnes, des Éclats ou une pièce de la collection de la saison',
     egal(recompenseDePalier(1, 'gratuit', 2), { genre: 'coffre', coffre: 'bois' }) && egal(recompenseDePalier(1, 'gratuit', 3), { genre: 'piece', piece: 'citrouilles.citrouille-casquee' })
-    && egal(recompenseDePalier(2, 'passe', 5), { genre: 'piece', piece: 'tournoi.banniere' }) && egal(recompenseDePalier(1, 'passe', 3), { genre: 'couronnes', couronnes: 100 })
+    && egal(recompenseDePalier(2, 'passe', 5), { genre: 'piece', piece: 'tournoi.banniere' }) && egal(recompenseDePalier(1, 'passe', 11), { genre: 'couronnes', couronnes: 100 })
     && recompenseDePalier(1, 'gratuit', 31) === null && recompenseDePalier(1, 'autre', 1) === null);
 
   // Les points.
@@ -432,12 +440,12 @@ console.log('\n--- La route ---');
   check('… acheté en cours de route, il donne les paliers déjà atteints : trois à prendre', etatDeLaSaison(passe.profil, J).aPrendre === 3
     && etatDeLaSaison(passe.profil, J).route.slice(0, 4).map((l) => l.passe.etat).join() === 'aPrendre,aPrendre,aPrendre,aVenir');
   const pris = prendreTout(passe.profil);
-  check('… un autocollant, 40 Éclats, 100 Couronnes', pris.profil.pieces.includes('citrouilles.araignee-au-hamac') && pris.profil.eclats === 60 && pris.profil.couronnes === 120);
+  check('… un autocollant et deux fois 40 Éclats', pris.profil.pieces.includes('citrouilles.araignee-au-hamac') && pris.profil.eclats === 100 && pris.profil.couronnes === 20, `${pris.profil.eclats} Éclats, ${pris.profil.couronnes} Couronnes`);
   // Toute la route, les deux voies.
   const bout = prendreTout(acheterPasse({ ...enRoute(S.paliers * S.pointsParPalier), couronnes: 500 }).profil);
-  check('la route entière avec le Passe : toute la collection de la saison sauf son étendard et son grade de champion, 550 Couronnes, 660 Éclats, 8 coffres',
-    collection('citrouilles').pieces.filter((id) => !bout.profil.pieces.includes(id)).join() === 'citrouilles.etendard,citrouilles.champion'
-    && bout.profil.couronnes === 550 && bout.profil.eclats === 660 && bout.profil.coffres.length === 8, `${bout.profil.couronnes} Couronnes, ${bout.profil.eclats} Éclats, ${bout.profil.coffres.length} coffres`);
+  check('la route entière avec le Passe : toute la collection de la saison — sa teinture comprise — sauf son étendard et son grade de champion, 350 Couronnes, 700 Éclats, 8 coffres',
+    collection('citrouilles').pieces.filter((id) => !bout.profil.pieces.includes(id)).join() === 'citrouilles.etendard,citrouilles.champion' && bout.profil.pieces.includes('citrouilles.teinture')
+    && bout.profil.couronnes === 350 && bout.profil.eclats === 700 && bout.profil.coffres.length === 8, `${bout.profil.couronnes} Couronnes, ${bout.profil.eclats} Éclats, ${bout.profil.coffres.length} coffres`);
   check('… sans le Passe : 6 autocollants, 150 Couronnes, 260 Éclats, 8 coffres — et aucune pièce de la voie payante',
     (() => { const g = prendreTout(enRoute(S.paliers * S.pointsParPalier)).profil; return g.pieces.filter((id) => PIECES[id].collection === 'citrouilles').length === 6 && g.couronnes === 150 && g.eclats === 260 && g.coffres.length === 8; })());
 }
@@ -486,7 +494,7 @@ console.log('\n--- D’une saison à l’autre ---');
   const revenue = etatDeLaSaison(collectionneur, '2027-01-05');
   check('quand le thème d’une saison revient, chaque pièce déjà possédée est signalée sur la route, avec les Éclats qu’elle rendra',
     revenue.theme === 'citrouilles' && revenue.route.every((l) => ['gratuit', 'passe'].every((v) => (l[v].recompense.genre === 'piece') === l[v].dejaLa && (l[v].dejaLa ? l[v].eclats > 0 : l[v].eclats === 0)))
-    && revenue.route.filter((l) => l.passe.dejaLa).length === 16 && etatDeLaSaison(enRoute(0), '2026-10-09').route.every((l) => !l.gratuit.dejaLa && !l.passe.dejaLa));
+    && revenue.route.filter((l) => l.passe.dejaLa).length === 17 && etatDeLaSaison(enRoute(0), '2026-10-09').route.every((l) => !l.gratuit.dejaLa && !l.passe.dejaLa));
   const redite = finDeSaison({ ...haut.profil, saison: 4, elo: 3200, ligue: 9 });
   check('la même collection, trois saisons plus tard : une pièce déjà gagnée devient des Éclats', parType(redite.evenements, 'piece').some((e) => e.piece === 'citrouilles.etendard' && e.doublon && e.eclats === C.eclats.doublon.epique)
     && redite.profil.eclats === haut.profil.eclats + C.eclats.doublon.epique);
@@ -574,7 +582,10 @@ console.log('\n--- Les écrans ---');
     (page.match(/class="col-palier /g) || []).length === 30 && /class="col-case pris" data-voie="gratuit"/.test(page) && /data-act="palier" data-arg="gratuit" data-i="2"/.test(page)
     && (page.match(/class="col-case ferme" data-voie="passe"/g) || []).length === 30 && propre(page));
   check('… le Passe dit son prix, son équivalent en euros et ce qu’il contient — et ce qu’il ne contient pas',
-    /500 Couronnes, environ 5 €/.test(t.replace(/\u00a0/g, ' ')) && /12 autocollants, 4 pièces de blason/.test(t) && /400 Couronnes et 400 Éclats/.test(t) && /Ni coffre, ni fragment, ni niveau/.test(t));
+    /500 Couronnes, environ 5 €/.test(t.replace(/\u00a0/g, ' ')) && /la teinture de la saison, 12 autocollants, 4 pièces de blason/.test(t) && /200 Couronnes et 440 Éclats/.test(t) && /Ni coffre, ni fragment, ni niveau/.test(t));
+  check('… la vedette de la saison, en tête de l’écran : sa teinture, ce qu’elle est et où elle se gagne',
+    /class="col-vedette "/.test(page) && page.indexOf('col-vedette') < page.indexOf('col-route') && page.indexOf('col-vedette') < page.indexOf('Le Passe de saison')
+    && t.includes(`${PIECES[pieceDe(theme.id, 'teinture')].nom} La vedette de la saison : tes troupes la portent en partie. Au palier 30 du Passe, et nulle part ailleurs.`));
   toucher({ act: 'palier', arg: 'gratuit', i: '2' });
   check('prendre un palier : la récompense arrive, l’écran la nomme', egal(lu().route.pris.gratuit, [1, 2]) && lu().coffres.length === 1 && /Tu reçois : un coffre de bois\./.test(texte(noeud.innerHTML)));
   toucher({ act: 'passe' });
@@ -677,7 +688,7 @@ console.log('\n--- Les écrans ---');
   ouvrirProgression('saison');
   page = noeud.innerHTML; t = texte(page);
   check('une saison dont on a déjà la collection : chaque pièce de la route est dite « Déjà à toi », avec ses Éclats',
-    (page.match(/class="col-deja">Déjà à toi/g) || []).length === 22 && /tu as 16 de ces pièces\. Celles-là te rendront des Éclats à la place/.test(t) && propre(page));
+    (page.match(/class="col-deja">Déjà à toi/g) || []).length === 23 && /tu as 17 de ces pièces\. Celles-là te rendront des Éclats à la place/.test(t) && propre(page));
   poser({ ...profilNeuf(), saison });
   ouvrirProgression('saison');
   check('… et rien de tel quand la collection est neuve', !/Déjà à toi/.test(noeud.innerHTML) && !/déjà passée par ici/.test(noeud.innerHTML));

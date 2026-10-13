@@ -65,6 +65,7 @@ export default {
   "Par les ligues": "From leagues",
   "Route de saison": "Season road",
   "En Éclats": "For Shards",
+  "Offre de bienvenue": "Welcome offer",
   "Saison {0}": "Season {0}",
 
   // --- Une collection ------------------------------------------------------------
@@ -84,6 +85,7 @@ export default {
   "Voir la route": "See the road",
   "Une teinture habille tes troupes d’une autre matière, en partie : l’or et l’acier changent, jamais le tissu de ton camp. Elle ne change rien au combat. Chacune s’achète en Éclats.": "A dye dresses your troops in another material during games: gold and steel change, never your side’s cloth. It changes nothing in combat. Each one is bought with Shards.",
   "Les cadeaux des ligues : ils arrivent à chaque promotion.": "League gifts: they arrive with each promotion.",
+  "Les pièces de l’offre de bienvenue : elles ne viennent de nulle part ailleurs.": "The welcome offer’s pieces: they come from nowhere else.",
   "Et avec elle": "And with it",
   "Ses pièces": "Its pieces",
   "{0} : c’est sur ton blason.": "{0}: it’s on your crest.",
@@ -123,7 +125,9 @@ export default {
   "Passe de saison : à toi.": "Season Pass: yours.",
   "Les deux voies sont ouvertes.": "Both tracks are open.",
   "<b>Le Passe de saison</b> ouvre la voie de droite : {0}.": "<b>The Season Pass</b> opens the right-hand track: {0}.",
-  "{0} autocollants, {1} pièces de blason (bannière, cadre, deux mots de titre), {2} Couronnes et {3} Éclats": "{0} stickers, {1} crest pieces (banner, frame, two title words), {2} Crowns and {3} Shards",
+  "la teinture de la saison, {0} autocollants, {1} pièces de blason (bannière, cadre, deux mots de titre), {2} Couronnes et {3} Éclats": "the season’s dye, {0} stickers, {1} crest pieces (banner, frame, two title words), {2} Crowns and {3} Shards",
+  "La vedette de la saison : elle est à toi. Porte-la depuis ton blason.": "The star of the season: it’s yours. Equip it from your crest.",
+  "La vedette de la saison : tes troupes la portent en partie. Au palier {0} du Passe, et nulle part ailleurs.": "The star of the season: your troops wear it in games. At tier {0} of the Pass, and nowhere else.",
   "Ni coffre, ni fragment, ni niveau.": "No chests, no fragments, no levels.",
   "Cette collection est déjà passée par ici : tu as {0} de ces pièces. Celles-là te rendront des Éclats à la place ({1} en tout).": "This collection has come around before: you have {0} of these pieces. Those will give you Shards instead ({1} in all).",
   "{0} Couronnes{1}.": "{0} Crowns{1}.",
@@ -192,6 +196,7 @@ export default {
   "La Nuit des Citrouilles": "Night of the Pumpkins",
   "Le Grand Tournoi": "The Grand Tournament",
   "Le Grand Froid": "The Big Freeze",
+  "Le Pionnier": "The Pioneer",
 
   // --- Le Départ -----------------------------------------------------------------
   "Villageois": "Villager",
@@ -361,6 +366,7 @@ export default {
   "des Citrouilles": "Pumpkin",
   "Étendard de la Nuit": "Night Pennant",
   "Épouvantail en chef": "Scarecrow-in-Chief",
+  "Teinture de feu follet": "Will-o’-the-Wisp Dye",
 
   // --- Le Grand Tournoi ----------------------------------------------------------
   "Chevalier en pantoufles": "Knight in Slippers",
@@ -387,6 +393,7 @@ export default {
   "du Tournoi": "Tournament",
   "Étendard du Tournoi": "Tournament Pennant",
   "Roi de la joute": "Joust King",
+  "Teinture de pourpre": "Royal Purple Dye",
 
   // --- Le Grand Froid ------------------------------------------------------------
   "Bonhomme de garde": "Snowman-at-Arms",
@@ -413,4 +420,9 @@ export default {
   "du Grand Froid": "Big Freeze",
   "Étendard du Grand Froid": "Big Freeze Pennant",
   "Maître des neiges": "Snow Master",
+  "Teinture de neige": "Snow Dye",
+
+  // --- Le Pionnier (l'offre de bienvenue) ---------------------------------------
+  "Cadre du Pionnier": "Pioneer Frame",
+  "Pionnier": "Pioneer",
 };

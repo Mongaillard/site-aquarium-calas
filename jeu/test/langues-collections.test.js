@@ -165,7 +165,7 @@ console.log('\n--- L’anglais ---');
   check('marqué « en », le jeu parle anglais', m.langue === 'en');
   check('les tables sont traduites : les genres, les collections',
     egal(m.genres, { embleme: 'Sticker', cadre: 'Frame', banniere: 'Banner', grade: 'Title', epithete: 'Title', teinture: 'Dye' })
-    && egal(m.collections, ['The Start', 'The Barnyard', 'The High Tide', 'The Sands', 'The Construction Site', 'War Bloopers', 'The Monsters', 'The Banquet', 'The Court', 'The Leagues', 'The Dyes', 'Night of the Pumpkins', 'The Grand Tournament', 'The Big Freeze']), m.collections.join(', '));
+    && egal(m.collections, ['The Start', 'The Barnyard', 'The High Tide', 'The Sands', 'The Construction Site', 'War Bloopers', 'The Monsters', 'The Banquet', 'The Court', 'The Leagues', 'The Dyes', 'Night of the Pumpkins', 'The Grand Tournament', 'The Big Freeze', 'The Pioneer']), m.collections.join(', '));
   check('… les pièces : un grade, un autocollant, une bannière et un cadre nommés d’après leur collection, une épithète, un étendard, une teinture',
     egal(m.noms, ['Villager', 'Major Blunder', 'Barnyard Banner', 'Barnyard Frame', 'Barnyard', 'Night Pennant', 'Jade Dye', 'Bear Hug', 'Gold Frame']), m.noms.join(', '));
   check('… pas les identifiants, que les sauvegardes contiennent : les pièces, leur genre, leur rareté, leur dessin ; les collections et leur rangement ; le blason de départ',
@@ -187,8 +187,8 @@ console.log('\n--- L’anglais ---');
     /<h2>Album<\/h2>/.test(m.album) && /aria-label="Customize my crest"/.test(m.album) && /Tap to customize your crest/.test(t) && /<span>Shards<\/span> · [\s\S]*<span>Crowns<\/span>/.test(m.album)
     && /\d+ \S+ out of \d+\. Every chest holds at least one sticker; a duplicate turns into Shards, which buy the ones you’re missing\./.test(t) && propre(m.album), t.slice(0, 200));
   check('… la saison en cours d’abord, puis chaque collection et d’où elle vient',
-    /Night of the Pumpkins 0 of 24 · Season 1 The Barnyard 2 of 13 · In chests/.test(t) && /The Court 0 of 13 · In the shop/.test(t) && /The Leagues 2 of 10 · From leagues/.test(t) && /The Dyes 0 of 4 · For Shards/.test(t)
-    && /aria-label="Major Blunder"/.test(m.album) && restes(m.album).length === 0, restes(m.album).join(' | '));
+    /Night of the Pumpkins 0 of 25 · Season 1 The Barnyard 2 of 13 · In chests/.test(t) && /The Court 0 of 13 · In the shop/.test(t) && /The Leagues 2 of 10 · From leagues/.test(t) && /The Dyes 0 of 4 · For Shards/.test(t)
+    && /aria-label="Major Blunder"/.test(m.album) && !/The Pioneer/.test(t) && restes(m.album).length === 0, restes(m.album).join(' | '));
 
   t = texte(m.collection);
   check('la page d’une collection : ce qu’il manque, ce qu’on porte, ce qu’elle donne, les prix',
@@ -212,8 +212,11 @@ console.log('\n--- L’anglais ---');
     /<h2>Season 1<\/h2>/.test(m.saison) && /Night of the Pumpkins 23 days left Tier 2 of 30 · 50 \S+ out of 200 toward the next/.test(t)
     && /A ranked game: 20 points\. A win: 20 more\. The first win of the day: another 40\./.test(t) && propre(m.saison), t.slice(0, 200));
   check('… le Passe : ce qu’il contient, ce qu’il ne contient pas, son prix et son équivalent en euros',
-    /<b>The Season Pass<\/b> opens the right-hand track: 12 stickers, 4 crest pieces \(banner, frame, two title words\), 400 Crowns and 400 Shards\. No chests, no fragments, no levels\./.test(m.saison)
+    /<b>The Season Pass<\/b> opens the right-hand track: the season’s dye, 12 stickers, 4 crest pieces \(banner, frame, two title words\), 200 Crowns and 440 Shards\. No chests, no fragments, no levels\./.test(m.saison)
     && /500 Crowns, about €5\. Bought mid-season, it also gives you the tiers you’ve already reached\./.test(t));
+  check('… la vedette de la saison : sa teinture, et où elle se gagne',
+    /Will-o’-the-Wisp Dye The star of the season: your troops wear it in games\. At tier 30 of the Pass, and nowhere else\./.test(t)
+    && /The star of the season: it’s yours\. Equip it from your crest\./.test(texte(m.finie)) && /<small>Will-o’-the-Wisp Dye<\/small>|Will-o’-the-Wisp Dye/.test(m.saison));
   check('… la route : les deux voies, ce qui est pris, ce qui est à prendre, les récompenses',
     /<b>For everyone<\/b>/.test(m.saison) && /<b>[\s\S]{0,400}?<\/svg> Pass<\/b>/.test(m.saison) && /class="col-pris">Claimed</.test(m.saison) && /data-i="2">Claim</.test(m.saison)
     && /<small>20 Shards<\/small>/.test(m.saison) && /<small>100 Crowns<\/small>/.test(m.saison) && /<small>Title: Gourd Gobbler<\/small>/.test(m.saison) && /<small>Title: Pumpkin …<\/small>/.test(m.saison)
@@ -222,8 +225,8 @@ console.log('\n--- L’anglais ---');
     /^You get: a [^.]+\.$/.test(annonce(m.palier)) && /data-act="passe" data-i="1">Tap again: /.test(m.confirmer) && annonce(m.passe) === 'The Season Pass is yours: the right-hand track is open.'
     && /<b>Season Pass: yours\.<\/b> Both tracks are open\./.test(m.passe) && /Claim all \(2\)/.test(m.passe) && /^You’re \d+ short for the Pass\. Shop$/.test(annonce(m.sansLeSou)), `${annonce(m.palier)} | ${annonce(m.sansLeSou)}`);
   check('une route finie, une collection déjà possédée : l’écran le dit',
-    /Tier 30 of 30: the road is complete/.test(texte(m.finie)) && /This collection has come around before: you have 16 of these pieces\. Those will give you Shards instead \(\s*\d+ in all\)\./.test(texte(m.finie))
-    && (m.finie.match(/class="col-deja">Already yours: /g) || []).length === 22 && restes(m.finie).length === 0);
+    /Tier 30 of 30: the road is complete/.test(texte(m.finie)) && /This collection has come around before: you have 17 of these pieces\. Those will give you Shards instead \(\s*\d+ in all\)\./.test(texte(m.finie))
+    && (m.finie.match(/class="col-deja">Already yours: /g) || []).length === 23 && restes(m.finie).length === 0);
 
   t = texte(m.boutique);
   check('le rayon des collections, à la boutique : le Passe, les autocollants du jour, les teintures, la collection à vendre',

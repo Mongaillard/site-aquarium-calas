@@ -12,6 +12,7 @@ import {
 } from '../js/progression.js';
 import { ouvrirProgression, htmlBandeau, htmlFinDePartie, installerProgression, reglerPeuple, euros, resteEnClair } from '../js/progression-ecrans.js';
 import { PROGRESSION_KEY } from '../js/save.js';
+import { PIECES, COLLECTIONS } from '../js/collections-config.js';
 import { ICONES } from '../js/icones.js';
 
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -155,6 +156,14 @@ console.log('\n--- L’offre de bienvenue ---');
   check('avec la preuve : le Mercenaire, l’Archer monté et 300 Couronnes, et la transaction est retenue',
     prise.profil.debloquees.triton === 'achat' && prise.profil.debloquees.horseArcher === 'achat' && prise.profil.couronnes === 300 && prise.profil.boutique.bienvenuePrise === true
     && egal(prise.profil.boutique.transactions, ['b-1']));
+  // Ce que l'offre a de propre : un cadre et un mot de titre qui ne viennent de nulle part ailleurs.
+  check('… et ses deux pièces à elle : le Cadre du Pionnier et le titre « Pionnier »', egal(B.offres.bienvenue.pieces, ['pionnier.cadre', 'pionnier.grade'])
+    && B.offres.bienvenue.pieces.every((id) => prise.profil.pieces.includes(id) && !premiere.profil.pieces.includes(id))
+    && prise.evenements.filter((e) => e.type === 'piece' && e.origine === 'bienvenue' && !e.doublon).length === 2 && prise.profil.eclats === premiere.profil.eclats);
+  check('… ces pièces ne se gagnent ni ne s’achètent autrement : ni coffre, ni route, ni ligue, ni atelier, ni collection à vendre',
+    B.offres.bienvenue.pieces.every((id) => PIECES[id].collection === 'pionnier' && !Object.prototype.hasOwnProperty.call(R.collections.atelier, id))
+    && !JSON.stringify([R.saisons.route, R.ligues, R.collections.lots, R.coffres]).includes('pionnier') && COLLECTIONS.find((c) => c.id === 'pionnier').source === 'offre');
+  check('… ses 300 Couronnes restent sous le prix du Passe : l’offre ne l’offre pas', B.offres.bienvenue.couronnes < R.saisons.passe.prix);
   check('… une seule fois : la même transaction représentée ne donne rien, une autre non plus',
     prendreOffreDeBienvenue(prise.profil, recu('b-1')).erreur === 'dejaCredite' && prendreOffreDeBienvenue(prise.profil, recu('b-2')).erreur === 'fermee');
   // Ce qui est payé est dû : la fin de l'offre ferme la vitrine, pas la livraison.
@@ -164,8 +173,9 @@ console.log('\n--- L’offre de bienvenue ---');
     !catalogueBoutique(premiere.profil, T0 + 80 * HEURE).offres.some((x) => x.id === 'bienvenue') && tard.profil.couronnes === 300 && tard.profil.debloquees.triton === 'achat'
     && jamaisOuverte.profil.couronnes === 300 && jamaisOuverte.profil.boutique.bienvenuePrise === true);
   const rendue = prendreOffreDeBienvenue(profilNeuf(), recu('b-5', { restauration: true }));
-  check('restaurée (réinstallation, autre appareil) : les troupes reviennent, pas les Couronnes',
+  check('restaurée (réinstallation, autre appareil) : les troupes et les deux pièces reviennent, pas les Couronnes',
     rendue.profil.debloquees.triton === 'achat' && rendue.profil.debloquees.horseArcher === 'achat' && rendue.profil.couronnes === 0 && rendue.profil.boutique.bienvenuePrise === true
+    && B.offres.bienvenue.pieces.every((id) => rendue.profil.pieces.includes(id)) && rendue.profil.eclats === 0
     && !rendue.evenements.some((e) => e.type === 'couronnes') && rendue.profil.journal.at(-1).restauration === true
     && prendreOffreDeBienvenue(rendue.profil, recu('b-5', { restauration: true })).erreur === 'dejaCredite');
 }
@@ -232,7 +242,8 @@ console.log('\n--- L’écran ---');
     /<h2>Boutique<\/h2>/.test(page) && /class="prog-bourse">[\s\S]*250/.test(page) && /class="prog-bourse-eclats"/.test(page)
     && ['Offres du moment', 'Autocollants du jour', 'Collections', 'Troupes', 'Couronnes'].every((titre) => page.includes(`<h3>${titre}</h3>`)) && !page.includes('<h3>Apparence</h3>'));
   check('l’offre de ligue : la troupe, son prix barré, ce qu’il reste', /Offre de ligue : Archer monté à moitié prix/.test(t) && /100 au lieu de 200 · encore 30 h/.test(t));
-  check('l’offre de bienvenue : son contenu, son prix, « Bientôt »', /Offre de bienvenue : Archer monté \+ 300 Couronnes/.test(t) && /2,99 €, une seule fois · encore 2 j/.test(t) && /<button class="btn small" disabled>Bientôt<\/button>/.test(page));
+  check('l’offre de bienvenue : son contenu — ses deux pièces d’abord —, son prix, « Bientôt »', /Offre de bienvenue : Cadre du Pionnier \+ titre « Pionnier » \+ Archer monté \+ 300 Couronnes/.test(t.replace(/\u00a0/g, ' '))
+    && /Le cadre et le titre ne viennent que d’ici/.test(t) && /2,99 €, une seule fois · encore 2 j/.test(t) && /<button class="btn small" disabled>Bientôt<\/button>/.test(page));
   check('les noms sont ceux du peuple du joueur : le Sphinx, pas l’Hydre', t.includes('Sphinx') && !/Hydre(?! aux trois glaces| fantôme)/.test(t) && t.includes('Mercenaire atlante'));
   check('une troupe déjà gagnée est dite « Débloquée », sans bouton', /Mercenaire atlante<\/b>\s*<small>Déjà à toi\.<\/small>\s*<\/span>\s*<span class="prog-acquis">Débloquée<\/span>/.test(page));
   check('les lots montrent leur prix en euros, pas encore achetables', B.lots.every((l) => page.includes(`<button class="btn small" disabled>${euros(l.prixCentimes)}</button>`)) && /arrivera avec l’application/.test(t));

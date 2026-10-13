@@ -71,6 +71,12 @@ export const TEINTURES = Object.freeze({
   jade: { vers: 150, sat: 0.72, lum: 0.9 },
   obsidienne: { vers: 278, sat: 0.22, lum: 0.44 },
   amethyste: { vers: 280, sat: 0.8, lum: 0.92 },
+  // Les teintures de saison : une par thème, au bout de la voie du Passe (js/progression-config.js,
+  // saisons.route) — la pièce de la saison qui se voit à chaque partie. Choisies loin du bleu et du rouge
+  // des camps, et loin des quatre de l'atelier : un vert de feu follet, un pourpre sombre, un blanc de neige.
+  feuFollet: { vers: 96, sat: 0.9, lum: 1 },
+  pourpre: { vers: 298, sat: 1, lum: 0.52 },
+  neige: { vers: 60, sat: 0.04, lum: 1.6 },
 });
 
 /** Ce que chaque teinture fait de l'acier : sa teinte, sa saturation (posée, l'acier n'en a pas), sa clarté. L'argent le laisse tel quel. */
@@ -78,6 +84,9 @@ const SUR_L_ACIER = Object.freeze({
   jade: { vers: 150, sat: 0.4, lum: 0.9 },
   obsidienne: { vers: 278, sat: 0.2, lum: 0.46 },
   amethyste: { vers: 280, sat: 0.46, lum: 0.9 },
+  feuFollet: { vers: 96, sat: 0.5, lum: 0.95 },
+  pourpre: { vers: 298, sat: 0.65, lum: 0.56 },
+  neige: { vers: 60, sat: 0.02, lum: 1.32 },
 });
 
 /** Ce qu'une teinture fait de l'acier de ce modèle : `{ vers, sat, lum, satMax, fondu, lumMin, lumMax }`, ou null. */

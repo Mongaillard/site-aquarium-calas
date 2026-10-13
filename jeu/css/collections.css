@@ -316,6 +316,14 @@
 #progression .col-saison-texte { position: relative; display: grid; gap: 1px; padding: 6px 12px 7px; border: 3px solid var(--b-encre); border-radius: 12px; background: var(--b-papier); }
 #progression .col-saison-texte b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 22px; line-height: 1.08; }
 #progression .col-saison-texte small { font-size: 13px; font-weight: 800; color: var(--b-gris); }
+/* La vedette de la saison : sa teinture, en tête de la route — ce que le Passe a de propre. */
+#progression .col-vedette { display: flex; align-items: center; gap: 12px; margin: 12px 0 14px; padding: 8px 12px; color: var(--b-encre); background: var(--b-blanc); border: 3px solid var(--b-encre); border-radius: 14px; box-shadow: 0 4px 0 var(--b-encre); }
+#progression .col-vedette.a-moi { background: var(--b-jaune); }
+#progression .col-vedette .piece-vignette { flex: none; width: 64px; }
+#progression .col-vedette p { display: grid; gap: 2px; margin: 0; }
+#progression .col-vedette b { font-family: var(--b-titres); font-weight: 900; font-synthesis: none; font-size: 18px; line-height: 1.1; }
+#progression .col-vedette small { font-size: 13px; font-weight: 700; line-height: 1.35; color: var(--b-gris); }
+#progression .col-vedette.a-moi small { color: var(--b-encre); }
 #progression .col-passe { margin: 12px 0; padding: 10px 12px; border: 3px solid var(--b-encre); border-radius: 14px; background: var(--b-sable); font-size: 14px; font-weight: 700; line-height: 1.4; }
 #progression .col-passe p { margin: 0; }
 #progression .col-passe .modal-actions { margin: 8px 0 6px; }

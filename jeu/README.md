@@ -829,7 +829,11 @@ entière, les autocollants du jour (voir « Collections, blason et saisons »).
 rebours) : l'**offre de ligue** — à chaque ligue atteinte pour la première
 fois, la troupe de la ligue suivante à moitié prix pendant 48 h, en Couronnes —
 et l'**offre de bienvenue** — une seule fois, 72 h après la première partie
-comptée : le Mercenaire, l'Archer monté et 300 Couronnes pour 2,99 €. Chaque
+comptée : le Cadre du Pionnier et le titre « Pionnier », le Mercenaire,
+l'Archer monté et 300 Couronnes pour 2,99 €. Le cadre et le titre sont la seule
+chose du jeu qui ne se gagne pas en jouant : de l'apparence, à contenu fixe et
+affiché, qu'on ne retrouve dans aucun coffre ni à aucun autre rayon (un achat
+restauré les rend ; une pièce déjà là n'est pas changée en Éclats). Chaque
 nouvelle ligue offre aussi 50 Couronnes.
 
 **Ce qui attend l'application** : tout ce qui se paie en argent réel (lots,
@@ -855,11 +859,22 @@ Basse-cour, La Grande Marée, Les Sables, Le Chantier, Les Gaffes de guerre, Les
 Monstres, Le Banquet, La Cour, et une par saison. Chacune a neuf
 **autocollants** dessinés (cinq communs, trois rares, un épique ; dix-huit pour
 une saison), et à ses couleurs un **grade**, une **épithète**, une **bannière**
-et un **cadre**. Avec les quatre teintures des troupes, 193 pièces en tout. Ce qu'on porte fait le **blason** : le
-cadre, l'autocollant posé dessus, la bannière en fond, et un titre en deux mots
-qui se mélangent d'une collection à l'autre (« Dompteur du Banquet »). Le
-blason se voit à l'accueil et à la fin d'une partie classée ; il ne change rien
-au combat (aucune pièce n'entre dans `js/game.js`).
+et un **cadre**. Avec les quatre teintures de l'atelier, celle de chaque
+saison et les deux pièces de l'offre de bienvenue, 198 pièces en tout. Ce qu'on
+porte fait le **blason** : le cadre, l'autocollant posé dessus, la bannière en
+fond, et un titre en deux mots qui se mélangent d'une collection à l'autre
+(« Dompteur du Banquet »). Le blason se voit à l'accueil, à la fin d'une partie
+classée et à la fin d'un scénario ; il ne change rien au combat (aucune pièce
+n'entre dans `js/game.js`).
+
+**Ce qu'on porte se voit en partie.** La bannière du blason est plantée au sol,
+à l'angle sud-est du bâtiment principal du joueur (`dessinerEtendard`,
+`js/render.js` ; `banniereDe`, `js/collections-config.js`) : une hampe, une
+toile à deux pointes aux couleurs et au motif de la bannière, cernée d'encre
+comme les troupes. Elle suit le bâtiment principal — pas de bâtiment achevé,
+pas d'étendard — et la teinture, elle, se voit sur les troupes. C'est le joueur
+qui les voit, sur son écran : rien n'en passe par les règles. Tests :
+`node test/etendard.test.js`.
 
 | D'où vient une pièce | Règle |
 |---|---|
@@ -870,9 +885,12 @@ au combat (aucune pièce n'entre dans `js/game.js`).
 | La boutique | La Cour, vendue entière : ses treize pièces pour 300 Couronnes, contenu affiché avant l'achat |
 | La saison | Sa route, ci-dessous |
 | L'atelier | Les quatre teintures des troupes, une à une : 300, 600, 600 ou 900 Éclats |
+| L'offre de bienvenue | Le Cadre du Pionnier et le titre « Pionnier » (collection « Le Pionnier », `source: 'offre'`) : ils viennent avec l'offre, et de nulle part ailleurs — ni Éclats, ni Couronnes, ni coffre, ni palier. La collection ne se montre dans l'Album qu'à qui l'a |
 
 **Les teintures** (`js/teintures.js`) habillent les troupes du joueur d'une
-autre matière : argent, jade, obsidienne, améthyste. L'or des armures change —
+autre matière : argent, jade, obsidienne, améthyste à l'atelier, et une par
+saison — feu follet (octobre), pourpre (novembre), neige (décembre) —, qui ne
+vient que du dernier palier de la voie du Passe. L'or des armures change —
 et l'acier, pour les troupes en armure de plates (Milicien, Champion,
 Cavalier) ; la peau, le pelage d'une monture, le bois, le lin blanc et le
 trait d'encre restent ce qu'ils sont, et **le tissu à la couleur du camp ne
@@ -888,7 +906,11 @@ la dessine plus, comme la copie de l'autre camp (`variantesEquipe`,
 matière : une entrée dans `TEINTURES` (éviter les teintes de 170 à 260°, celles
 des camps alliés, et les rouges et orangés des camps adverses), une pièce dans
 la collection « Les Teintures », son prix dans `collections.atelier`, et ses
-deux images dans `assets/teintures`.
+deux images dans `assets/teintures` (une teinture de saison : le champ
+`teinture` de sa collection, sans prix). Les deux vignettes d'une matière se
+refont à partir de celles d'origine :
+`python3 outils/vignettes-teintures.py <matière>` (`--planche image.jpg` pour
+comparer avant de garder).
 
 **Une saison par mois de calendrier** (`saisons`, `js/progression-config.js` ;
 la saison 1 est octobre 2026 : La Nuit des Citrouilles, puis Le Grand Tournoi
@@ -898,10 +920,17 @@ points, un palier s'ouvre, trente en tout, sur deux voies. La **voie gratuite**
 donne 8 coffres, 150 Couronnes, 6 autocollants de la saison et des Éclats. La
 **voie du Passe** (500 Couronnes, environ 5 €, pour la saison en cours) donne
 les 12 autres autocollants, la bannière, le cadre et les deux mots de titre de
-la saison, 400 Couronnes et des Éclats. **Elle ne contient ni coffre, ni
-fragment, ni niveau** : un Passe payant qui contient des coffres reviendrait à
-vendre des coffres — un test le vérifie sur chaque palier. Acheté en cours de
-saison, le Passe donne aussi les paliers déjà atteints.
+la saison, 200 Couronnes, 440 Éclats — et, au trentième palier, **la teinture
+de la saison**, sa vedette : la seule pièce de la route qu'on voit à chaque
+partie, sur ses troupes, et qui ne se gagne nulle part ailleurs. L'écran de la
+saison la montre en tête (`htmlVedette`, `js/collections-ecrans.js`). Jusqu'au
+13 octobre 2026 le Passe rendait 400 Couronnes sur 500 : il se remboursait
+presque seul, et rien de ce qu'il donnait n'était hors de portée d'un joueur
+patient. Il en rend 200 et porte désormais quelque chose à lui. **Il ne
+contient ni coffre, ni fragment, ni niveau** : un Passe payant qui contient des
+coffres reviendrait à vendre des coffres — un test le vérifie sur chaque
+palier. Acheté en cours de saison, le Passe donne aussi les paliers déjà
+atteints.
 
 Quand le mois tourne (`ouvrirLaSaison`, à l'ouverture de l'écran de la saison
 ou à la partie classée suivante), la saison se clôt une seule fois, quel que

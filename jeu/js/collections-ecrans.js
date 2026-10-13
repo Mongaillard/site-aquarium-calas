@@ -62,7 +62,7 @@ export function enEuros(couronnes, avant = ', ', apres = '') {
   return EN_MAGASIN && !R.boutique.argentReel ? '' : `${avant}${environ(couronnes)}${apres}`;
 }
 
-const SOURCES = { coffres: txt('Dans les coffres'), boutique: txt('À la boutique'), ligues: txt('Par les ligues'), saison: txt('Route de saison'), atelier: txt('En Éclats') };
+const SOURCES = { coffres: txt('Dans les coffres'), boutique: txt('À la boutique'), ligues: txt('Par les ligues'), saison: txt('Route de saison'), atelier: txt('En Éclats'), offre: txt('Offre de bienvenue') };
 /** Les genres de pièces qui s'accordent au féminin : « la Bannière », « Portée ». */
 const FEMININS = ['banniere', 'teinture'];
 /** La rareté d'un autocollant : « Commun », « Rare », « Épique ». */
@@ -87,7 +87,9 @@ export function pieceEnEtiquette(id) {
 
 /** Les collections que l'album montre à ce profil : celle de la saison en cours, celles des coffres, de la boutique et des ligues — et une saison passée dont on garde des pièces. */
 function collectionsVisibles(profil, saison) {
+  // (Une collection venue d'une offre ne se montre qu'à qui la possède : l'album ne fait pas la réclame d'un achat.)
   const visibles = COLLECTIONS.filter((c) => c.source !== 'depart'
+    && (c.source !== 'offre' || c.pieces.some((id) => possede(profil, id)))
     && (c.source !== 'saison' || c.id === saison.theme || c.pieces.some((id) => possede(profil, id))));
   // (La saison en cours d'abord.)
   return visibles.sort((a, b) => (b.id === saison.theme) - (a.id === saison.theme));
@@ -188,6 +190,8 @@ function ecranCollection(id, profil, message = '', { confirmer = '' } = {}) {
       if (c.id === saison.theme) chapeau += `</p><div class="modal-actions"><button class="btn primary" data-ecran="saison">${iconeSVG('saison', 16, 'inline')} ${txt('Voir la route')}</button></div><p class="col-vide">`;
     } else if (c.source === 'atelier') {
       chapeau = txt('Une teinture habille tes troupes d’une autre matière, en partie : l’or et l’acier changent, jamais le tissu de ton camp. Elle ne change rien au combat. Chacune s’achète en Éclats.');
+    } else if (c.source === 'offre') {
+      chapeau = txt('Les pièces de l’offre de bienvenue : elles ne viennent de nulle part ailleurs.');
     } else {
       chapeau = txt('Les cadeaux des ligues : ils arrivent à chaque promotion.');
     }
@@ -255,7 +259,25 @@ function contenuDuPasse() {
     else if (r.couronnes) compte.couronnes += r.couronnes;
     else if (r.eclats) compte.eclats += r.eclats;
   }
-  return txt`${compte.embleme} autocollants, ${compte.autres} pièces de blason (bannière, cadre, deux mots de titre), ${o.nombre(compte.couronnes)} Couronnes et ${o.nombre(compte.eclats)} Éclats`;
+  // (La teinture de la saison se dit à part : c'est la vedette — voir htmlVedette.)
+  return txt`la teinture de la saison, ${compte.embleme} autocollants, ${compte.autres - 1} pièces de blason (bannière, cadre, deux mots de titre), ${o.nombre(compte.couronnes)} Couronnes et ${o.nombre(compte.eclats)} Éclats`;
+}
+
+/**
+ * La vedette de la saison : sa teinture, au dernier palier de la voie du Passe — la pièce qu'on voit à chaque
+ * partie, sur ses troupes. Montrée en tête de l'écran de la saison, avec ce qu'elle est et où elle se gagne.
+ */
+function htmlVedette(profil, theme) {
+  const id = pieceDe(theme.id, 'teinture');
+  const palier = R.saisons.route.findIndex((l) => l.passe.piece === 'teinture') + 1;
+  if (!id || !palier) return '';
+  const aMoi = possede(profil, id);
+  return `
+    <div class="col-vedette ${aMoi ? 'a-moi' : ''}">
+      ${htmlPiece(id)}
+      <p><b>${PIECES[id].nom}</b>
+        <small>${aMoi ? txt('La vedette de la saison : elle est à toi. Porte-la depuis ton blason.') : txt`La vedette de la saison : tes troupes la portent en partie. Au palier ${palier} du Passe, et nulle part ailleurs.`}</small></p>
+    </div>`;
 }
 
 function celluleDePalier(voie, palier, c) {
@@ -309,6 +331,7 @@ function ecranSaison(profil, message = '', { confirmer = false } = {}) {
       <small>${s.palier >= s.paliers ? txt`Palier ${s.palier} sur ${s.paliers} : la route est finie` : txt`Palier ${s.palier} sur ${s.paliers} · ${o.pluriel(s.versLeSuivant, 'point')} sur ${s.parPalier} vers le suivant`}</small>
     </div>
     ${message ? `<p class="prog-annonce">${message}</p>` : ''}
+    ${htmlVedette(profil, theme)}
     <p class="subtitle">${txt`Une partie classée : ${p.partie} points. Une victoire : ${p.victoire} de plus. La première victoire du jour : encore ${p.premiereVictoireDuJour}.`}</p>
     ${s.aPrendre > 1 ? `<div class="modal-actions"><button class="btn primary prog-attend" data-act="toutPrendre">${txt`Tout prendre (${s.aPrendre})`}</button></div>` : ''}
     ${passe}

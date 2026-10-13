@@ -471,7 +471,9 @@ export const PROGRESSION = figer(traduire({
     ],
     toutesLesTroupes: { part: 70, arrondi: 50, minimum: 2 },
     offres: {
-      bienvenue: { produit: 'offre.bienvenue', prixCentimes: 299, troupes: ['triton', 'horseArcher'], couronnes: 300, heures: 72 },
+      // (`pieces` : ce que seule cette offre donne — js/collections-config.js, collection « pionnier ».
+      // Ses 300 Couronnes restent sous le prix du Passe : l'offre ne l'offre pas.)
+      bienvenue: { produit: 'offre.bienvenue', prixCentimes: 299, troupes: ['triton', 'horseArcher'], couronnes: 300, pieces: ['pionnier.cadre', 'pionnier.grade'], heures: 72 },
       ligue: { part: 50, heures: 48 },
     },
   },
@@ -546,6 +548,14 @@ export const PROGRESSION = figer(traduire({
   // et des Éclats (qui n'achètent que de l'apparence). Jamais un coffre,
   // jamais un fragment, jamais un niveau : un Passe payant qui contient des
   // coffres revient à vendre des coffres. Les essais le vérifient.
+  //
+  // CE QUE LE PASSE A DE PROPRE (état des lieux du 12/10/2026) : sa voie se
+  // termine par la TEINTURE de la saison (`piece: 'teinture'`), qui se voit à
+  // chaque partie et ne vient de nulle part ailleurs. Elle rend 200 Couronnes
+  // (aux paliers 11 et 26), plus 400 : à 400 pour 500 payées, le Passe ne se
+  // payait qu'une fois par joueur. Et ses trois autocollants épiques (15, 16,
+  // 17) sont aux paliers 15, 22 et 28 : qui joue une partie par jour en touche
+  // un, au lieu de s'arrêter avant le premier.
   saisons: {
     premiere: '2026-10',
     themes: ['citrouilles', 'tournoi', 'froid'],
@@ -562,7 +572,7 @@ export const PROGRESSION = figer(traduire({
     route: [
       { gratuit: { eclats: 20 }, passe: { embleme: 6 } },
       { gratuit: { coffre: 'bois' }, passe: { eclats: 40 } },
-      { gratuit: { embleme: 0 }, passe: { couronnes: 100 } },
+      { gratuit: { embleme: 0 }, passe: { eclats: 40 } },
       { gratuit: { eclats: 20 }, passe: { embleme: 7 } },
       { gratuit: { coffre: 'argent' }, passe: { piece: 'banniere' } },
       { gratuit: { couronnes: 50 }, passe: { eclats: 40 } },
@@ -574,22 +584,22 @@ export const PROGRESSION = figer(traduire({
       { gratuit: { embleme: 2 }, passe: { embleme: 10 } },
       { gratuit: { eclats: 20 }, passe: { eclats: 40 } },
       { gratuit: { coffre: 'or' }, passe: { embleme: 11 } },
-      { gratuit: { couronnes: 50 }, passe: { piece: 'epithete' } },
-      { gratuit: { embleme: 3 }, passe: { eclats: 40 } },
+      { gratuit: { couronnes: 50 }, passe: { embleme: 15 } },
+      { gratuit: { embleme: 3 }, passe: { piece: 'epithete' } },
       { gratuit: { eclats: 20 }, passe: { embleme: 12 } },
-      { gratuit: { coffre: 'argent' }, passe: { couronnes: 100 } },
+      { gratuit: { coffre: 'argent' }, passe: { eclats: 40 } },
       { gratuit: { eclats: 20 }, passe: { embleme: 13 } },
       { gratuit: { eclats: 20 }, passe: { piece: 'cadre' } },
       { gratuit: { embleme: 4 }, passe: { eclats: 40 } },
-      { gratuit: { eclats: 20 }, passe: { embleme: 14 } },
-      { gratuit: { coffre: 'or' }, passe: { eclats: 40 } },
-      { gratuit: { couronnes: 50 }, passe: { embleme: 15 } },
+      { gratuit: { eclats: 20 }, passe: { embleme: 16 } },
+      { gratuit: { coffre: 'or' }, passe: { embleme: 14 } },
+      { gratuit: { couronnes: 50 }, passe: { eclats: 40 } },
       { gratuit: { embleme: 5 }, passe: { eclats: 40 } },
       { gratuit: { eclats: 20 }, passe: { couronnes: 100 } },
-      { gratuit: { coffre: 'or' }, passe: { embleme: 16 } },
+      { gratuit: { coffre: 'or' }, passe: { eclats: 40 } },
+      { gratuit: { eclats: 20 }, passe: { embleme: 17 } },
       { gratuit: { eclats: 20 }, passe: { eclats: 40 } },
-      { gratuit: { eclats: 20 }, passe: { eclats: 40 } },
-      { gratuit: { coffre: 'legendaire' }, passe: { embleme: 17 } },
+      { gratuit: { coffre: 'legendaire' }, passe: { piece: 'teinture' } },
     ],
   },
 }));

@@ -18,7 +18,7 @@ import { appliquerResultat, reglagesDePartie, issueDePartie, formatConseille, de
 import { scenarioDe, optionsDeScenario, etoilesDe, consigneDe } from './scenarios.js';
 import { htmlFinDeScenario, titreDeScenario } from './defis-ecrans.js';
 import { hoteDesRappels, lireReglages as lireRappels, ecrireReglages as ecrireRappels, fautIlDemander, quitterLeJeu, revenirAuJeu, SORTES as SORTES_DE_RAPPELS } from './rappels.js';
-import { matiereDe } from './collections-config.js';
+import { matiereDe, banniereDe } from './collections-config.js';
 import { EN_MAGASIN, NOM_DU_JEU, nomComplet } from './edition.js';
 import { guichetParDefaut } from './achats.js';
 import { txt, accord, traduireLaPage } from './langue.js';
@@ -170,6 +170,8 @@ class Game {
     this.renderer = new Renderer(this.canvas, this.world, this.camera);
     // La teinture que le joueur a choisie pour ses troupes (js/teintures.js) : de l'apparence, lue au lancement.
     this.renderer.teinture = matiereDe(lireProgression().blason);
+    // … et sa bannière, plantée au sol près de son bâtiment principal : ce qu'il porte se voit en partie.
+    this.renderer.etendard = banniereDe(lireProgression().blason);
     // Les gestes des ouvriers à l'écran s'entendent : la hache au bois, la pioche à l'or, la cueillette, le marteau au chantier.
     const GESTES = { wood: 'chop', gold: 'mine', food: 'pick', build: 'hammer' };
     this.renderer.surGeste = (quoi) => { if (GESTES[quoi]) audio.play(GESTES[quoi]); };
@@ -606,7 +608,7 @@ class Game {
       etoiles: etoilesDe(def, bilan), record, sens: def.record === 'temps' ? 'bas' : 'haut',
     });
     ecrireProgression(r.profil);
-    return htmlFinDeScenario(def, bilan, r.evenements);
+    return htmlFinDeScenario(def, bilan, r.evenements, r.profil);
   }
 
   pruneSelection() {

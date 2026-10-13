@@ -201,7 +201,7 @@ console.log('\n--- L’anglais ---');
     v.villager.texte.slice(-220));
   check('la boutique : les bourses, l’offre de ligue, les troupes, les lots et leurs prix',
     v.boutique.titre === 'Shop' && /^Shop 250 Crowns 145 Shards /.test(v.boutique.texte) && v.boutique.texte.includes('League offer: Catapult at half price 100 instead of 200 · 30 h left')
-    && /Welcome offer: 300 Crowns €2\.99, one time only · \d d left Soon/.test(v.boutique.texte) && v.boutique.texte.includes('Horse Archer Already yours. Unlocked') && v.boutique.texte.includes('Otherwise free in Silver League')
+    && /Welcome offer: Pioneer Frame \+ title “Pioneer” \+ 300 Crowns The frame and the title come only from here: neither Crowns nor Shards can buy them\. €2\.99, one time only · \d d left Soon/.test(v.boutique.texte) && v.boutique.texte.includes('Horse Archer Already yours. Unlocked') && v.boutique.texte.includes('Otherwise free in Silver League')
     && /All troops \(5\) instead of 1,400/.test(v.boutique.texte) && v.boutique.texte.includes('Handful: 100 Crowns The first pack €0.99 Pouch: 550 Crowns 10% more than the first pack €4.99')
     && v.boutique.texte.includes('Trial wallet: +500 Crowns') && v.boutique.texte.includes('Nothing random is sold here: no chests, no fragments, no levels.') && v.boutique.etiquettes.includes('View details: Hydra'),
     v.boutique.texte.slice(0, 160));

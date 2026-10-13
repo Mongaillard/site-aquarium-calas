@@ -1,5 +1,5 @@
 // Service worker : le jeu reste jouable hors ligne une fois chargé.
-const CACHE = 'age-empires-mobile-v84';
+const CACHE = 'age-empires-mobile-v85';
 // La musique (js/musique.js) : trois morceaux lourds. Ils ne sont pas pris à
 // l'installation mais à la première écoute, et gardés à part, comme les unités
 // en 3D : une mise à jour du jeu ne les fait pas retélécharger.
@@ -230,6 +230,12 @@ const ASSETS = [
   './assets/teintures/obsidienne-solarien.webp',
   './assets/teintures/amethyste-atlante.webp',
   './assets/teintures/amethyste-solarien.webp',
+  './assets/teintures/feuFollet-atlante.webp',
+  './assets/teintures/feuFollet-solarien.webp',
+  './assets/teintures/pourpre-atlante.webp',
+  './assets/teintures/pourpre-solarien.webp',
+  './assets/teintures/neige-atlante.webp',
+  './assets/teintures/neige-solarien.webp',
   './assets/sons/clic-1.mp4',
   './assets/sons/clic-2.mp4',
   './assets/sons/selection-1.mp4',
